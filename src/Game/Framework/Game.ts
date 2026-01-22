@@ -1,14 +1,16 @@
-import '../style.css';
-import { Engine } from './Engine';
-import { Environment } from './Environment';
-import { Player } from '../entities/Player';
-import { CombatSystem } from '../systems/CombatSystem';
+import '../../style.css';
+import { Engine } from '../../Engine/Core/Engine';
+import { Environment } from '../../Actors/Props/Environment';
+import { Player } from '../../Actors/Player/Player';
+import { CombatSystem } from '../../Systems/Combat/CombatSystem';
+import { HUD } from '../UI/HUD';
 
 export class Game {
   private engine: Engine;
   private player: Player | null = null;
   private environment: Environment | null = null;
   private combatSystem: CombatSystem;
+  private hud: HUD;
 
   private score = 0;
   private hasStarted = false;
@@ -17,6 +19,7 @@ export class Game {
   constructor() {
     this.engine = new Engine('game-container', this.update.bind(this));
     this.combatSystem = new CombatSystem();
+    this.hud = new HUD();
     this.initEvents();
   }
 
@@ -46,7 +49,7 @@ export class Game {
     this.environment = new Environment(this.engine.sceneManager.worldScene);
     this.player = new Player(this.engine.sceneManager);
 
-    this.engine.uiManager.setGameStarted(true);
+    this.hud.setGameStarted(true);
     this.updateAmmoUI();
     
     this.hasStarted = true;
@@ -62,11 +65,11 @@ export class Game {
     const isLocked = document.pointerLockElement === this.engine.renderer.domElement;
     
     if (isLocked) {
-      this.engine.uiManager.setPaused(false);
+      this.hud.setPaused(false);
       this.isPaused = false;
     } else {
       if (this.hasStarted) {
-        this.engine.uiManager.setPaused(true);
+        this.hud.setPaused(true);
         this.isPaused = true;
       }
     }
@@ -100,10 +103,8 @@ export class Game {
       
       const hitTarget = this.combatSystem.checkHit(this.player.getCamera(), this.environment.getTargets());
       if (hitTarget) {
-        // hitTarget.hit() does not return points directly anymore in this implementation, 
-        // we can add it back or hardcode for now.
         this.score += 10;
-        this.engine.uiManager.updateScore(this.score);
+        this.hud.updateScore(this.score);
         hitTarget.hit();
       }
     }
@@ -112,9 +113,9 @@ export class Game {
   private handleReload(): void {
     if (!this.player) return;
 
-    this.engine.uiManager.setReloading(true);
+    this.hud.setReloading(true);
     this.player.reload(() => {
-      this.engine.uiManager.setReloading(false);
+      this.hud.setReloading(false);
       this.updateAmmoUI();
     });
   }
@@ -122,7 +123,7 @@ export class Game {
   private updateAmmoUI(): void {
     if (!this.player) return;
     const weapon = this.player.getWeapon();
-    this.engine.uiManager.updateAmmo(weapon.currentAmmo, weapon.totalAmmo);
+    this.hud.updateAmmo(weapon.currentAmmo, weapon.totalAmmo);
   }
 
   private update(delta: number): void {

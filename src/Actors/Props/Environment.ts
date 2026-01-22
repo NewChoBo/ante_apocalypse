@@ -1,6 +1,17 @@
 import * as THREE from 'three';
-import { Target } from '../entities/Target';
-import { StaticEntity } from '../entities/types/StaticEntity';
+import { Target } from './Target';
+import { BaseEntity } from '../Base/BaseEntity';
+
+class StaticEntity extends BaseEntity {
+  constructor(scene: THREE.Scene, geometry: THREE.BufferGeometry, material: THREE.Material) {
+    super(scene);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.receiveShadow = true;
+    this.mesh.add(mesh);
+  }
+
+  public update(_delta: number): void {}
+}
 
 export class Environment {
   private scene: THREE.Scene;
@@ -14,14 +25,12 @@ export class Environment {
   }
 
   private createGround(): void {
-    // Grass
     const grassGeo = new THREE.PlaneGeometry(100, 100);
     const grassMat = new THREE.MeshStandardMaterial({ color: 0x2d5e1e });
     const grass = new StaticEntity(this.scene, grassGeo, grassMat);
     grass.mesh.rotation.x = -Math.PI / 2;
     grass.mesh.receiveShadow = true;
 
-    // Grid
     const grid = new THREE.GridHelper(100, 50, 0x000000, 0x000000);
     (grid.material as THREE.Material).opacity = 0.2;
     (grid.material as THREE.Material).transparent = true;

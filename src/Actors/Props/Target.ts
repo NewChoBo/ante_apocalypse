@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BaseEntity } from './BaseEntity';
+import { BaseEntity } from '../Base/BaseEntity';
 
 export class Target extends BaseEntity {
   public id: number;

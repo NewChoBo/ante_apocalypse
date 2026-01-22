@@ -1,4 +1,4 @@
-export class UIManager {
+export class HUD {
   private scoreElement: HTMLElement | null;
   private currentAmmoElement: HTMLElement | null;
   private totalAmmoElement: HTMLElement | null;
@@ -27,23 +27,15 @@ export class UIManager {
   }
 
   public setReloading(isReloading: boolean): void {
-    if (this.reloadMessageElement) {
-      this.reloadMessageElement.style.display = isReloading ? 'block' : 'none';
-    }
+    if (this.reloadMessageElement) this.reloadMessageElement.style.display = isReloading ? 'block' : 'none';
   }
 
   public setPaused(isPaused: boolean): void {
-    if (this.pauseOverlay) {
-      this.pauseOverlay.style.display = isPaused ? 'flex' : 'none';
-    }
+    if (this.pauseOverlay) this.pauseOverlay.style.display = isPaused ? 'flex' : 'none';
   }
 
   public setGameStarted(started: boolean): void {
-    if (this.startOverlay) {
-      this.startOverlay.style.display = started ? 'none' : 'flex';
-    }
-    if (this.hudElement) {
-      this.hudElement.style.display = started ? 'block' : 'none';
-    }
+    if (this.startOverlay) this.startOverlay.style.display = started ? 'none' : 'flex';
+    if (this.hudElement) this.hudElement.style.display = started ? 'block' : 'none';
   }
 }

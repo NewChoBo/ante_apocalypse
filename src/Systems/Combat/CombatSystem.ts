@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Target } from '../entities/Target';
+import { Target } from '../../Actors/Props/Target';
 
 export class CombatSystem {
   private raycaster = new THREE.Raycaster();

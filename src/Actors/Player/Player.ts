@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { Pistol } from '../weapons/Pistol';
-import { InputManager } from '../core/managers/InputManager';
-import { SceneManager } from '../core/managers/SceneManager';
+import { Pistol } from '../../Items/Weapons/Pistol';
+import { InputManager } from '../../Engine/Input/InputManager';
+import { SceneManager } from '../../Engine/Scene/SceneManager';
 
 export class Player {
   private camera: THREE.PerspectiveCamera;
@@ -18,6 +18,11 @@ export class Player {
 
   private mouseSensitivity = 0.002;
   private euler = new THREE.Euler(0, 0, 0, 'YXZ');
+
+  // 재사용 벡터 (GC 최적화)
+  private direction = new THREE.Vector3();
+  private forward = new THREE.Vector3();
+  private right = new THREE.Vector3();
 
   constructor(sceneManager: SceneManager) {
     this.sceneManager = sceneManager;
@@ -64,11 +69,6 @@ export class Player {
       this.input.isKeyDown('KeyD')
     );
   }
-
-  // 재사용 벡터 (GC 최적화)
-  private direction = new THREE.Vector3();
-  private forward = new THREE.Vector3();
-  private right = new THREE.Vector3();
 
   private handleMovement(delta: number): void {
     this.direction.set(0, 0, 0);
