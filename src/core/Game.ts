@@ -17,6 +17,8 @@ export class Game {
   private maxAmmo = 30;
   private totalAmmo = 90;
   private isReloading = false;
+  private isPaused = false;
+  private hasStarted = false;
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -52,6 +54,13 @@ export class Game {
 
     document.addEventListener('mousedown', this.onMouseDown.bind(this));
     document.addEventListener('keydown', this.onKeyDown.bind(this));
+    document.addEventListener('pointerlockchange', this.onPointerLockChange.bind(this));
+
+    // 버튼 이벤트
+    const resumeButton = document.getElementById('resume-button');
+    if (resumeButton) {
+      resumeButton.addEventListener('click', () => this.resumeGame());
+    }
   }
 
   private onWindowResize(): void {
@@ -77,7 +86,36 @@ export class Game {
     this.controller = new FirstPersonController(this.camera, this.renderer.domElement);
 
     this.updateAmmoDisplay();
+    this.hasStarted = true;
     this.isRunning = true;
+    this.isPaused = false;
+  }
+
+  private resumeGame(): void {
+    if (this.hasStarted) {
+      this.renderer.domElement.requestPointerLock();
+    }
+  }
+
+  private onPointerLockChange(): void {
+    const isLocked = document.pointerLockElement === this.renderer.domElement;
+    const pauseOverlay = document.getElementById('pause-overlay');
+    const startOverlay = document.getElementById('start-overlay');
+
+    if (isLocked) {
+      // 게임 진행 중
+      if (pauseOverlay) pauseOverlay.style.display = 'none';
+      if (startOverlay) startOverlay.style.display = 'none';
+      this.isRunning = true;
+      this.isPaused = false;
+    } else {
+      // 포인터가 풀림 (ESC 등)
+      if (this.hasStarted) {
+        if (pauseOverlay) pauseOverlay.style.display = 'flex';
+        this.isRunning = false;
+        this.isPaused = true;
+      }
+    }
   }
 
   public start(): void {
@@ -104,9 +142,14 @@ export class Game {
   }
 
   private onKeyDown(event: KeyboardEvent): void {
-    if (!this.isRunning) return;
+    if (!this.hasStarted) return;
+
     if (event.code === 'KeyR') {
       this.reload();
+    }
+
+    if (event.code === 'Escape' && this.isPaused) {
+      this.resumeGame();
     }
   }
 
