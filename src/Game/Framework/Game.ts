@@ -11,7 +11,6 @@ export class Game {
   private environment: Environment | null = null;
   private combatSystem: CombatSystem;
   private hud: HUD;
-
   private score = 0;
   private hasStarted = false;
   private isPaused = false;
@@ -29,9 +28,9 @@ export class Game {
       startButton.addEventListener('click', () => this.startGame());
     }
 
-    document.addEventListener('mousedown', this.onMouseDown.bind(this));
-    document.addEventListener('keydown', this.onKeyDown.bind(this));
     document.addEventListener('pointerlockchange', this.onPointerLockChange.bind(this));
+    document.addEventListener('keydown', this.handleKeyDown.bind(this));
+    document.addEventListener('mousedown', this.onMouseDown.bind(this));
 
     const resumeButton = document.getElementById('resume-button');
     if (resumeButton) {
@@ -57,7 +56,14 @@ export class Game {
 
   private resumeGame(): void {
     if (this.hasStarted) {
-      this.engine.renderer.domElement.requestPointerLock();
+      const promise = this.engine.renderer.domElement.requestPointerLock() as any;
+      if (promise && typeof promise.catch === 'function') {
+        promise.catch((e: Error) => {
+          if (e.name !== 'SecurityError') {
+            console.error('Pointer lock error:', e);
+          }
+        });
+      }
     }
   }
 
@@ -75,23 +81,28 @@ export class Game {
     }
   }
 
+  private update(delta: number): void {
+    if (!this.hasStarted || this.isPaused) return;
+
+    if (this.player) {
+      this.player.update(delta);
+    }
+  }
+
   private onMouseDown(event: MouseEvent): void {
-    if (!this.hasStarted || this.isPaused || document.pointerLockElement !== this.engine.renderer.domElement) return;
+    if (!this.hasStarted || this.isPaused) return;
+    if (document.pointerLockElement !== this.engine.renderer.domElement) return;
 
     if (event.button === 0) {
       this.handleShoot();
     }
   }
 
-  private onKeyDown(event: KeyboardEvent): void {
-    if (!this.hasStarted) return;
+  private handleKeyDown(event: KeyboardEvent): void {
+    if (!this.hasStarted || event.repeat) return;
 
     if (event.code === 'KeyR') {
       this.handleReload();
-    }
-
-    if (event.code === 'Escape' && this.isPaused) {
-      this.resumeGame();
     }
   }
 
@@ -124,12 +135,6 @@ export class Game {
     if (!this.player) return;
     const weapon = this.player.getWeapon();
     this.hud.updateAmmo(weapon.currentAmmo, weapon.totalAmmo);
-  }
-
-  private update(delta: number): void {
-    if (this.hasStarted && !this.isPaused && this.player) {
-      this.player.update(delta);
-    }
   }
 
   public start(): void {
