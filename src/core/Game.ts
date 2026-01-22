@@ -13,6 +13,10 @@ export class Game {
   private isRunning = false;
   private score = 0;
   private raycaster = new THREE.Raycaster();
+  private currentAmmo = 30;
+  private maxAmmo = 30;
+  private totalAmmo = 90;
+  private isReloading = false;
 
   constructor() {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -46,6 +50,7 @@ export class Game {
     }
 
     document.addEventListener('mousedown', this.onMouseDown.bind(this));
+    document.addEventListener('keydown', this.onKeyDown.bind(this));
   }
 
   private onWindowResize(): void {
@@ -70,6 +75,7 @@ export class Game {
     this._environment = new Environment(this.scene);
     this.controller = new FirstPersonController(this.camera, this.renderer.domElement);
 
+    this.updateAmmoDisplay();
     this.isRunning = true;
   }
 
@@ -96,8 +102,18 @@ export class Game {
     }
   }
 
+  private onKeyDown(event: KeyboardEvent): void {
+    if (!this.isRunning) return;
+    if (event.code === 'KeyR') {
+      this.reload();
+    }
+  }
+
   private shoot(): void {
-    if (!this._environment) return;
+    if (!this._environment || this.isReloading || this.currentAmmo <= 0) return;
+
+    this.currentAmmo--;
+    this.updateAmmoDisplay();
 
     this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
 
@@ -118,11 +134,38 @@ export class Game {
     }
   }
 
+  private reload(): void {
+    if (this.isReloading || this.currentAmmo >= this.maxAmmo || this.totalAmmo <= 0) return;
+
+    this.isReloading = true;
+    const reloadMsg = document.getElementById('reload-message');
+    if (reloadMsg) reloadMsg.style.display = 'block';
+
+    setTimeout(() => {
+      const ammoNeeded = this.maxAmmo - this.currentAmmo;
+      const ammoToFill = Math.min(ammoNeeded, this.totalAmmo);
+
+      this.currentAmmo += ammoToFill;
+      this.totalAmmo -= ammoToFill;
+      this.isReloading = false;
+
+      if (reloadMsg) reloadMsg.style.display = 'none';
+      this.updateAmmoDisplay();
+    }, 1500);
+  }
+
   private updateScoreDisplay(): void {
     const scoreEl = document.getElementById('score');
     if (scoreEl) {
       scoreEl.textContent = this.score.toString();
     }
+  }
+
+  private updateAmmoDisplay(): void {
+    const currentEl = document.getElementById('current-ammo');
+    const totalEl = document.getElementById('total-ammo');
+    if (currentEl) currentEl.textContent = this.currentAmmo.toString();
+    if (totalEl) totalEl.textContent = this.totalAmmo.toString();
   }
 
   public get environment(): Environment | null {

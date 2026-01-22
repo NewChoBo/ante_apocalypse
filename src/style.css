@@ -74,6 +74,34 @@ canvas {
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
+#ammo-display {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  color: #fff;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 32px;
+  font-weight: bold;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+#ammo-display span {
+  font-variant-numeric: tabular-nums;
+}
+
+#reload-message {
+  position: absolute;
+  top: 60%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #ffcc00;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 24px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(255, 204, 0, 0.5);
+}
+
 /* 시작 화면 */
 #start-overlay {
   position: absolute;
