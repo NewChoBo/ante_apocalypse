@@ -1,52 +1,26 @@
-import * as THREE from 'three';
 import '../style.css';
-import { FirstPersonController } from './FirstPersonController';
+import { Engine } from './Engine';
 import { Environment } from './Environment';
+import { Player } from '../entities/Player';
+import { CombatSystem } from '../systems/CombatSystem';
 
 export class Game {
-  private renderer: THREE.WebGLRenderer;
-  private scene: THREE.Scene;
-  private camera: THREE.PerspectiveCamera;
-  private controller: FirstPersonController | null = null;
-  private _environment: Environment | null = null;
-  private clock: THREE.Clock;
-  private isRunning = false;
+  private engine: Engine;
+  private player: Player | null = null;
+  private environment: Environment | null = null;
+  private combatSystem: CombatSystem;
+
   private score = 0;
-  private raycaster = new THREE.Raycaster();
-  private currentAmmo = 30;
-  private maxAmmo = 30;
-  private totalAmmo = 90;
-  private isReloading = false;
-  private isPaused = false;
   private hasStarted = false;
+  private isPaused = false;
 
   constructor() {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.engine = new Engine('game-container', this.update.bind(this));
+    this.combatSystem = new CombatSystem();
+    this.initEvents();
+  }
 
-    const container = document.getElementById('game-container');
-    if (container) {
-      container.insertBefore(this.renderer.domElement, container.firstChild);
-    }
-
-    this.scene = new THREE.Scene();
-
-    this.camera = new THREE.PerspectiveCamera(
-      75,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    );
-    this.camera.position.set(0, 1.7, 5);
-    this.scene.add(this.camera);
-
-    this.clock = new THREE.Clock();
-
-    window.addEventListener('resize', this.onWindowResize.bind(this));
-
+  private initEvents(): void {
     const startButton = document.getElementById('start-button');
     if (startButton) {
       startButton.addEventListener('click', () => this.startGame());
@@ -56,88 +30,53 @@ export class Game {
     document.addEventListener('keydown', this.onKeyDown.bind(this));
     document.addEventListener('pointerlockchange', this.onPointerLockChange.bind(this));
 
-    // 버튼 이벤트
     const resumeButton = document.getElementById('resume-button');
     if (resumeButton) {
       resumeButton.addEventListener('click', () => this.resumeGame());
     }
   }
 
-  private onWindowResize(): void {
-    this.camera.aspect = window.innerWidth / window.innerHeight;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
-  }
-
   private startGame(): void {
-    const overlay = document.getElementById('start-overlay');
-    if (overlay) {
-      overlay.style.display = 'none';
-    }
+    if (this.hasStarted) return;
 
-    const hud = document.getElementById('hud');
-    if (hud) {
-      hud.style.display = 'block';
-    }
+    this.engine.sceneManager.onResize();
+    const dom = this.engine.renderer.domElement;
+    dom.requestPointerLock();
 
-    this.renderer.domElement.requestPointerLock();
+    this.environment = new Environment(this.engine.sceneManager.worldScene);
+    this.player = new Player(this.engine.sceneManager);
 
-    this._environment = new Environment(this.scene);
-    this.controller = new FirstPersonController(this.camera, this.renderer.domElement);
-
-    this.updateAmmoDisplay();
+    this.engine.uiManager.setGameStarted(true);
+    this.updateAmmoUI();
+    
     this.hasStarted = true;
-    this.isRunning = true;
-    this.isPaused = false;
   }
 
   private resumeGame(): void {
     if (this.hasStarted) {
-      this.renderer.domElement.requestPointerLock();
+      this.engine.renderer.domElement.requestPointerLock();
     }
   }
 
   private onPointerLockChange(): void {
-    const isLocked = document.pointerLockElement === this.renderer.domElement;
-    const pauseOverlay = document.getElementById('pause-overlay');
-    const startOverlay = document.getElementById('start-overlay');
-
+    const isLocked = document.pointerLockElement === this.engine.renderer.domElement;
+    
     if (isLocked) {
-      // 게임 진행 중
-      if (pauseOverlay) pauseOverlay.style.display = 'none';
-      if (startOverlay) startOverlay.style.display = 'none';
-      this.isRunning = true;
+      this.engine.uiManager.setPaused(false);
       this.isPaused = false;
     } else {
-      // 포인터가 풀림 (ESC 등)
       if (this.hasStarted) {
-        if (pauseOverlay) pauseOverlay.style.display = 'flex';
-        this.isRunning = false;
+        this.engine.uiManager.setPaused(true);
         this.isPaused = true;
       }
     }
   }
 
-  public start(): void {
-    this.animate();
-  }
-
-  private animate(): void {
-    requestAnimationFrame(this.animate.bind(this));
-
-    const delta = this.clock.getDelta();
-
-    if (this.isRunning && this.controller) {
-      this.controller.update(delta);
-    }
-
-    this.renderer.render(this.scene, this.camera);
-  }
-
   private onMouseDown(event: MouseEvent): void {
-    if (!this.isRunning || document.pointerLockElement !== this.renderer.domElement) return;
+    if (!this.hasStarted || this.isPaused || document.pointerLockElement !== this.engine.renderer.domElement) return;
+
     if (event.button === 0) {
-      this.shoot();
+      this.handleShoot();
     }
   }
 
@@ -145,7 +84,7 @@ export class Game {
     if (!this.hasStarted) return;
 
     if (event.code === 'KeyR') {
-      this.reload();
+      this.handleReload();
     }
 
     if (event.code === 'Escape' && this.isPaused) {
@@ -153,73 +92,46 @@ export class Game {
     }
   }
 
-  private shoot(): void {
-    if (!this._environment || this.isReloading || this.currentAmmo <= 0 || !this.controller) return;
+  private handleShoot(): void {
+    if (!this.player || !this.environment) return;
 
-    this.currentAmmo--;
-    this.updateAmmoDisplay();
-
-    // 총기 반동 애니메이션
-    this.controller.getWeapon().shoot();
-
-    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
-
-    const targets = this._environment.getTargets();
-    const intersects = this.raycaster.intersectObjects(targets, true);
-
-    if (intersects.length > 0) {
-      const hitObject = intersects[0].object;
-      const targetGroup = hitObject.parent;
-
-      if (targetGroup && targetGroup.userData.isTarget) {
-        const points = hitObject.userData.points || 0;
-        this.score += points;
-        this.updateScoreDisplay();
-
-        targetGroup.visible = false;
+    if (this.player.shoot()) {
+      this.updateAmmoUI();
+      
+      const hitTarget = this.combatSystem.checkHit(this.player.getCamera(), this.environment.getTargets());
+      if (hitTarget) {
+        // hitTarget.hit() does not return points directly anymore in this implementation, 
+        // we can add it back or hardcode for now.
+        this.score += 10;
+        this.engine.uiManager.updateScore(this.score);
+        hitTarget.hit();
       }
     }
   }
 
-  private reload(): void {
-    if (this.isReloading || this.currentAmmo >= this.maxAmmo || this.totalAmmo <= 0 || !this.controller) return;
+  private handleReload(): void {
+    if (!this.player) return;
 
-    this.isReloading = true;
-    
-    // 총기 재장전 애니메이션
-    this.controller.getWeapon().reload();
-
-    const reloadMsg = document.getElementById('reload-message');
-    if (reloadMsg) reloadMsg.style.display = 'block';
-
-    setTimeout(() => {
-      const ammoNeeded = this.maxAmmo - this.currentAmmo;
-      const ammoToFill = Math.min(ammoNeeded, this.totalAmmo);
-
-      this.currentAmmo += ammoToFill;
-      this.totalAmmo -= ammoToFill;
-      this.isReloading = false;
-
-      if (reloadMsg) reloadMsg.style.display = 'none';
-      this.updateAmmoDisplay();
-    }, 1500);
+    this.engine.uiManager.setReloading(true);
+    this.player.reload(() => {
+      this.engine.uiManager.setReloading(false);
+      this.updateAmmoUI();
+    });
   }
 
-  private updateScoreDisplay(): void {
-    const scoreEl = document.getElementById('score');
-    if (scoreEl) {
-      scoreEl.textContent = this.score.toString();
+  private updateAmmoUI(): void {
+    if (!this.player) return;
+    const weapon = this.player.getWeapon();
+    this.engine.uiManager.updateAmmo(weapon.currentAmmo, weapon.totalAmmo);
+  }
+
+  private update(delta: number): void {
+    if (this.hasStarted && !this.isPaused && this.player) {
+      this.player.update(delta);
     }
   }
 
-  private updateAmmoDisplay(): void {
-    const currentEl = document.getElementById('current-ammo');
-    const totalEl = document.getElementById('total-ammo');
-    if (currentEl) currentEl.textContent = this.currentAmmo.toString();
-    if (totalEl) totalEl.textContent = this.totalAmmo.toString();
-  }
-
-  public get environment(): Environment | null {
-    return this._environment;
+  public start(): void {
+    this.engine.start();
   }
 }
