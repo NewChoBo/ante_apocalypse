@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ante Apocalypse - Shooting Range</title>
+  </head>
+  <body>
+    <div id="game-container">
+      <!-- HUD -->
+      <div id="hud" style="display: none;">
+        <div id="crosshair"></div>
+        <div id="score-display">SCORE: <span id="score">0</span></div>
+      </div>
+      
+      <!-- 시작 화면 -->
+      <div id="start-overlay">
+        <h1>SHOOTING RANGE</h1>
+        <p>FPS 기본 조작 테스트</p>
+        <button id="start-button">시작하기</button>
+        <p class="controls-hint">
+          WASD: 이동 | 마우스: 시점 | Space: 점프
+        </p>
+      </div>
+    </div>
+    
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
