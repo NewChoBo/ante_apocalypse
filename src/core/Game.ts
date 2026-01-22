@@ -39,6 +39,7 @@ export class Game {
       1000
     );
     this.camera.position.set(0, 1.7, 5);
+    this.scene.add(this.camera);
 
     this.clock = new THREE.Clock();
 
@@ -110,10 +111,13 @@ export class Game {
   }
 
   private shoot(): void {
-    if (!this._environment || this.isReloading || this.currentAmmo <= 0) return;
+    if (!this._environment || this.isReloading || this.currentAmmo <= 0 || !this.controller) return;
 
     this.currentAmmo--;
     this.updateAmmoDisplay();
+
+    // 총기 반동 애니메이션
+    this.controller.getWeapon().shoot();
 
     this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
 
@@ -135,9 +139,13 @@ export class Game {
   }
 
   private reload(): void {
-    if (this.isReloading || this.currentAmmo >= this.maxAmmo || this.totalAmmo <= 0) return;
+    if (this.isReloading || this.currentAmmo >= this.maxAmmo || this.totalAmmo <= 0 || !this.controller) return;
 
     this.isReloading = true;
+    
+    // 총기 재장전 애니메이션
+    this.controller.getWeapon().reload();
+
     const reloadMsg = document.getElementById('reload-message');
     if (reloadMsg) reloadMsg.style.display = 'block';
 

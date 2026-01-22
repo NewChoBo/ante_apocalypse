@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Weapon } from './Weapon';
 
 export class FirstPersonController {
   private camera: THREE.PerspectiveCamera;
@@ -29,10 +30,13 @@ export class FirstPersonController {
   // 포인터 잠금 상태
   private isLocked = false;
 
+  private weapon: Weapon;
+
   constructor(camera: THREE.PerspectiveCamera, domElement: HTMLElement) {
     this.camera = camera;
     this.domElement = domElement;
     this.camera.position.y = this.groundLevel;
+    this.weapon = new Weapon(this.camera);
     this.initEventListeners();
   }
 
@@ -137,6 +141,14 @@ export class FirstPersonController {
       direction.normalize();
       this.camera.position.addScaledVector(direction, this.moveSpeed * delta);
     }
+
+    // 무기 애니메이션 업데이트
+    const isMoving = direction.length() > 0 && !this.isJumping;
+    this.weapon.update(delta, isMoving);
+  }
+
+  public getWeapon(): Weapon {
+    return this.weapon;
   }
 
   public getCamera(): THREE.PerspectiveCamera {
