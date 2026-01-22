@@ -65,24 +65,27 @@ export class Player {
     );
   }
 
+  // 재사용 벡터 (GC 최적화)
+  private direction = new THREE.Vector3();
+  private forward = new THREE.Vector3();
+  private right = new THREE.Vector3();
+
   private handleMovement(delta: number): void {
-    const direction = new THREE.Vector3();
-    const forward = new THREE.Vector3();
-    const right = new THREE.Vector3();
+    this.direction.set(0, 0, 0);
 
-    this.camera.getWorldDirection(forward);
-    forward.y = 0;
-    forward.normalize();
-    right.crossVectors(forward, new THREE.Vector3(0, 1, 0));
+    this.camera.getWorldDirection(this.forward);
+    this.forward.y = 0;
+    this.forward.normalize();
+    this.right.crossVectors(this.forward, new THREE.Vector3(0, 1, 0));
 
-    if (this.input.isKeyDown('KeyW')) direction.add(forward);
-    if (this.input.isKeyDown('KeyS')) direction.sub(forward);
-    if (this.input.isKeyDown('KeyA')) direction.sub(right);
-    if (this.input.isKeyDown('KeyD')) direction.add(right);
+    if (this.input.isKeyDown('KeyW')) this.direction.add(this.forward);
+    if (this.input.isKeyDown('KeyS')) this.direction.sub(this.forward);
+    if (this.input.isKeyDown('KeyA')) this.direction.sub(this.right);
+    if (this.input.isKeyDown('KeyD')) this.direction.add(this.right);
 
-    if (direction.length() > 0) {
-      direction.normalize();
-      this.camera.position.addScaledVector(direction, this.moveSpeed * delta);
+    if (this.direction.length() > 0) {
+      this.direction.normalize();
+      this.camera.position.addScaledVector(this.direction, this.moveSpeed * delta);
     }
   }
 

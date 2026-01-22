@@ -28,8 +28,10 @@ export abstract class BaseWeapon {
     this.mesh = new THREE.Group();
   }
 
+  private static readonly ZERO_VECTOR = new THREE.Vector3(0, 0, 0);
+
   public update(delta: number, isMoving: boolean): void {
-    this.recoilOffset.lerp(new THREE.Vector3(0, 0, 0), delta * 10);
+    this.recoilOffset.lerp(BaseWeapon.ZERO_VECTOR, delta * 10);
     this.recoilRotation *= (1 - delta * 15);
 
     if (isMoving) {
