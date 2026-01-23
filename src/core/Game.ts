@@ -93,7 +93,7 @@ export class Game {
     this.weaponSystem = new WeaponSystem(this.scene, this.playerPawn.camera, this.targetManager);
 
     // HUD
-    this.hud = new HUD(this.weaponSystem);
+    this.hud = new HUD();
   }
 
   public start(): void {
@@ -124,7 +124,6 @@ export class Game {
     this.playerPawn.update(deltaTime);
     this.weaponSystem.update(deltaTime);
     this.targetManager.update(deltaTime);
-    this.hud.update();
   }
 
   public pause(): void {

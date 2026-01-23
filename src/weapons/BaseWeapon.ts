@@ -52,6 +52,7 @@ export abstract class BaseWeapon implements IWeapon {
     this.onFire();
 
     eventBus.emit(GameEvents.WEAPON_AMMO_CHANGED, {
+      weaponId: this.name,
       current: this.currentAmmo,
       reserve: this.reserveAmmo,
     });
@@ -98,6 +99,7 @@ export abstract class BaseWeapon implements IWeapon {
       this.onReloadEnd();
 
       eventBus.emit(GameEvents.WEAPON_AMMO_CHANGED, {
+        weaponId: this.name,
         current: this.currentAmmo,
         reserve: this.reserveAmmo,
       });

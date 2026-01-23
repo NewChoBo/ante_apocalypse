@@ -1,23 +1,29 @@
-import { WeaponSystem } from '../weapons/WeaponSystem';
+import { eventBus } from '../core/events/EventBus.ts';
+import { GameEvents } from '../types/IEventBus.ts';
 
 export class HUD {
-  private weaponSystem: WeaponSystem;
-
   private scoreElement: HTMLElement;
   private currentAmmoElement: HTMLElement;
   private totalAmmoElement: HTMLElement;
 
-  constructor(weaponSystem: WeaponSystem) {
-    this.weaponSystem = weaponSystem;
-
+  constructor() {
     this.scoreElement = document.getElementById('score')!;
     this.currentAmmoElement = document.getElementById('current-ammo')!;
     this.totalAmmoElement = document.getElementById('total-ammo')!;
+
+    this.setupSubscriptions();
   }
 
-  public update(): void {
-    this.scoreElement.textContent = this.weaponSystem.score.toString();
-    this.currentAmmoElement.textContent = this.weaponSystem.currentAmmo.toString();
-    this.totalAmmoElement.textContent = this.weaponSystem.reserveAmmo.toString();
+  private setupSubscriptions(): void {
+    // 탄약 변경 구독
+    eventBus.on(GameEvents.WEAPON_AMMO_CHANGED, (data) => {
+      this.currentAmmoElement.textContent = data.current.toString();
+      this.totalAmmoElement.textContent = data.reserve.toString();
+    });
+
+    // 점수 변경 구독
+    eventBus.on(GameEvents.SCORE_CHANGED, (data) => {
+      this.scoreElement.textContent = data.newScore.toString();
+    });
   }
 }

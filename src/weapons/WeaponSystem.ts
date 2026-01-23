@@ -3,6 +3,8 @@ import { IWeapon } from '../types/IWeapon.ts';
 import { Rifle } from './Rifle.ts';
 import { Pistol } from './Pistol.ts';
 import { TargetManager } from '../targets/TargetManager.ts';
+import { eventBus } from '../core/events/EventBus.ts';
+import { GameEvents } from '../types/IEventBus.ts';
 
 /**
  * 무기 시스템 매니저.
@@ -80,6 +82,7 @@ export class WeaponSystem {
 
   private addScore(points: number): void {
     this.score += points;
+    eventBus.emit(GameEvents.SCORE_CHANGED, { newScore: this.score });
   }
 
   public update(deltaTime: number): void {

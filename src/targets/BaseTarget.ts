@@ -34,8 +34,8 @@ export abstract class BaseTarget implements ITarget {
 
       // 타겟 파괴 이벤트 발행
       eventBus.emit(GameEvents.TARGET_DESTROYED, {
-        id: this.id,
-        point: amount,
+        targetId: this.id,
+        points: amount,
       });
     }
   }
