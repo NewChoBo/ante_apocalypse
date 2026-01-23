@@ -70,7 +70,7 @@ export class PlayerController extends BaseController {
     // 빙의 해제 시 추가 로직
   }
 
-  public update(deltaTime: number): void {
+  public tick(deltaTime: number): void {
     if (!this.possessedPawn) return;
 
     // Pawn에게 입력 데이터 전달

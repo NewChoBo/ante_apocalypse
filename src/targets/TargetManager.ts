@@ -3,12 +3,15 @@ import { ITarget } from '../types/ITarget.ts';
 import { StaticTarget } from './StaticTarget.ts';
 import { MovingTarget } from './MovingTarget.ts';
 import { HumanoidTarget } from './HumanoidTarget.ts';
+import { ITickable } from '../core/interfaces/ITickable';
+import { TickManager } from '../core/TickManager';
 
 /**
  * 타겟 매니저.
  * ITarget 인터페이스를 통해 다양한 타겟 타입을 관리합니다.
  */
-export class TargetManager {
+export class TargetManager implements ITickable {
+  public readonly priority = 30;
   private scene: Scene;
   private shadowGenerator: ShadowGenerator;
   private targets: Map<string, ITarget> = new Map();
@@ -17,6 +20,13 @@ export class TargetManager {
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
+    // TickManager에 자동 등록
+    TickManager.getInstance().register(this);
+  }
+
+  /** ITickable 인터페이스 구현 */
+  public tick(_deltaTime: number): void {
+    // 타겟 업데이트 (필요시 추가 로직)
   }
 
   public spawnInitialTargets(): void {
@@ -81,11 +91,11 @@ export class TargetManager {
     }, 1500);
   }
 
-  public update(_deltaTime: number): void {
-    // 타겟 업데이트 (필요시 추가 로직)
-  }
-
   public getActiveTargetCount(): number {
     return this.targets.size;
+  }
+
+  public dispose(): void {
+    TickManager.getInstance().unregister(this);
   }
 }

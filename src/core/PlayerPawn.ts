@@ -60,7 +60,7 @@ export class PlayerPawn extends BasePawn {
     this.movementComponent.handleMovement(keys, deltaTime);
   }
 
-  public update(deltaTime: number): void {
+  public tick(deltaTime: number): void {
     // 모든 컴포넌트 업데이트 호출
     this.updateComponents(deltaTime);
   }

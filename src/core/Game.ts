@@ -15,14 +15,12 @@ import { TargetManager } from '../targets/TargetManager';
 import { HUD } from '../ui/HUD';
 import { gameStateStore } from './store/GameStore.ts';
 import { CombatComponent } from './components/CombatComponent';
+import { TickManager } from './TickManager';
 
 export class Game {
   private canvas!: HTMLCanvasElement;
   private engine!: Engine;
   private scene!: Scene;
-  private playerController!: PlayerController;
-  private playerPawn!: PlayerPawn;
-  private targetManager!: TargetManager;
   private shadowGenerator!: ShadowGenerator;
 
   private isRunning = false;
@@ -80,20 +78,20 @@ export class Game {
     shootingRange.create();
 
     // 하이브리드 아키텍처 시스템 초기화
-    this.playerPawn = new PlayerPawn(this.scene);
-    this.playerController = new PlayerController('player1', this.canvas);
-    this.playerController.possess(this.playerPawn);
+    const playerPawn = new PlayerPawn(this.scene);
+    const playerController = new PlayerController('player1', this.canvas);
+    playerController.possess(playerPawn);
 
     // HUD를 다른 시스템보다 먼저 초기화하여 초기 이벤트를 수신할 수 있게 합니다.
     new HUD();
 
     // 타겟 매니저
-    this.targetManager = new TargetManager(this.scene, this.shadowGenerator);
-    this.targetManager.spawnInitialTargets();
+    const targetManager = new TargetManager(this.scene, this.shadowGenerator);
+    targetManager.spawnInitialTargets();
 
     // 무기 시스템 (이제 Pawn의 CombatComponent가 소유)
-    const combatComp = new CombatComponent(this.playerPawn, this.scene, this.targetManager);
-    this.playerPawn.addComponent(combatComp);
+    const combatComp = new CombatComponent(playerPawn, this.scene, targetManager);
+    playerPawn.addComponent(combatComp);
   }
 
   public start(): void {
@@ -121,9 +119,7 @@ export class Game {
   }
 
   private update(deltaTime: number): void {
-    this.playerController.update(deltaTime);
-    this.playerPawn.update(deltaTime);
-    this.targetManager.update(deltaTime);
+    TickManager.getInstance().tick(deltaTime);
   }
 
   public pause(): void {
