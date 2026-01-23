@@ -2,6 +2,9 @@ import { Scene } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { WeaponSystem } from '../../weapons/WeaponSystem';
 import { TargetManager } from '../../targets/TargetManager';
+import { WeaponEffectComponent } from './WeaponEffectComponent';
+import { GameObservables } from '../events/GameObservables';
+import { IMuzzleProvider } from '../../types/IWeapon';
 import { CameraComponent } from './CameraComponent';
 import type { BasePawn } from '../BasePawn';
 
@@ -10,6 +13,7 @@ import type { BasePawn } from '../BasePawn';
  */
 export class CombatComponent extends BaseComponent {
   private weaponSystem: WeaponSystem;
+  private effectComponent: WeaponEffectComponent;
 
   constructor(owner: BasePawn, scene: Scene, targetManager: TargetManager) {
     super(owner, scene);
@@ -23,9 +27,28 @@ export class CombatComponent extends BaseComponent {
     // 무기 시스템 초기화 (Pawn의 카메라와 연동)
     this.weaponSystem = new WeaponSystem(scene, cameraComp.camera, targetManager);
 
-    // 반동 효과 연결 (무기 발사 시 카메라 킥)
+    // 이펙트 컴포넌트 초기화
+    this.effectComponent = new WeaponEffectComponent(owner, scene);
+
+    // 1. 반동 효과 연결
     this.weaponSystem.setOnFireCallback(() => {
-      cameraComp.applyRecoil(0.015); // 반동 강도 조절 가능
+      (cameraComp as CameraComponent).applyRecoil(0.015);
+    });
+
+    // 2. 총구 화염 연결 (Observable 사용)
+    GameObservables.weaponFire.add(() => {
+      const weapon = this.weaponSystem.getCurrentWeapon();
+      if ('getMuzzleTransform' in weapon) {
+        const { position, direction, transformNode } = (
+          weapon as unknown as IMuzzleProvider
+        ).getMuzzleTransform();
+        this.effectComponent.emitMuzzleFlash(position, direction, transformNode);
+      }
+    });
+
+    // 3. 피격 이펙트 연결 (Observable 사용)
+    GameObservables.targetHit.add((hitInfo) => {
+      this.effectComponent.emitHitSpark(hitInfo.position);
     });
   }
 

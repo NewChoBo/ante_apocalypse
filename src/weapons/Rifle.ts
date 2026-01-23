@@ -30,7 +30,7 @@ export class Rifle extends Firearm {
     onScore?: (points: number) => void
   ) {
     super(scene, camera, targetManager, 30, 90, onScore);
-    this.muzzleOffset = new Vector3(0, 0.05, 0.35);
+    this.muzzleOffset = new Vector3(0, 0.05, -0.4); // 총구 상단 정렬, 모델 회전 고려
     this.createWeaponModel();
   }
 
@@ -54,7 +54,6 @@ export class Rifle extends Firearm {
 
   protected onFire(): void {
     this.playRecoilAnimation();
-    this.createMuzzleFlash();
     this.performRaycast();
   }
 

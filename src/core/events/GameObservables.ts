@@ -22,4 +22,12 @@ export const GameObservables = {
 
   /** 타격 발생 (VFX 연출용) */
   hitEffect: new Observable<{ position: Vector3; normal: Vector3 }>(),
+
+  /** 타겟 피격 (상세 정보 포함) */
+  targetHit: new Observable<{
+    targetId: string;
+    part: string;
+    damage: number;
+    position: Vector3;
+  }>(),
 };

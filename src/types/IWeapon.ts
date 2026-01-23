@@ -1,3 +1,16 @@
+import { Vector3 } from '@babylonjs/core';
+
+/**
+ * 총구의 위치와 방향을 제공하는 인터페이스.
+ */
+export interface IMuzzleProvider {
+  getMuzzleTransform(): {
+    position: Vector3;
+    direction: Vector3;
+    transformNode?: any;
+  };
+}
+
 /**
  * 모든 무기(총기, 근접 무기 등)의 핵심 인터페이스.
  */
@@ -50,7 +63,7 @@ export interface IWeapon {
 /**
  * 총기류 전용 인터페이스
  */
-export interface IFirearm extends IWeapon {
+export interface IFirearm extends IWeapon, IMuzzleProvider {
   currentAmmo: number;
   magazineSize: number;
   reserveAmmo: number;

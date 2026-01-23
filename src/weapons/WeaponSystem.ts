@@ -97,6 +97,11 @@ export class WeaponSystem {
     this.emitAmmoUpdate();
   }
 
+  /** 현재 활성화된 무기를 반환합니다. */
+  public getCurrentWeapon(): IWeapon {
+    return this.weapons[this.currentWeaponIndex];
+  }
+
   private addScore(points: number): void {
     this.score += points;
     this.emitScoreUpdate();
