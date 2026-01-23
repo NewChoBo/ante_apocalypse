@@ -25,6 +25,7 @@
     "@babylonjs/core": "^8.47.0",
     "@babylonjs/gui": "^8.47.0",
     "@babylonjs/inspector": "^8.47.0",
-    "@babylonjs/loaders": "^8.47.0"
+    "@babylonjs/loaders": "^8.47.0",
+    "nanostores": "^1.1.0"
   }
 }

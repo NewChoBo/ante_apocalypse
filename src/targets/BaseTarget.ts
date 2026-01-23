@@ -1,7 +1,6 @@
 import { Mesh, Vector3, Scene } from '@babylonjs/core';
 import { ITarget } from '../types/ITarget.ts';
-import { eventBus } from '../core/events/EventBus.ts';
-import { GameEvents } from '../types/IEventBus.ts';
+import { GameObservables } from '../core/events/GameObservables.ts';
 
 /**
  * 모든 타겟의 공통 추상 클래스.
@@ -38,10 +37,11 @@ export abstract class BaseTarget implements ITarget {
       this.isActive = false;
       this.onDestroy();
 
-      // 타겟 파괴 이벤트 발행
-      eventBus.emit(GameEvents.TARGET_DESTROYED, {
+      // 타겟 파괴 이벤트 발행 (Babylon Observable 사용)
+      GameObservables.targetDestroyed.notifyObservers({
         targetId: this.id,
-        points: amount,
+        points: finalDamage, // points를 finalDamage로 계산
+        position: this.mesh.position.clone(),
       });
     }
   }

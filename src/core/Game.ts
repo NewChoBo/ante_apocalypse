@@ -14,6 +14,7 @@ import { ShootingRange } from '../world/ShootingRange';
 import { WeaponSystem } from '../weapons/WeaponSystem';
 import { TargetManager } from '../targets/TargetManager';
 import { HUD } from '../ui/HUD';
+import { gameStateStore } from './store/GameStore.ts';
 
 export class Game {
   private canvas!: HTMLCanvasElement;
@@ -100,6 +101,7 @@ export class Game {
 
     this.isRunning = true;
     this.isPaused = false;
+    gameStateStore.set('PLAYING');
 
     // 오버레이 숨기기
     document.getElementById('start-overlay')!.style.display = 'none';
@@ -129,6 +131,7 @@ export class Game {
     if (!this.isRunning || this.isPaused) return;
 
     this.isPaused = true;
+    gameStateStore.set('PAUSED');
     document.getElementById('pause-overlay')!.style.display = 'flex';
     document.exitPointerLock();
   }
@@ -137,6 +140,7 @@ export class Game {
     if (!this.isPaused) return;
 
     this.isPaused = false;
+    gameStateStore.set('PLAYING');
     document.getElementById('pause-overlay')!.style.display = 'none';
     this.canvas.requestPointerLock();
   }

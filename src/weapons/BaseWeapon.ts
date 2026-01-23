@@ -1,7 +1,7 @@
 import { Scene, Mesh, UniversalCamera } from '@babylonjs/core';
+import { GameObservables } from '../core/events/GameObservables.ts';
 import { IWeapon } from '../types/IWeapon.ts';
-import { eventBus } from '../core/events/EventBus.ts';
-import { GameEvents } from '../types/IEventBus.ts';
+import { ammoStore } from '../core/store/GameStore.ts';
 
 /**
  * 모든 무기의 공통 베이스 클래스.
@@ -19,6 +19,7 @@ export abstract class BaseWeapon implements IWeapon {
   public abstract range: number;
   public abstract reloadTime: number;
   public abstract firingMode: 'semi' | 'auto';
+  public isActive = false;
 
   protected scene: Scene;
   protected camera: UniversalCamera;
@@ -51,11 +52,15 @@ export abstract class BaseWeapon implements IWeapon {
     this.lastFireTime = now;
     this.onFire();
 
-    eventBus.emit(GameEvents.WEAPON_AMMO_CHANGED, {
+    // 발사 이벤트 발행
+    GameObservables.weaponFire.notifyObservers({
       weaponId: this.name,
-      current: this.currentAmmo,
-      reserve: this.reserveAmmo,
+      ammoRemaining: this.currentAmmo,
     });
+
+    if (this.isActive) {
+      this.updateAmmoStore();
+    }
 
     if (this.currentAmmo <= 0 && this.reserveAmmo > 0) {
       this.reload();
@@ -98,12 +103,18 @@ export abstract class BaseWeapon implements IWeapon {
 
       this.onReloadEnd();
 
-      eventBus.emit(GameEvents.WEAPON_AMMO_CHANGED, {
-        weaponId: this.name,
-        current: this.currentAmmo,
-        reserve: this.reserveAmmo,
-      });
+      if (this.isActive) {
+        this.updateAmmoStore();
+      }
     }, this.reloadTime * 1000);
+  }
+
+  private updateAmmoStore(): void {
+    ammoStore.set({
+      weaponName: this.name,
+      current: this.currentAmmo,
+      reserve: this.reserveAmmo,
+    });
   }
 
   /** 매 프레임 업데이트 - 연발 처리 */
@@ -130,12 +141,14 @@ export abstract class BaseWeapon implements IWeapon {
   }
 
   public show(): void {
+    this.isActive = true;
     if (this.weaponMesh) {
       this.weaponMesh.setEnabled(true);
     }
   }
 
   public hide(): void {
+    this.isActive = false;
     this.stopFire();
     if (this.weaponMesh) {
       this.weaponMesh.setEnabled(false);

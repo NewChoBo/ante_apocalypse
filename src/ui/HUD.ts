@@ -1,5 +1,4 @@
-import { eventBus } from '../core/events/EventBus.ts';
-import { GameEvents } from '../types/IEventBus.ts';
+import { scoreStore, ammoStore } from '../core/store/GameStore.ts';
 
 export class HUD {
   private scoreElement: HTMLElement;
@@ -15,15 +14,15 @@ export class HUD {
   }
 
   private setupSubscriptions(): void {
-    // 탄약 변경 구독
-    eventBus.on(GameEvents.WEAPON_AMMO_CHANGED, (data) => {
-      this.currentAmmoElement.textContent = data.current.toString();
-      this.totalAmmoElement.textContent = data.reserve.toString();
+    // 탄약 상태 구독 (NanoStores)
+    ammoStore.subscribe((state) => {
+      this.currentAmmoElement.textContent = state.current.toString();
+      this.totalAmmoElement.textContent = state.reserve.toString();
     });
 
-    // 점수 변경 구독
-    eventBus.on(GameEvents.SCORE_CHANGED, (data) => {
-      this.scoreElement.textContent = data.newScore.toString();
+    // 점수 상태 구독 (NanoStores)
+    scoreStore.subscribe((score) => {
+      this.scoreElement.textContent = score.toString();
     });
   }
 }

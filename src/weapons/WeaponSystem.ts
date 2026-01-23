@@ -3,8 +3,7 @@ import { IWeapon } from '../types/IWeapon.ts';
 import { Rifle } from './Rifle.ts';
 import { Pistol } from './Pistol.ts';
 import { TargetManager } from '../targets/TargetManager.ts';
-import { eventBus } from '../core/events/EventBus.ts';
-import { GameEvents } from '../types/IEventBus.ts';
+import { scoreStore, ammoStore } from '../core/store/GameStore.ts';
 
 /**
  * 무기 시스템 매니저.
@@ -38,15 +37,16 @@ export class WeaponSystem {
   }
 
   private emitAmmoUpdate(): void {
-    eventBus.emit(GameEvents.WEAPON_AMMO_CHANGED, {
-      weaponId: this.currentWeapon.name,
+    // NanoStores 업데이트 (이제 HUD는 이 스토어를 구독합니다)
+    ammoStore.set({
+      weaponName: this.currentWeapon.name,
       current: this.currentAmmo,
       reserve: this.reserveAmmo,
     });
   }
 
   private emitScoreUpdate(): void {
-    eventBus.emit(GameEvents.SCORE_CHANGED, { newScore: this.score });
+    scoreStore.set(this.score);
   }
 
   private get currentWeapon(): IWeapon {
