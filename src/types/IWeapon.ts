@@ -53,6 +53,9 @@ export interface IWeapon {
 
   /** 정조준 상태 설정 */
   setAiming(isAiming: boolean): void;
+
+  /** 리소스 해제 */
+  dispose(): void;
 }
 
 /**

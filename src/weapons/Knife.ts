@@ -8,7 +8,7 @@ import {
   Mesh,
 } from '@babylonjs/core';
 import { MeleeWeapon } from './MeleeWeapon.ts';
-import { TargetManager } from '../targets/TargetManager.ts';
+import { TargetRegistry } from '../core/systems/TargetRegistry';
 import { GameObservables } from '../core/events/GameObservables.ts';
 
 /**
@@ -24,13 +24,8 @@ export class Knife extends MeleeWeapon {
   private defaultRotation = new Vector3(0, 0, 0);
   private defaultPosition = new Vector3(0.4, -0.4, 0.6);
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    targetManager: TargetManager,
-    onScore?: (points: number) => void
-  ) {
-    super(scene, camera, targetManager, onScore);
+  constructor(scene: Scene, camera: UniversalCamera, onScore?: (points: number) => void) {
+    super(scene, camera, onScore);
     this.createMesh();
   }
 
@@ -87,7 +82,7 @@ export class Knife extends MeleeWeapon {
 
     if (hitResult) {
       const { targetId, part, pickedPoint } = hitResult;
-      const destroyed = this.targetManager.hitTarget(targetId, part, this.damage);
+      const destroyed = TargetRegistry.getInstance().hitTarget(targetId, part, this.damage);
 
       // 히트 이벤트 발행 (이펙트 연출용)
       GameObservables.targetHit.notifyObservers({

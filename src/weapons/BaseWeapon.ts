@@ -1,6 +1,5 @@
 import { Scene, Mesh, UniversalCamera } from '@babylonjs/core';
 import { IWeapon } from '../types/IWeapon.ts';
-import { TargetManager } from '../targets/TargetManager.ts';
 
 /**
  * 모든 무기의 최상위 추상 클래스.
@@ -13,7 +12,6 @@ export abstract class BaseWeapon implements IWeapon {
 
   protected scene: Scene;
   protected camera: UniversalCamera;
-  protected targetManager: TargetManager;
   protected onScoreCallback: ((points: number) => void) | null = null;
   protected weaponMesh: Mesh | null = null;
 
@@ -28,15 +26,9 @@ export abstract class BaseWeapon implements IWeapon {
     return defaultFOV;
   }
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    targetManager: TargetManager,
-    onScore?: (points: number) => void
-  ) {
+  constructor(scene: Scene, camera: UniversalCamera, onScore?: (points: number) => void) {
     this.scene = scene;
     this.camera = camera;
-    this.targetManager = targetManager;
     this.onScoreCallback = onScore || null;
   }
 

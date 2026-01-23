@@ -1,6 +1,6 @@
 import { Scene, UniversalCamera, Ray, Vector3 } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon.ts';
-import { TargetManager } from '../targets/TargetManager.ts';
+import { TargetRegistry } from '../core/systems/TargetRegistry';
 import { GameObservables } from '../core/events/GameObservables.ts';
 import { ammoStore } from '../core/store/GameStore.ts';
 import { IFirearm } from '../types/IWeapon.ts';
@@ -37,13 +37,12 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
   constructor(
     scene: Scene,
     camera: UniversalCamera,
-    targetManager: TargetManager,
     initialAmmo: number,
     reserveAmmo: number,
     onScore?: (points: number) => void,
     applyRecoil?: (force: number) => void
   ) {
-    super(scene, camera, targetManager, onScore);
+    super(scene, camera, onScore);
     this.currentAmmo = initialAmmo;
     this.reserveAmmo = reserveAmmo;
     this.applyRecoilCallback = applyRecoil;
@@ -192,7 +191,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
       const part = nameParts[2] || 'body';
 
       const isHeadshot = part === 'head';
-      const destroyed = this.targetManager.hitTarget(targetId, part, this.damage);
+      const destroyed = TargetRegistry.getInstance().hitTarget(targetId, part, this.damage);
 
       if (this.onScoreCallback) {
         const score = destroyed ? (isHeadshot ? 200 : 100) : isHeadshot ? 30 : 10;

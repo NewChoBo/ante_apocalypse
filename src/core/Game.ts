@@ -11,7 +11,7 @@ import {
 import { PlayerController } from './controllers/PlayerController';
 import { PlayerPawn } from './PlayerPawn';
 import { ShootingRange } from '../world/ShootingRange';
-import { TargetManager } from '../targets/TargetManager';
+import { TargetSpawnerComponent } from './components/TargetSpawnerComponent';
 import { HUD } from '../ui/HUD';
 import { gameStateStore } from './store/GameStore.ts';
 import { CombatComponent } from './components/CombatComponent';
@@ -86,12 +86,12 @@ export class Game {
     // HUD를 다른 시스템보다 먼저 초기화하여 초기 이벤트를 수신할 수 있게 합니다.
     new HUD();
 
-    // 타겟 매니저
-    const targetManager = new TargetManager(this.scene, this.shadowGenerator);
-    targetManager.spawnInitialTargets();
+    // 타겟 스폰 시스템 (Modular Component)
+    const spawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
+    spawner.spawnInitialTargets();
 
     // 무기 시스템 (이제 Pawn의 CombatComponent가 소유)
-    const combatComp = new CombatComponent(playerPawn, this.scene, targetManager);
+    const combatComp = new CombatComponent(playerPawn, this.scene);
     playerPawn.addComponent(combatComp);
 
     // 에셋 프리로딩 시작

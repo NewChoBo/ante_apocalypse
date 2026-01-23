@@ -1,55 +1,65 @@
 import { Scene } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
-import { WeaponSystem } from '../../weapons/WeaponSystem';
-import { TargetManager } from '../../targets/TargetManager';
+import { WeaponInventoryComponent } from './WeaponInventoryComponent';
+import { WeaponInputComponent } from './WeaponInputComponent';
+import { HUDSyncComponent } from './HUDSyncComponent';
 import { FirearmEffectComponent } from './FirearmEffectComponent';
 import { MeleeEffectComponent } from './MeleeEffectComponent';
 import { CameraComponent } from './CameraComponent';
 import type { BasePawn } from '../BasePawn';
 
 /**
- * 캐릭터의 무기 시스템과 타겟 상호작용을 담당하는 컴포넌트.
+ * 캐릭터의 무기 인벤토리, 입력, UI 동기화를 조율하는 컴포넌트.
  */
 export class CombatComponent extends BaseComponent {
-  private weaponSystem: WeaponSystem;
+  private inventory: WeaponInventoryComponent;
+  private input: WeaponInputComponent;
+  private hudSync: HUDSyncComponent;
 
-  constructor(owner: BasePawn, scene: Scene, targetManager: TargetManager) {
+  constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
 
-    // Pawn이 소유한 카메라 컴포넌트 찾기
     const cameraComp = owner.getComponent(CameraComponent);
     if (!cameraComp) {
       throw new Error('CombatComponent requires a CameraComponent on the Pawn');
     }
 
-    // 무기 시스템 초기화
-    this.weaponSystem = new WeaponSystem(scene, cameraComp.camera, targetManager, (force) =>
-      cameraComp.applyRecoil(force)
+    this.hudSync = new HUDSyncComponent();
+
+    // 1. 인벤토리 초기화 (점수 콜백을 hudSync에 연결)
+    this.inventory = new WeaponInventoryComponent(
+      scene,
+      cameraComp.camera,
+      (points) => this.hudSync.updateScore(points),
+      (force) => cameraComp.applyRecoil(force),
+      (newWeapon) => this.hudSync.syncAmmo(newWeapon)
     );
 
-    // 특수화된 이펙트 컴포넌트들 초기화 (각자 담당하는 무기 타입 이벤트 구독)
+    // 2. 입력 처리 초기화
+    this.input = new WeaponInputComponent(this.inventory);
+
+    // 초기 HUD 동기화
+    this.hudSync.syncAmmo(this.inventory.currentWeapon);
+
+    // 이펙트 컴포넌트 초기화
     new FirearmEffectComponent(owner, scene);
     new MeleeEffectComponent(owner, scene);
   }
 
   public setAiming(isAiming: boolean): void {
-    this.weaponSystem.setAiming(isAiming);
+    this.input.setAiming(isAiming);
   }
 
   public update(deltaTime: number): void {
-    this.weaponSystem.update(deltaTime);
-  }
-
-  public getWeaponSystem(): WeaponSystem {
-    return this.weaponSystem;
+    this.inventory.update(deltaTime);
   }
 
   public getCurrentWeapon() {
-    return this.weaponSystem.getCurrentWeapon();
+    return this.inventory.currentWeapon;
   }
 
   public dispose(): void {
     super.dispose();
-    // WeaponSystem에 dispose가 있다면 호출 필요 (현재는 event listener 제거 등)
+    this.inventory.dispose();
   }
 }

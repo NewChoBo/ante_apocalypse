@@ -1,6 +1,6 @@
 import { Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon.ts';
-import { TargetManager } from '../targets/TargetManager.ts';
+import { TargetRegistry } from '../core/systems/TargetRegistry';
 
 /**
  * 근접 무기(Melee Weapons)를 위한 중간 추상 클래스.
@@ -18,13 +18,8 @@ export abstract class MeleeWeapon extends BaseWeapon {
     return defaultFOV;
   }
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    targetManager: TargetManager,
-    onScore?: (points: number) => void
-  ) {
-    super(scene, camera, targetManager, onScore);
+  constructor(scene: Scene, camera: UniversalCamera, onScore?: (points: number) => void) {
+    super(scene, camera, onScore);
   }
 
   /** 근접 무기 사용 */
@@ -41,7 +36,7 @@ export abstract class MeleeWeapon extends BaseWeapon {
     // 카메라의 월드 포지션 가져오기 (부모가 있을 경우 position은 로컬좌표이므로 absolutePosition 사용)
     const camPos = this.camera.globalPosition;
     const camForward = this.camera.getForwardRay().direction;
-    const targets = this.targetManager.getAllTargets();
+    const targets = TargetRegistry.getInstance().getAllTargets();
 
     let closestTarget: { targetId: string; part: string; pickedPoint: Vector3 } | null = null;
     let minDistance = this.range;

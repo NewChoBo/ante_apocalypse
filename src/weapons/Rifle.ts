@@ -8,7 +8,6 @@ import {
   Animation,
 } from '@babylonjs/core';
 import { Firearm } from './Firearm.ts';
-import { TargetManager } from '../targets/TargetManager.ts';
 
 /**
  * 소총 (Rifle) - 연발 가능
@@ -27,11 +26,10 @@ export class Rifle extends Firearm {
   constructor(
     scene: Scene,
     camera: UniversalCamera,
-    targetManager: TargetManager,
     onScore?: (points: number) => void,
     applyRecoil?: (force: number) => void
   ) {
-    super(scene, camera, targetManager, 30, 90, onScore, applyRecoil);
+    super(scene, camera, 30, 90, onScore, applyRecoil);
     this.muzzleOffset = new Vector3(0, 0.05, -0.4); // 총구 상단 정렬, 모델 회전 고려
     this.createWeaponModel();
   }
