@@ -1,5 +1,6 @@
 import { Scene, Vector3, MeshBuilder, StandardMaterial, Color3, PointLight } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
+import { AssetLoader } from '../AssetLoader';
 import type { BasePawn } from '../BasePawn';
 
 /**
@@ -9,6 +10,7 @@ export class WeaponEffectComponent extends BaseComponent {
   private flashMaterial: StandardMaterial;
   private hitSparkMaterial: StandardMaterial;
   private muzzleLight: PointLight;
+  private gunshotSound: any;
 
   constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
@@ -22,9 +24,20 @@ export class WeaponEffectComponent extends BaseComponent {
     this.hitSparkMaterial.emissiveColor = new Color3(1, 0.8, 0.3);
 
     this.muzzleLight = new PointLight('weaponEffectLight', Vector3.Zero(), this.scene);
-    this.muzzleLight.intensity = 0;
     this.muzzleLight.range = 4;
     this.muzzleLight.diffuse = new Color3(1, 0.8, 0.4);
+
+    // 총성 사운드 가져오기 (이미 AssetLoader에서 로드됨)
+    this.gunshotSound = AssetLoader.getInstance().getSound('gunshot');
+  }
+
+  /** 총성 재생 */
+  public playGunshot(): void {
+    const sound = this.gunshotSound || AssetLoader.getInstance().getSound('gunshot');
+    if (sound) {
+      this.gunshotSound = sound;
+      sound.play();
+    }
   }
 
   /** 총구 화염 이펙트 실행 */

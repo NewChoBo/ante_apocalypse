@@ -38,6 +38,8 @@ export class CombatComponent extends BaseComponent {
     // 2. 총구 화염 연결 (Observable 사용)
     GameObservables.weaponFire.add(() => {
       const weapon = this.weaponSystem.getCurrentWeapon();
+      this.effectComponent.playGunshot(); // 사운드 재생 추가
+
       if ('getMuzzleTransform' in weapon) {
         const { position, direction, transformNode } = (
           weapon as unknown as IMuzzleProvider

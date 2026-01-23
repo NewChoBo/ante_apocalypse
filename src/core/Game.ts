@@ -16,6 +16,7 @@ import { HUD } from '../ui/HUD';
 import { gameStateStore } from './store/GameStore.ts';
 import { CombatComponent } from './components/CombatComponent';
 import { TickManager } from './TickManager';
+import { AssetLoader } from './AssetLoader';
 
 export class Game {
   private canvas!: HTMLCanvasElement;
@@ -92,6 +93,30 @@ export class Game {
     // 무기 시스템 (이제 Pawn의 CombatComponent가 소유)
     const combatComp = new CombatComponent(playerPawn, this.scene, targetManager);
     playerPawn.addComponent(combatComp);
+
+    // 에셋 프리로딩 시작
+    this.initPreloading();
+  }
+
+  private async initPreloading(): Promise<void> {
+    const startBtn = document.getElementById('start-button') as HTMLButtonElement;
+    if (startBtn) {
+      startBtn.disabled = true;
+      startBtn.innerText = '로딩 중...';
+    }
+
+    try {
+      await AssetLoader.getInstance().load(this.scene);
+      if (startBtn) {
+        startBtn.disabled = false;
+        startBtn.innerText = '시작하기';
+      }
+    } catch (e) {
+      console.error('Failed to preload assets:', e);
+      if (startBtn) {
+        startBtn.innerText = '로드 실패';
+      }
+    }
   }
 
   public start(): void {
@@ -107,6 +132,12 @@ export class Game {
 
     // 포인터 잠금
     this.canvas.requestPointerLock();
+
+    // 오디오 엔진 언락 (Audio V2 대응)
+    const audioEngine = AssetLoader.getInstance().getAudioEngine();
+    if (audioEngine) {
+      audioEngine.resumeAsync().catch((e) => console.error('Failed to resume AudioEngine:', e));
+    }
 
     // 렌더 루프 시작
     this.engine.runRenderLoop(() => {
