@@ -1,4 +1,4 @@
-import { Scene, UniversalCamera } from '@babylonjs/core';
+import { Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon.ts';
 import { TargetManager } from '../targets/TargetManager.ts';
 
@@ -25,6 +25,51 @@ export abstract class MeleeWeapon extends BaseWeapon {
   }
 
   public abstract swing(): boolean;
+
+  /**
+   * 볼륨 기반 근접 공격 판정 (Bounding Box 거리 및 각도 체크)
+   */
+  protected checkMeleeHit(): { targetId: string; part: string; pickedPoint: Vector3 } | null {
+    // 카메라의 월드 포지션 가져오기 (부모가 있을 경우 position은 로컬좌표이므로 absolutePosition 사용)
+    const camPos = this.camera.globalPosition;
+    const camForward = this.camera.getForwardRay().direction;
+    const targets = this.targetManager.getAllTargets();
+
+    let closestTarget: { targetId: string; part: string; pickedPoint: Vector3 } | null = null;
+    let minDistance = this.range;
+
+    for (const target of targets) {
+      if (!target.mesh) continue;
+
+      // 월드 행렬 강제 업데이트 (정밀한 위치 보정)
+      target.mesh.computeWorldMatrix(true);
+      const targetPos = target.mesh.absolutePosition;
+
+      // 메쉬의 중심과의 거리 (피벗 기준)
+      const distance = Vector3.Distance(camPos, targetPos);
+
+      // 타겟이 충분히 가깝다면 (사거리 보정 포함 - 히트박스 두께를 고려하여 +1.0m 보정)
+      if (distance <= this.range + 1.0) {
+        // 방향 체크 (카메라 전방 90도 이내로 넉넉하게)
+        const toTarget = targetPos.subtract(camPos).normalize();
+        const dot = Vector3.Dot(camForward, toTarget);
+
+        // 1. 거리가 매우 가깝거나 (범위 내 인접) 2. 전방 각도 안에 있으면 히트 인정
+        if (distance < 1.0 || dot > 0.1) {
+          if (distance < minDistance) {
+            minDistance = distance;
+            closestTarget = {
+              targetId: target.id,
+              part: 'body',
+              pickedPoint: targetPos,
+            };
+          }
+        }
+      }
+    }
+
+    return closestTarget;
+  }
 
   public startFire(): void {
     this.fire();

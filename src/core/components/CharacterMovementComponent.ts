@@ -1,5 +1,7 @@
 import { Vector3, Scene, Ray } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
+import { MeleeWeapon } from '../../weapons/MeleeWeapon';
+import { CombatComponent } from './CombatComponent';
 import type { BasePawn } from '../BasePawn';
 
 export interface MovementInput {
@@ -43,10 +45,13 @@ export class CharacterMovementComponent extends BaseComponent {
     // 부드러운 전환을 위해 보간 사용 (옵션, 여기서는 즉시 변경)
     this.currentHeight = targetHeight;
 
+    const combatComp = this.owner.getComponent(CombatComponent) as any;
+    const isMelee = combatComp && combatComp.getCurrentWeapon() instanceof MeleeWeapon;
+
     let speed = this.moveSpeed;
     if (input.crouch && this.isGrounded) {
       speed *= this.crouchMultiplier;
-    } else if (input.aim && this.isGrounded) {
+    } else if (input.aim && this.isGrounded && !isMelee) {
       speed *= this.aimMultiplier;
     } else if (input.sprint) {
       speed *= this.sprintMultiplier;

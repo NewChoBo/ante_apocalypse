@@ -17,7 +17,7 @@ import { GameObservables } from '../core/events/GameObservables.ts';
 export class Bat extends MeleeWeapon {
   public name = 'Bat';
   public damage = 100;
-  public range = 3.5;
+  public range = 6.0;
 
   private swingAnimationTimer = 0;
   private isAnimating = false;
@@ -71,19 +71,20 @@ export class Bat extends MeleeWeapon {
       fireType: 'melee',
     });
 
-    // 공격 판정
-    const ray = this.camera.getForwardRay(this.range);
-    const hit = this.scene.pickWithRay(ray, (mesh) => {
-      return mesh.isPickable && mesh.name.startsWith('target');
-    });
+    // 공격 판정 (보정된 다중 레이캐스트 적용)
+    const hitResult = this.checkMeleeHit();
 
-    if (hit?.hit && hit.pickedMesh) {
-      const meshName = hit.pickedMesh.name;
-      const nameParts = meshName.split('_');
-      const targetId = `${nameParts[0]}_${nameParts[1]}`;
-      const part = nameParts[2] || 'body';
-
+    if (hitResult) {
+      const { targetId, part, pickedPoint } = hitResult;
       const destroyed = this.targetManager.hitTarget(targetId, part, this.damage);
+
+      // 히트 이벤트 발행 (이펙트 연출용)
+      GameObservables.targetHit.notifyObservers({
+        targetId,
+        part,
+        damage: this.damage,
+        position: pickedPoint,
+      });
 
       if (this.onScoreCallback) {
         const score = destroyed ? 200 : 50;

@@ -91,6 +91,11 @@ export class TargetManager implements ITickable {
     }, 1500);
   }
 
+  /** 모든 활성 타겟 목록 반환 */
+  public getAllTargets(): ITarget[] {
+    return Array.from(this.targets.values()).filter((t) => t.isActive);
+  }
+
   public getActiveTargetCount(): number {
     return this.targets.size;
   }

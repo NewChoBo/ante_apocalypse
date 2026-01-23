@@ -44,6 +44,10 @@ export class CombatComponent extends BaseComponent {
     return this.weaponSystem;
   }
 
+  public getCurrentWeapon() {
+    return this.weaponSystem.getCurrentWeapon();
+  }
+
   public dispose(): void {
     super.dispose();
     // WeaponSystem에 dispose가 있다면 호출 필요 (현재는 event listener 제거 등)

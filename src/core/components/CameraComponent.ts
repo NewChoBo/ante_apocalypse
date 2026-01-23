@@ -1,5 +1,7 @@
 import { UniversalCamera, Vector3, Scene } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
+import { MeleeWeapon } from '../../weapons/MeleeWeapon';
+import { CombatComponent } from './CombatComponent';
 import type { BasePawn } from '../BasePawn';
 
 export interface RotationInput {
@@ -60,8 +62,11 @@ export class CameraComponent extends BaseComponent {
   }
 
   public update(deltaTime: number): void {
-    // FOV 보간 (정조준 줌 효과)
-    const targetFOV = this.isAiming ? this.adsFOV : this.defaultFOV;
+    const combatComp = this.owner.getComponent(CombatComponent) as any;
+    const isMelee = combatComp && combatComp.getCurrentWeapon() instanceof MeleeWeapon;
+
+    // 근접 무기이거나 정조준이 아니면 기본 FOV, 총기류이면서 정조준 중이면 ADS FOV
+    const targetFOV = this.isAiming && !isMelee ? this.adsFOV : this.defaultFOV;
     this.currentFOV = this.currentFOV + (targetFOV - this.currentFOV) * (10 * deltaTime);
     this.camera.fov = this.currentFOV;
   }
