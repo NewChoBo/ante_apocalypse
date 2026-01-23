@@ -13,6 +13,7 @@ export class PlayerController extends BaseController {
     right: false,
     sprint: false,
     jump: false,
+    crouch: false,
   };
 
   private mouseDelta = { x: 0, y: 0 };
@@ -54,6 +55,9 @@ export class PlayerController extends BaseController {
         break;
       case 'Space':
         this.keys.jump = isPressed;
+        break;
+      case 'ControlLeft':
+        this.keys.crouch = isPressed;
         break;
     }
   }

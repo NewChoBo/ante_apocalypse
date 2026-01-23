@@ -9,6 +9,7 @@ export interface InputState {
   right: boolean;
   sprint: boolean;
   jump: boolean;
+  crouch: boolean;
 }
 
 export interface MouseDelta {

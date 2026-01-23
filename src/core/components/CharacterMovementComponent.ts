@@ -9,6 +9,7 @@ export interface MovementInput {
   right: boolean;
   sprint: boolean;
   jump: boolean;
+  crouch: boolean;
 }
 
 /**
@@ -16,22 +17,37 @@ export interface MovementInput {
  */
 export class CharacterMovementComponent extends BaseComponent {
   private playerHeight = 1.8;
+  private crouchHeight = 1.0;
   private moveSpeed = 8;
   private sprintMultiplier = 1.6;
+  private crouchMultiplier = 0.5;
 
   // 중력/상태 변수
   private velocityY = 0;
   private gravity = -25;
   private jumpForce = 9;
   private isGrounded = false;
+  private currentHeight = 1.8;
 
   constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
+    this.currentHeight = this.playerHeight;
   }
 
   /** 입력 데이터에 기반해 이동 처리 */
   public handleMovement(input: MovementInput, deltaTime: number): void {
-    const speed = this.moveSpeed * (input.sprint ? this.sprintMultiplier : 1);
+    // 1. 앉기 상태 처리 (높이 변경)
+    const targetHeight = input.crouch ? this.crouchHeight : this.playerHeight;
+    // 부드러운 전환을 위해 보간 사용 (옵션, 여기서는 즉시 변경)
+    this.currentHeight = targetHeight;
+
+    let speed = this.moveSpeed;
+    if (input.crouch && this.isGrounded) {
+      speed *= this.crouchMultiplier;
+    } else if (input.sprint) {
+      speed *= this.sprintMultiplier;
+    }
+
     const forward = this.owner.mesh.getDirection(Vector3.Forward());
     const right = this.owner.mesh.getDirection(Vector3.Right());
 
@@ -46,8 +62,8 @@ export class CharacterMovementComponent extends BaseComponent {
       this.owner.mesh.position.addInPlace(moveDirection.scale(speed * deltaTime));
     }
 
-    // 점프 시도
-    if (this.isGrounded && input.jump) {
+    // 2. 점프 시도 (앉아있을 때는 점프 불가)
+    if (this.isGrounded && input.jump && !input.crouch) {
       this.velocityY = this.jumpForce;
       this.isGrounded = false;
     }
@@ -60,24 +76,24 @@ export class CharacterMovementComponent extends BaseComponent {
   private updateGravity(deltaTime: number): void {
     this.checkGround();
 
-    if (this.isGrounded) {
+    if (this.isGrounded && this.velocityY < 0) {
       this.velocityY = 0;
-    } else {
+    } else if (!this.isGrounded) {
       this.velocityY += this.gravity * deltaTime;
     }
 
     this.owner.mesh.position.y += this.velocityY * deltaTime;
 
     // 최소 높이 안전장치
-    if (this.owner.mesh.position.y < this.playerHeight) {
-      this.owner.mesh.position.y = this.playerHeight;
+    if (this.owner.mesh.position.y < this.currentHeight) {
+      this.owner.mesh.position.y = this.currentHeight;
       this.velocityY = 0;
       this.isGrounded = true;
     }
   }
 
   private checkGround(): void {
-    const ray = new Ray(this.owner.mesh.position, Vector3.Down(), this.playerHeight + 0.1);
+    const ray = new Ray(this.owner.mesh.position, Vector3.Down(), this.currentHeight + 0.1);
     const pickInfo = this.scene.pickWithRay(ray, (m) => m.isPickable && m !== this.owner.mesh);
     this.isGrounded = !!pickInfo?.hit;
   }
