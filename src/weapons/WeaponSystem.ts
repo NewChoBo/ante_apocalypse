@@ -48,11 +48,13 @@ export class WeaponSystem {
 
   private emitAmmoUpdate(): void {
     // NanoStores 업데이트 (이제 HUD는 이 스토어를 구독합니다)
+    // IFirearm 속성이 있는지 체크하여 탄약 UI 표시 여부 결정
+    const firearm = this.currentWeapon as any;
     ammoStore.set({
       weaponName: this.currentWeapon.name,
-      current: this.currentAmmo,
-      reserve: this.reserveAmmo,
-      showAmmo: this.currentWeapon instanceof Firearm,
+      current: firearm.currentAmmo !== undefined ? firearm.currentAmmo : 0,
+      reserve: firearm.reserveAmmo !== undefined ? firearm.reserveAmmo : 0,
+      showAmmo: firearm.currentAmmo !== undefined,
     });
   }
 
@@ -92,8 +94,9 @@ export class WeaponSystem {
           this.switchWeapon(3);
           break;
         case 'KeyR':
-          if (this.currentWeapon instanceof Firearm) {
-            this.currentWeapon.reload();
+          const gun = this.currentWeapon as any;
+          if (gun.reload && typeof gun.reload === 'function') {
+            gun.reload();
           }
           break;
       }

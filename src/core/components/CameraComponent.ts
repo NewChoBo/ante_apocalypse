@@ -1,6 +1,5 @@
 import { UniversalCamera, Vector3, Scene } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
-import { MeleeWeapon } from '../../weapons/MeleeWeapon';
 import { CombatComponent } from './CombatComponent';
 import type { BasePawn } from '../BasePawn';
 
@@ -20,9 +19,7 @@ export class CameraComponent extends BaseComponent {
 
   // ADS & Recoil 관련 변수
   private defaultFOV = 1.2;
-  private adsFOV = 0.8;
   private currentFOV = 1.2;
-  private isAiming = false;
 
   constructor(owner: BasePawn, scene: Scene, initialHeight: number = 0) {
     super(owner, scene);
@@ -56,17 +53,15 @@ export class CameraComponent extends BaseComponent {
     this.camera.rotation.x -= force;
   }
 
-  /** 정조준 상태 설정 */
-  public setAiming(active: boolean): void {
-    this.isAiming = active;
-  }
+  /* 정조준 상태는 이제 무기 시스템에서 직접 관리하므로 더 이상 카메라 컴포넌트에서 추적할 필요가 없습니다. */
 
   public update(deltaTime: number): void {
-    const combatComp = this.owner.getComponent(CombatComponent) as any;
-    const isMelee = combatComp && combatComp.getCurrentWeapon() instanceof MeleeWeapon;
+    const combatComp = this.owner.getComponent(CombatComponent);
+    if (!combatComp) return;
 
-    // 근접 무기이거나 정조준이 아니면 기본 FOV, 총기류이면서 정조준 중이면 ADS FOV
-    const targetFOV = this.isAiming && !isMelee ? this.adsFOV : this.defaultFOV;
+    const weapon = combatComp.getCurrentWeapon();
+    const targetFOV = weapon ? weapon.getDesiredFOV(this.defaultFOV) : this.defaultFOV;
+
     this.currentFOV = this.currentFOV + (targetFOV - this.currentFOV) * (10 * deltaTime);
     this.camera.fov = this.currentFOV;
   }

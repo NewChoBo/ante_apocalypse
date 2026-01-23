@@ -45,6 +45,12 @@ export interface IWeapon {
   /** 무기 모델 숨기기 */
   hide(): void;
 
+  /** 현재 상태에 따른 이동 속도 배수 반환 */
+  getMovementSpeedMultiplier(): number;
+
+  /** 현재 상태에 따른 원하는 FOV 반환 */
+  getDesiredFOV(defaultFOV: number): number;
+
   /** 정조준 상태 설정 */
   setAiming(isAiming: boolean): void;
 }

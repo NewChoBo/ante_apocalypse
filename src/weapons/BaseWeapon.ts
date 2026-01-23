@@ -20,6 +20,14 @@ export abstract class BaseWeapon implements IWeapon {
   public isActive = false;
   public isAiming = false;
 
+  public getMovementSpeedMultiplier(): number {
+    return 1.0;
+  }
+
+  public getDesiredFOV(defaultFOV: number): number {
+    return defaultFOV;
+  }
+
   constructor(
     scene: Scene,
     camera: UniversalCamera,

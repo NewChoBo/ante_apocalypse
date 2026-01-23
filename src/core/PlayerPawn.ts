@@ -63,8 +63,7 @@ export class PlayerPawn extends BasePawn {
     // 1. 회전 처리를 컴포넌트에 위임
     this.cameraComponent.handleRotation(mouseDelta);
 
-    // 2. 정조준 상태 업데이트
-    this.cameraComponent.setAiming(keys.aim);
+    // 2. 정조준 상태 업데이트 (무기 시스템에서 통합 관리)
     const combatComp = this.getComponent(CombatComponent);
     if (combatComp instanceof CombatComponent) {
       combatComp.setAiming(keys.aim);

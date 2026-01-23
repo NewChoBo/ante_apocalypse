@@ -10,6 +10,14 @@ export abstract class MeleeWeapon extends BaseWeapon {
   protected isSwinging = false;
   protected lastSwingTime = 0;
 
+  public getMovementSpeedMultiplier(): number {
+    return 1.0;
+  }
+
+  public getDesiredFOV(defaultFOV: number): number {
+    return defaultFOV;
+  }
+
   constructor(
     scene: Scene,
     camera: UniversalCamera,

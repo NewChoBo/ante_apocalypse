@@ -19,6 +19,14 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
   public abstract firingMode: 'semi' | 'auto';
   public abstract recoilForce: number;
 
+  public getMovementSpeedMultiplier(): number {
+    return this.isAiming ? 0.4 : 1.0;
+  }
+
+  public getDesiredFOV(defaultFOV: number): number {
+    return this.isAiming ? 0.8 : defaultFOV;
+  }
+
   protected applyRecoilCallback?: (force: number) => void;
 
   protected isReloading = false;
