@@ -2,7 +2,8 @@ import { Scene } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { WeaponSystem } from '../../weapons/WeaponSystem';
 import { TargetManager } from '../../targets/TargetManager';
-import { WeaponEffectComponent } from './WeaponEffectComponent';
+import { FirearmEffectComponent } from './FirearmEffectComponent';
+import { MeleeEffectComponent } from './MeleeEffectComponent';
 import { CameraComponent } from './CameraComponent';
 import type { BasePawn } from '../BasePawn';
 
@@ -26,8 +27,9 @@ export class CombatComponent extends BaseComponent {
       cameraComp.applyRecoil(force)
     );
 
-    // 이펙트 컴포넌트 초기화 (생성자 내부에서 자체적으로 이벤트 구독)
-    new WeaponEffectComponent(owner, scene);
+    // 특수화된 이펙트 컴포넌트들 초기화 (각자 담당하는 무기 타입 이벤트 구독)
+    new FirearmEffectComponent(owner, scene);
+    new MeleeEffectComponent(owner, scene);
   }
 
   public setAiming(isAiming: boolean): void {
