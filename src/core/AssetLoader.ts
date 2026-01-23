@@ -27,24 +27,30 @@ export class AssetLoader {
   public async load(_scene: Scene): Promise<void> {
     if (this.isLoaded) return;
 
-    console.log('Starting asset preloading (Audio V2)...');
-
     try {
-      // 오디오 엔진 생성
       this.audioEngine = await CreateAudioEngineAsync();
-      console.log('AudioEngine V2 created.');
 
-      // 총성 사운드 생성 (비동기)
-      const sound = await this.audioEngine.createSoundAsync('gunshot', '/sounds/gunshot.wav', {
-        volume: 0.5,
-      });
+      const gunshotSound = await this.audioEngine.createSoundAsync(
+        'gunshot',
+        '/sounds/gunshot.wav',
+        {
+          volume: 0.5,
+        }
+      );
+      this.sounds.set('gunshot', gunshotSound);
 
-      console.log('Local gunshot sound preloaded successfully (Audio V2).');
-      this.sounds.set('gunshot', sound);
+      try {
+        const swipeSound = await this.audioEngine.createSoundAsync('swipe', '/sounds/swipe.wav', {
+          volume: 0.6,
+        });
+        this.sounds.set('swipe', swipeSound);
+      } catch (e) {
+        console.warn('Swipe sound not found, placeholder used.');
+      }
+
       this.isLoaded = true;
     } catch (e) {
-      console.error('Failed to preload assets (Audio V2):', e);
-      // 실패해도 게임은 시작할 수 있게 함
+      console.error('Failed to preload assets:', e);
       this.isLoaded = true;
     }
   }

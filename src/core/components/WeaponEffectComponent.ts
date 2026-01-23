@@ -1,6 +1,7 @@
 import { Scene, Vector3, MeshBuilder, StandardMaterial, Color3, PointLight } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { AssetLoader } from '../AssetLoader';
+import { GameObservables } from '../events/GameObservables.ts';
 import type { BasePawn } from '../BasePawn';
 
 /**
@@ -11,6 +12,7 @@ export class WeaponEffectComponent extends BaseComponent {
   private hitSparkMaterial: StandardMaterial;
   private muzzleLight: PointLight;
   private gunshotSound: any;
+  private swipeSound: any;
 
   constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
@@ -27,15 +29,46 @@ export class WeaponEffectComponent extends BaseComponent {
     this.muzzleLight.range = 4;
     this.muzzleLight.diffuse = new Color3(1, 0.8, 0.4);
 
-    // 총성 사운드 가져오기 (이미 AssetLoader에서 로드됨)
+    // 사운드 가져오기
     this.gunshotSound = AssetLoader.getInstance().getSound('gunshot');
+    this.swipeSound = AssetLoader.getInstance().getSound('swipe');
+
+    // 이벤트 구독 (구조 강화: 이펙트 컴포넌트가 발사 이벤트를 직접 듣고 연출 수행)
+    GameObservables.weaponFire.add((payload) => {
+      if (payload.weaponId === 'Knife') {
+        this.playSwipe();
+      } else {
+        this.playGunshot();
+        if (payload.muzzleTransform) {
+          this.emitMuzzleFlash(
+            payload.muzzleTransform.position,
+            payload.muzzleTransform.direction,
+            payload.muzzleTransform.transformNode
+          );
+        }
+      }
+    });
+
+    // 피격 이펙트 구독
+    GameObservables.targetHit.add((hitInfo) => {
+      this.emitHitSpark(hitInfo.position);
+    });
   }
 
   /** 총성 재생 */
-  public playGunshot(): void {
+  private playGunshot(): void {
     const sound = this.gunshotSound || AssetLoader.getInstance().getSound('gunshot');
     if (sound) {
       this.gunshotSound = sound;
+      sound.play();
+    }
+  }
+
+  /** 휘두르기 사운드 재생 */
+  private playSwipe(): void {
+    const sound = this.swipeSound || AssetLoader.getInstance().getSound('swipe');
+    if (sound) {
+      this.swipeSound = sound;
       sound.play();
     }
   }

@@ -16,6 +16,9 @@ export abstract class Firearm extends BaseWeapon {
   public abstract fireRate: number;
   public abstract reloadTime: number;
   public abstract firingMode: 'semi' | 'auto';
+  public abstract recoilForce: number;
+
+  protected applyRecoilCallback?: (force: number) => void;
 
   protected isReloading = false;
   protected lastFireTime = 0;
@@ -28,11 +31,13 @@ export abstract class Firearm extends BaseWeapon {
     targetManager: TargetManager,
     initialAmmo: number,
     reserveAmmo: number,
-    onScore?: (points: number) => void
+    onScore?: (points: number) => void,
+    applyRecoil?: (force: number) => void
   ) {
     super(scene, camera, targetManager, onScore);
     this.currentAmmo = initialAmmo;
     this.reserveAmmo = reserveAmmo;
+    this.applyRecoilCallback = applyRecoil;
   }
 
   /** 총구 트랜스폼 정보 제공 (IMuzzleProvider 구현) */
@@ -74,16 +79,17 @@ export abstract class Firearm extends BaseWeapon {
     this.lastFireTime = now;
     this.onFire();
 
-    // 반동 및 이펙트 콜백 호출
-    if (this.onFireCallback) {
-      this.onFireCallback();
-    }
-
     // 발사 이벤트 발행
     GameObservables.weaponFire.notifyObservers({
       weaponId: this.name,
       ammoRemaining: this.currentAmmo,
+      muzzleTransform: this.getMuzzleTransform(),
     });
+
+    // 자체 반동 처리
+    if (this.applyRecoilCallback) {
+      this.applyRecoilCallback(this.recoilForce);
+    }
 
     if (this.isActive) {
       this.updateAmmoStore();
@@ -198,6 +204,7 @@ export abstract class Firearm extends BaseWeapon {
       weaponName: this.name,
       current: this.currentAmmo,
       reserve: this.reserveAmmo,
+      showAmmo: true,
     });
   }
 

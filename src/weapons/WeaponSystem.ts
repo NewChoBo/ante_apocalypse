@@ -2,6 +2,7 @@ import { Scene, UniversalCamera } from '@babylonjs/core';
 import { IWeapon } from '../types/IWeapon.ts';
 import { Rifle } from './Rifle.ts';
 import { Pistol } from './Pistol.ts';
+import { Knife } from './Knife.ts';
 import { TargetManager } from '../targets/TargetManager.ts';
 import { scoreStore, ammoStore } from '../core/store/GameStore.ts';
 
@@ -14,12 +15,18 @@ export class WeaponSystem {
   private currentWeaponIndex = 0;
   public score = 0;
 
-  constructor(scene: Scene, camera: UniversalCamera, targetManager: TargetManager) {
+  constructor(
+    scene: Scene,
+    camera: UniversalCamera,
+    targetManager: TargetManager,
+    applyRecoil?: (force: number) => void
+  ) {
     const scoreCallback = (points: number): void => this.addScore(points);
 
     this.weapons = [
-      new Pistol(scene, camera, targetManager, scoreCallback),
-      new Rifle(scene, camera, targetManager, scoreCallback),
+      new Pistol(scene, camera, targetManager, scoreCallback, applyRecoil),
+      new Rifle(scene, camera, targetManager, scoreCallback, applyRecoil),
+      new Knife(scene, camera, targetManager, scoreCallback),
     ];
 
     // 첫 번째 무기만 표시, 나머지는 숨김
@@ -42,6 +49,7 @@ export class WeaponSystem {
       weaponName: this.currentWeapon.name,
       current: this.currentAmmo,
       reserve: this.reserveAmmo,
+      showAmmo: this.currentWeapon.name !== 'Knife',
     });
   }
 
@@ -73,6 +81,9 @@ export class WeaponSystem {
           break;
         case 'Digit2':
           this.switchWeapon(1);
+          break;
+        case 'Digit3':
+          this.switchWeapon(2);
           break;
         case 'KeyR':
           this.currentWeapon.reload();
@@ -109,13 +120,6 @@ export class WeaponSystem {
 
   public update(deltaTime: number): void {
     this.currentWeapon.update(deltaTime);
-  }
-
-  /** 모든 무기에 발사 콜백 설정 */
-  public setOnFireCallback(callback: () => void): void {
-    this.weapons.forEach((w) => {
-      w.onFireCallback = callback;
-    });
   }
 
   /** 현재 무기의 정조준 상태 설정 */

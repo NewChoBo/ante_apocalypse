@@ -18,7 +18,11 @@ export const GameObservables = {
   targetDestroyed: new Observable<TargetDestroyedInfo>(),
 
   /** 무기가 발사됨 */
-  weaponFire: new Observable<{ weaponId: string; ammoRemaining: number }>(),
+  weaponFire: new Observable<{
+    weaponId: string;
+    ammoRemaining: number;
+    muzzleTransform?: { position: Vector3; direction: Vector3; transformNode?: any };
+  }>(),
 
   /** 타격 발생 (VFX 연출용) */
   hitEffect: new Observable<{ position: Vector3; normal: Vector3 }>(),

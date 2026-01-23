@@ -19,7 +19,6 @@ export abstract class BaseWeapon implements IWeapon {
 
   public isActive = false;
   public isAiming = false;
-  public onFireCallback?: () => void;
 
   constructor(
     scene: Scene,

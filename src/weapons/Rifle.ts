@@ -22,14 +22,16 @@ export class Rifle extends Firearm {
   public range = 100;
   public reloadTime = 2.0;
   public firingMode: 'semi' | 'auto' = 'auto';
+  public recoilForce = 0.008; // 소총은 연사 속도가 빨라 반동이 적음
 
   constructor(
     scene: Scene,
     camera: UniversalCamera,
     targetManager: TargetManager,
-    onScore?: (points: number) => void
+    onScore?: (points: number) => void,
+    applyRecoil?: (force: number) => void
   ) {
-    super(scene, camera, targetManager, 30, 90, onScore);
+    super(scene, camera, targetManager, 30, 90, onScore, applyRecoil);
     this.muzzleOffset = new Vector3(0, 0.05, -0.4); // 총구 상단 정렬, 모델 회전 고려
     this.createWeaponModel();
   }
