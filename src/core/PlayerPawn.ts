@@ -1,4 +1,4 @@
-import { Mesh, Scene, UniversalCamera } from '@babylonjs/core';
+import { Mesh, Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn.ts';
 import { CharacterMovementComponent } from './components/CharacterMovementComponent';
 import { CameraComponent } from './components/CameraComponent';
@@ -33,6 +33,11 @@ export class PlayerPawn extends BasePawn {
     this.mesh = Mesh.CreateBox('playerPawn', 0.5, scene);
     this.mesh.isVisible = false; // 1인칭에서는 자신의 몸이 안보이게 함
     this.mesh.position.set(0, 1.75, -5);
+
+    // 물리 충돌 설정
+    this.mesh.checkCollisions = true;
+    this.mesh.ellipsoid = new Vector3(0.4, 0.875, 0.4); // 캐릭터의 충돌 볼륨 (너비, 높이의 절반, 깊이)
+    this.mesh.ellipsoidOffset = new Vector3(0, 0, 0);
 
     // 카메라 컴포넌트 추가 (오프셋 0: 메쉬 위치가 눈 높이임)
     this.cameraComponent = new CameraComponent(this, scene, 0);

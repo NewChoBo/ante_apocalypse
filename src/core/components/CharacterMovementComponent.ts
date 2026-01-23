@@ -59,7 +59,8 @@ export class CharacterMovementComponent extends BaseComponent {
 
     if (moveDirection.length() > 0) {
       moveDirection.normalize();
-      this.owner.mesh.position.addInPlace(moveDirection.scale(speed * deltaTime));
+      const velocity = moveDirection.scale(speed * deltaTime);
+      this.owner.mesh.moveWithCollisions(velocity);
     }
 
     // 2. 점프 시도 (앉아있을 때는 점프 불가)
@@ -82,9 +83,10 @@ export class CharacterMovementComponent extends BaseComponent {
       this.velocityY += this.gravity * deltaTime;
     }
 
-    this.owner.mesh.position.y += this.velocityY * deltaTime;
+    const gravityVelocity = new Vector3(0, this.velocityY * deltaTime, 0);
+    this.owner.mesh.moveWithCollisions(gravityVelocity);
 
-    // 최소 높이 안전장치
+    // 최소 높이 안전장치 (또는 바닥 충돌 시 처리)
     if (this.owner.mesh.position.y < this.currentHeight) {
       this.owner.mesh.position.y = this.currentHeight;
       this.velocityY = 0;
