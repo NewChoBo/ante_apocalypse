@@ -35,7 +35,7 @@ export class WeaponEffectComponent extends BaseComponent {
 
     // 이벤트 구독 (구조 강화: 이펙트 컴포넌트가 발사 이벤트를 직접 듣고 연출 수행)
     GameObservables.weaponFire.add((payload) => {
-      if (payload.weaponId === 'Knife') {
+      if (payload.fireType === 'melee') {
         this.playSwipe();
       } else {
         this.playGunshot();

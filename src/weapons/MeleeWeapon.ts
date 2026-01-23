@@ -34,10 +34,6 @@ export abstract class MeleeWeapon extends BaseWeapon {
     // 근접 무기는 보통 단발적임
   }
 
-  public reload(): void {
-    // 근접 무기는 재장전이 없음
-  }
-
   public getStats(): Record<string, unknown> {
     return {
       name: this.name,

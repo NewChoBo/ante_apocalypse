@@ -3,12 +3,13 @@ import { BaseWeapon } from './BaseWeapon.ts';
 import { TargetManager } from '../targets/TargetManager.ts';
 import { GameObservables } from '../core/events/GameObservables.ts';
 import { ammoStore } from '../core/store/GameStore.ts';
+import { IFirearm } from '../types/IWeapon.ts';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
  * 탄약 관리, 재장전, 레이캐스트 사격 로직을 포함합니다.
  */
-export abstract class Firearm extends BaseWeapon {
+export abstract class Firearm extends BaseWeapon implements IFirearm {
   public currentAmmo: number;
   public abstract magazineSize: number;
   public reserveAmmo: number;
@@ -83,6 +84,7 @@ export abstract class Firearm extends BaseWeapon {
     GameObservables.weaponFire.notifyObservers({
       weaponId: this.name,
       ammoRemaining: this.currentAmmo,
+      fireType: 'firearm',
       muzzleTransform: this.getMuzzleTransform(),
     });
 

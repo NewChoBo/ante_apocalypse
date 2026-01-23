@@ -41,9 +41,6 @@ export abstract class BaseWeapon implements IWeapon {
   /** 사용 중지 */
   public abstract stopFire(): void;
 
-  /** 재장전 (총기류 등에서 구현) */
-  public abstract reload(): void;
-
   /** 매 프레임 업데이트 */
   public abstract update(deltaTime: number): void;
 

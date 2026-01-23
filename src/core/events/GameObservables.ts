@@ -17,10 +17,10 @@ export const GameObservables = {
   /** 타겟이 파괴됨 */
   targetDestroyed: new Observable<TargetDestroyedInfo>(),
 
-  /** 무기가 발사됨 */
   weaponFire: new Observable<{
     weaponId: string;
     ammoRemaining: number;
+    fireType: 'firearm' | 'melee';
     muzzleTransform?: { position: Vector3; direction: Vector3; transformNode?: any };
   }>(),
 

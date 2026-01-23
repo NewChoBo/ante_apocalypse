@@ -5,24 +5,24 @@ import {
   Vector3,
   StandardMaterial,
   Color3,
-  Mesh,
 } from '@babylonjs/core';
 import { MeleeWeapon } from './MeleeWeapon.ts';
 import { TargetManager } from '../targets/TargetManager.ts';
 import { GameObservables } from '../core/events/GameObservables.ts';
 
 /**
- * 근접 공격용 칼(Knife) 클래스.
+ * 야구 방망이 (Bat) - 근접 무기
+ * 칼보다 공격력이 높고 사거리가 길지만, 공격 속도가 느림
  */
-export class Knife extends MeleeWeapon {
-  public name = 'Knife';
-  public damage = 50;
-  public range = 2.5;
+export class Bat extends MeleeWeapon {
+  public name = 'Bat';
+  public damage = 100;
+  public range = 3.5;
 
   private swingAnimationTimer = 0;
   private isAnimating = false;
   private defaultRotation = new Vector3(0, 0, 0);
-  private defaultPosition = new Vector3(0.4, -0.4, 0.6);
+  private defaultPosition = new Vector3(0.4, -0.5, 0.7);
 
   constructor(
     scene: Scene,
@@ -35,34 +35,23 @@ export class Knife extends MeleeWeapon {
   }
 
   private createMesh(): void {
-    // 임시 칼 매시 (박스 형태)
-    const handle = MeshBuilder.CreateBox(
-      'knifeHandle',
-      { width: 0.03, height: 0.1, depth: 0.03 },
+    // 임시 방망이 매시 (긴 원통)
+    const bat = MeshBuilder.CreateCylinder(
+      'batMesh',
+      { height: 0.8, diameterTop: 0.06, diameterBottom: 0.04 },
       this.scene
     );
-    const blade = MeshBuilder.CreateBox(
-      'knifeBlade',
-      { width: 0.01, height: 0.2, depth: 0.04 },
-      this.scene
-    );
-    blade.position.y = 0.15;
 
-    const handleMat = new StandardMaterial('handleMat', this.scene);
-    handleMat.diffuseColor = new Color3(0.2, 0.2, 0.2);
-    handle.material = handleMat;
+    const batMat = new StandardMaterial('batMat', this.scene);
+    batMat.diffuseColor = new Color3(0.6, 0.4, 0.2); // 나무 색상
+    bat.material = batMat;
 
-    const bladeMat = new StandardMaterial('bladeMat', this.scene);
-    bladeMat.diffuseColor = new Color3(0.8, 0.8, 0.8);
-    bladeMat.specularColor = new Color3(1, 1, 1);
-    blade.material = bladeMat;
-
-    this.weaponMesh = Mesh.MergeMeshes([handle, blade], true, true, undefined, false, true);
+    this.weaponMesh = bat;
     if (this.weaponMesh) {
-      this.weaponMesh.name = 'KnifeMesh';
+      this.weaponMesh.name = 'BatMesh';
       this.weaponMesh.parent = this.camera;
       this.weaponMesh.position.copyFrom(this.defaultPosition);
-      this.weaponMesh.rotation = new Vector3(Math.PI / 2, 0, 0);
+      this.weaponMesh.rotation = new Vector3(Math.PI / 2.5, 0, Math.PI / 4);
       this.defaultRotation.copyFrom(this.weaponMesh.rotation);
       this.weaponMesh.setEnabled(false);
     }
@@ -75,14 +64,14 @@ export class Knife extends MeleeWeapon {
     this.isAnimating = true;
     this.swingAnimationTimer = 0;
 
-    // 발사 이벤트 발행 (사운드 및 HUD 연동용)
+    // 공격 사운드 및 이벤트 발행 (swipe 사운드 재사용 혹은 전용 사운드)
     GameObservables.weaponFire.notifyObservers({
       weaponId: this.name,
       ammoRemaining: 0,
       fireType: 'melee',
     });
 
-    // 공격 판정 (카메라 정면 레이캐스트)
+    // 공격 판정
     const ray = this.camera.getForwardRay(this.range);
     const hit = this.scene.pickWithRay(ray, (mesh) => {
       return mesh.isPickable && mesh.name.startsWith('target');
@@ -97,15 +86,15 @@ export class Knife extends MeleeWeapon {
       const destroyed = this.targetManager.hitTarget(targetId, part, this.damage);
 
       if (this.onScoreCallback) {
-        const score = destroyed ? 150 : 30; // 근접 공격은 점수를 조금 더 줌
+        const score = destroyed ? 200 : 50;
         this.onScoreCallback(score);
       }
     }
 
-    // 일정 시간 후 공격 가능 상태로 복귀
+    // 방망이는 휘두르는 데 시간이 더 걸림 (0.8초)
     setTimeout(() => {
       this.isSwinging = false;
-    }, 400);
+    }, 800);
 
     return true;
   }
@@ -114,17 +103,15 @@ export class Knife extends MeleeWeapon {
     if (this.isAnimating && this.weaponMesh) {
       this.swingAnimationTimer += deltaTime;
 
-      // 간단한 휘두르기 애니메이션 (회전 왕복)
-      const duration = 0.4;
+      const duration = 0.8;
       const t = this.swingAnimationTimer / duration;
 
       if (t < 1.0) {
-        // 휘두를 때 앞으로 내밀고 회전
-        const swingAngle = Math.sin(t * Math.PI) * 0.8;
-        this.weaponMesh.rotation.x = this.defaultRotation.x + swingAngle;
-        this.weaponMesh.position.z = this.defaultPosition.z + Math.sin(t * Math.PI) * 0.2;
+        // 더 큰 궤적으로 휘두르기
+        const swingAngle = Math.sin(t * Math.PI) * 1.5;
+        this.weaponMesh.rotation.z = this.defaultRotation.z - swingAngle;
+        this.weaponMesh.rotation.x = this.defaultRotation.x + swingAngle * 0.5;
       } else {
-        // 애니메이션 종료
         this.isAnimating = false;
         this.weaponMesh.rotation.copyFrom(this.defaultRotation);
         this.weaponMesh.position.copyFrom(this.defaultPosition);

@@ -3,8 +3,10 @@ import { IWeapon } from '../types/IWeapon.ts';
 import { Rifle } from './Rifle.ts';
 import { Pistol } from './Pistol.ts';
 import { Knife } from './Knife.ts';
+import { Bat } from './Bat.ts';
 import { TargetManager } from '../targets/TargetManager.ts';
 import { scoreStore, ammoStore } from '../core/store/GameStore.ts';
+import { Firearm } from './Firearm.ts';
 
 /**
  * 무기 시스템 매니저.
@@ -27,6 +29,7 @@ export class WeaponSystem {
       new Pistol(scene, camera, targetManager, scoreCallback, applyRecoil),
       new Rifle(scene, camera, targetManager, scoreCallback, applyRecoil),
       new Knife(scene, camera, targetManager, scoreCallback),
+      new Bat(scene, camera, targetManager, scoreCallback),
     ];
 
     // 첫 번째 무기만 표시, 나머지는 숨김
@@ -49,7 +52,7 @@ export class WeaponSystem {
       weaponName: this.currentWeapon.name,
       current: this.currentAmmo,
       reserve: this.reserveAmmo,
-      showAmmo: this.currentWeapon.name !== 'Knife',
+      showAmmo: this.currentWeapon instanceof Firearm,
     });
   }
 
@@ -85,8 +88,13 @@ export class WeaponSystem {
         case 'Digit3':
           this.switchWeapon(2);
           break;
+        case 'Digit4':
+          this.switchWeapon(3);
+          break;
         case 'KeyR':
-          this.currentWeapon.reload();
+          if (this.currentWeapon instanceof Firearm) {
+            this.currentWeapon.reload();
+          }
           break;
       }
     });
@@ -128,11 +136,11 @@ export class WeaponSystem {
   }
 
   public get currentAmmo(): number {
-    return this.currentWeapon.currentAmmo ?? 0;
+    return this.currentWeapon instanceof Firearm ? this.currentWeapon.currentAmmo : 0;
   }
 
   public get reserveAmmo(): number {
-    return this.currentWeapon.reserveAmmo ?? 0;
+    return this.currentWeapon instanceof Firearm ? this.currentWeapon.reserveAmmo : 0;
   }
 
   public get weaponStats(): Record<string, unknown> {

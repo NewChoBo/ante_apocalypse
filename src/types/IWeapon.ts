@@ -33,9 +33,6 @@ export interface IWeapon {
   /** 공격 중지 */
   stopFire(): void;
 
-  /** 재장전 시도 (필요한 경우에만 구현) */
-  reload(): void;
-
   /** 매 프레임 업데이트 */
   update(deltaTime: number): void;
 
@@ -50,11 +47,6 @@ export interface IWeapon {
 
   /** 정조준 상태 설정 */
   setAiming(isAiming: boolean): void;
-
-  /** 현재 탄약 (총기류 등에서 사용, 기본은 선택적) */
-  currentAmmo?: number;
-  /** 예비 탄약 (총기류 등에서 사용, 기본은 선택적) */
-  reserveAmmo?: number;
 }
 
 /**
@@ -67,4 +59,5 @@ export interface IFirearm extends IWeapon, IMuzzleProvider {
   fireRate: number;
   reloadTime: number;
   firingMode: 'semi' | 'auto';
+  reload(): void;
 }
