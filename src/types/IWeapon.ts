@@ -1,3 +1,16 @@
+import { Vector3 } from '@babylonjs/core';
+
+/**
+ * 총구의 위치와 방향을 제공하는 인터페이스.
+ */
+export interface IMuzzleProvider {
+  getMuzzleTransform(): {
+    position: Vector3;
+    direction: Vector3;
+    transformNode?: any;
+  };
+}
+
 /**
  * 모든 무기(총기, 근접 무기 등)의 핵심 인터페이스.
  */
@@ -20,9 +33,6 @@ export interface IWeapon {
   /** 공격 중지 */
   stopFire(): void;
 
-  /** 재장전 시도 (필요한 경우에만 구현) */
-  reload(): void;
-
   /** 매 프레임 업데이트 */
   update(deltaTime: number): void;
 
@@ -35,23 +45,28 @@ export interface IWeapon {
   /** 무기 모델 숨기기 */
   hide(): void;
 
-  /** 자원 해제 */
-  dispose(): void;
+  /** 현재 상태에 따른 이동 속도 배수 반환 */
+  getMovementSpeedMultiplier(): number;
 
-  /** 현재 탄약 (총기류 등에서 사용, 기본은 선택적) */
-  currentAmmo?: number;
-  /** 예비 탄약 (총기류 등에서 사용, 기본은 선택적) */
-  reserveAmmo?: number;
+  /** 현재 상태에 따른 원하는 FOV 반환 */
+  getDesiredFOV(defaultFOV: number): number;
+
+  /** 정조준 상태 설정 */
+  setAiming(isAiming: boolean): void;
+
+  /** 리소스 해제 */
+  dispose(): void;
 }
 
 /**
  * 총기류 전용 인터페이스
  */
-export interface IFirearm extends IWeapon {
+export interface IFirearm extends IWeapon, IMuzzleProvider {
   currentAmmo: number;
   magazineSize: number;
   reserveAmmo: number;
   fireRate: number;
   reloadTime: number;
   firingMode: 'semi' | 'auto';
+  reload(): void;
 }

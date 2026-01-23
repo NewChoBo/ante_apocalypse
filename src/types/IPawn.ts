@@ -18,7 +18,7 @@ export interface IPawn {
   initialize(scene: Scene): void;
 
   /** 매 프레임 업데이트 */
-  update(deltaTime: number): void;
+  tick(deltaTime: number): void;
 
   /** 자원 해제 */
   dispose(): void;

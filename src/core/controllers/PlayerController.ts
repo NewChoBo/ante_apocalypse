@@ -13,6 +13,8 @@ export class PlayerController extends BaseController {
     right: false,
     sprint: false,
     jump: false,
+    crouch: false,
+    aim: false,
   };
 
   private mouseDelta = { x: 0, y: 0 };
@@ -33,6 +35,19 @@ export class PlayerController extends BaseController {
         this.mouseDelta.y += e.movementY;
       }
     });
+
+    this.canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) this.updateKeyState('MouseLeft', true);
+      if (e.button === 2) this.updateKeyState('MouseRight', true);
+    });
+
+    this.canvas.addEventListener('mouseup', (e) => {
+      if (e.button === 0) this.updateKeyState('MouseLeft', false);
+      if (e.button === 2) this.updateKeyState('MouseRight', false);
+    });
+
+    // 우클릭 컨텍스트 메뉴 방지 (정조준 용)
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   private updateKeyState(code: string, isPressed: boolean): void {
@@ -55,6 +70,12 @@ export class PlayerController extends BaseController {
       case 'Space':
         this.keys.jump = isPressed;
         break;
+      case 'ControlLeft':
+        this.keys.crouch = isPressed;
+        break;
+      case 'MouseRight':
+        this.keys.aim = isPressed;
+        break;
     }
   }
 
@@ -66,7 +87,7 @@ export class PlayerController extends BaseController {
     // 빙의 해제 시 추가 로직
   }
 
-  public update(deltaTime: number): void {
+  public tick(deltaTime: number): void {
     if (!this.possessedPawn) return;
 
     // Pawn에게 입력 데이터 전달

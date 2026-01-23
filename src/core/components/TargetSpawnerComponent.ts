@@ -1,30 +1,31 @@
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
-import { ITarget } from '../types/ITarget.ts';
-import { StaticTarget } from './StaticTarget.ts';
-import { MovingTarget } from './MovingTarget.ts';
-import { HumanoidTarget } from './HumanoidTarget.ts';
+import { ITarget } from '../../types/ITarget';
+import { StaticTarget } from '../../targets/StaticTarget';
+import { MovingTarget } from '../../targets/MovingTarget';
+import { HumanoidTarget } from '../../targets/HumanoidTarget';
+import { TargetRegistry } from '../systems/TargetRegistry';
 
 /**
- * 타겟 매니저.
- * ITarget 인터페이스를 통해 다양한 타겟 타입을 관리합니다.
+ * 타겟의 스폰 및 리스폰 로직을 담당하는 컴포넌트.
  */
-export class TargetManager {
+export class TargetSpawnerComponent {
   private scene: Scene;
   private shadowGenerator: ShadowGenerator;
-  private targets: Map<string, ITarget> = new Map();
   private targetIdCounter = 0;
+  private registry: TargetRegistry;
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
+    this.registry = TargetRegistry.getInstance();
   }
 
+  /** 초기 타겟 자동 스폰 */
   public spawnInitialTargets(): void {
     const distances = [10, 15, 20];
 
     for (let lane = 0; lane < 5; lane++) {
       const x = (lane - 2) * 7;
-
       distances.forEach((z) => {
         const isMoving = Math.random() > 0.5;
         this.spawnTarget(new Vector3(x, 1.0, z), isMoving);
@@ -32,14 +33,13 @@ export class TargetManager {
     }
   }
 
-  private spawnTarget(position: Vector3, isMoving: boolean): void {
+  /** 개별 타겟 스폰 */
+  public spawnTarget(position: Vector3, isMoving: boolean): string {
     const id = `target_${++this.targetIdCounter}`;
-
     let target: ITarget;
 
     const randomType = Math.random();
     if (randomType > 0.6) {
-      // 인간형 타겟
       target = new HumanoidTarget(
         this.scene,
         id,
@@ -52,40 +52,19 @@ export class TargetManager {
       target = new StaticTarget(this.scene, id, position, this.shadowGenerator);
     }
 
-    this.targets.set(id, target);
+    // 레지스트리에 등록
+    this.registry.register(target);
+    return id;
   }
 
-  public hitTarget(targetId: string, part: string, damage: number): boolean {
-    const target = this.targets.get(targetId);
-    if (!target || !target.isActive) return false;
-
-    target.takeDamage(damage, part);
-
-    // 파괴되었으면 맵에서 제거하고 새 타겟 스폰
-    if (!target.isActive) {
-      this.targets.delete(targetId);
-      this.scheduleRespawn();
-      return true;
-    }
-
-    return false;
-  }
-
-  private scheduleRespawn(): void {
+  /** 일정 시간 후 리스폰 예약 */
+  public scheduleRespawn(delayMs: number = 1500): void {
     setTimeout(() => {
       const lane = Math.floor(Math.random() * 5);
       const x = (lane - 2) * 7;
       const z = 10 + Math.random() * 12;
       const isMoving = Math.random() > 0.4;
       this.spawnTarget(new Vector3(x, 1.0, z), isMoving);
-    }, 1500);
-  }
-
-  public update(_deltaTime: number): void {
-    // 타겟 업데이트 (필요시 추가 로직)
-  }
-
-  public getActiveTargetCount(): number {
-    return this.targets.size;
+    }, delayMs);
   }
 }

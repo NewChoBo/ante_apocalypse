@@ -1,22 +1,15 @@
-import {
-  Scene,
-  UniversalCamera,
-  Ray,
-  Vector3,
-  MeshBuilder,
-  StandardMaterial,
-  Color3,
-} from '@babylonjs/core';
+import { Scene, UniversalCamera, Ray, Vector3 } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon.ts';
-import { TargetManager } from '../targets/TargetManager.ts';
+import { TargetRegistry } from '../core/systems/TargetRegistry';
 import { GameObservables } from '../core/events/GameObservables.ts';
 import { ammoStore } from '../core/store/GameStore.ts';
+import { IFirearm } from '../types/IWeapon.ts';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
  * 탄약 관리, 재장전, 레이캐스트 사격 로직을 포함합니다.
  */
-export abstract class Firearm extends BaseWeapon {
+export abstract class Firearm extends BaseWeapon implements IFirearm {
   public currentAmmo: number;
   public abstract magazineSize: number;
   public reserveAmmo: number;
@@ -24,22 +17,59 @@ export abstract class Firearm extends BaseWeapon {
   public abstract fireRate: number;
   public abstract reloadTime: number;
   public abstract firingMode: 'semi' | 'auto';
+  public abstract recoilForce: number;
+
+  public getMovementSpeedMultiplier(): number {
+    return this.isAiming ? 0.4 : 1.0;
+  }
+
+  public getDesiredFOV(defaultFOV: number): number {
+    return this.isAiming ? 0.8 : defaultFOV;
+  }
+
+  protected applyRecoilCallback?: (force: number) => void;
 
   protected isReloading = false;
   protected lastFireTime = 0;
   protected isFiring = false;
+  protected muzzleOffset = new Vector3(0, 0.1, 0.5);
 
   constructor(
     scene: Scene,
     camera: UniversalCamera,
-    targetManager: TargetManager,
     initialAmmo: number,
     reserveAmmo: number,
-    onScore?: (points: number) => void
+    onScore?: (points: number) => void,
+    applyRecoil?: (force: number) => void
   ) {
-    super(scene, camera, targetManager, onScore);
+    super(scene, camera, onScore);
     this.currentAmmo = initialAmmo;
     this.reserveAmmo = reserveAmmo;
+    this.applyRecoilCallback = applyRecoil;
+  }
+
+  /** 총구 트랜스폼 정보 제공 (IMuzzleProvider 구현) */
+  public getMuzzleTransform(): { position: Vector3; direction: Vector3; transformNode?: any } {
+    const forward = this.camera.getForwardRay().direction;
+
+    if (this.weaponMesh) {
+      this.camera.computeWorldMatrix();
+      this.weaponMesh.computeWorldMatrix();
+      const worldPos = Vector3.TransformCoordinates(
+        this.muzzleOffset,
+        this.weaponMesh.getWorldMatrix()
+      );
+
+      return {
+        position: worldPos,
+        direction: forward,
+        transformNode: this.weaponMesh,
+      };
+    }
+
+    // 모델이 없을 경우 카메라 위치 기준 (월드 좌표)
+    const pos = this.camera.globalPosition.add(forward.scale(0.8));
+    return { position: pos, direction: forward };
   }
 
   public fire(): boolean {
@@ -61,7 +91,14 @@ export abstract class Firearm extends BaseWeapon {
     GameObservables.weaponFire.notifyObservers({
       weaponId: this.name,
       ammoRemaining: this.currentAmmo,
+      fireType: 'firearm',
+      muzzleTransform: this.getMuzzleTransform(),
     });
+
+    // 자체 반동 처리
+    if (this.applyRecoilCallback) {
+      this.applyRecoilCallback(this.recoilForce);
+    }
 
     if (this.isActive) {
       this.updateAmmoStore();
@@ -131,7 +168,17 @@ export abstract class Firearm extends BaseWeapon {
 
   protected performRaycast(): void {
     const forwardRay = this.camera.getForwardRay(this.range);
-    const ray = new Ray(this.camera.globalPosition, forwardRay.direction, this.range);
+
+    // 탄 퍼짐 계산 (정조준 시 감소)
+    const spread = this.isAiming ? 0.01 : 0.05;
+    const randomSpread = new Vector3(
+      (Math.random() - 0.5) * spread,
+      (Math.random() - 0.5) * spread,
+      (Math.random() - 0.5) * spread
+    );
+
+    const direction = forwardRay.direction.add(randomSpread).normalize();
+    const ray = new Ray(this.camera.globalPosition, direction, this.range);
 
     const pickInfo = this.scene.pickWithRay(ray, (mesh) => {
       return mesh.isPickable && mesh.name.startsWith('target');
@@ -144,26 +191,21 @@ export abstract class Firearm extends BaseWeapon {
       const part = nameParts[2] || 'body';
 
       const isHeadshot = part === 'head';
-      const destroyed = this.targetManager.hitTarget(targetId, part, this.damage);
+      const destroyed = TargetRegistry.getInstance().hitTarget(targetId, part, this.damage);
 
       if (this.onScoreCallback) {
         const score = destroyed ? (isHeadshot ? 200 : 100) : isHeadshot ? 30 : 10;
         this.onScoreCallback(score);
       }
 
-      this.createHitEffect(pickInfo.pickedPoint!);
+      // 히트 이벤트 발행 (WeaponEffectComponent에서 구독 가능하도록)
+      GameObservables.targetHit.notifyObservers({
+        targetId,
+        part,
+        damage: this.damage,
+        position: pickInfo.pickedPoint!,
+      });
     }
-  }
-
-  protected createHitEffect(position: Vector3): void {
-    const spark = MeshBuilder.CreateSphere('hitSpark', { diameter: 0.15 }, this.scene);
-    spark.position = position;
-
-    const material = new StandardMaterial('sparkMat', this.scene);
-    material.emissiveColor = new Color3(1, 0.8, 0.3);
-    spark.material = material;
-
-    setTimeout(() => spark.dispose(), 80);
   }
 
   protected updateAmmoStore(): void {
@@ -171,10 +213,15 @@ export abstract class Firearm extends BaseWeapon {
       weaponName: this.name,
       current: this.currentAmmo,
       reserve: this.reserveAmmo,
+      showAmmo: true,
     });
   }
 
   protected abstract onFire(): void;
   protected abstract onReloadStart(): void;
   protected abstract onReloadEnd(): void;
+
+  public dispose(): void {
+    super.dispose();
+  }
 }

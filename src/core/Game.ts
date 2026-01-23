@@ -11,19 +11,17 @@ import {
 import { PlayerController } from './controllers/PlayerController';
 import { PlayerPawn } from './PlayerPawn';
 import { ShootingRange } from '../world/ShootingRange';
-import { WeaponSystem } from '../weapons/WeaponSystem';
-import { TargetManager } from '../targets/TargetManager';
+import { TargetSpawnerComponent } from './components/TargetSpawnerComponent';
 import { HUD } from '../ui/HUD';
 import { gameStateStore } from './store/GameStore.ts';
+import { CombatComponent } from './components/CombatComponent';
+import { TickManager } from './TickManager';
+import { AssetLoader } from './AssetLoader';
 
 export class Game {
   private canvas!: HTMLCanvasElement;
   private engine!: Engine;
   private scene!: Scene;
-  private playerController!: PlayerController;
-  private playerPawn!: PlayerPawn;
-  private weaponSystem!: WeaponSystem;
-  private targetManager!: TargetManager;
   private shadowGenerator!: ShadowGenerator;
 
   private isRunning = false;
@@ -81,19 +79,44 @@ export class Game {
     shootingRange.create();
 
     // 하이브리드 아키텍처 시스템 초기화
-    this.playerPawn = new PlayerPawn(this.scene);
-    this.playerController = new PlayerController('player1', this.canvas);
-    this.playerController.possess(this.playerPawn);
+    const playerPawn = new PlayerPawn(this.scene);
+    const playerController = new PlayerController('player1', this.canvas);
+    playerController.possess(playerPawn);
 
     // HUD를 다른 시스템보다 먼저 초기화하여 초기 이벤트를 수신할 수 있게 합니다.
     new HUD();
 
-    // 타겟 매니저
-    this.targetManager = new TargetManager(this.scene, this.shadowGenerator);
-    this.targetManager.spawnInitialTargets();
+    // 타겟 스폰 시스템 (Modular Component)
+    const spawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
+    spawner.spawnInitialTargets();
 
-    // 무기 시스템 (Pawn의 카메라와 연동)
-    this.weaponSystem = new WeaponSystem(this.scene, this.playerPawn.camera, this.targetManager);
+    // 무기 시스템 (이제 Pawn의 CombatComponent가 소유)
+    const combatComp = new CombatComponent(playerPawn, this.scene);
+    playerPawn.addComponent(combatComp);
+
+    // 에셋 프리로딩 시작
+    this.initPreloading();
+  }
+
+  private async initPreloading(): Promise<void> {
+    const startBtn = document.getElementById('start-button') as HTMLButtonElement;
+    if (startBtn) {
+      startBtn.disabled = true;
+      startBtn.innerText = '로딩 중...';
+    }
+
+    try {
+      await AssetLoader.getInstance().load(this.scene);
+      if (startBtn) {
+        startBtn.disabled = false;
+        startBtn.innerText = '시작하기';
+      }
+    } catch (e) {
+      console.error('Failed to preload assets:', e);
+      if (startBtn) {
+        startBtn.innerText = '로드 실패';
+      }
+    }
   }
 
   public start(): void {
@@ -110,6 +133,12 @@ export class Game {
     // 포인터 잠금
     this.canvas.requestPointerLock();
 
+    // 오디오 엔진 언락 (Audio V2 대응)
+    const audioEngine = AssetLoader.getInstance().getAudioEngine();
+    if (audioEngine) {
+      audioEngine.resumeAsync().catch((e) => console.error('Failed to resume AudioEngine:', e));
+    }
+
     // 렌더 루프 시작
     this.engine.runRenderLoop(() => {
       if (!this.isPaused) {
@@ -121,10 +150,7 @@ export class Game {
   }
 
   private update(deltaTime: number): void {
-    this.playerController.update(deltaTime);
-    this.playerPawn.update(deltaTime);
-    this.weaponSystem.update(deltaTime);
-    this.targetManager.update(deltaTime);
+    TickManager.getInstance().tick(deltaTime);
   }
 
   public pause(): void {

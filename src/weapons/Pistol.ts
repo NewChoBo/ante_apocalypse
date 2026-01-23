@@ -8,7 +8,6 @@ import {
   Animation,
 } from '@babylonjs/core';
 import { Firearm } from './Firearm.ts';
-import { TargetManager } from '../targets/TargetManager.ts';
 
 /**
  * 권총 (Pistol) - 단발
@@ -22,14 +21,16 @@ export class Pistol extends Firearm {
   public range = 50;
   public reloadTime = 1.5;
   public firingMode: 'semi' | 'auto' = 'semi';
+  public recoilForce = 0.015;
 
   constructor(
     scene: Scene,
     camera: UniversalCamera,
-    targetManager: TargetManager,
-    onScore?: (points: number) => void
+    onScore?: (points: number) => void,
+    applyRecoil?: (force: number) => void
   ) {
-    super(scene, camera, targetManager, 12, 48, onScore);
+    super(scene, camera, 12, 48, onScore, applyRecoil);
+    this.muzzleOffset = new Vector3(0, 0.05, -0.2); // 총구 상단 정렬
     this.createWeaponModel();
   }
 

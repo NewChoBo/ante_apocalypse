@@ -27,6 +27,7 @@ export class ShootingRange {
     const ground = MeshBuilder.CreateGround('ground', { width: 40, height: 60 }, this.scene);
     ground.position.y = 0;
     ground.receiveShadows = true;
+    ground.checkCollisions = true;
 
     const material = new StandardMaterial('groundMat', this.scene);
     material.diffuseColor = new Color3(0.2, 0.2, 0.22);
@@ -47,6 +48,7 @@ export class ShootingRange {
     backWall.position = new Vector3(0, 3, 25);
     backWall.material = wallMaterial;
     backWall.receiveShadows = true;
+    backWall.checkCollisions = true;
     this.shadowGenerator.addShadowCaster(backWall);
 
     // 좌우 벽
@@ -58,6 +60,7 @@ export class ShootingRange {
     leftWall.position = new Vector3(-20, 3, 0);
     leftWall.material = wallMaterial;
     leftWall.receiveShadows = true;
+    leftWall.checkCollisions = true;
 
     const rightWall = leftWall.clone('rightWall');
     rightWall.position.x = 20;
@@ -83,6 +86,7 @@ export class ShootingRange {
       // 레인 번호 표시용 기둥
       const post = MeshBuilder.CreateCylinder(`post${i}`, { height: 2, diameter: 0.2 }, this.scene);
       post.position = new Vector3(x - 2.5, 1, -5);
+      post.checkCollisions = true;
 
       const postMat = new StandardMaterial(`postMat${i}`, this.scene);
       postMat.diffuseColor = new Color3(0.8, 0.6, 0.2);

@@ -1,6 +1,5 @@
 import { Scene, Mesh, UniversalCamera } from '@babylonjs/core';
 import { IWeapon } from '../types/IWeapon.ts';
-import { TargetManager } from '../targets/TargetManager.ts';
 
 /**
  * 모든 무기의 최상위 추상 클래스.
@@ -13,21 +12,23 @@ export abstract class BaseWeapon implements IWeapon {
 
   protected scene: Scene;
   protected camera: UniversalCamera;
-  protected targetManager: TargetManager;
   protected onScoreCallback: ((points: number) => void) | null = null;
   protected weaponMesh: Mesh | null = null;
 
   public isActive = false;
+  public isAiming = false;
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    targetManager: TargetManager,
-    onScore?: (points: number) => void
-  ) {
+  public getMovementSpeedMultiplier(): number {
+    return 1.0;
+  }
+
+  public getDesiredFOV(defaultFOV: number): number {
+    return defaultFOV;
+  }
+
+  constructor(scene: Scene, camera: UniversalCamera, onScore?: (points: number) => void) {
     this.scene = scene;
     this.camera = camera;
-    this.targetManager = targetManager;
     this.onScoreCallback = onScore || null;
   }
 
@@ -39,9 +40,6 @@ export abstract class BaseWeapon implements IWeapon {
 
   /** 사용 중지 */
   public abstract stopFire(): void;
-
-  /** 재장전 (총기류 등에서 구현) */
-  public abstract reload(): void;
 
   /** 매 프레임 업데이트 */
   public abstract update(deltaTime: number): void;
@@ -62,6 +60,10 @@ export abstract class BaseWeapon implements IWeapon {
     if (this.weaponMesh) {
       this.weaponMesh.setEnabled(false);
     }
+  }
+
+  public setAiming(isAiming: boolean): void {
+    this.isAiming = isAiming;
   }
 
   public dispose(): void {
