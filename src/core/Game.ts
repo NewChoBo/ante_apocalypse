@@ -11,10 +11,10 @@ import {
 import { PlayerController } from './controllers/PlayerController';
 import { PlayerPawn } from './PlayerPawn';
 import { ShootingRange } from '../world/ShootingRange';
-import { WeaponSystem } from '../weapons/WeaponSystem';
 import { TargetManager } from '../targets/TargetManager';
 import { HUD } from '../ui/HUD';
 import { gameStateStore } from './store/GameStore.ts';
+import { CombatComponent } from './components/CombatComponent';
 
 export class Game {
   private canvas!: HTMLCanvasElement;
@@ -22,7 +22,6 @@ export class Game {
   private scene!: Scene;
   private playerController!: PlayerController;
   private playerPawn!: PlayerPawn;
-  private weaponSystem!: WeaponSystem;
   private targetManager!: TargetManager;
   private shadowGenerator!: ShadowGenerator;
 
@@ -92,8 +91,9 @@ export class Game {
     this.targetManager = new TargetManager(this.scene, this.shadowGenerator);
     this.targetManager.spawnInitialTargets();
 
-    // 무기 시스템 (Pawn의 카메라와 연동)
-    this.weaponSystem = new WeaponSystem(this.scene, this.playerPawn.camera, this.targetManager);
+    // 무기 시스템 (이제 Pawn의 CombatComponent가 소유)
+    const combatComp = new CombatComponent(this.playerPawn, this.scene, this.targetManager);
+    this.playerPawn.addComponent(combatComp);
   }
 
   public start(): void {
@@ -123,7 +123,6 @@ export class Game {
   private update(deltaTime: number): void {
     this.playerController.update(deltaTime);
     this.playerPawn.update(deltaTime);
-    this.weaponSystem.update(deltaTime);
     this.targetManager.update(deltaTime);
   }
 
