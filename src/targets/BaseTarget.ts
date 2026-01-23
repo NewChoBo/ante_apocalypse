@@ -21,11 +21,17 @@ export abstract class BaseTarget implements ITarget {
     this.health = maxHealth;
   }
 
-  public takeDamage(amount: number, hitPoint?: Vector3): void {
+  public takeDamage(amount: number, part?: string, hitPoint?: Vector3): void {
     if (!this.isActive) return;
 
-    this.health -= amount;
-    this.onHit(amount, hitPoint);
+    let finalDamage = amount;
+    if (part === 'head') {
+      finalDamage *= 3;
+      console.log(`[BaseTarget] Headshot! x3 Damage: ${finalDamage}`);
+    }
+
+    this.health -= finalDamage;
+    this.onHit(finalDamage, hitPoint);
 
     if (this.health <= 0) {
       this.health = 0;

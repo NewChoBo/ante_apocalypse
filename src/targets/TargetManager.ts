@@ -2,6 +2,7 @@ import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
 import { ITarget } from '../types/ITarget.ts';
 import { StaticTarget } from './StaticTarget.ts';
 import { MovingTarget } from './MovingTarget.ts';
+import { HumanoidTarget } from './HumanoidTarget.ts';
 
 /**
  * 타겟 매니저.
@@ -26,7 +27,7 @@ export class TargetManager {
 
       distances.forEach((z) => {
         const isMoving = Math.random() > 0.5;
-        this.spawnTarget(new Vector3(x, 1.5, z), isMoving);
+        this.spawnTarget(new Vector3(x, 1.0, z), isMoving);
       });
     }
   }
@@ -36,7 +37,16 @@ export class TargetManager {
 
     let target: ITarget;
 
-    if (isMoving) {
+    const randomType = Math.random();
+    if (randomType > 0.6) {
+      // 인간형 타겟
+      target = new HumanoidTarget(
+        this.scene,
+        id,
+        position.add(new Vector3(0, 0.5, 0)),
+        this.shadowGenerator
+      );
+    } else if (isMoving) {
       target = new MovingTarget(this.scene, id, position, this.shadowGenerator);
     } else {
       target = new StaticTarget(this.scene, id, position, this.shadowGenerator);
@@ -45,11 +55,11 @@ export class TargetManager {
     this.targets.set(id, target);
   }
 
-  public hitTarget(targetId: string, damage: number): boolean {
+  public hitTarget(targetId: string, part: string, damage: number): boolean {
     const target = this.targets.get(targetId);
     if (!target || !target.isActive) return false;
 
-    target.takeDamage(damage);
+    target.takeDamage(damage, part);
 
     // 파괴되었으면 맵에서 제거하고 새 타겟 스폰
     if (!target.isActive) {
@@ -67,7 +77,7 @@ export class TargetManager {
       const x = (lane - 2) * 7;
       const z = 10 + Math.random() * 12;
       const isMoving = Math.random() > 0.4;
-      this.spawnTarget(new Vector3(x, 1.5, z), isMoving);
+      this.spawnTarget(new Vector3(x, 1.0, z), isMoving);
     }, 1500);
   }
 

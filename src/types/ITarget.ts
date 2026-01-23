@@ -17,7 +17,7 @@ export interface ITarget {
   maxHealth: number;
 
   /** 데미지 입기 */
-  takeDamage(amount: number, hitPoint?: Vector3): void;
+  takeDamage(amount: number, part?: string, hitPoint?: Vector3): void;
 
   /** 타겟 파괴/사망 처리 */
   onDestroy(): void;

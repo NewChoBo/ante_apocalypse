@@ -71,10 +71,19 @@ export class Pistol extends BaseWeapon {
     });
 
     if (pickInfo?.hit && pickInfo.pickedMesh) {
-      const destroyed = this.targetManager.hitTarget(pickInfo.pickedMesh.name, this.damage);
+      const meshName = pickInfo.pickedMesh.name;
+      const nameParts = meshName.split('_'); // target_1_head -> ["target", "1", "head"]
+
+      const targetId = `${nameParts[0]}_${nameParts[1]}`;
+      const part = nameParts[2] || 'body';
+
+      const isHeadshot = part === 'head';
+      const destroyed = this.targetManager.hitTarget(targetId, part, this.damage);
 
       if (this.onScoreCallback) {
-        this.onScoreCallback(destroyed ? 100 : 10);
+        // 헤드샷 시 2배 점수 보너스
+        const score = destroyed ? (isHeadshot ? 200 : 100) : isHeadshot ? 30 : 10;
+        this.onScoreCallback(score);
       }
 
       this.createHitEffect(pickInfo.pickedPoint!);
