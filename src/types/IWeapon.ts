@@ -35,8 +35,11 @@ export interface IWeapon {
   /** 무기 모델 숨기기 */
   hide(): void;
 
-  /** 자원 해제 */
-  dispose(): void;
+  /** 정조준 상태 설정 */
+  setAiming(isAiming: boolean): void;
+
+  /** 발사 시 콜백 (반동 처리 등) */
+  onFireCallback?: () => void;
 
   /** 현재 탄약 (총기류 등에서 사용, 기본은 선택적) */
   currentAmmo?: number;

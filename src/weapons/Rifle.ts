@@ -53,6 +53,7 @@ export class Rifle extends Firearm {
 
   protected onFire(): void {
     this.playRecoilAnimation();
+    this.createMuzzleFlash();
     this.performRaycast();
   }
 

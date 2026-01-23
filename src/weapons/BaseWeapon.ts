@@ -18,6 +18,8 @@ export abstract class BaseWeapon implements IWeapon {
   protected weaponMesh: Mesh | null = null;
 
   public isActive = false;
+  public isAiming = false;
+  public onFireCallback?: () => void;
 
   constructor(
     scene: Scene,
@@ -62,6 +64,10 @@ export abstract class BaseWeapon implements IWeapon {
     if (this.weaponMesh) {
       this.weaponMesh.setEnabled(false);
     }
+  }
+
+  public setAiming(isAiming: boolean): void {
+    this.isAiming = isAiming;
   }
 
   public dispose(): void {

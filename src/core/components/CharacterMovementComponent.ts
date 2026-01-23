@@ -10,6 +10,7 @@ export interface MovementInput {
   sprint: boolean;
   jump: boolean;
   crouch: boolean;
+  aim: boolean;
 }
 
 /**
@@ -21,6 +22,7 @@ export class CharacterMovementComponent extends BaseComponent {
   private moveSpeed = 8;
   private sprintMultiplier = 1.6;
   private crouchMultiplier = 0.5;
+  private aimMultiplier = 0.4; // 정조준 시 속도 대폭 감소
 
   // 중력/상태 변수
   private velocityY = 0;
@@ -44,6 +46,8 @@ export class CharacterMovementComponent extends BaseComponent {
     let speed = this.moveSpeed;
     if (input.crouch && this.isGrounded) {
       speed *= this.crouchMultiplier;
+    } else if (input.aim && this.isGrounded) {
+      speed *= this.aimMultiplier;
     } else if (input.sprint) {
       speed *= this.sprintMultiplier;
     }

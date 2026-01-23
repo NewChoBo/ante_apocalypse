@@ -57,6 +57,11 @@ export abstract class Firearm extends BaseWeapon {
     this.lastFireTime = now;
     this.onFire();
 
+    // 반동 콜백 호출
+    if (this.onFireCallback) {
+      this.onFireCallback();
+    }
+
     // 발사 이벤트 발행
     GameObservables.weaponFire.notifyObservers({
       weaponId: this.name,
@@ -131,7 +136,17 @@ export abstract class Firearm extends BaseWeapon {
 
   protected performRaycast(): void {
     const forwardRay = this.camera.getForwardRay(this.range);
-    const ray = new Ray(this.camera.globalPosition, forwardRay.direction, this.range);
+
+    // 탄 퍼짐 계산 (정조준 시 감소)
+    const spread = this.isAiming ? 0.01 : 0.05;
+    const randomSpread = new Vector3(
+      (Math.random() - 0.5) * spread,
+      (Math.random() - 0.5) * spread,
+      (Math.random() - 0.5) * spread
+    );
+
+    const direction = forwardRay.direction.add(randomSpread).normalize();
+    const ray = new Ray(this.camera.globalPosition, direction, this.range);
 
     const pickInfo = this.scene.pickWithRay(ray, (mesh) => {
       return mesh.isPickable && mesh.name.startsWith('target');
@@ -175,6 +190,25 @@ export abstract class Firearm extends BaseWeapon {
   }
 
   protected abstract onFire(): void;
+
+  protected createMuzzleFlash(): void {
+    const flash = MeshBuilder.CreateSphere('muzzleFlash', { diameter: 0.2 }, this.scene);
+
+    // 카메라 살짝 앞에서 생성
+    const forward = this.camera.getForwardRay(1).direction;
+    flash.position = this.camera.globalPosition.add(forward.scale(0.5));
+
+    const mat = new StandardMaterial('flashMat', this.scene);
+    mat.emissiveColor = new Color3(1, 1, 0.5);
+    mat.alpha = 0.8;
+    flash.material = mat;
+
+    // 아주 잠깐만 보여주고 삭제
+    setTimeout(() => {
+      flash.dispose();
+    }, 30);
+  }
+
   protected abstract onReloadStart(): void;
   protected abstract onReloadEnd(): void;
 }

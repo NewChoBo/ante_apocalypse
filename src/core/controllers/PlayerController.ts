@@ -14,6 +14,7 @@ export class PlayerController extends BaseController {
     sprint: false,
     jump: false,
     crouch: false,
+    aim: false,
   };
 
   private mouseDelta = { x: 0, y: 0 };
@@ -34,6 +35,19 @@ export class PlayerController extends BaseController {
         this.mouseDelta.y += e.movementY;
       }
     });
+
+    this.canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) this.updateKeyState('MouseLeft', true);
+      if (e.button === 2) this.updateKeyState('MouseRight', true);
+    });
+
+    this.canvas.addEventListener('mouseup', (e) => {
+      if (e.button === 0) this.updateKeyState('MouseLeft', false);
+      if (e.button === 2) this.updateKeyState('MouseRight', false);
+    });
+
+    // 우클릭 컨텍스트 메뉴 방지 (정조준 용)
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
   private updateKeyState(code: string, isPressed: boolean): void {
@@ -58,6 +72,9 @@ export class PlayerController extends BaseController {
         break;
       case 'ControlLeft':
         this.keys.crouch = isPressed;
+        break;
+      case 'MouseRight':
+        this.keys.aim = isPressed;
         break;
     }
   }

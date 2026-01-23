@@ -106,6 +106,18 @@ export class WeaponSystem {
     this.currentWeapon.update(deltaTime);
   }
 
+  /** 모든 무기에 발사 콜백 설정 */
+  public setOnFireCallback(callback: () => void): void {
+    this.weapons.forEach((w) => {
+      w.onFireCallback = callback;
+    });
+  }
+
+  /** 현재 무기의 정조준 상태 설정 */
+  public setAiming(isAiming: boolean): void {
+    this.currentWeapon.setAiming(isAiming);
+  }
+
   public get currentAmmo(): number {
     return this.currentWeapon.currentAmmo ?? 0;
   }

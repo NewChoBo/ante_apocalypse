@@ -16,6 +16,12 @@ export class CameraComponent extends BaseComponent {
   private minPitch = -Math.PI / 2 + 0.1;
   private maxPitch = Math.PI / 2 - 0.1;
 
+  // ADS & Recoil 관련 변수
+  private defaultFOV = 1.2;
+  private adsFOV = 0.8;
+  private currentFOV = 1.2;
+  private isAiming = false;
+
   constructor(owner: BasePawn, scene: Scene, initialHeight: number = 0) {
     super(owner, scene);
 
@@ -23,7 +29,7 @@ export class CameraComponent extends BaseComponent {
     this.camera.parent = this.owner.mesh;
     this.camera.position.set(0, initialHeight, 0); // 기본 높이 설정
     this.camera.minZ = 0.1;
-    this.camera.fov = 1.2;
+    this.camera.fov = this.defaultFOV;
     this.camera.inputs.clear(); // 컨트롤러에서 제어하므로 입력 해제
   }
 
@@ -42,8 +48,22 @@ export class CameraComponent extends BaseComponent {
     );
   }
 
-  public update(_deltaTime: number): void {
-    // 카메라 위치나 흔들림 로직이 필요할 경우 여기에 추가
+  /** 반동 적용 */
+  public applyRecoil(force: number): void {
+    // 카메라를 위로 튕김 (X축 회전 감소)
+    this.camera.rotation.x -= force;
+  }
+
+  /** 정조준 상태 설정 */
+  public setAiming(active: boolean): void {
+    this.isAiming = active;
+  }
+
+  public update(deltaTime: number): void {
+    // FOV 보간 (정조준 줌 효과)
+    const targetFOV = this.isAiming ? this.adsFOV : this.defaultFOV;
+    this.currentFOV = this.currentFOV + (targetFOV - this.currentFOV) * (10 * deltaTime);
+    this.camera.fov = this.currentFOV;
   }
 
   public setMouseSensitivity(value: number): void {

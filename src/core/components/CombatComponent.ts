@@ -22,6 +22,15 @@ export class CombatComponent extends BaseComponent {
 
     // 무기 시스템 초기화 (Pawn의 카메라와 연동)
     this.weaponSystem = new WeaponSystem(scene, cameraComp.camera, targetManager);
+
+    // 반동 효과 연결 (무기 발사 시 카메라 킥)
+    this.weaponSystem.setOnFireCallback(() => {
+      cameraComp.applyRecoil(0.015); // 반동 강도 조절 가능
+    });
+  }
+
+  public setAiming(isAiming: boolean): void {
+    this.weaponSystem.setAiming(isAiming);
   }
 
   public update(deltaTime: number): void {

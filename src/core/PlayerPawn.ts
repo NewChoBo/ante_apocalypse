@@ -2,6 +2,7 @@ import { Mesh, Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn.ts';
 import { CharacterMovementComponent } from './components/CharacterMovementComponent';
 import { CameraComponent } from './components/CameraComponent';
+import { CombatComponent } from './components/CombatComponent';
 
 export interface InputState {
   forward: boolean;
@@ -11,6 +12,7 @@ export interface InputState {
   sprint: boolean;
   jump: boolean;
   crouch: boolean;
+  aim: boolean;
 }
 
 export interface MouseDelta {
@@ -61,7 +63,14 @@ export class PlayerPawn extends BasePawn {
     // 1. 회전 처리를 컴포넌트에 위임
     this.cameraComponent.handleRotation(mouseDelta);
 
-    // 2. 이동 처리를 컴포넌트에 위임
+    // 2. 정조준 상태 업데이트
+    this.cameraComponent.setAiming(keys.aim);
+    const combatComp = this.getComponent(CombatComponent);
+    if (combatComp instanceof CombatComponent) {
+      combatComp.setAiming(keys.aim);
+    }
+
+    // 3. 이동 처리를 컴포넌트에 위임
     this.movementComponent.handleMovement(keys, deltaTime);
   }
 
