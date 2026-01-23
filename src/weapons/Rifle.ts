@@ -30,6 +30,7 @@ export class Rifle extends Firearm {
     onScore?: (points: number) => void
   ) {
     super(scene, camera, targetManager, 30, 90, onScore);
+    this.muzzleOffset = new Vector3(0, 0.05, 0.35);
     this.createWeaponModel();
   }
 

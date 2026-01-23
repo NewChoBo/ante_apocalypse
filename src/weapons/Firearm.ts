@@ -6,6 +6,7 @@ import {
   MeshBuilder,
   StandardMaterial,
   Color3,
+  PointLight,
 } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon.ts';
 import { TargetManager } from '../targets/TargetManager.ts';
@@ -28,6 +29,12 @@ export abstract class Firearm extends BaseWeapon {
   protected isReloading = false;
   protected lastFireTime = 0;
   protected isFiring = false;
+  protected muzzleOffset = new Vector3(0, 0.1, 0.5);
+
+  // 성능 최적화 (깜빡임 방지)를 위한 재사용 자원
+  private flashMaterial: StandardMaterial;
+  private hitSparkMaterial: StandardMaterial;
+  private muzzleLight: PointLight;
 
   constructor(
     scene: Scene,
@@ -40,6 +47,19 @@ export abstract class Firearm extends BaseWeapon {
     super(scene, camera, targetManager, onScore);
     this.currentAmmo = initialAmmo;
     this.reserveAmmo = reserveAmmo;
+
+    // 자원 미리 생성 (첫 사격 시 셰이더 컴파일 지연 방지)
+    this.flashMaterial = new StandardMaterial('muzzleFlashMat', this.scene);
+    this.flashMaterial.emissiveColor = new Color3(1, 1, 0.6);
+    this.flashMaterial.disableLighting = true;
+
+    this.hitSparkMaterial = new StandardMaterial('hitSparkMat', this.scene);
+    this.hitSparkMaterial.emissiveColor = new Color3(1, 0.8, 0.3);
+
+    this.muzzleLight = new PointLight('muzzleLight', Vector3.Zero(), this.scene);
+    this.muzzleLight.intensity = 0; // 초기 상태는 끔
+    this.muzzleLight.range = 4;
+    this.muzzleLight.diffuse = new Color3(1, 0.8, 0.4);
   }
 
   public fire(): boolean {
@@ -171,12 +191,9 @@ export abstract class Firearm extends BaseWeapon {
   }
 
   protected createHitEffect(position: Vector3): void {
-    const spark = MeshBuilder.CreateSphere('hitSpark', { diameter: 0.15 }, this.scene);
+    const spark = MeshBuilder.CreateSphere('hitSpark', { diameter: 0.05 }, this.scene);
     spark.position = position;
-
-    const material = new StandardMaterial('sparkMat', this.scene);
-    material.emissiveColor = new Color3(1, 0.8, 0.3);
-    spark.material = material;
+    spark.material = this.hitSparkMaterial;
 
     setTimeout(() => spark.dispose(), 80);
   }
@@ -191,24 +208,38 @@ export abstract class Firearm extends BaseWeapon {
 
   protected abstract onFire(): void;
 
+  /** 총구 화염 효과 생성 */
   protected createMuzzleFlash(): void {
-    const flash = MeshBuilder.CreateSphere('muzzleFlash', { diameter: 0.2 }, this.scene);
+    const flash = MeshBuilder.CreateSphere('muzzleFlash', { diameter: 0.15 }, this.scene);
+    flash.isPickable = false;
+    flash.material = this.flashMaterial;
 
-    // 카메라 살짝 앞에서 생성
-    const forward = this.camera.getForwardRay(1).direction;
-    flash.position = this.camera.globalPosition.add(forward.scale(0.5));
+    if (this.weaponMesh) {
+      flash.parent = this.camera;
+      flash.position = this.weaponMesh.position.add(this.muzzleOffset);
+    } else {
+      const forward = this.camera.getForwardRay(1).direction;
+      flash.position = this.camera.globalPosition.add(forward.scale(1.0));
+    }
 
-    const mat = new StandardMaterial('flashMat', this.scene);
-    mat.emissiveColor = new Color3(1, 1, 0.5);
-    mat.alpha = 0.8;
-    flash.material = mat;
+    // 미리 생성해둔 조명 켜기 및 위치 이동
+    flash.computeWorldMatrix(true);
+    this.muzzleLight.position.copyFrom(flash.absolutePosition);
+    this.muzzleLight.intensity = 0.8;
 
-    // 아주 잠깐만 보여주고 삭제
     setTimeout(() => {
       flash.dispose();
-    }, 30);
+      this.muzzleLight.intensity = 0;
+    }, 60);
   }
 
   protected abstract onReloadStart(): void;
   protected abstract onReloadEnd(): void;
+
+  public dispose(): void {
+    super.dispose();
+    if (this.flashMaterial) this.flashMaterial.dispose();
+    if (this.hitSparkMaterial) this.hitSparkMaterial.dispose();
+    if (this.muzzleLight) this.muzzleLight.dispose();
+  }
 }
