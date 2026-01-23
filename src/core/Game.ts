@@ -23,7 +23,6 @@ export class Game {
   private playerPawn!: PlayerPawn;
   private weaponSystem!: WeaponSystem;
   private targetManager!: TargetManager;
-  private hud!: HUD;
   private shadowGenerator!: ShadowGenerator;
 
   private isRunning = false;
@@ -85,15 +84,15 @@ export class Game {
     this.playerController = new PlayerController('player1', this.canvas);
     this.playerController.possess(this.playerPawn);
 
+    // HUD를 다른 시스템보다 먼저 초기화하여 초기 이벤트를 수신할 수 있게 합니다.
+    new HUD();
+
     // 타겟 매니저
     this.targetManager = new TargetManager(this.scene, this.shadowGenerator);
     this.targetManager.spawnInitialTargets();
 
     // 무기 시스템 (Pawn의 카메라와 연동)
     this.weaponSystem = new WeaponSystem(this.scene, this.playerPawn.camera, this.targetManager);
-
-    // HUD
-    this.hud = new HUD();
   }
 
   public start(): void {

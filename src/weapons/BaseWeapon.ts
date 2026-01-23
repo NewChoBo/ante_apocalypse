@@ -117,7 +117,7 @@ export abstract class BaseWeapon implements IWeapon {
   protected abstract onReloadStart(): void;
   protected abstract onReloadEnd(): void;
 
-  public getStats(): any {
+  public getStats(): Record<string, unknown> {
     return {
       name: this.name,
       damage: this.damage,

@@ -1,19 +1,12 @@
+import { WeaponEventMap } from './events/WeaponEvents.ts';
+import { TargetEventMap } from './events/TargetEvents.ts';
+import { CoreEventMap } from './events/CoreEvents.ts';
+
 /**
- * 각 이벤트 이름과 그에 대응하는 페이로드(데이터) 타입을 정의합니다.
+ * 프로젝트의 모든 독립적인 이벤트 맵들을 하나로 통합합니다.
+ * 이 방식은 유지보수성과 확장성을 높이며 파일 간 순환 참조를 방지합니다.
  */
-export interface EventMap {
-  [GameEvents.WEAPON_FIRE]: { weaponId: string; ammoRemaining: number };
-  [GameEvents.WEAPON_RELOAD]: { weaponId: string };
-  [GameEvents.WEAPON_AMMO_CHANGED]: { weaponId: string; current: number; reserve: number };
-  [GameEvents.GAME_START]: void;
-  [GameEvents.GAME_PAUSE]: void;
-  [GameEvents.GAME_RESUME]: void;
-  [GameEvents.GAME_OVER]: { score: number; reason: string };
-  [GameEvents.SCORE_CHANGED]: { newScore: number };
-  [GameEvents.TARGET_DESTROYED]: { targetId: string; points: number };
-  [GameEvents.SETTINGS_CHANGED]: { key: string; value: any };
-  [GameEvents.LOCALE_CHANGED]: { locale: string };
-}
+export interface EventMap extends WeaponEventMap, TargetEventMap, CoreEventMap {}
 
 /**
  * 이벤트 핸들러 콜백의 타입 정의.

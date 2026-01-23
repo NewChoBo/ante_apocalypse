@@ -16,7 +16,7 @@ export class WeaponSystem {
   public score = 0;
 
   constructor(scene: Scene, camera: UniversalCamera, targetManager: TargetManager) {
-    const scoreCallback = (points: number) => this.addScore(points);
+    const scoreCallback = (points: number): void => this.addScore(points);
 
     this.weapons = [
       new Pistol(scene, camera, targetManager, scoreCallback),
@@ -33,6 +33,20 @@ export class WeaponSystem {
     });
 
     this.setupInputEvents();
+    this.emitAmmoUpdate();
+    this.emitScoreUpdate();
+  }
+
+  private emitAmmoUpdate(): void {
+    eventBus.emit(GameEvents.WEAPON_AMMO_CHANGED, {
+      weaponId: this.currentWeapon.name,
+      current: this.currentAmmo,
+      reserve: this.reserveAmmo,
+    });
+  }
+
+  private emitScoreUpdate(): void {
+    eventBus.emit(GameEvents.SCORE_CHANGED, { newScore: this.score });
   }
 
   private get currentWeapon(): IWeapon {
@@ -78,11 +92,14 @@ export class WeaponSystem {
 
     // 새 무기 표시
     this.currentWeapon.show();
+
+    // 무기 교체 시 탄약 UI 업데이트
+    this.emitAmmoUpdate();
   }
 
   private addScore(points: number): void {
     this.score += points;
-    eventBus.emit(GameEvents.SCORE_CHANGED, { newScore: this.score });
+    this.emitScoreUpdate();
   }
 
   public update(deltaTime: number): void {
@@ -97,7 +114,7 @@ export class WeaponSystem {
     return this.currentWeapon.reserveAmmo;
   }
 
-  public get weaponStats(): any {
+  public get weaponStats(): Record<string, unknown> {
     return this.currentWeapon.getStats();
   }
 }
