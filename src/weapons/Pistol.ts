@@ -1,21 +1,20 @@
 import {
   Scene,
   UniversalCamera,
-  Ray,
   Vector3,
   MeshBuilder,
   StandardMaterial,
   Color3,
   Animation,
 } from '@babylonjs/core';
-import { BaseWeapon } from './BaseWeapon.ts';
+import { Firearm } from './Firearm.ts';
 import { TargetManager } from '../targets/TargetManager.ts';
 
 /**
  * 권총 (Pistol) - 단발
  * firingMode = 'semi' - 클릭당 1발만 발사
  */
-export class Pistol extends BaseWeapon {
+export class Pistol extends Firearm {
   public name = 'Pistol';
   public magazineSize = 12;
   public damage = 50; // 높은 단발 데미지
@@ -24,18 +23,13 @@ export class Pistol extends BaseWeapon {
   public reloadTime = 1.5;
   public firingMode: 'semi' | 'auto' = 'semi';
 
-  private targetManager: TargetManager;
-  private onScoreCallback: ((points: number) => void) | null = null;
-
   constructor(
     scene: Scene,
     camera: UniversalCamera,
     targetManager: TargetManager,
     onScore?: (points: number) => void
   ) {
-    super(scene, camera, 12, 48);
-    this.targetManager = targetManager;
-    this.onScoreCallback = onScore || null;
+    super(scene, camera, targetManager, 12, 48, onScore);
     this.createWeaponModel();
   }
 
@@ -62,34 +56,6 @@ export class Pistol extends BaseWeapon {
     this.performRaycast();
   }
 
-  private performRaycast(): void {
-    const forwardRay = this.camera.getForwardRay(this.range);
-    const ray = new Ray(this.camera.globalPosition, forwardRay.direction, this.range);
-
-    const pickInfo = this.scene.pickWithRay(ray, (mesh) => {
-      return mesh.isPickable && mesh.name.startsWith('target');
-    });
-
-    if (pickInfo?.hit && pickInfo.pickedMesh) {
-      const meshName = pickInfo.pickedMesh.name;
-      const nameParts = meshName.split('_'); // target_1_head -> ["target", "1", "head"]
-
-      const targetId = `${nameParts[0]}_${nameParts[1]}`;
-      const part = nameParts[2] || 'body';
-
-      const isHeadshot = part === 'head';
-      const destroyed = this.targetManager.hitTarget(targetId, part, this.damage);
-
-      if (this.onScoreCallback) {
-        // 헤드샷 시 2배 점수 보너스
-        const score = destroyed ? (isHeadshot ? 200 : 100) : isHeadshot ? 30 : 10;
-        this.onScoreCallback(score);
-      }
-
-      this.createHitEffect(pickInfo.pickedPoint!);
-    }
-  }
-
   private playRecoilAnimation(): void {
     if (!this.weaponMesh) return;
 
@@ -110,17 +76,6 @@ export class Pistol extends BaseWeapon {
 
     this.weaponMesh.animations = [recoilAnim];
     this.scene.beginAnimation(this.weaponMesh, 0, 12, false);
-  }
-
-  private createHitEffect(position: Vector3): void {
-    const spark = MeshBuilder.CreateSphere('hitSpark', { diameter: 0.25 }, this.scene);
-    spark.position = position;
-
-    const material = new StandardMaterial('sparkMat', this.scene);
-    material.emissiveColor = new Color3(1, 0.6, 0.2);
-    spark.material = material;
-
-    setTimeout(() => spark.dispose(), 120);
   }
 
   protected onReloadStart(): void {

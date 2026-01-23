@@ -1,6 +1,20 @@
 import { Mesh, Vector3, Scene, UniversalCamera, Ray } from '@babylonjs/core';
 import { BasePawn } from './BasePawn.ts';
 
+export interface InputState {
+  forward: boolean;
+  backward: boolean;
+  left: boolean;
+  right: boolean;
+  sprint: boolean;
+  jump: boolean;
+}
+
+export interface MouseDelta {
+  x: number;
+  y: number;
+}
+
 /**
  * 1인칭 플레이어 캐릭터 실체 (Pawn).
  */
@@ -35,12 +49,12 @@ export class PlayerPawn extends BasePawn {
     this.camera.inputs.clear(); // Controller가 제어하므로 입력 해제
   }
 
-  public initialize(scene: Scene): void {
+  public initialize(): void {
     // 추가 초기화 로직
   }
 
   /** Controller로부터 입력을 받아 이동 처리 */
-  public handleInput(keys: any, mouseDelta: any, deltaTime: number): void {
+  public handleInput(keys: InputState, mouseDelta: MouseDelta, deltaTime: number): void {
     // 1. 회전 처리 (카메라는 X축, 몸체는 Y축)
     this.mesh.rotation.y += mouseDelta.x * this.mouseSensitivity;
     this.camera.rotation.x += mouseDelta.y * this.mouseSensitivity;

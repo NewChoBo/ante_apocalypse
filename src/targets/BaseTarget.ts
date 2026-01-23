@@ -26,7 +26,6 @@ export abstract class BaseTarget implements ITarget {
     let finalDamage = amount;
     if (part === 'head') {
       finalDamage *= 3;
-      console.log(`[BaseTarget] Headshot! x3 Damage: ${finalDamage}`);
     }
 
     this.health -= finalDamage;

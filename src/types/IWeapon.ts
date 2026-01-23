@@ -1,52 +1,33 @@
 /**
- * 무기 시스템의 핵심 인터페이스.
- * 모든 무기 클래스가 구현해야 하는 표준 계약입니다.
+ * 모든 무기(총기, 근접 무기 등)의 핵심 인터페이스.
  */
 export interface IWeapon {
   /** 무기 이름 */
   name: string;
 
-  /** 현재 탄약 수 */
-  currentAmmo: number;
-
-  /** 전체 탄약 수 (탄창 크기) */
-  magazineSize: number;
-
-  /** 예비 탄약 수 */
-  reserveAmmo: number;
-
   /** 기본 데미지 */
   damage: number;
-
-  /** 발사 간격 (초) */
-  fireRate: number;
 
   /** 사거리 */
   range: number;
 
-  /** 재장전 시간 (초) */
-  reloadTime: number;
-
-  /** 발사 모드: 'semi' = 단발, 'auto' = 연발 */
-  firingMode: 'semi' | 'auto';
-
-  /** 발사 시도 (단발) */
+  /** 발사/공격 시도 */
   fire(): boolean;
 
-  /** 연발 시작 (auto 모드 전용) */
+  /** 공격 시작 (연사 혹은 휘두르기 시작) */
   startFire(): void;
 
-  /** 연발 중지 (auto 모드 전용) */
+  /** 공격 중지 */
   stopFire(): void;
 
-  /** 재장전 시도 */
+  /** 재장전 시도 (필요한 경우에만 구현) */
   reload(): void;
 
-  /** 매 프레임 업데이트 (반동 회복, 애니메이션 등) */
+  /** 매 프레임 업데이트 */
   update(deltaTime: number): void;
 
   /** 무기 스태츠 가져오기 */
-  getStats(): any;
+  getStats(): Record<string, unknown>;
 
   /** 무기 모델 표시 */
   show(): void;
@@ -56,4 +37,21 @@ export interface IWeapon {
 
   /** 자원 해제 */
   dispose(): void;
+
+  /** 현재 탄약 (총기류 등에서 사용, 기본은 선택적) */
+  currentAmmo?: number;
+  /** 예비 탄약 (총기류 등에서 사용, 기본은 선택적) */
+  reserveAmmo?: number;
+}
+
+/**
+ * 총기류 전용 인터페이스
+ */
+export interface IFirearm extends IWeapon {
+  currentAmmo: number;
+  magazineSize: number;
+  reserveAmmo: number;
+  fireRate: number;
+  reloadTime: number;
+  firingMode: 'semi' | 'auto';
 }

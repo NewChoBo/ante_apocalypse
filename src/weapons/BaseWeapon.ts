@@ -1,144 +1,53 @@
 import { Scene, Mesh, UniversalCamera } from '@babylonjs/core';
-import { GameObservables } from '../core/events/GameObservables.ts';
 import { IWeapon } from '../types/IWeapon.ts';
-import { ammoStore } from '../core/store/GameStore.ts';
+import { TargetManager } from '../targets/TargetManager.ts';
 
 /**
- * 모든 무기의 공통 베이스 클래스.
- * 탄약 관리, 발사율, 데미지 등 기본 필드를 포함합니다.
+ * 모든 무기의 최상위 추상 클래스.
+ * 총기, 근접 무기 등에 공통적으로 필요한 기본 필드와 메서드만 포함합니다.
  */
 export abstract class BaseWeapon implements IWeapon {
   public abstract name: string;
-  public currentAmmo: number;
-  public abstract magazineSize: number;
-  public reserveAmmo: number;
-
-  // 무기 스탯
   public abstract damage: number;
-  public abstract fireRate: number;
   public abstract range: number;
-  public abstract reloadTime: number;
-  public abstract firingMode: 'semi' | 'auto';
-  public isActive = false;
 
   protected scene: Scene;
   protected camera: UniversalCamera;
-  protected isReloading = false;
-  protected lastFireTime = 0;
+  protected targetManager: TargetManager;
+  protected onScoreCallback: ((points: number) => void) | null = null;
   protected weaponMesh: Mesh | null = null;
 
-  // 연발 상태
-  protected isFiring = false;
+  public isActive = false;
 
-  constructor(scene: Scene, camera: UniversalCamera, initialAmmo: number, reserveAmmo: number) {
+  constructor(
+    scene: Scene,
+    camera: UniversalCamera,
+    targetManager: TargetManager,
+    onScore?: (points: number) => void
+  ) {
     this.scene = scene;
     this.camera = camera;
-    this.currentAmmo = initialAmmo;
-    this.reserveAmmo = reserveAmmo;
+    this.targetManager = targetManager;
+    this.onScoreCallback = onScore || null;
   }
 
-  public fire(): boolean {
-    if (this.isReloading) return false;
+  /** 무기 사용 (사격 혹은 휘두르기) */
+  public abstract fire(): boolean;
 
-    const now = performance.now() / 1000;
-    if (now - this.lastFireTime < this.fireRate) return false;
+  /** 사용 시작 (연사 혹은 차지) */
+  public abstract startFire(): void;
 
-    if (this.currentAmmo <= 0) {
-      this.reload();
-      return false;
-    }
+  /** 사용 중지 */
+  public abstract stopFire(): void;
 
-    this.currentAmmo--;
-    this.lastFireTime = now;
-    this.onFire();
+  /** 재장전 (총기류 등에서 구현) */
+  public abstract reload(): void;
 
-    // 발사 이벤트 발행
-    GameObservables.weaponFire.notifyObservers({
-      weaponId: this.name,
-      ammoRemaining: this.currentAmmo,
-    });
+  /** 매 프레임 업데이트 */
+  public abstract update(deltaTime: number): void;
 
-    if (this.isActive) {
-      this.updateAmmoStore();
-    }
-
-    if (this.currentAmmo <= 0 && this.reserveAmmo > 0) {
-      this.reload();
-    }
-
-    return true;
-  }
-
-  /** 연발 시작 (auto 모드 전용) */
-  public startFire(): void {
-    if (this.firingMode === 'auto') {
-      this.isFiring = true;
-    } else {
-      // semi 모드는 단발만
-      this.fire();
-    }
-  }
-
-  /** 연발 중지 */
-  public stopFire(): void {
-    this.isFiring = false;
-  }
-
-  public reload(): void {
-    if (this.isReloading || this.currentAmmo === this.magazineSize || this.reserveAmmo === 0) {
-      return;
-    }
-
-    this.isReloading = true;
-    this.isFiring = false; // 재장전 시 연발 중지
-    this.onReloadStart();
-
-    setTimeout(() => {
-      const needed = this.magazineSize - this.currentAmmo;
-      const amount = Math.min(needed, this.reserveAmmo);
-
-      this.currentAmmo += amount;
-      this.reserveAmmo -= amount;
-      this.isReloading = false;
-
-      this.onReloadEnd();
-
-      if (this.isActive) {
-        this.updateAmmoStore();
-      }
-    }, this.reloadTime * 1000);
-  }
-
-  private updateAmmoStore(): void {
-    ammoStore.set({
-      weaponName: this.name,
-      current: this.currentAmmo,
-      reserve: this.reserveAmmo,
-    });
-  }
-
-  /** 매 프레임 업데이트 - 연발 처리 */
-  public update(_deltaTime: number): void {
-    if (this.isFiring && this.firingMode === 'auto') {
-      this.fire();
-    }
-  }
-
-  protected abstract onFire(): void;
-  protected abstract onReloadStart(): void;
-  protected abstract onReloadEnd(): void;
-
-  public getStats(): Record<string, unknown> {
-    return {
-      name: this.name,
-      damage: this.damage,
-      fireRate: this.fireRate,
-      magazineSize: this.magazineSize,
-      reloadTime: this.reloadTime,
-      range: this.range,
-      firingMode: this.firingMode,
-    };
-  }
+  /** 무기 스탯 정보 */
+  public abstract getStats(): Record<string, unknown>;
 
   public show(): void {
     this.isActive = true;
@@ -156,7 +65,6 @@ export abstract class BaseWeapon implements IWeapon {
   }
 
   public dispose(): void {
-    this.isFiring = false;
     if (this.weaponMesh) {
       this.weaponMesh.dispose();
     }

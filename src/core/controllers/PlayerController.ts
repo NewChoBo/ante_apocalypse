@@ -1,5 +1,6 @@
 import { BaseController } from './BaseController.ts';
 import { IPawn } from '../../types/IPawn.ts';
+import { PlayerPawn } from '../PlayerPawn.ts';
 
 /**
  * 실제 플레이어의 입력을 처리하는 컨트롤러.
@@ -69,7 +70,9 @@ export class PlayerController extends BaseController {
     if (!this.possessedPawn) return;
 
     // Pawn에게 입력 데이터 전달
-    (this.possessedPawn as any).handleInput(this.keys, this.mouseDelta, deltaTime);
+    if (this.possessedPawn instanceof PlayerPawn) {
+      this.possessedPawn.handleInput(this.keys, this.mouseDelta, deltaTime);
+    }
 
     // 델타값 초기화
     this.mouseDelta.x = 0;

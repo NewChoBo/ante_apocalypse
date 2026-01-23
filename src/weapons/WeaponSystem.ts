@@ -107,11 +107,11 @@ export class WeaponSystem {
   }
 
   public get currentAmmo(): number {
-    return this.currentWeapon.currentAmmo;
+    return this.currentWeapon.currentAmmo ?? 0;
   }
 
   public get reserveAmmo(): number {
-    return this.currentWeapon.reserveAmmo;
+    return this.currentWeapon.reserveAmmo ?? 0;
   }
 
   public get weaponStats(): Record<string, unknown> {
