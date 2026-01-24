@@ -130,11 +130,13 @@ export class InventoryUI {
 
       const meta = weaponId ? getItemMetadata(weaponId) : null;
       const weaponName = meta?.name || 'Empty Slot';
-      const icon = meta?.icon || '➖';
+      const iconHtml = meta
+        ? `<img src="${meta.icon}" alt="${weaponName}" class="item-icon-img">`
+        : '➖';
 
       slot.innerHTML = `
             <div class="slot-number">${index + 1}</div>
-            <div class="item-icon">${icon}</div>
+            <div class="item-icon">${iconHtml}</div>
             <div class="item-name">${weaponName}</div>
         `;
 
@@ -173,7 +175,7 @@ export class InventoryUI {
         }
 
         slot.innerHTML = `
-                <div class="item-icon" style="font-size: 24px;">${meta?.icon || '📦'}</div>
+                <div class="item-icon"><img src="${meta?.icon || '/images/items/generic.png'}" alt="${meta?.name}" class="item-icon-img"></div>
                 <div class="item-count">x${item.count}</div>
             `;
 
