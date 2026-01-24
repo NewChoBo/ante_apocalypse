@@ -1,4 +1,6 @@
-import { inventoryStore, InventoryItem, BagItem } from '../core/store/GameStore';
+import { inventoryStore, BagItem } from '../core/store/GameStore';
+import { getItemMetadata } from '../core/items/ItemDatabase';
+import { InventoryManager } from '../core/inventory/InventoryManager';
 
 export interface InventoryCallbacks {
   onEquipWeapon: (slot: number, weaponId: string | null) => void;
@@ -18,8 +20,7 @@ export class InventoryUI {
   private selectedSlotIndex = 0;
 
   // DnD state
-  private draggedItemId: string | null = null;
-  private dragSource: { type: 'slot' | 'bag'; index: number } | null = null;
+  private dragSource: { type: 'slot' | 'bag'; index: number; itemId: string | null } | null = null;
 
   constructor(callbacks: InventoryCallbacks) {
     this.callbacks = callbacks;
@@ -46,12 +47,18 @@ export class InventoryUI {
   private createTooltip(): HTMLElement {
     const el = document.createElement('div');
     el.id = 'inventory-tooltip';
+    el.style.position = 'fixed';
+    el.style.display = 'none';
+    el.style.zIndex = '2000';
     return el;
   }
 
   private createContextMenu(): HTMLElement {
     const el = document.createElement('div');
     el.id = 'inventory-context-menu';
+    el.style.position = 'fixed';
+    el.style.display = 'none';
+    el.style.zIndex = '2100';
     return el;
   }
 
@@ -88,7 +95,7 @@ export class InventoryUI {
         </div>
         <div class="inventory-footer">
           <div class="usage-hint">
-            [L-Click] Assign | [R-Click] Menu | [Drag] Manage Gear
+            [L-Click] Equip | [R-Click] Menu | [Drag] Manage Gear
           </div>
         </div>
       </div>
@@ -104,6 +111,9 @@ export class InventoryUI {
     if (this.isOpen) {
       this.render();
       document.exitPointerLock();
+    } else {
+      this.hideTooltip();
+      this.hideContextMenu();
     }
     return this.isOpen;
   }
@@ -118,8 +128,9 @@ export class InventoryUI {
       slot.className = `weapon-slot ${this.selectedSlotIndex === index ? 'active' : ''}`;
       if (weaponId) slot.draggable = true;
 
-      const weaponName = weaponId || 'Empty Slot';
-      const icon = this.getItemIcon(weaponId);
+      const meta = weaponId ? getItemMetadata(weaponId) : null;
+      const weaponName = meta?.name || 'Empty Slot';
+      const icon = meta?.icon || '➖';
 
       slot.innerHTML = `
             <div class="slot-number">${index + 1}</div>
@@ -135,7 +146,7 @@ export class InventoryUI {
       });
 
       slot.addEventListener('mouseenter', () => {
-        if (weaponId) this.showTooltip({ id: weaponId, name: weaponId, type: 'weapon' });
+        if (meta) this.showTooltip(meta);
       });
       slot.addEventListener('mouseleave', () => this.hideTooltip());
 
@@ -154,25 +165,29 @@ export class InventoryUI {
 
       if (item) {
         slot.draggable = true;
+        const meta = getItemMetadata(item.id);
         slot.innerHTML = `
-                <div class="item-icon" style="font-size: 24px;">${this.getItemIcon(item.id)}</div>
+                <div class="item-icon" style="font-size: 24px;">${meta?.icon || '📦'}</div>
                 <div class="item-count">x${item.count}</div>
             `;
 
         slot.addEventListener('click', (e) => {
           e.preventDefault();
           if (item.type === 'weapon') {
-            this.callbacks.onEquipWeapon(this.selectedSlotIndex, item.id);
+            InventoryManager.equipWeapon(this.selectedSlotIndex, item.id);
+          } else if (item.type === 'consumable') {
+            InventoryManager.useItem(item.id);
           }
         });
 
         slot.addEventListener('contextmenu', (e) => this.showContextMenu(e, item));
-        slot.addEventListener('mouseenter', () => this.showTooltip(item));
+        slot.addEventListener('mouseenter', () => {
+          if (meta) this.showTooltip(meta);
+        });
         slot.addEventListener('mouseleave', () => this.hideTooltip());
 
         this.setupDnD(slot, 'bag', i, item.id);
       } else {
-        // Empty bag slot can also be a drop target
         this.setupDnD(slot, 'bag', i, null);
       }
 
@@ -187,16 +202,20 @@ export class InventoryUI {
     itemId: string | null
   ): void {
     el.addEventListener('dragstart', (e) => {
-      if (!itemId) return;
-      this.draggedItemId = itemId;
-      this.dragSource = { type, index };
+      if (!itemId) {
+        e.preventDefault();
+        return;
+      }
+      this.dragSource = { type, index, itemId };
       el.style.opacity = '0.5';
-      if (e.dataTransfer) e.dataTransfer.setData('text/plain', itemId);
+      if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', itemId);
+      }
     });
 
     el.addEventListener('dragend', () => {
       el.style.opacity = '1';
-      this.draggedItemId = null;
       this.dragSource = null;
       const slots = this.container.querySelectorAll('.weapon-slot, .bag-slot');
       slots.forEach((s) => s.classList.remove('drag-over'));
@@ -204,7 +223,10 @@ export class InventoryUI {
 
     el.addEventListener('dragover', (e) => {
       e.preventDefault();
-      if (this.draggedItemId) el.classList.add('drag-over');
+      if (this.dragSource) {
+        el.classList.add('drag-over');
+        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+      }
     });
 
     el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
@@ -212,23 +234,32 @@ export class InventoryUI {
     el.addEventListener('drop', (e) => {
       e.preventDefault();
       el.classList.remove('drag-over');
-      if (!this.draggedItemId || !this.dragSource) return;
+      if (!this.dragSource) return;
+
+      const source = this.dragSource;
 
       if (type === 'slot') {
         // Drop into equipment slot
-        this.callbacks.onEquipWeapon(index, this.draggedItemId);
-      } else if (type === 'bag' && this.dragSource.type === 'slot') {
-        // Drop from slot back to bag -> Unequip
-        this.callbacks.onEquipWeapon(this.dragSource.index, null);
+        if (source.type === 'bag' || source.type === 'slot') {
+          InventoryManager.equipWeapon(index, source.itemId);
+        }
+      } else if (type === 'bag') {
+        if (source.type === 'slot') {
+          // Drop from slot back to bag -> Unequip
+          InventoryManager.equipWeapon(source.index, null);
+        } else if (source.type === 'bag') {
+          // Swap items in bag
+          InventoryManager.swapBagItems(source.index, index);
+        }
       }
     });
   }
 
-  private showTooltip(item: InventoryItem): void {
+  private showTooltip(item: { name: string; type: string; description: string }): void {
     this.tooltip.innerHTML = `
       <div class="tooltip-name">${item.name}</div>
       <div class="tooltip-type">${item.type.toUpperCase()}</div>
-      <div class="tooltip-desc">${this.getItemDescription(item.id)}</div>
+      <div class="tooltip-desc">${item.description}</div>
     `;
     this.tooltip.style.display = 'block';
   }
@@ -249,41 +280,24 @@ export class InventoryUI {
       const useBtn = document.createElement('div');
       useBtn.className = 'context-menu-item';
       useBtn.innerHTML = `<span>USE ITEM</span>`;
-      useBtn.onclick = () => this.callbacks.onUseItem(item.id);
+      useBtn.onclick = () => {
+        InventoryManager.useItem(item.id);
+        this.hideContextMenu();
+      };
       this.contextMenu.appendChild(useBtn);
     }
 
     const dropBtn = document.createElement('div');
     dropBtn.className = 'context-menu-item';
     dropBtn.innerHTML = `<span style="color: #ff5252;">DROP ITEM</span>`;
-    dropBtn.onclick = () => this.callbacks.onDropItem(item.id);
+    dropBtn.onclick = () => {
+      InventoryManager.dropItem(item.id);
+      this.hideContextMenu();
+    };
     this.contextMenu.appendChild(dropBtn);
   }
 
   private hideContextMenu(): void {
     this.contextMenu.style.display = 'none';
-  }
-
-  private getItemDescription(id: string): string {
-    const lid = id.toLowerCase();
-    if (lid.includes('pistol')) return 'Standard sidearm. Reliable and fast.';
-    if (lid.includes('rifle')) return 'Powerful long-range weapon.';
-    if (lid.includes('knife')) return 'Sharp combat knife for silent kills.';
-    if (lid.includes('bat')) return 'Melee weapon for heavy impact.';
-    if (lid.includes('health')) return 'Restores 30 HP on use.';
-    if (lid.includes('ammo')) return 'Restores 50 rounds for all weapons.';
-    return 'Generic survival item.';
-  }
-
-  private getItemIcon(id: string | null): string {
-    if (!id) return '➖';
-    const lid = id.toLowerCase();
-    if (lid.includes('pistol')) return '🔫';
-    if (lid.includes('rifle')) return '🔫';
-    if (lid.includes('knife')) return '🔪';
-    if (lid.includes('bat')) return '🏏';
-    if (lid.includes('health')) return '💊';
-    if (lid.includes('ammo')) return '🔋';
-    return '📦';
   }
 }
