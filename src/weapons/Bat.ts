@@ -22,7 +22,7 @@ export class Bat extends MeleeWeapon {
   private swingAnimationTimer = 0;
   private isAnimating = false;
   private defaultRotation = new Vector3(0, 0, 0);
-  private defaultPosition = new Vector3(0.4, -0.5, 0.7);
+  private defaultPosition = new Vector3(0.5, -0.5, 0.75);
 
   constructor(scene: Scene, camera: UniversalCamera, onScore?: (points: number) => void) {
     super(scene, camera, onScore);
@@ -48,6 +48,7 @@ export class Bat extends MeleeWeapon {
       this.weaponMesh.position.copyFrom(this.defaultPosition);
       this.weaponMesh.rotation = new Vector3(Math.PI / 2.5, 0, Math.PI / 4);
       this.defaultRotation.copyFrom(this.weaponMesh.rotation);
+      this.setIdleState();
       this.weaponMesh.setEnabled(false);
     }
   }
@@ -96,6 +97,7 @@ export class Bat extends MeleeWeapon {
   }
 
   public update(deltaTime: number): void {
+    this.updateAnimations(deltaTime);
     if (this.isAnimating && this.weaponMesh) {
       this.swingAnimationTimer += deltaTime;
 

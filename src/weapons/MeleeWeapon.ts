@@ -106,7 +106,7 @@ export abstract class MeleeWeapon extends BaseWeapon {
     };
   }
 
-  public update(_deltaTime: number): void {
-    // 애니메이션 업데이트 등
+  public update(deltaTime: number): void {
+    this.updateAnimations(deltaTime);
   }
 }

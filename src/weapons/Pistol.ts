@@ -48,8 +48,9 @@ export class Pistol extends Firearm {
     this.weaponMesh.material = material;
 
     this.weaponMesh.parent = this.camera;
-    this.weaponMesh.position = new Vector3(0.25, -0.15, 0.4);
+    this.weaponMesh.position = new Vector3(0.35, -0.2, 0.45);
     this.weaponMesh.rotation.y = Math.PI;
+    this.setIdleState();
   }
 
   protected onFire(): void {

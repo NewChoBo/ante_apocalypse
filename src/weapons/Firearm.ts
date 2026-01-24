@@ -1,4 +1,13 @@
-import { Scene, UniversalCamera, Ray, Vector3, Mesh } from '@babylonjs/core';
+import {
+  Scene,
+  UniversalCamera,
+  Ray,
+  Vector3,
+  Mesh,
+  MeshBuilder,
+  StandardMaterial,
+  Color3,
+} from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon.ts';
 import { GameObservables } from '../core/events/GameObservables.ts';
 import { ammoStore } from '../core/store/GameStore.ts';
@@ -131,6 +140,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     this.isReloading = true;
     this.isFiring = false;
     this.onReloadStart();
+    this.ejectMagazine();
 
     setTimeout(() => {
       const needed = this.magazineSize - this.currentAmmo;
@@ -148,7 +158,15 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     }, this.reloadTime * 1000);
   }
 
-  public update(_deltaTime: number): void {
+  public update(deltaTime: number): void {
+    this.updateAnimations(deltaTime);
+
+    // 장전 중 연출 (기울기)
+    if (this.weaponMesh) {
+      const targetZ = this.isReloading ? this.idleRotation.z + 0.6 : this.idleRotation.z;
+      this.weaponMesh.rotation.z += (targetZ - this.weaponMesh.rotation.z) * deltaTime * 10;
+    }
+
     if (this.isFiring && this.firingMode === 'auto') {
       this.fire();
     }
@@ -203,6 +221,43 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
       current: this.currentAmmo,
       reserve: this.reserveAmmo,
       showAmmo: true,
+    });
+  }
+
+  protected ejectMagazine(): void {
+    if (!this.weaponMesh) return;
+
+    // 현재 총의 위치와 회전 가져오기
+    const worldMatrix = this.weaponMesh.getWorldMatrix();
+    const position = Vector3.TransformCoordinates(new Vector3(0, -0.1, 0), worldMatrix);
+
+    const mag = MeshBuilder.CreateBox(
+      'mag_eject',
+      { width: 0.04, height: 0.08, depth: 0.04 },
+      this.scene
+    );
+    mag.position.copyFrom(position);
+
+    const material = new StandardMaterial('magMat', this.scene);
+    material.diffuseColor = new Color3(0.1, 0.1, 0.1);
+    mag.material = material;
+
+    // 물리적 효과 시뮬레이션 (간단하게 관성 적용)
+    let velocity = new Vector3(0, -0.05, 0);
+    const gravity = -0.01;
+    let lifetime = 60; // 약 1초 (60프레임)
+
+    const observer = this.scene.onBeforeRenderObservable.add(() => {
+      velocity.y += gravity;
+      mag.position.addInPlace(velocity);
+      mag.rotation.x += 0.1;
+      mag.rotation.z += 0.05;
+
+      lifetime--;
+      if (lifetime <= 0) {
+        this.scene.onBeforeRenderObservable.remove(observer);
+        mag.dispose();
+      }
     });
   }
 

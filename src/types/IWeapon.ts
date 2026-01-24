@@ -45,6 +45,12 @@ export interface IWeapon {
   /** 무기 모델 숨기기 */
   hide(): void;
 
+  /** 무기 내리기 애니메이션 (교체 시) */
+  lower(): Promise<void>;
+
+  /** 무기 올리기 애니메이션 (교체 시) */
+  raise(): void;
+
   /** 현재 상태에 따른 이동 속도 배수 반환 */
   getMovementSpeedMultiplier(): number;
 

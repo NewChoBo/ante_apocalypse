@@ -22,7 +22,7 @@ export class Knife extends MeleeWeapon {
   private swingAnimationTimer = 0;
   private isAnimating = false;
   private defaultRotation = new Vector3(0, 0, 0);
-  private defaultPosition = new Vector3(0.4, -0.4, 0.6);
+  private defaultPosition = new Vector3(0.45, -0.4, 0.65);
 
   constructor(scene: Scene, camera: UniversalCamera, onScore?: (points: number) => void) {
     super(scene, camera, onScore);
@@ -59,6 +59,7 @@ export class Knife extends MeleeWeapon {
       this.weaponMesh.position.copyFrom(this.defaultPosition);
       this.weaponMesh.rotation = new Vector3(Math.PI / 2, 0, 0);
       this.defaultRotation.copyFrom(this.weaponMesh.rotation);
+      this.setIdleState();
       this.weaponMesh.setEnabled(false);
     }
   }
@@ -107,6 +108,7 @@ export class Knife extends MeleeWeapon {
   }
 
   public update(deltaTime: number): void {
+    this.updateAnimations(deltaTime);
     if (this.isAnimating && this.weaponMesh) {
       this.swingAnimationTimer += deltaTime;
 

@@ -20,6 +20,24 @@ export abstract class BaseWeapon implements IWeapon {
   public isActive = false;
   public isAiming = false;
 
+  // 절차적 애니메이션 상태
+  protected visualOffset = new Vector3(0, 0, 0);
+  protected visualRotation = new Vector3(0, 0, 0);
+  protected animState: 'idle' | 'lowering' | 'raising' = 'idle';
+  protected animProgress = 1; // 1: 완전히 올라옴, 0: 완전히 내려감
+  protected animSpeed = 5.0;
+
+  protected idlePosition = new Vector3(0, 0, 0);
+  protected idleRotation = new Vector3(0, 0, 0);
+
+  /** 현재 무기의 기본 위치와 회전을 저장 (애니메이션 기준점) */
+  protected setIdleState(): void {
+    if (this.weaponMesh) {
+      this.idlePosition.copyFrom(this.weaponMesh.position);
+      this.idleRotation.copyFrom(this.weaponMesh.rotation);
+    }
+  }
+
   public getMovementSpeedMultiplier(): number {
     return 1.0;
   }
@@ -66,6 +84,55 @@ export abstract class BaseWeapon implements IWeapon {
 
   public setAiming(isAiming: boolean): void {
     this.isAiming = isAiming;
+  }
+
+  /** 무기 내리기 애니메이션 시작 */
+  public async lower(): Promise<void> {
+    if (this.animState === 'lowering') return;
+    this.animState = 'lowering';
+    // 애니메이션이 끝날 때까지 대기하는 프로미스를 반환할 수도 있지만,
+    // 여기서는 간단히 상태만 변경하고 update에서 처리합니다.
+    return new Promise((resolve) => {
+      const check = () => {
+        if (this.animProgress <= 0) {
+          this.animState = 'idle';
+          resolve();
+        } else {
+          setTimeout(check, 50);
+        }
+      };
+      check();
+    });
+  }
+
+  /** 무기 올리기 애니메이션 시작 */
+  public raise(): void {
+    this.animState = 'raising';
+    this.animProgress = 0;
+    this.show();
+  }
+
+  /** 절차적 애니메이션 업데이트 (매 프레임 호출 필요) */
+  protected updateAnimations(deltaTime: number): void {
+    if (this.animState === 'lowering') {
+      this.animProgress = Math.max(0, this.animProgress - deltaTime * this.animSpeed);
+    } else if (this.animState === 'raising') {
+      this.animProgress = Math.min(1, this.animProgress + deltaTime * this.animSpeed);
+      if (this.animProgress >= 1) {
+        this.animState = 'idle';
+      }
+    }
+
+    if (this.weaponMesh) {
+      // Y축 오프셋 적용 (무기가 아래로 내려가는 효과)
+      // animProgress가 1이면 0, 0이면 -0.5만큼 내려감
+      const yOffset = (this.animProgress - 1) * 0.5;
+      this.weaponMesh.position.y = this.idlePosition.y + yOffset;
+
+      // X축 회전 적용 (내려갈 때 살짝 눕는 효과)
+      const xRot = (1 - this.animProgress) * 0.5;
+      this.weaponMesh.rotation.x = this.idleRotation.x + xRot;
+    }
   }
 
   /** 공통 히트 처리 로직 (적, 타겟 모두 포함) */

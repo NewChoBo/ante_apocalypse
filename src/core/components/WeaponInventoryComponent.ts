@@ -37,17 +37,29 @@ export class WeaponInventoryComponent {
     return this.weapons[this.currentWeaponIndex];
   }
 
-  public switchWeapon(index: number): void {
-    if (index === this.currentWeaponIndex) return;
+  private isSwitching = false;
+
+  public async switchWeapon(index: number): Promise<void> {
+    if (this.isSwitching || index === this.currentWeaponIndex) return;
     if (index < 0 || index >= this.weapons.length) return;
 
+    this.isSwitching = true;
+
+    // 1. 현재 무기 내리기
+    await this.currentWeapon.lower();
     this.currentWeapon.hide();
+
+    // 2. 무기 교체
     this.currentWeaponIndex = index;
-    this.currentWeapon.show();
+
+    // 3. 새 무기 올리기
+    this.currentWeapon.raise();
 
     if (this.onWeaponChanged) {
       this.onWeaponChanged(this.currentWeapon);
     }
+
+    this.isSwitching = false;
   }
 
   public update(deltaTime: number): void {
