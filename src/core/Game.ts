@@ -19,6 +19,7 @@ import { gameStateStore } from './store/GameStore.ts';
 import { CombatComponent } from './components/CombatComponent';
 import { TickManager } from './TickManager';
 import { AssetLoader } from './AssetLoader';
+import '@babylonjs/inspector'; // 인스펙터 기능 활성화
 
 export class Game {
   private canvas!: HTMLCanvasElement;
@@ -160,13 +161,34 @@ export class Game {
       document.documentElement.requestFullscreen().catch(() => {});
     }
 
-    // 포인터 잠금 및 키보드 잠금
+    // 포인터 잠금
     this.canvas.requestPointerLock();
+
+    // 실험적 기능: 키보드 잠금 (Supported in Chrome/Edge Desktop)
     if ('keyboard' in navigator && 'lock' in (navigator as any).keyboard) {
+      // Ctrl+W, Ctrl+S, Ctrl+D 등을 브라우저가 아닌 게임이 처리하도록 잠금 요청
       (navigator as any).keyboard
-        .lock(['ControlLeft', 'ControlRight', 'KeyW', 'KeyS', 'KeyD', 'KeyA', 'Escape'])
-        .catch(() => {});
+        .lock(['ControlLeft', 'ControlRight', 'KeyW', 'KeyS', 'KeyD', 'KeyA', 'Escape', 'KeyI'])
+        .catch(() => {
+          // Keyboard lock failed silently
+        });
     }
+
+    // 디버그 레이어 (인스펙터) 토글
+    window.addEventListener('keydown', (e) => {
+      // Shift+I 또는 그냥 I (게임 중에는 채팅이 없으므로 단순 키 할당)
+      if (e.code === 'KeyI' && !e.repeat) {
+        if (this.scene.debugLayer.isVisible()) {
+          this.scene.debugLayer.hide();
+          // 인스펙터 닫으면 포인터 잠금 재요청 (게임으로 복귀)
+          if (!this.isPaused) this.canvas.requestPointerLock();
+        } else {
+          this.scene.debugLayer.show();
+          // 인스펙터 열면 포인터 잠금 해제 (마우스 사용)
+          document.exitPointerLock();
+        }
+      }
+    });
 
     // 오디오 엔진 언락
     const audioEngine = AssetLoader.getInstance().getAudioEngine();
