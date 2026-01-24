@@ -6,6 +6,7 @@ import {
   DirectionalLight,
   ShadowGenerator,
   Color3,
+  CubeTexture,
   Color4,
   UniversalCamera,
 } from '@babylonjs/core';
@@ -90,10 +91,19 @@ export class Game {
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.1, 0.1, 0.15, 1);
 
-    // 조명 설정
-    const ambient = new HemisphericLight('ambient', new Vector3(0, 1, 0), this.scene);
-    ambient.intensity = 0.4;
-    ambient.groundColor = new Color3(0.2, 0.2, 0.25);
+    // PBR 환경 맵 로드 (Studio Lighting)
+    // Babylon.js 호스팅 에셋 사용
+    const envTexture = CubeTexture.CreateFromPrefilteredData(
+      'https://assets.babylonjs.com/environments/studio.env',
+      this.scene
+    );
+    this.scene.environmentTexture = envTexture;
+    this.scene.environmentIntensity = 1.0; // 조명 강도 조절
+
+    // 기본 조명 (HemisphericLight) - 보조광으로 유지하되 강도 조절
+    const light = new HemisphericLight('light', new Vector3(0, 1, 0), this.scene);
+    light.intensity = 0.5; // PBR 환경광이 주가 되므로 강도 낮춤
+    light.groundColor = new Color3(0.2, 0.2, 0.25);
 
     const sun = new DirectionalLight('sun', new Vector3(-0.5, -1, -0.5), this.scene);
     sun.position = new Vector3(20, 40, 20);

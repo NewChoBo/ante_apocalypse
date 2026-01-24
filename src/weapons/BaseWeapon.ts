@@ -1,4 +1,4 @@
-import { Scene, Mesh, UniversalCamera, Vector3 } from '@babylonjs/core';
+import { Scene, AbstractMesh, UniversalCamera, Vector3, Mesh } from '@babylonjs/core';
 import { IWeapon } from '../types/IWeapon.ts';
 import { TargetRegistry } from '../core/systems/TargetRegistry';
 import { GameObservables } from '../core/events/GameObservables.ts';
@@ -15,7 +15,7 @@ export abstract class BaseWeapon implements IWeapon {
   protected scene: Scene;
   protected camera: UniversalCamera;
   protected onScoreCallback: ((points: number) => void) | null = null;
-  protected weaponMesh: Mesh | null = null;
+  protected weaponMesh: AbstractMesh | null = null;
 
   public isActive = false;
   public isAiming = false;
