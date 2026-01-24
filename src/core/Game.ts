@@ -157,6 +157,13 @@ export class Game {
     // 아이템 드랍 시스템 초기화
     PickupManager.getInstance().initialize(this.scene, this.playerPawn);
 
+    const combat = this.playerPawn.getComponent(CombatComponent);
+    if (combat instanceof CombatComponent) {
+      combat.onWeaponChanged(() => {
+        this.syncInventoryStore();
+      });
+    }
+
     // 인벤토리 UI 초기화
     this.inventoryUI = new InventoryUI({
       onEquipWeapon: (slot, weaponId) => {
@@ -367,12 +374,28 @@ export class Game {
     const weapons = combat.getWeapons();
     const slots: (string | null)[] = [null, null, null, null];
 
-    // 초기화 시 가진 무기들을 슬롯에 순서대로 배치
+    // 1. 슬롯 초기화 (처음 4개 무기 배치)
     weapons.forEach((w, i) => {
       if (i < 4) slots[i] = w.name;
     });
 
-    inventoryStore.setKey('weaponSlots', slots);
+    // 2. 모든 보유 무기를 가방(Storage)에도 표시하여 재배치 가능하게 함
+    const weaponBagItems = weapons.map((w) => ({
+      id: w.name,
+      name: w.name,
+      type: 'weapon' as const,
+      count: 1,
+    }));
+
+    // 기존 소모품 유지 (있다면)
+    const currentState = inventoryStore.get();
+    const consumables = currentState.bagItems.filter((i) => i.type === 'consumable');
+
+    inventoryStore.set({
+      ...currentState,
+      weaponSlots: slots,
+      bagItems: [...weaponBagItems, ...consumables],
+    });
   }
 
   private update(deltaTime: number): void {

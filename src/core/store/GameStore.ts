@@ -55,5 +55,5 @@ export interface InventoryState {
 export const inventoryStore = map<InventoryState>({
   weaponSlots: [null, null, null, null],
   bagItems: [],
-  maxBagSlots: 16,
+  maxBagSlots: 24,
 });

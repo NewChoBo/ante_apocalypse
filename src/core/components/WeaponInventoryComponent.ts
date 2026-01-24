@@ -14,6 +14,10 @@ export class WeaponInventoryComponent {
   private currentWeaponIndex = 0;
   private onWeaponChanged?: (weapon: IWeapon) => void;
 
+  public setOnWeaponChanged(callback: (weapon: IWeapon) => void): void {
+    this.onWeaponChanged = callback;
+  }
+
   constructor(
     scene: Scene,
     camera: UniversalCamera,

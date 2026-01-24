@@ -40,18 +40,18 @@ export class InventoryUI {
     overlay.innerHTML = `
       <div class="inventory-window">
         <div class="inventory-header">
-          <h2>CHARACTER INVENTORY</h2>
+          <h2>SYSTEM INVENTORY V.2</h2>
           <div class="close-hint">PRESS [TAB] TO CLOSE</div>
         </div>
         <div class="inventory-panels">
           <div class="equipment-side">
-            <div class="section-title">Equipment Slots (1-4)</div>
+            <div class="section-title">QUICK SLOTS (1-4)</div>
             <div class="equipment-slots">
                 <!-- Weapon slots will be rendered here -->
             </div>
           </div>
           <div class="bag-side">
-            <div class="section-title">Bag / Items</div>
+            <div class="section-title">MODULAR STORAGE</div>
             <div class="bag-grid">
                 <!-- Bag items will be rendered here -->
             </div>
@@ -59,11 +59,11 @@ export class InventoryUI {
         </div>
         <div class="inventory-footer">
           <div class="item-details">
-             <div class="detail-name">INVENTORY</div>
-             <div class="detail-description">Manage your gear and consumables.</div>
+             <div class="detail-name">INITIALIZING...</div>
+             <div class="detail-description">Select a slot or item to view details.</div>
           </div>
           <div class="usage-hint">
-            [L-Click] Equip/Select | [R-Click] Use Item
+            [L-Click] Assign/Select | [R-Click] Use Consumable
           </div>
         </div>
       </div>
@@ -103,6 +103,9 @@ export class InventoryUI {
 
       slot.addEventListener('click', () => {
         this.selectedSlotIndex = index;
+        if (weaponId) {
+          this.callbacks.onEquipWeapon(index, weaponId);
+        }
         this.render();
         this.updateDetails(weaponId ? { id: weaponId, name: weaponId, type: 'weapon' } : null);
       });

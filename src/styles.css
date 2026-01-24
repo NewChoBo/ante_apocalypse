@@ -236,54 +236,125 @@ body {
 }
 
 .equipment-side {
-  width: 350px;
+  width: 380px;
   border-right: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 20px;
+  padding: 25px;
   background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+/* 커스텀 스크롤바 디자인 - 장비창 */
+.equipment-side::-webkit-scrollbar {
+  width: 6px;
+}
+
+.equipment-side::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
+}
+
+.equipment-side::-webkit-scrollbar-thumb {
+  background: rgba(79, 195, 247, 0.15);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.equipment-side::-webkit-scrollbar-thumb:hover {
+  background: rgba(79, 195, 247, 0.4);
 }
 
 .bag-side {
   flex: 1;
-  padding: 20px;
+  padding: 25px;
   overflow-y: auto;
 }
 
+/* 커스텀 스크롤바 디자인 */
+.bag-side::-webkit-scrollbar {
+  width: 6px;
+}
+
+.bag-side::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+}
+
+.bag-side::-webkit-scrollbar-thumb {
+  background: rgba(79, 195, 247, 0.2);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.bag-side::-webkit-scrollbar-thumb:hover {
+  background: rgba(79, 195, 247, 0.5);
+}
+
 .section-title {
-  font-size: 14px;
+  font-size: 13px;
   color: #4fc3f7;
-  letter-spacing: 2px;
-  margin-bottom: 15px;
+  letter-spacing: 3px;
+  margin-bottom: 20px;
   text-transform: uppercase;
-  font-weight: bold;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+}
+
+.section-title::before {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 14px;
+  background: #4fc3f7;
+  margin-right: 10px;
+  border-radius: 2px;
 }
 
 .equipment-slots {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 18px;
 }
 
 .weapon-slot {
-  height: 100px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  height: 110px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.04) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   display: flex;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 25px;
   position: relative;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
 }
 
 .weapon-slot:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(79, 195, 247, 0.5);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.08) 100%);
+  border-color: rgba(79, 195, 247, 0.3);
+  transform: translateX(5px);
 }
 
 .weapon-slot.active {
-  background: rgba(79, 195, 247, 0.1);
+  background: linear-gradient(90deg, rgba(79, 195, 247, 0.05) 0%, rgba(79, 195, 247, 0.1) 100%);
   border-color: #4fc3f7;
+  box-shadow: 0 0 20px rgba(79, 195, 247, 0.1);
+}
+
+.weapon-slot.active::after {
+  content: 'SELECTED SLOT';
+  position: absolute;
+  top: -10px;
+  right: 15px;
+  font-size: 10px;
+  background: #4fc3f7;
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 900;
+  letter-spacing: 1px;
 }
 
 .slot-number {

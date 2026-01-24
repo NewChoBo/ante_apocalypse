@@ -78,6 +78,10 @@ export class CombatComponent extends BaseComponent {
     await this.inventory.equipWeaponById(id);
   }
 
+  public onWeaponChanged(callback: (weapon: IWeapon) => void): void {
+    this.inventory.setOnWeaponChanged(callback);
+  }
+
   public addAmmoToAll(amount: number): void {
     this.inventory.addAmmoToAll(amount);
   }
