@@ -21,6 +21,9 @@ export class CameraComponent extends BaseComponent {
   private defaultFOV = 1.2;
   private currentFOV = 1.2;
 
+  private currentRecoilOffset = 0;
+  private targetRecoilOffset = 0;
+
   constructor(owner: BasePawn, scene: Scene, initialHeight: number = 0) {
     super(owner, scene);
 
@@ -49,21 +52,40 @@ export class CameraComponent extends BaseComponent {
 
   /** 반동 적용 */
   public applyRecoil(force: number): void {
-    // 카메라를 위로 튕김 (X축 회전 감소)
-    this.camera.rotation.x -= force;
+    // 목표 반동값을 증가시킴
+    this.targetRecoilOffset += force;
   }
-
-  /* 정조준 상태는 이제 무기 시스템에서 직접 관리하므로 더 이상 카메라 컴포넌트에서 추적할 필요가 없습니다. */
 
   public update(deltaTime: number): void {
     const combatComp = this.owner.getComponent(CombatComponent);
     if (!combatComp) return;
 
+    // 1. FOV 처리
     const weapon = combatComp.getCurrentWeapon();
     const targetFOV = weapon ? weapon.getDesiredFOV(this.defaultFOV) : this.defaultFOV;
 
     this.currentFOV = this.currentFOV + (targetFOV - this.currentFOV) * (10 * deltaTime);
     this.camera.fov = this.currentFOV;
+
+    // 2. 반동 처리 (Recoil)
+    // 현재 반동 상태를 목표값으로 보간 (Kick)
+    const previousOffset = this.currentRecoilOffset;
+    this.currentRecoilOffset = this.lerp(
+      this.currentRecoilOffset,
+      this.targetRecoilOffset,
+      15 * deltaTime
+    );
+
+    // 이번 프레임의 반동 델타를 카메라에 적용
+    const recoilDelta = this.currentRecoilOffset - previousOffset;
+    this.camera.rotation.x -= recoilDelta;
+
+    // 목표 반동값을 0으로 복구 (Recovery)
+    this.targetRecoilOffset = this.lerp(this.targetRecoilOffset, 0, 5 * deltaTime);
+  }
+
+  private lerp(start: number, end: number, amt: number): number {
+    return (1 - amt) * start + amt * end;
   }
 
   public setMouseSensitivity(value: number): void {

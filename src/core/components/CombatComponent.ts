@@ -5,6 +5,7 @@ import { WeaponInputComponent } from './WeaponInputComponent';
 import { HUDSyncComponent } from './HUDSyncComponent';
 import { FirearmEffectComponent } from './FirearmEffectComponent';
 import { MeleeEffectComponent } from './MeleeEffectComponent';
+import { ImpactEffectComponent } from './ImpactEffectComponent';
 import { CameraComponent } from './CameraComponent';
 import type { BasePawn } from '../BasePawn';
 
@@ -44,6 +45,7 @@ export class CombatComponent extends BaseComponent {
     // 이펙트 컴포넌트 초기화
     new FirearmEffectComponent(owner, scene);
     new MeleeEffectComponent(owner, scene);
+    new ImpactEffectComponent(owner, scene);
   }
 
   public setAiming(isAiming: boolean): void {

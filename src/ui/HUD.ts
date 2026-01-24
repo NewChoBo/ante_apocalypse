@@ -30,5 +30,22 @@ export class HUD {
     scoreStore.subscribe((score) => {
       this.scoreElement.textContent = score.toString();
     });
+
+    // 크로스헤어 반동 효과
+    const crosshair = document.getElementById('crosshair');
+    let expandTimeout: any;
+
+    if (crosshair) {
+      import('../core/events/GameObservables.ts').then(({ GameObservables }) => {
+        GameObservables.weaponFire.add(() => {
+          crosshair.classList.add('expanded');
+
+          if (expandTimeout) clearTimeout(expandTimeout);
+          expandTimeout = setTimeout(() => {
+            crosshair.classList.remove('expanded');
+          }, 150);
+        });
+      });
+    }
   }
 }

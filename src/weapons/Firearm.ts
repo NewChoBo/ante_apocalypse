@@ -181,30 +181,39 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     const ray = new Ray(this.camera.globalPosition, direction, this.range);
 
     const pickInfo = this.scene.pickWithRay(ray, (mesh) => {
-      return mesh.isPickable && mesh.name.startsWith('target');
+      // 투명한 메쉬나 플레이어 자신 제외하고 모든 pickable 메쉬 허용
+      return mesh.isPickable && mesh.isVisible && mesh.name !== 'playerPawn';
     });
 
     if (pickInfo?.hit && pickInfo.pickedMesh) {
-      const meshName = pickInfo.pickedMesh.name;
-      const nameParts = meshName.split('_');
-      const targetId = `${nameParts[0]}_${nameParts[1]}`;
-      const part = nameParts[2] || 'body';
-
-      const isHeadshot = part === 'head';
-      const destroyed = TargetRegistry.getInstance().hitTarget(targetId, part, this.damage);
-
-      if (this.onScoreCallback) {
-        const score = destroyed ? (isHeadshot ? 200 : 100) : isHeadshot ? 30 : 10;
-        this.onScoreCallback(score);
-      }
-
-      // 히트 이벤트 발행 (WeaponEffectComponent에서 구독 가능하도록)
-      GameObservables.targetHit.notifyObservers({
-        targetId,
-        part,
-        damage: this.damage,
+      // 1. 공통 타격 이펙트 (벽, 바닥, 타겟 모두 포함)
+      GameObservables.hitEffect.notifyObservers({
         position: pickInfo.pickedPoint!,
+        normal: pickInfo.getNormal(true) || Vector3.Up(),
       });
+
+      // 2. 타겟 처리 로직 (이름 확인)
+      const meshName = pickInfo.pickedMesh.name;
+      if (meshName.startsWith('target')) {
+        const nameParts = meshName.split('_');
+        const targetId = `${nameParts[0]}_${nameParts[1]}`;
+        const part = nameParts[2] || 'body';
+
+        const isHeadshot = part === 'head';
+        const destroyed = TargetRegistry.getInstance().hitTarget(targetId, part, this.damage);
+
+        if (this.onScoreCallback) {
+          const score = destroyed ? (isHeadshot ? 200 : 100) : isHeadshot ? 30 : 10;
+          this.onScoreCallback(score);
+        }
+
+        GameObservables.targetHit.notifyObservers({
+          targetId,
+          part,
+          damage: this.damage,
+          position: pickInfo.pickedPoint!,
+        });
+      }
     }
   }
 

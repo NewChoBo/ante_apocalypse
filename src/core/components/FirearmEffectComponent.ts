@@ -46,6 +46,15 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
     const sound = this.gunshotSound || AssetLoader.getInstance().getSound('gunshot');
     if (sound) {
       this.gunshotSound = sound;
+      // 피치(재생 속도)를 0.9 ~ 1.1 사이로 랜덤화
+      const randomRate = 0.9 + Math.random() * 0.2;
+
+      if (typeof sound.setPlaybackRate === 'function') {
+        sound.setPlaybackRate(randomRate);
+      } else if (typeof sound.setPitch === 'function') {
+        sound.setPitch(randomRate);
+      }
+
       sound.play();
     }
   }
