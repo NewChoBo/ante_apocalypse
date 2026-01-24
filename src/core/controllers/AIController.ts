@@ -1,4 +1,3 @@
-import { Vector3 } from '@babylonjs/core';
 import { BaseController } from './BaseController';
 import { EnemyPawn } from '../EnemyPawn';
 import { PlayerPawn } from '../PlayerPawn';
@@ -9,6 +8,10 @@ export class AIController extends BaseController {
   private targetPlayer: PlayerPawn | null = null;
   private detectionRange = 30;
   private attackRange = 15;
+  private meleeAttackRange = 2.5;
+  private attackCooldown = 1.0;
+  private lastAttackTime = 0;
+  private damage = 10;
   private moveSpeed = 3.0;
 
   private enemyPawn: EnemyPawn | null = null;
@@ -68,8 +71,17 @@ export class AIController extends BaseController {
       enemy.move(direction, this.moveSpeed, deltaTime);
     }
 
-    // 3. Attack (Placeholder)
-    if (distance < this.attackRange) {
+    // 3. Attack (Melee)
+    const now = performance.now() / 1000;
+    if (distance <= this.meleeAttackRange) {
+      if (now - this.lastAttackTime >= this.attackCooldown) {
+        target.takeDamage(this.damage);
+        this.lastAttackTime = now;
+      }
+    }
+
+    // 4. Attack (Firearm Placeholder)
+    if (distance < this.attackRange && distance > this.meleeAttackRange) {
       // enemy.fire();
     }
   }

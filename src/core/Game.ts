@@ -14,7 +14,7 @@ import { PlayerPawn } from './PlayerPawn';
 import { TargetSpawnerComponent } from './components/TargetSpawnerComponent';
 import { TargetRegistry } from './systems/TargetRegistry';
 import { HUD } from '../ui/HUD';
-import { gameStateStore } from './store/GameStore.ts';
+import { gameStateStore, playerHealthStore } from './store/GameStore.ts';
 import { CombatComponent } from './components/CombatComponent';
 import { TickManager } from './TickManager';
 import { AssetLoader } from './AssetLoader';
@@ -33,6 +33,7 @@ export class Game {
   private hud: HUD | null = null;
   private spawner: TargetSpawnerComponent | null = null;
   private enemyManager: EnemyManager | null = null;
+  private healthUnsub: (() => void) | null = null;
 
   private isRunning = false;
   private isPaused = false;
@@ -140,8 +141,31 @@ export class Game {
     const combatComp = new CombatComponent(this.playerPawn, this.scene);
     this.playerPawn.addComponent(combatComp);
 
+    // 체력 구독 (사망 판정)
+    if (this.healthUnsub) this.healthUnsub();
+    this.healthUnsub = playerHealthStore.subscribe((health) => {
+      if (health <= 0 && this.isRunning && !this.isPaused) {
+        this.gameOver();
+      }
+    });
+
     // 에셋 프리로딩
     await this.initPreloading();
+  }
+
+  private gameOver(): void {
+    this.isPaused = true;
+    gameStateStore.set('GAME_OVER');
+
+    // 게임 오버 UI 표시 (간단히 pause-overlay 재활용하거나 새로 만듦)
+    const pauseTitle = document.querySelector('#pause-overlay h1');
+    if (pauseTitle) pauseTitle.textContent = 'GAME OVER';
+
+    const resumeBtn = document.getElementById('resume-button');
+    if (resumeBtn) resumeBtn.style.display = 'none'; // 사망 시 계속하기 불가
+
+    document.getElementById('pause-overlay')!.style.display = 'flex';
+    document.exitPointerLock();
   }
 
   private async initPreloading(): Promise<void> {
@@ -331,6 +355,17 @@ export class Game {
     // 싱글톤 상태 초기화
     TickManager.getInstance().clear();
     TargetRegistry.getInstance().clear();
+
+    if (this.healthUnsub) {
+      this.healthUnsub();
+      this.healthUnsub = null;
+    }
+
+    // UI 복구
+    const pauseTitle = document.querySelector('#pause-overlay h1');
+    if (pauseTitle) pauseTitle.textContent = 'PAUSED';
+    const resumeBtn = document.getElementById('resume-button');
+    if (resumeBtn) resumeBtn.style.display = 'block';
 
     // 씬 폐기 (Bullet holes, decals 등 청소)
     this.scene.dispose();

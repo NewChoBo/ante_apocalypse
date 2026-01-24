@@ -20,6 +20,8 @@ export interface MouseDelta {
   y: number;
 }
 
+import { playerHealthStore } from './store/GameStore.ts';
+
 /**
  * 1인칭 플레이어 캐릭터 실체 (Pawn).
  */
@@ -27,9 +29,13 @@ export class PlayerPawn extends BasePawn {
   public mesh: Mesh;
   private movementComponent: CharacterMovementComponent;
   private cameraComponent: CameraComponent;
+  private _health = 100;
 
   constructor(scene: Scene) {
     super(scene);
+
+    // 초기 체력 동기화
+    playerHealthStore.set(this._health);
 
     // 단순한 히트박스 또는 투명 메쉬 (Pawn의 실체)
     this.mesh = Mesh.CreateBox('playerPawn', 0.5, scene);
@@ -76,5 +82,24 @@ export class PlayerPawn extends BasePawn {
   public tick(deltaTime: number): void {
     // 모든 컴포넌트 업데이트 호출
     this.updateComponents(deltaTime);
+  }
+
+  public takeDamage(amount: number): void {
+    if (this._health <= 0) return;
+
+    this._health = Math.max(0, this._health - amount);
+    playerHealthStore.set(this._health);
+
+    console.log(`Player took ${amount} damage. Health: ${this._health}`);
+
+    if (this._health <= 0) {
+      this.die();
+    }
+  }
+
+  private die(): void {
+    console.log('Player Died');
+    // 게임 오버 처리는 나중에 Game 클래스나 전역 상태 관리에서 수행할 수도 있음
+    // 일단 로그만 출력
   }
 }

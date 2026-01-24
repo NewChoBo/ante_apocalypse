@@ -1,4 +1,4 @@
-import { scoreStore, ammoStore } from '../core/store/GameStore.ts';
+import { scoreStore, ammoStore, playerHealthStore } from '../core/store/GameStore.ts';
 import { GameObservables } from '../core/events/GameObservables.ts';
 import { Observer } from '@babylonjs/core';
 
@@ -6,18 +6,32 @@ export class HUD {
   private scoreElement: HTMLElement;
   private currentAmmoElement: HTMLElement;
   private totalAmmoElement: HTMLElement;
+  private healthBarElement: HTMLElement;
+  private healthValueElement: HTMLElement;
+  private damageOverlay: HTMLElement;
 
   private curAmmoUnsub: (() => void) | null = null;
   private scoreUnsub: (() => void) | null = null;
+  private healthUnsub: (() => void) | null = null;
   private weaponFireObserver: Observer<any> | null = null;
   private expandTimeout: any;
+  private previousHealth: number = 100;
 
   constructor() {
     this.scoreElement = document.getElementById('score')!;
     this.currentAmmoElement = document.getElementById('current-ammo')!;
     this.totalAmmoElement = document.getElementById('total-ammo')!;
+    this.healthBarElement = document.getElementById('health-bar')!;
+    this.healthValueElement = document.getElementById('health-value')!;
+    this.damageOverlay = document.getElementById('damage-overlay')!;
 
     this.setupSubscriptions();
+  }
+
+  private showDamageFlash(): void {
+    this.damageOverlay.classList.remove('hit');
+    void this.damageOverlay.offsetWidth; // Trigger reflow
+    this.damageOverlay.classList.add('hit');
   }
 
   private setupSubscriptions(): void {
@@ -36,6 +50,26 @@ export class HUD {
     // 점수 상태 구독 (NanoStores)
     this.scoreUnsub = scoreStore.subscribe((score) => {
       this.scoreElement.textContent = score.toString();
+    });
+
+    // 체력 상태 구독 (NanoStores)
+    this.healthUnsub = playerHealthStore.subscribe((health) => {
+      if (health < this.previousHealth) {
+        this.showDamageFlash();
+      }
+      this.previousHealth = health;
+
+      this.healthBarElement.style.width = `${health}%`;
+      this.healthValueElement.textContent = Math.ceil(health).toString();
+
+      // 체력에 따른 색상 변경
+      if (health < 30) {
+        this.healthBarElement.style.background = '#f44336'; // Red
+      } else if (health < 60) {
+        this.healthBarElement.style.background = '#ffeb3b'; // Yellow
+      } else {
+        this.healthBarElement.style.background = 'linear-gradient(90deg, #ff5252, #f44336)';
+      }
     });
 
     // 크로스헤어 반동 효과
@@ -61,6 +95,10 @@ export class HUD {
     if (this.scoreUnsub) {
       this.scoreUnsub();
       this.scoreUnsub = null;
+    }
+    if (this.healthUnsub) {
+      this.healthUnsub();
+      this.healthUnsub = null;
     }
     if (this.weaponFireObserver) {
       GameObservables.weaponFire.remove(this.weaponFireObserver);

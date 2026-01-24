@@ -26,3 +26,8 @@ export const ammoStore = map<AmmoState>({
   weaponName: 'None',
   showAmmo: true,
 });
+
+/**
+ * 플레이어 체력 저장소 (0~100)
+ */
+export const playerHealthStore = atom<number>(100);
