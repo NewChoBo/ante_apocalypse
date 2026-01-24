@@ -6,7 +6,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700;900&family=Montserrat:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Roboto+Mono:wght@300;400;700&display=swap"
       rel="stylesheet"
     />
     <title>Ante Apocalypse</title>
@@ -36,25 +36,51 @@
       <!-- 시작 화면 -->
       <div id="start-overlay">
         <h1>ANTE APOCALYPSE</h1>
-        <p>3D Web Shooter</p>
+        <p
+          style="
+            font-family: var(--font-tactical);
+            font-size: 18px;
+            color: var(--primary);
+            letter-spacing: 5px;
+            margin-bottom: 40px;
+            margin-top: -40px;
+            text-transform: uppercase;
+            z-index: 2;
+          "
+        >
+          ADVANCED_INFANTRY_SIMULATION_V2
+        </p>
 
-        <div style="margin-bottom: 20px">
-          <label for="map-select" style="color: white; margin-right: 10px">Select Map:</label>
+        <div class="map-selector" style="margin-bottom: 40px; z-index: 2">
+          <label
+            for="map-select"
+            style="
+              font-family: var(--font-tactical);
+              color: rgba(255, 255, 255, 0.6);
+              margin-right: 15px;
+              letter-spacing: 2px;
+            "
+            >DEPLOYMENT ZONE:</label
+          >
           <select
             id="map-select"
             style="
-              padding: 5px;
-              background: rgba(0, 0, 0, 0.5);
+              padding: 10px 20px;
+              background: #000;
               color: white;
-              border: 1px solid #666;
+              border: 1px solid #333;
+              font-family: var(--font-mono);
+              font-size: 14px;
+              outline: none;
+              cursor: pointer;
             "
           >
-            <option value="/levels/training_ground.json">Shooting Range (Training)</option>
-            <option value="/levels/combat_zone.json">Combat Zone (AI Battle)</option>
+            <option value="/levels/training_ground.json">TRAINING_GROUND.EXE</option>
+            <option value="/levels/combat_zone.json">COMBAT_ZONE.EXE</option>
           </select>
         </div>
 
-        <button id="start-button">시작하기</button>
+        <button id="start-button">INITIALIZE SESSION</button>
         <p class="controls-hint">WASD: 이동 | 마우스: 시점 | Space: 점프</p>
       </div>
 
