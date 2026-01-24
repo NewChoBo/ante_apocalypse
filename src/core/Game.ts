@@ -202,6 +202,29 @@ export class Game {
           inventoryStore.setKey('bagItems', bag);
         }
       },
+      onDropItem: (itemId) => {
+        if (!this.playerPawn) return;
+        const state = inventoryStore.get();
+        const bag = [...state.bagItems];
+        const itemIndex = bag.findIndex((i) => i.id === itemId);
+
+        if (itemIndex !== -1) {
+          const item = bag[itemIndex];
+          // 소모 처리 (버리기)
+          if (item.count > 1) {
+            bag[itemIndex] = { ...item, count: item.count - 1 };
+          } else {
+            bag.splice(itemIndex, 1);
+          }
+          inventoryStore.setKey('bagItems', bag);
+
+          // 월드에 드랍 (플레이어 위치)
+          const dropPos = this.playerPawn.mesh.position.clone();
+          dropPos.y += 0.5; // 약간 위에서 떨어뜨림
+          PickupManager.getInstance().spawnPickup(dropPos, item.id as any);
+          console.log(`[Game] Dropped ${item.id} in world`);
+        }
+      },
     });
     this.syncInventoryStore();
 

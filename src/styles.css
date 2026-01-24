@@ -441,7 +441,95 @@ body {
 #pause-overlay {
   z-index: 2000; /* 일시정지: 최상단 */
 }
+/* 인벤토리 툴팁 */
+#inventory-tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: rgba(15, 15, 25, 0.95);
+  border: 1px solid rgba(79, 195, 247, 0.4);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: white;
+  z-index: 3000;
+  display: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  width: 220px;
+}
 
+#inventory-tooltip .tooltip-name {
+  font-weight: 900;
+  color: #4fc3f7;
+  font-size: 14px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+#inventory-tooltip .tooltip-type {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 8px;
+}
+
+#inventory-tooltip .tooltip-desc {
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* 컨텍스트 메뉴 */
+#inventory-context-menu {
+  position: fixed;
+  background: rgba(25, 25, 35, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 6px;
+  z-index: 3500;
+  display: none;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.7);
+  min-width: 140px;
+  backdrop-filter: blur(15px);
+}
+
+.context-menu-item {
+  padding: 10px 16px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.context-menu-item:hover {
+  background: rgba(79, 195, 247, 0.15);
+  color: #4fc3f7;
+}
+
+.context-menu-item i {
+  margin-right: 10px;
+}
+
+/* 드래그 앤 드롭 피드백 */
+.weapon-slot.drag-over,
+.bag-slot.drag-over {
+  border-color: #4fc3f7;
+  background: rgba(79, 195, 247, 0.15);
+  box-shadow: 0 0 15px rgba(79, 195, 247, 0.2);
+  transform: scale(1.02);
+}
+
+.weapon-slot[draggable='true'],
+.bag-slot[draggable='true'] {
+  cursor: grab;
+}
+
+.weapon-slot[draggable='true']:active,
+.bag-slot[draggable='true']:active {
+  cursor: grabbing;
+}
 .detail-name {
   font-size: 20px;
   font-weight: bold;
