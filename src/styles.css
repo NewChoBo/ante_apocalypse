@@ -1,3 +1,18 @@
+:root {
+  /* Tactical Color Palette */
+  --primary: #00f2ff;
+  --primary-glow: rgba(0, 242, 255, 0.5);
+  --secondary: #ff9d00;
+  --secondary-glow: rgba(255, 157, 0, 0.5);
+  --danger: #ff4d4d;
+  --bg-dark: #0a0a0f;
+  --bg-panel: rgba(10, 10, 15, 0.85);
+  --border-dim: rgba(255, 255, 255, 0.1);
+  --font-main: 'Rajdhani', sans-serif;
+  --font-tech: 'Orbitron', sans-serif;
+  --font-mono: 'Roboto Mono', monospace;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -9,8 +24,9 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: #0a0a0f;
+  font-family: var(--font-main);
+  background: var(--bg-dark);
+  color: #fff;
 }
 
 #game-container {
@@ -41,24 +57,17 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 20px;
-  height: 20px;
-  transition:
-    width 0.1s ease-out,
-    height 0.1s ease-out;
-}
-
-#crosshair.expanded {
-  width: 40px;
-  height: 40px;
+  width: 30px;
+  height: 30px;
+  transition: all 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
 #crosshair::before,
 #crosshair::after {
   content: '';
   position: absolute;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+  background: var(--primary);
+  box-shadow: 0 0 8px var(--primary-glow);
 }
 
 #crosshair::before {
@@ -78,67 +87,97 @@ body {
 /* 스코어 */
 #score-display {
   position: absolute;
-  top: 20px;
-  left: 20px;
-  font-size: 24px;
-  font-weight: bold;
-  color: #fff;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-  letter-spacing: 2px;
+  top: 25px;
+  left: 30px;
+  font-family: var(--font-tech);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  display: flex;
+  flex-direction: column;
 }
 
 #score-display #score {
-  color: #ffd700;
+  font-size: 32px;
+  color: var(--primary);
+  text-shadow: 0 0 15px var(--primary-glow);
+  letter-spacing: 0;
 }
 
 /* 탄약 */
 #ammo-display {
   position: absolute;
-  bottom: 30px;
-  right: 30px;
-  font-size: 32px;
-  font-weight: bold;
-  color: #fff;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+  bottom: 40px;
+  right: 40px;
+  font-family: var(--font-mono);
+  color: rgba(255, 255, 255, 0.5);
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
 
 #ammo-display #current-ammo {
-  font-size: 48px;
-  color: #4fc3f7;
+  font-family: var(--font-tech);
+  font-size: 64px;
+  color: var(--primary);
+  text-shadow: 0 0 20px var(--primary-glow);
+}
+
+#ammo-display #total-ammo {
+  font-size: 24px;
 }
 
 /* 체력 */
 #health-display {
   position: absolute;
-  bottom: 30px;
-  left: 30px;
+  bottom: 40px;
+  left: 40px;
   display: flex;
-  align-items: center;
-  gap: 15px;
+  flex-direction: column;
+  gap: 8px;
 }
 
 #health-bar-container {
-  width: 200px;
-  height: 20px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 10px;
-  overflow: hidden;
+  width: 300px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-radius: 0;
+  position: relative;
+  overflow: visible;
+}
+
+#health-bar-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent,
+    transparent 18px,
+    rgba(10, 10, 15, 0.8) 18px,
+    rgba(10, 10, 15, 0.8) 20px
+  );
+  z-index: 2;
 }
 
 #health-bar {
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, #ff5252, #f44336);
-  transition: width 0.3s ease-out;
+  background: var(--danger);
+  box-shadow: 0 0 15px rgba(255, 77, 77, 0.4);
+  transition: width 0.4s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 #health-value {
-  font-size: 32px;
-  font-weight: bold;
-  color: #fff;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
-  min-width: 60px;
+  font-family: var(--font-tech);
+  font-size: 24px;
+  color: var(--danger);
+  text-shadow: 0 0 10px rgba(255, 77, 77, 0.3);
 }
 
 /* 재장전 메시지 */
@@ -198,35 +237,74 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(12px);
+  background: radial-gradient(
+    circle at center,
+    rgba(15, 15, 25, 0.4) 0%,
+    rgba(5, 5, 10, 0.85) 100%
+  );
+  backdrop-filter: blur(20px);
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1500; /* 인벤토리: 중간 */
-  animation: fadeIn 0.3s ease-out;
+  z-index: 1500;
+  animation: tacticalFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tacticalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(1.05);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .inventory-window {
-  width: 1000px;
+  width: 1100px;
   max-width: 95vw;
-  height: 600px;
-  background: linear-gradient(135deg, rgba(30, 30, 45, 0.95), rgba(15, 15, 25, 0.98));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 20px;
-  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8);
+  height: 700px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-dim);
+  box-shadow:
+    0 0 50px rgba(0, 0, 0, 0.5),
+    inset 0 0 100px rgba(0, 242, 255, 0.02);
   display: flex;
   flex-direction: column;
+  position: relative;
   overflow: hidden;
 }
 
+.inventory-window::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background:
+    linear-gradient(rgba(0, 242, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
+  background-size: 30px 30px;
+  pointer-events: none;
+}
+
 .inventory-header {
-  padding: 20px 30px;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 25px 40px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--border-dim);
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.inventory-header h2 {
+  font-family: var(--font-tech);
+  font-size: 24px;
+  letter-spacing: 6px;
+  color: var(--primary);
+  text-shadow: 0 0 10px var(--primary-glow);
 }
 
 .inventory-panels {
@@ -292,111 +370,71 @@ body {
 }
 
 .section-title {
-  font-size: 13px;
-  color: #4fc3f7;
-  letter-spacing: 3px;
-  margin-bottom: 20px;
+  font-family: var(--font-tech);
+  font-size: 14px;
+  color: var(--primary);
+  letter-spacing: 4px;
+  margin-bottom: 25px;
   text-transform: uppercase;
-  font-weight: 800;
   display: flex;
   align-items: center;
 }
 
 .section-title::before {
-  content: '';
-  display: inline-block;
-  width: 4px;
-  height: 14px;
-  background: #4fc3f7;
-  margin-right: 10px;
-  border-radius: 2px;
-}
-
-.equipment-slots {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  content: '▶';
+  font-size: 10px;
+  margin-right: 12px;
+  color: var(--primary);
+  text-shadow: 0 0 8px var(--primary-glow);
 }
 
 .weapon-slot {
-  height: 110px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.04) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: center;
-  padding: 0 25px;
+  padding: 0 30px;
   position: relative;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s ease;
   cursor: pointer;
 }
 
 .weapon-slot:hover {
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.08) 100%);
-  border-color: rgba(79, 195, 247, 0.3);
-  transform: translateX(5px);
+  background: rgba(255, 242, 255, 0.04);
+  border-color: var(--primary-glow);
 }
 
 .weapon-slot.active {
-  background: linear-gradient(90deg, rgba(79, 195, 247, 0.05) 0%, rgba(79, 195, 247, 0.1) 100%);
-  border-color: #4fc3f7;
-  box-shadow: 0 0 20px rgba(79, 195, 247, 0.1);
+  background: rgba(0, 242, 255, 0.05);
+  border-color: var(--primary);
+  box-shadow: inset 0 0 20px rgba(0, 242, 255, 0.1);
 }
 
 .weapon-slot.active::after {
-  content: 'SELECTED SLOT';
+  content: 'ACTIVE_MODULE';
   position: absolute;
-  top: -10px;
+  top: 10px;
   right: 15px;
-  font-size: 10px;
-  background: #4fc3f7;
-  color: #000;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-weight: 900;
-  letter-spacing: 1px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--primary);
+  letter-spacing: 2px;
 }
 
 .slot-number {
   position: absolute;
-  top: 8px;
-  left: 12px;
+  top: 10px;
+  left: 15px;
+  font-family: var(--font-mono);
   font-size: 10px;
-  font-weight: bold;
-  opacity: 0.5;
-}
-
-.weapon-slot .item-icon {
-  width: 60px;
-  height: 60px;
-  margin-right: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.item-icon-img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 0 5px rgba(79, 195, 247, 0.3));
-}
-
-.weapon-slot .item-name {
-  font-size: 14px;
-}
-
-.bag-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  color: rgba(255, 255, 255, 0.3);
 }
 
 .bag-slot {
   aspect-ratio: 1;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -407,46 +445,26 @@ body {
 }
 
 .bag-slot:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: #4fc3f7;
-}
-
-.bag-slot .item-icon {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.bag-slot .item-count {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  font-size: 12px;
-  font-weight: bold;
-  background: rgba(0, 0, 0, 0.5);
-  padding: 2px 6px;
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--primary);
 }
 
 .bag-slot.equipped::before {
-  content: 'EQUIPPED';
+  content: 'EQP';
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 5px;
+  right: 5px;
+  font-family: var(--font-mono);
   font-size: 8px;
-  background: #4fc3f7;
-  color: #000;
+  color: var(--bg-dark);
+  background: var(--primary);
   padding: 1px 4px;
-  border-radius: 2px;
-  font-weight: 900;
   z-index: 1;
 }
 
 .bag-slot.equipped {
-  border-color: rgba(79, 195, 247, 0.5);
-  background: rgba(79, 195, 247, 0.05);
+  border-color: var(--primary-glow);
+  background: rgba(0, 242, 255, 0.03);
 }
 
 .inventory-slot.equipped {
@@ -461,17 +479,19 @@ body {
 }
 
 .inventory-footer {
-  padding: 20px 30px;
-  background: rgba(0, 0, 0, 0.3);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 25px 40px;
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid var(--border-dim);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .usage-hint {
-  font-size: 12px;
-  color: #666;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 1px;
 }
 
 /* 일시정지 오버레이 */
@@ -635,83 +655,111 @@ body {
   backdrop-filter: blur(5px);
 }
 
+/* 시작/일시정지 화면 */
 #start-overlay h1,
 #pause-overlay h1 {
-  font-size: 64px;
+  font-family: var(--font-tech);
+  font-size: 84px;
   font-weight: 900;
   color: #fff;
   text-transform: uppercase;
-  letter-spacing: 8px;
-  margin-bottom: 20px;
-  text-shadow:
-    0 0 20px rgba(79, 195, 247, 0.5),
-    0 0 40px rgba(79, 195, 247, 0.3);
-}
-
-#start-overlay p {
-  font-size: 18px;
-  color: #aaa;
-  margin-bottom: 40px;
+  letter-spacing: 15px;
+  margin-bottom: 30px;
+  text-shadow: 0 0 30px var(--primary-glow);
 }
 
 #start-button,
 #resume-button {
-  padding: 16px 48px;
+  padding: 20px 60px;
+  font-family: var(--font-tech);
   font-size: 20px;
-  font-weight: bold;
-  color: #fff;
-  background: linear-gradient(135deg, #4fc3f7, #0288d1);
-  border: none;
-  border-radius: 8px;
+  color: var(--primary);
+  background: transparent;
+  border: 1px solid var(--primary);
   cursor: pointer;
   text-transform: uppercase;
-  letter-spacing: 3px;
-  transition: all 0.3s ease;
-  box-shadow:
-    0 4px 15px rgba(79, 195, 247, 0.4),
-    0 0 30px rgba(79, 195, 247, 0.2);
+  letter-spacing: 5px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+#start-button::before,
+#resume-button::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(0, 242, 255, 0.2), transparent);
+  transition: left 0.5s ease;
 }
 
 #start-button:hover,
 #resume-button:hover {
-  transform: translateY(-2px);
-  box-shadow:
-    0 6px 20px rgba(79, 195, 247, 0.5),
-    0 0 40px rgba(79, 195, 247, 0.3);
+  background: rgba(0, 242, 255, 0.1);
+  box-shadow: 0 0 30px var(--primary-glow);
+  letter-spacing: 8px;
 }
 
-#start-button:active,
-#resume-button:active {
-  transform: translateY(0);
+#start-button:hover::before,
+#resume-button:hover::before {
+  left: 100%;
 }
 
 .secondary-button {
-  margin-top: 16px;
-  padding: 12px 36px;
-  font-size: 18px;
-  font-weight: bold;
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+  margin-top: 25px;
+  padding: 12px 40px;
+  font-family: var(--font-tech);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 8px;
   cursor: pointer;
   text-transform: uppercase;
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   transition: all 0.3s ease;
 }
 
 .secondary-button:hover {
-  background: rgba(255, 80, 80, 0.8);
-  border-color: rgba(255, 80, 80, 0.4);
-  box-shadow: 0 0 20px rgba(255, 80, 80, 0.3);
-  transform: translateY(-2px);
+  border-color: var(--danger);
+  color: var(--danger);
+  box-shadow: 0 0 20px rgba(255, 77, 77, 0.2);
 }
 
 .controls-hint {
-  margin-top: 30px;
-  font-size: 14px;
-  color: #666;
+  margin-top: 50px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.3);
   letter-spacing: 1px;
+}
+
+/* 전술적 데코레이션 (코너 브라켓) */
+.weapon-slot::before,
+.bag-slot::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  pointer-events: none;
+}
+
+.weapon-slot::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 10px;
+  height: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  pointer-events: none;
 }
 
 /* 바빌론 인스펙터 레이어 최상단 고정 */
