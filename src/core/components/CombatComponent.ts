@@ -43,9 +43,15 @@ export class CombatComponent extends BaseComponent {
     this.hudSync.syncAmmo(this.inventory.currentWeapon);
 
     // 이펙트 컴포넌트 초기화
-    new FirearmEffectComponent(owner, scene);
-    new MeleeEffectComponent(owner, scene);
-    new ImpactEffectComponent(owner, scene);
+    // 이펙트 컴포넌트 초기화 및 등록
+    const fireEffect = new FirearmEffectComponent(owner, scene);
+    owner.addComponent(fireEffect);
+
+    const meleeEffect = new MeleeEffectComponent(owner, scene);
+    owner.addComponent(meleeEffect);
+
+    const impactEffect = new ImpactEffectComponent(owner, scene);
+    owner.addComponent(impactEffect);
   }
 
   public setAiming(isAiming: boolean): void {
