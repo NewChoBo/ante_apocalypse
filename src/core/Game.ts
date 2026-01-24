@@ -21,6 +21,7 @@ import { AssetLoader } from './AssetLoader';
 import '@babylonjs/inspector'; // 인스펙터 기능 활성화
 import { LevelLoader, LevelData } from './systems/LevelLoader';
 import { EnemyManager } from './systems/EnemyManager';
+import { CustomLoadingScreen } from '../ui/CustomLoadingScreen';
 
 export class Game {
   private canvas!: HTMLCanvasElement;
@@ -72,6 +73,7 @@ export class Game {
       preserveDrawingBuffer: true,
       stencil: true,
     });
+    this.engine.loadingScreen = new CustomLoadingScreen();
 
     window.addEventListener('resize', () => {
       this.engine.resize();
@@ -176,9 +178,11 @@ export class Game {
     this.shadowGenerator.useBlurExponentialShadowMap = true;
     this.shadowGenerator.blurKernel = 32;
 
-    // 4. 레벨 로드
+    // 4. 레벨 로드 (로딩 화면 표시)
+    this.engine.displayLoadingUI();
     const levelLoader = new LevelLoader(this.scene, this.shadowGenerator);
     const levelData = await levelLoader.loadLevel(levelUrl);
+    this.engine.hideLoadingUI();
 
     // 5. 게임 세션 초기화 (지연 로딩)
     if (levelData) {
