@@ -1,5 +1,6 @@
 import { Mesh, Vector3, Scene, StandardMaterial, Color3 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
+import { PickupManager } from './systems/PickupManager';
 
 export class EnemyPawn extends BasePawn {
   public mesh: Mesh;
@@ -53,6 +54,9 @@ export class EnemyPawn extends BasePawn {
   private die(): void {
     this.isDead = true;
     console.log('Enemy Died');
+    // 아이템 드롭
+    PickupManager.getInstance().spawnRandomPickup(this.position);
+
     // 사망 애니메이션 또는 제거
     this.mesh.dispose();
     this.dispose();

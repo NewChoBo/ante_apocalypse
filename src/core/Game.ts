@@ -18,6 +18,7 @@ import { gameStateStore, playerHealthStore } from './store/GameStore.ts';
 import { CombatComponent } from './components/CombatComponent';
 import { TickManager } from './TickManager';
 import { AssetLoader } from './AssetLoader';
+import { PickupManager } from './systems/PickupManager';
 import '@babylonjs/inspector'; // 인스펙터 기능 활성화
 import { LevelLoader, LevelData } from './systems/LevelLoader';
 import { EnemyManager } from './systems/EnemyManager';
@@ -148,6 +149,9 @@ export class Game {
         this.gameOver();
       }
     });
+
+    // 아이템 드랍 시스템 초기화
+    PickupManager.getInstance().initialize(this.scene, this.playerPawn);
 
     // 에셋 프리로딩
     await this.initPreloading();
@@ -355,6 +359,7 @@ export class Game {
     // 싱글톤 상태 초기화
     TickManager.getInstance().clear();
     TargetRegistry.getInstance().clear();
+    PickupManager.getInstance().clear();
 
     if (this.healthUnsub) {
       this.healthUnsub();

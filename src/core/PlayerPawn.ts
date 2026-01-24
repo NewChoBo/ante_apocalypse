@@ -97,6 +97,20 @@ export class PlayerPawn extends BasePawn {
     }
   }
 
+  public addHealth(amount: number): void {
+    if (this._health <= 0) return;
+    this._health = Math.min(100, this._health + amount);
+    playerHealthStore.set(this._health);
+    console.log(`Player healed ${amount}. Health: ${this._health}`);
+  }
+
+  public addAmmo(amount: number): void {
+    const combatComp = this.getComponent(CombatComponent);
+    if (combatComp instanceof CombatComponent) {
+      combatComp.addAmmoToAll(amount);
+    }
+  }
+
   private die(): void {
     console.log('Player Died');
     // 게임 오버 처리는 나중에 Game 클래스나 전역 상태 관리에서 수행할 수도 있음

@@ -64,6 +64,9 @@ export abstract class BaseWeapon implements IWeapon {
   /** 매 프레임 업데이트 */
   public abstract update(deltaTime: number): void;
 
+  /** 탄약 추가 */
+  public abstract addAmmo(amount: number): void;
+
   /** 무기 스탯 정보 */
   public abstract getStats(): Record<string, unknown>;
 

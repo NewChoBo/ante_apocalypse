@@ -66,6 +66,10 @@ export class WeaponInventoryComponent {
     this.currentWeapon.update(deltaTime);
   }
 
+  public addAmmoToAll(amount: number): void {
+    this.weapons.forEach((w) => w.addAmmo(amount));
+  }
+
   public dispose(): void {
     this.weapons.forEach((w) => w.dispose());
   }

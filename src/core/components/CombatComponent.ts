@@ -69,6 +69,10 @@ export class CombatComponent extends BaseComponent {
     return this.inventory.currentWeapon;
   }
 
+  public addAmmoToAll(amount: number): void {
+    this.inventory.addAmmoToAll(amount);
+  }
+
   public dispose(): void {
     super.dispose();
     this.inventory.dispose();

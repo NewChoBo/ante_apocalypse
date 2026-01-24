@@ -265,6 +265,13 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
   protected abstract onReloadStart(): void;
   protected abstract onReloadEnd(): void;
 
+  public addAmmo(amount: number): void {
+    this.reserveAmmo += amount;
+    if (this.isActive) {
+      this.updateAmmoStore();
+    }
+  }
+
   public dispose(): void {
     super.dispose();
   }

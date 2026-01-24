@@ -109,4 +109,8 @@ export abstract class MeleeWeapon extends BaseWeapon {
   public update(deltaTime: number): void {
     this.updateAnimations(deltaTime);
   }
+
+  public addAmmo(_amount: number): void {
+    // 근접 무기는 탄약 없음
+  }
 }
