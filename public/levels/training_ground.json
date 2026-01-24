@@ -4,6 +4,8 @@
     "height": 60,
     "material": { "diffuse": [0.2, 0.2, 0.22], "specular": [0.1, 0.1, 0.1] }
   },
+  "playerSpawn": [0, 1.75, -25],
+  "enemySpawns": [],
   "walls": [
     {
       "name": "backWall",

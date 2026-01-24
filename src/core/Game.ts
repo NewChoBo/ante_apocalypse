@@ -11,7 +11,6 @@ import {
 } from '@babylonjs/core';
 import { PlayerController } from './controllers/PlayerController';
 import { PlayerPawn } from './PlayerPawn';
-import { ShootingRange } from '../world/ShootingRange';
 import { TargetSpawnerComponent } from './components/TargetSpawnerComponent';
 import { TargetRegistry } from './systems/TargetRegistry';
 import { HUD } from '../ui/HUD';
@@ -20,6 +19,8 @@ import { CombatComponent } from './components/CombatComponent';
 import { TickManager } from './TickManager';
 import { AssetLoader } from './AssetLoader';
 import '@babylonjs/inspector'; // 인스펙터 기능 활성화
+import { LevelLoader, LevelData } from './systems/LevelLoader';
+import { EnemyManager } from './systems/EnemyManager';
 
 export class Game {
   private canvas!: HTMLCanvasElement;
@@ -30,6 +31,7 @@ export class Game {
   private playerPawn: PlayerPawn | null = null;
   private hud: HUD | null = null;
   private spawner: TargetSpawnerComponent | null = null;
+  private enemyManager: EnemyManager | null = null;
 
   private isRunning = false;
   private isPaused = false;
@@ -76,7 +78,7 @@ export class Game {
     });
   }
 
-  private initMenuScene(): void {
+  private async initMenuScene(): Promise<void> {
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.1, 0.1, 0.15, 1);
 
@@ -94,47 +96,53 @@ export class Game {
     this.shadowGenerator.useBlurExponentialShadowMap = true;
     this.shadowGenerator.blurKernel = 32;
 
-    // 월드 생성
-    const shootingRange = new ShootingRange(this.scene, this.shadowGenerator);
-    shootingRange.create();
+    // 레벨 로더 초기화
+    const levelLoader = new LevelLoader(this.scene, this.shadowGenerator);
+    await levelLoader.loadLevel('/levels/training_ground.json');
 
     // 메뉴 카메라 (배경 조망용)
     const menuCamera = new UniversalCamera('menuCamera', new Vector3(0, 2, -10), this.scene);
     menuCamera.setTarget(Vector3.Zero());
-    menuCamera.attachControl(this.canvas, true); // 마우스로 둘러보기 허용 (선택사항)
+    menuCamera.attachControl(this.canvas, true);
   }
 
-  private async initGameSession(): Promise<void> {
-    // 메뉴 카메라 제거 (만약 있다면)
-    const menuCam = this.scene.getCameraByName('menuCamera');
-    if (menuCam) {
-      menuCam.dispose();
-    }
-
+  private async initGameSession(levelData: LevelData): Promise<void> {
     // 하이브리드 아키텍처 시스템 초기화
     this.playerPawn = new PlayerPawn(this.scene);
+
+    // 플레이어 스폰 위치 설정
+    if (levelData.playerSpawn) {
+      this.playerPawn.position = Vector3.FromArray(levelData.playerSpawn);
+    } else {
+      this.playerPawn.position = new Vector3(0, 1.75, -5);
+    }
+
     this.playerController = new PlayerController('player1', this.canvas);
     this.playerController.possess(this.playerPawn);
 
-    // HUD를 다른 시스템보다 먼저 초기화하여 초기 이벤트를 수신할 수 있게 합니다.
+    // HUD 초기화
     this.hud = new HUD();
 
-    // 타겟 스폰 시스템 (Modular Component)
+    // 적 스폰 시스템 (TargetSpawner는 사격장용, EnemyManager는Combat용)
+    // 두 맵의 성격에 따라 다르게 로드할 수도 있지만, 일단 둘 다 존재 가능하게 처리
     this.spawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
     this.spawner.spawnInitialTargets();
 
-    // 무기 시스템 (이제 Pawn의 CombatComponent가 소유)
+    // 적 AI 매니저 (데이터가 있을 경우에만)
+    if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
+      this.enemyManager = new EnemyManager(this.scene);
+      this.enemyManager.spawnEnemies(levelData.enemySpawns, this.playerPawn);
+    }
+
+    // 무기 시스템
     const combatComp = new CombatComponent(this.playerPawn, this.scene);
     this.playerPawn.addComponent(combatComp);
 
-    // 에셋 프리로딩 (필요 시) 및 시작 버튼 제어는 main.ts나 여기서 처리
-    // 여기서는 이미 시작 버튼을 누른 후이므로 바로 로딩 대기
+    // 에셋 프리로딩
     await this.initPreloading();
   }
 
   private async initPreloading(): Promise<void> {
-    // 기존 initPreloading 로직 재활용 또는 단순화
-    // 여기서는 로딩 중 UI 처리는 생략하거나 간소화 (이미 게임 시작 중이므로)
     try {
       await AssetLoader.getInstance().load(this.scene);
     } catch (e) {
@@ -145,8 +153,40 @@ export class Game {
   public async start(): Promise<void> {
     if (this.isRunning) return;
 
-    // 게임 세션 초기화 (지연 로딩)
-    await this.initGameSession();
+    // 1. 선택된 맵 URL 가져오기
+    const select = document.getElementById('map-select') as HTMLSelectElement;
+    const levelUrl = select ? select.value : '/levels/training_ground.json';
+
+    // 2. 현재 메뉴 씬 폐기
+    this.engine.stopRenderLoop(this.renderFunction);
+    this.scene.dispose();
+
+    // 3. 게임 씬 생성 및 기본 설정 (initScene 로직 일부 재사용)
+    this.scene = new Scene(this.engine);
+    this.scene.clearColor = new Color4(0.1, 0.1, 0.15, 1);
+
+    // 조명/그림자 설정 (공통 함수로 뺄 수 있음)
+    const ambient = new HemisphericLight('ambient', new Vector3(0, 1, 0), this.scene);
+    ambient.intensity = 0.4;
+    ambient.groundColor = new Color3(0.2, 0.2, 0.25);
+    const sun = new DirectionalLight('sun', new Vector3(-0.5, -1, -0.5), this.scene);
+    sun.position = new Vector3(20, 40, 20);
+    sun.intensity = 0.8;
+    this.shadowGenerator = new ShadowGenerator(2048, sun);
+    this.shadowGenerator.useBlurExponentialShadowMap = true;
+    this.shadowGenerator.blurKernel = 32;
+
+    // 4. 레벨 로드
+    const levelLoader = new LevelLoader(this.scene, this.shadowGenerator);
+    const levelData = await levelLoader.loadLevel(levelUrl);
+
+    // 5. 게임 세션 초기화 (지연 로딩)
+    if (levelData) {
+      await this.initGameSession(levelData);
+    } else {
+      console.error('Failed to load level data');
+      return;
+    }
 
     this.isRunning = true;
     this.isPaused = false;
@@ -277,6 +317,11 @@ export class Game {
     if (this.spawner) {
       this.spawner.dispose();
       this.spawner = null;
+    }
+
+    if (this.enemyManager) {
+      this.enemyManager.dispose();
+      this.enemyManager = null;
     }
 
     // 싱글톤 상태 초기화

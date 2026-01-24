@@ -27,6 +27,8 @@ export interface LevelData {
     size: number[]; // [width, height, depth] or [height, diameter]
     material: { diffuse: number[]; emissive?: number[] };
   }>;
+  playerSpawn?: number[]; // [x, y, z]
+  enemySpawns?: number[][]; // [[x,y,z], [x,y,z], ...]
 }
 
 export class LevelLoader {
@@ -38,14 +40,16 @@ export class LevelLoader {
     this.shadowGenerator = shadowGenerator;
   }
 
-  public async loadLevel(url: string): Promise<void> {
+  public async loadLevel(url: string): Promise<LevelData | null> {
     try {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Failed to load level: ${url}`);
       const data: LevelData = await response.json();
       this.buildLevel(data);
+      return data;
     } catch (e) {
       console.error('LevelLoader error:', e);
+      return null;
     }
   }
 

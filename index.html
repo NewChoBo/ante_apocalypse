@@ -20,8 +20,25 @@
 
       <!-- 시작 화면 -->
       <div id="start-overlay">
-        <h1>SHOOTING RANGE</h1>
-        <p>FPS 기본 조작 테스트</p>
+        <h1>ANTE APOCALYPSE</h1>
+        <p>3D Web Shooter</p>
+
+        <div style="margin-bottom: 20px">
+          <label for="map-select" style="color: white; margin-right: 10px">Select Map:</label>
+          <select
+            id="map-select"
+            style="
+              padding: 5px;
+              background: rgba(0, 0, 0, 0.5);
+              color: white;
+              border: 1px solid #666;
+            "
+          >
+            <option value="/levels/training_ground.json">Shooting Range (Training)</option>
+            <option value="/levels/combat_zone.json">Combat Zone (AI Battle)</option>
+          </select>
+        </div>
+
         <button id="start-button">시작하기</button>
         <p class="controls-hint">WASD: 이동 | 마우스: 시점 | Space: 점프</p>
       </div>
