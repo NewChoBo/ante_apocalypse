@@ -21,6 +21,7 @@ export class EnemyPawn extends BasePawn {
 
   // Visuals & Animation
   private visualMesh: AbstractMesh | null = null;
+  private placeholderMesh: Mesh | null = null;
   private skeleton: Skeleton | null = null;
   private shadowGenerator: ShadowGenerator;
 
@@ -46,7 +47,19 @@ export class EnemyPawn extends BasePawn {
     // Metadata for Raycast/Tagging
     this.mesh.metadata = { type: 'enemy', pawn: this };
 
-    // 2. Load Visual Model asynchronously
+    // 2. Placeholder (prevent pop-in)
+    this.placeholderMesh = MeshBuilder.CreateCylinder(
+      'enemyPlaceholder',
+      { height: 1.8, diameter: 0.5 },
+      scene
+    );
+    this.placeholderMesh.position = new Vector3(0, 0, 0); // Local to parent (0,0,0 is center)
+    this.placeholderMesh.parent = this.mesh;
+    const pMat = new StandardMaterial('placeholderMat', scene);
+    pMat.diffuseColor = Color3.Red();
+    this.placeholderMesh.material = pMat;
+
+    // 3. Load Visual Model asynchronously
     this.loadModel();
   }
 
@@ -112,6 +125,12 @@ export class EnemyPawn extends BasePawn {
       }
 
       console.log('Enemy Model Loaded');
+
+      // Dispose Placeholder
+      if (this.placeholderMesh) {
+        this.placeholderMesh.dispose();
+        this.placeholderMesh = null;
+      }
     } catch (e) {
       console.error('Failed to load enemy model:', e);
       // Fallback visualization already handled by invisible root?
@@ -120,6 +139,7 @@ export class EnemyPawn extends BasePawn {
       const mat = new StandardMaterial('errMat', this.scene);
       mat.diffuseColor = Color3.Red();
       this.mesh.material = mat;
+      // Keep placeholder if failed
     }
   }
 
@@ -129,6 +149,11 @@ export class EnemyPawn extends BasePawn {
 
   public tick(deltaTime: number): void {
     this.updateComponents(deltaTime);
+
+    // Apply Gravity (Simple constant downward force)
+    if (this.mesh) {
+      this.mesh.moveWithCollisions(new Vector3(0, -9.81 * deltaTime, 0));
+    }
   }
 
   public takeDamage(amount: number): void {
