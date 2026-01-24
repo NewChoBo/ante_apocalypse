@@ -30,37 +30,59 @@ export class Knife extends MeleeWeapon {
   }
 
   private createMesh(): void {
-    // 임시 칼 매시 (박스 형태)
-    const handle = MeshBuilder.CreateBox(
-      'knifeHandle',
-      { width: 0.03, height: 0.1, depth: 0.03 },
-      this.scene
-    );
-    const blade = MeshBuilder.CreateBox(
-      'knifeBlade',
-      { width: 0.01, height: 0.2, depth: 0.04 },
-      this.scene
-    );
-    blade.position.y = 0.15;
+    // Advanced Procedural Knife (Blade, Guard, Handle)
 
+    // 1. Handle
+    const handle = MeshBuilder.CreateCylinder(
+      'knifeHandle',
+      { height: 0.12, diameter: 0.03 },
+      this.scene
+    );
     const handleMat = new StandardMaterial('handleMat', this.scene);
-    handleMat.diffuseColor = new Color3(0.2, 0.2, 0.2);
+    handleMat.diffuseColor = new Color3(0.1, 0.1, 0.1); // Black grip
     handle.material = handleMat;
 
+    // 2. Guard (Crossguard)
+    const guard = MeshBuilder.CreateBox(
+      'knifeGuard',
+      { width: 0.08, height: 0.015, depth: 0.02 },
+      this.scene
+    );
+    guard.position.y = 0.065; // Top of handle
+    const guardMat = new StandardMaterial('guardMat', this.scene);
+    guardMat.diffuseColor = new Color3(0.3, 0.3, 0.3); // Dark Grey
+    guardMat.specularColor = new Color3(0.8, 0.8, 0.8);
+    guard.material = guardMat;
+
+    // 3. Blade
+    const blade = MeshBuilder.CreateBox(
+      'knifeBlade',
+      { width: 0.03, height: 0.18, depth: 0.005 },
+      this.scene
+    );
+    blade.position.y = 0.16; // Above guard
+
     const bladeMat = new StandardMaterial('bladeMat', this.scene);
-    bladeMat.diffuseColor = new Color3(0.8, 0.8, 0.8);
-    bladeMat.specularColor = new Color3(1, 1, 1);
+    bladeMat.diffuseColor = Color3.White();
+    bladeMat.specularColor = Color3.White();
+    bladeMat.emissiveColor = new Color3(0.1, 0.1, 0.1); // Slight shine
     blade.material = bladeMat;
 
-    this.weaponMesh = Mesh.MergeMeshes([handle, blade], true, true, undefined, false, true);
+    this.weaponMesh = Mesh.MergeMeshes([handle, guard, blade], true, true, undefined, false, true);
+
     if (this.weaponMesh) {
-      this.weaponMesh.name = 'KnifeMesh';
+      this.weaponMesh.name = 'KnifeMesh_Proc';
       this.weaponMesh.parent = this.camera;
       this.weaponMesh.position.copyFrom(this.defaultPosition);
+
+      // Rotate: Pointing forward-ish
       this.weaponMesh.rotation = new Vector3(Math.PI / 2, 0, 0);
+
+      this.weaponMesh.receiveShadows = true;
+
       this.defaultRotation.copyFrom(this.weaponMesh.rotation);
       this.setIdleState();
-      this.weaponMesh.setEnabled(false);
+      this.weaponMesh.setEnabled(false); // Start hidden
     }
   }
 

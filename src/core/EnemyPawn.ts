@@ -1,4 +1,4 @@
-import { Mesh, Vector3, Scene, StandardMaterial, Color3 } from '@babylonjs/core';
+import { Mesh, Vector3, Scene, StandardMaterial, Color3, MeshBuilder } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { PickupManager } from './systems/PickupManager';
 
@@ -10,14 +10,45 @@ export class EnemyPawn extends BasePawn {
   constructor(scene: Scene, position: Vector3) {
     super(scene);
 
-    // 적 모델 (빨간 박스)
-    this.mesh = Mesh.CreateBox('enemy', 1.0, scene);
+    // 적 모델 (Droid Geometry)
+    // 1. Torso
+    const torso = MeshBuilder.CreateCylinder('enemyTorso', { height: 0.9, diameter: 0.4 }, scene);
+    torso.position.y = 0.9;
+
+    // 2. Head
+    const head = MeshBuilder.CreateSphere('enemyHead', { diameter: 0.35 }, scene);
+    head.position.y = 1.6;
+
+    // 3. Arms (One box across)
+    const arms = MeshBuilder.CreateBox(
+      'enemyArms',
+      { width: 1.0, height: 0.1, depth: 0.15 },
+      scene
+    );
+    arms.position.y = 1.1;
+
+    // Merge meshes including position offsets
+    // Note: MergeMeshes with transform updates is creating a single mesh.
+    // The "pawn" logic assumes this.mesh is the main collider.
+    // We should make sure the origin is at the bottom (0,0,0).
+    // Our primitives are offsetted relative to (0,0,0) so merging them "as is" works if we don't parent them first (they are in world space), or we parent them to a root node.
+    // Simpler: Just merge them.
+
+    this.mesh = Mesh.MergeMeshes([torso, head, arms], true, true, undefined, false, true)!;
+
+    // Ensure the mesh was created
+    if (!this.mesh) {
+      // Fallback
+      this.mesh = MeshBuilder.CreateBox('enemyFallback', { size: 1 }, scene);
+    }
+
     this.mesh.position.copyFrom(position);
     this.mesh.checkCollisions = true;
 
-    // 머티리얼 (빨강)
+    // 머티리얼 (Metallic Red)
     const mat = new StandardMaterial('enemyMat', scene);
     mat.diffuseColor = new Color3(0.8, 0.1, 0.1);
+    mat.specularColor = new Color3(1.0, 1.0, 1.0);
     this.mesh.material = mat;
 
     // 태그 설정 (레이캐스트 식별용)
