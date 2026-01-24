@@ -1,6 +1,5 @@
-import { Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
+import { Scene, UniversalCamera, Vector3, Mesh } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon.ts';
-import { TargetRegistry } from '../core/systems/TargetRegistry';
 
 /**
  * 근접 무기(Melee Weapons)를 위한 중간 추상 클래스.
@@ -33,45 +32,62 @@ export abstract class MeleeWeapon extends BaseWeapon {
    * 볼륨 기반 근접 공격 판정 (Bounding Box 거리 및 각도 체크)
    */
   protected checkMeleeHit(): { targetId: string; part: string; pickedPoint: Vector3 } | null {
-    // 카메라의 월드 포지션 가져오기 (부모가 있을 경우 position은 로컬좌표이므로 absolutePosition 사용)
     const camPos = this.camera.globalPosition;
     const camForward = this.camera.getForwardRay().direction;
-    const targets = TargetRegistry.getInstance().getAllTargets();
 
-    let closestTarget: { targetId: string; part: string; pickedPoint: Vector3 } | null = null;
+    // 타겟 레지스트리 + 일반 적(메타데이터 체크) 모두 검색
+    const allMeshes = this.scene.meshes;
+
+    let closestHit: { mesh: Mesh; distance: number; point: Vector3 } | null = null;
     let minDistance = this.range;
 
-    for (const target of targets) {
-      if (!target.mesh) continue;
+    for (const mesh of allMeshes) {
+      if (!mesh.isEnabled() || !mesh.isVisible || !mesh.isPickable) continue;
+      if (mesh.name === 'playerPawn') continue;
 
-      // 월드 행렬 강제 업데이트 (정밀한 위치 보정)
-      target.mesh.computeWorldMatrix(true);
-      const targetPos = target.mesh.absolutePosition;
+      // Enemy 태그가 있거나, Target 이름으로 시작하는 메쉬만 대상으로 한다.
+      const isEnemy = mesh.metadata && mesh.metadata.type === 'enemy';
+      const isTarget = mesh.name.startsWith('target');
 
-      // 메쉬의 중심과의 거리 (피벗 기준)
+      if (!isEnemy && !isTarget) continue;
+
+      mesh.computeWorldMatrix(true);
+      const targetPos = mesh.absolutePosition;
       const distance = Vector3.Distance(camPos, targetPos);
 
-      // 타겟이 충분히 가깝다면 (사거리 보정 포함 - 히트박스 두께를 고려하여 +1.0m 보정)
+      // 거리 체크 (두께 보정 +1.0)
       if (distance <= this.range + 1.0) {
-        // 방향 체크 (카메라 전방 90도 이내로 넉넉하게)
         const toTarget = targetPos.subtract(camPos).normalize();
         const dot = Vector3.Dot(camForward, toTarget);
 
-        // 1. 거리가 매우 가깝거나 (범위 내 인접) 2. 전방 각도 안에 있으면 히트 인정
-        if (distance < 1.0 || dot > 0.1) {
+        // 공격 각도(전방) 및 거리 체크
+        if (distance < 1.0 || dot > 0.3) {
+          // 각도를 조금 더 좁힘 (0.1 -> 0.3) 정면 공격 유도
           if (distance < minDistance) {
             minDistance = distance;
-            closestTarget = {
-              targetId: target.id,
-              part: 'body',
-              pickedPoint: targetPos,
+            closestHit = {
+              mesh: mesh as Mesh,
+              distance: distance,
+              point: targetPos,
             };
           }
         }
       }
     }
 
-    return closestTarget;
+    if (closestHit) {
+      // processHit 호출하여 데미지 적용
+      this.processHit(closestHit.mesh, closestHit.point, this.damage);
+
+      // 하위 호환성을 위해 리턴값 형식 유지 (필요하다면)
+      return {
+        targetId: closestHit.mesh.name,
+        part: 'body',
+        pickedPoint: closestHit.point,
+      };
+    }
+
+    return null;
   }
 
   public startFire(): void {

@@ -1,6 +1,5 @@
-import { Scene, UniversalCamera, Ray, Vector3 } from '@babylonjs/core';
+import { Scene, UniversalCamera, Ray, Vector3, Mesh } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon.ts';
-import { TargetRegistry } from '../core/systems/TargetRegistry';
 import { GameObservables } from '../core/events/GameObservables.ts';
 import { ammoStore } from '../core/store/GameStore.ts';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon.ts';
@@ -193,28 +192,8 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
         normal: pickInfo.getNormal(true) || Vector3.Up(),
       });
 
-      // 2. 타겟 처리 로직 (이름 확인)
-      const meshName = pickInfo.pickedMesh.name;
-      if (meshName.startsWith('target')) {
-        const nameParts = meshName.split('_');
-        const targetId = `${nameParts[0]}_${nameParts[1]}`;
-        const part = nameParts[2] || 'body';
-
-        const isHeadshot = part === 'head';
-        const destroyed = TargetRegistry.getInstance().hitTarget(targetId, part, this.damage);
-
-        if (this.onScoreCallback) {
-          const score = destroyed ? (isHeadshot ? 200 : 100) : isHeadshot ? 30 : 10;
-          this.onScoreCallback(score);
-        }
-
-        GameObservables.targetHit.notifyObservers({
-          targetId,
-          part,
-          damage: this.damage,
-          position: pickInfo.pickedPoint!,
-        });
-      }
+      // 2. 통합 히트 프로세싱 (적, 타겟 등)
+      this.processHit(pickInfo.pickedMesh as Mesh, pickInfo.pickedPoint!, this.damage);
     }
   }
 

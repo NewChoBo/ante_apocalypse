@@ -1,5 +1,7 @@
-import { Scene, Mesh, UniversalCamera } from '@babylonjs/core';
+import { Scene, Mesh, UniversalCamera, Vector3 } from '@babylonjs/core';
 import { IWeapon } from '../types/IWeapon.ts';
+import { TargetRegistry } from '../core/systems/TargetRegistry';
+import { GameObservables } from '../core/events/GameObservables.ts';
 
 /**
  * 모든 무기의 최상위 추상 클래스.
@@ -64,6 +66,57 @@ export abstract class BaseWeapon implements IWeapon {
 
   public setAiming(isAiming: boolean): void {
     this.isAiming = isAiming;
+  }
+
+  /** 공통 히트 처리 로직 (적, 타겟 모두 포함) */
+  protected processHit(pickedMesh: Mesh, pickedPoint: Vector3, damageAmount: number): boolean {
+    // 1. 적(Enemy) 피격 처리
+    const metadata = pickedMesh.metadata;
+    if (metadata && metadata.type === 'enemy' && metadata.pawn) {
+      const enemy = metadata.pawn;
+      if (typeof enemy.takeDamage === 'function') {
+        enemy.takeDamage(damageAmount);
+      }
+
+      GameObservables.targetHit.notifyObservers({
+        targetId: 'enemy',
+        part: 'body',
+        damage: damageAmount,
+        position: pickedPoint,
+      });
+
+      // 적 처치는 별도 점수 처리 로직이 필요할 수 있음 (일단 기본 점수 부여 가능)
+      if (this.onScoreCallback) {
+        this.onScoreCallback(50);
+      }
+      return true;
+    }
+
+    // 2. 타겟(Target) 피격 처리
+    if (pickedMesh.name.startsWith('target')) {
+      const nameParts = pickedMesh.name.split('_');
+      const targetId = `${nameParts[0]}_${nameParts[1]}`;
+      const part = nameParts[2] || 'body';
+
+      const isHeadshot = part === 'head';
+      const destroyed = TargetRegistry.getInstance().hitTarget(targetId, part, damageAmount);
+
+      if (this.onScoreCallback) {
+        const score = destroyed ? (isHeadshot ? 200 : 100) : isHeadshot ? 30 : 10;
+        this.onScoreCallback(score);
+      }
+
+      GameObservables.targetHit.notifyObservers({
+        targetId,
+        part,
+        damage: damageAmount,
+        position: pickedPoint,
+      });
+
+      return true;
+    }
+
+    return false;
   }
 
   public dispose(): void {
