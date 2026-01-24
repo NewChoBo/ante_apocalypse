@@ -44,14 +44,17 @@ export class CombatComponent extends BaseComponent {
 
     // 이펙트 컴포넌트 초기화
     // 이펙트 컴포넌트 초기화 및 등록
-    const fireEffect = new FirearmEffectComponent(owner, scene);
-    owner.addComponent(fireEffect);
+    this.attachEffect(FirearmEffectComponent);
+    this.attachEffect(MeleeEffectComponent);
+    this.attachEffect(ImpactEffectComponent);
+  }
 
-    const meleeEffect = new MeleeEffectComponent(owner, scene);
-    owner.addComponent(meleeEffect);
-
-    const impactEffect = new ImpactEffectComponent(owner, scene);
-    owner.addComponent(impactEffect);
+  private attachEffect<T extends BaseComponent>(
+    componentClass: new (owner: BasePawn, scene: Scene) => T
+  ): T {
+    const comp = new componentClass(this.owner, this.scene);
+    this.owner.addComponent(comp);
+    return comp;
   }
 
   public setAiming(isAiming: boolean): void {
