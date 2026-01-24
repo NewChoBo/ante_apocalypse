@@ -9,6 +9,7 @@ import {
   Skeleton,
   AnimationPropertiesOverride,
   AbstractMesh,
+  ShadowGenerator,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { PickupManager } from './systems/PickupManager';
@@ -21,6 +22,7 @@ export class EnemyPawn extends BasePawn {
   // Visuals & Animation
   private visualMesh: AbstractMesh | null = null;
   private skeleton: Skeleton | null = null;
+  private shadowGenerator: ShadowGenerator;
 
   // Animation Ranges
   private idleRange: any;
@@ -29,8 +31,9 @@ export class EnemyPawn extends BasePawn {
   private leftRange: any;
   private rightRange: any;
 
-  constructor(scene: Scene, position: Vector3) {
+  constructor(scene: Scene, position: Vector3, shadowGenerator: ShadowGenerator) {
     super(scene);
+    this.shadowGenerator = shadowGenerator;
 
     // 1. Create Root Collider (Invisible Box/Capsule)
     // This allows the Pawn to exist and collide immediately while model loads
@@ -69,6 +72,7 @@ export class EnemyPawn extends BasePawn {
 
       // Shadow & Rendering setup
       this.visualMesh.receiveShadows = true; // Root usually receives?
+      this.shadowGenerator.addShadowCaster(this.visualMesh, true);
       // User snippet: "newMeshes[index].receiveShadows = false;" for all?
       // But typically we want shadows.
       // Snippet says: shadowGenerator.addShadowCaster(scene.meshes[0], true);
@@ -78,6 +82,14 @@ export class EnemyPawn extends BasePawn {
       result.meshes.forEach((m) => {
         m.receiveShadows = true;
         m.checkCollisions = false; // visual doesn't collide, root does
+
+        // Critical: Apply Metadata so Weapon Raycast recognizes this as an Enemy
+        m.metadata = { type: 'enemy', pawn: this };
+        m.isPickable = true;
+
+        // Also add children to shadow caster if needed?
+        // addShadowCaster(mesh, includeDescendants=true) already handles it if the loop is redundant.
+        // But 'visualMesh' is root.
       });
 
       // Animation Setup (From Snippet)

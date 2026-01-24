@@ -148,7 +148,7 @@ export class Game {
 
     // 적 AI 매니저 (데이터가 있을 경우에만)
     if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
-      this.enemyManager = new EnemyManager(this.scene);
+      this.enemyManager = new EnemyManager(this.scene, this.shadowGenerator);
       this.enemyManager.spawnEnemies(levelData.enemySpawns, this.playerPawn);
     }
 
