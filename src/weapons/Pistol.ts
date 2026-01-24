@@ -1,6 +1,14 @@
-import { Scene, UniversalCamera, Animation, Mesh, Vector3, MeshBuilder } from '@babylonjs/core';
+import {
+  Scene,
+  UniversalCamera,
+  Animation,
+  Mesh,
+  Vector3,
+  MeshBuilder,
+  AbstractMesh,
+} from '@babylonjs/core';
 import { Firearm } from './Firearm.ts';
-import { AssetLoader } from '../core/utils/AssetLoader.ts';
+import { AssetLoader } from '../core/AssetLoader.ts';
 
 /**
  * 권총 (Pistol) - 단발
@@ -28,17 +36,20 @@ export class Pistol extends Firearm {
   }
 
   private async createWeaponModel(): Promise<void> {
-    // 외부 모델 로드 (Microsoft MRTK Sample Gun)
-    // Corrected URL from confirmed repo search
-    const rootUrl =
-      'https://raw.githubusercontent.com/microsoft/MixedRealityToolkit/main/SpatialInput/Samples/DemoRoom/Media/Models/';
-    const fileName = 'Gun.glb';
-
     try {
-      const meshes = await AssetLoader.loadModel(this.scene, rootUrl, fileName);
+      // Reuse 'rifle' asset (Gun.glb) for Pistol as they share the same source model
+      const entries = AssetLoader.getInstance().instantiateMesh('rifle');
 
-      // 루트 노드 설정 (GLB는 보통 __root__ 노드를 가짐)
-      this.weaponMesh = meshes[0];
+      if (!entries) {
+        throw new Error(
+          `Gun asset not preloaded. Loader status: isReady=${AssetLoader.getInstance().ready}`
+        );
+      }
+
+      this.weaponMesh = entries.rootNodes[0] as AbstractMesh;
+      if (!this.weaponMesh) {
+        throw new Error('[Pistol] Failed to find root node in gun asset');
+      }
 
       // --- 모델 정규화 (Normalization) ---
       // 1. 초기화
@@ -54,7 +65,7 @@ export class Pistol extends Firearm {
 
       // 목표 크기: 약 30cm (0.3 unit)
       const targetSize = 0.3;
-      const scaleFactor = targetSize / maxDim;
+      const scaleFactor = targetSize / (maxDim || 1);
 
       this.weaponMesh.scaling = new Vector3(scaleFactor, scaleFactor, scaleFactor);
 
@@ -69,10 +80,12 @@ export class Pistol extends Firearm {
       // 초기 가시성 설정 (현재 활성화 상태 따름)
       this.weaponMesh.setEnabled(this.isActive);
 
-      console.log(`Pistol Loaded. Original Size: ${maxDim}, Applied Scale: ${scaleFactor}`);
+      console.log(`Pistol Instantiated. Scale: ${scaleFactor}`);
 
       // 재질 오버라이드 (그림자 등)
-      meshes.forEach((m) => {
+      // Pistol uses default color (no override), but ensuring shadow props
+      const allMeshes = this.weaponMesh.getChildMeshes(false);
+      allMeshes.forEach((m) => {
         if (m instanceof Mesh) {
           m.receiveShadows = true;
           m.isPickable = false;
@@ -81,7 +94,7 @@ export class Pistol extends Firearm {
 
       this.setIdleState();
     } catch (e) {
-      console.error('Failed to load Gun.glb, falling back to primitive', e);
+      console.error('Failed to instantiate Pistol model:', e);
       // 실패 시 폴백 (기본 박스)
       this.weaponMesh = MeshBuilder.CreateBox('pistol_fallback', { size: 0.1 }, this.scene);
       this.weaponMesh.parent = this.camera;

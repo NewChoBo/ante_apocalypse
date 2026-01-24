@@ -237,9 +237,6 @@ export class Game {
       },
     });
     this.syncInventoryStore();
-
-    // 에셋 프리로딩
-    await this.initPreloading();
   }
 
   private gameOver(): void {
@@ -295,9 +292,12 @@ export class Game {
     this.engine.displayLoadingUI();
     const levelLoader = new LevelLoader(this.scene, this.shadowGenerator);
     const levelData = await levelLoader.loadLevel(levelUrl);
+
+    // 4.5 필수 에셋 프리로딩 (게임 세션 시작 전 완료 필수)
+    await this.initPreloading();
     this.engine.hideLoadingUI();
 
-    // 5. 게임 세션 초기화 (지연 로딩)
+    // 5. 게임 세션 초기화
     if (levelData) {
       await this.initGameSession(levelData);
     } else {
@@ -505,6 +505,7 @@ export class Game {
     TickManager.getInstance().clear();
     TargetRegistry.getInstance().clear();
     PickupManager.getInstance().clear();
+    AssetLoader.getInstance().clear(); // 추가: 씬이 바뀔 때 에셋 캐시도 정리하여 다음 게임에서 정상 로드되도록 함.
 
     if (this.healthUnsub) {
       this.healthUnsub();

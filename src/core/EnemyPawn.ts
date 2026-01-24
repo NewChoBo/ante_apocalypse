@@ -5,13 +5,13 @@ import {
   StandardMaterial,
   Color3,
   MeshBuilder,
-  SceneLoader,
   Skeleton,
   AnimationPropertiesOverride,
   AbstractMesh,
   ShadowGenerator,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
+import { AssetLoader } from './AssetLoader';
 import { PickupManager } from './systems/PickupManager';
 
 export class EnemyPawn extends BasePawn {
@@ -65,66 +65,77 @@ export class EnemyPawn extends BasePawn {
 
   private async loadModel(): Promise<void> {
     try {
-      // Load YBot from BabylonJS Assets
-      const result = await SceneLoader.ImportMeshAsync(
-        '',
-        'https://models.babylonjs.com/',
-        'dummy3.babylon',
-        this.scene
-      );
+      // Use consolidated AssetLoader to instantiate preloaded mesh
+      const entries = AssetLoader.getInstance().instantiateMesh('enemy');
 
-      const skeleton = result.skeletons[0];
-      this.skeleton = skeleton;
-      this.visualMesh = result.meshes[0];
+      if (!entries) {
+        const isReady = AssetLoader.getInstance().ready;
+        throw new Error(`Enemy asset not preloaded. Loader status: isReady=${isReady}`);
+      }
+
+      this.visualMesh = entries.rootNodes[0] as AbstractMesh;
+      if (!this.visualMesh) {
+        throw new Error(`[EnemyPawn] Failed to find root node in instantiated entries for enemy`);
+      }
+      this.visualMesh.setEnabled(false); // Hide T-pose initially
+
+      this.skeleton = entries.skeletons.length > 0 ? entries.skeletons[0] : null;
+
+      // ... Skeleton linkage loop ...
+      entries.rootNodes.forEach((node) => {
+        if (node instanceof AbstractMesh) {
+          node.checkCollisions = false;
+          node.metadata = { type: 'enemy', pawn: this };
+          node.isPickable = true;
+        }
+
+        node.getChildMeshes().forEach((m) => {
+          m.metadata = { type: 'enemy', pawn: this };
+          m.isPickable = true;
+          if (this.skeleton && m.skeleton !== this.skeleton) {
+            m.skeleton = this.skeleton;
+          }
+        });
+      });
 
       // Parent to Root Collider
-      // Normalize position (YBot might need offset)
       this.visualMesh.parent = this.mesh;
-      this.visualMesh.position = new Vector3(0, -1.0, 0); // Align feet to bottom of collider
+      this.visualMesh.position = new Vector3(0, -1.0, 0);
       this.visualMesh.rotation = Vector3.Zero();
 
       // Shadow & Rendering setup
-      this.visualMesh.receiveShadows = true; // Root usually receives?
       this.shadowGenerator.addShadowCaster(this.visualMesh, true);
-      // User snippet: "newMeshes[index].receiveShadows = false;" for all?
-      // But typically we want shadows.
-      // Snippet says: shadowGenerator.addShadowCaster(scene.meshes[0], true);
-      // We will handle shadows in EnemyManager or Spawn logic if possible,
-      // but here we just ensure properties are sane.
 
-      result.meshes.forEach((m) => {
-        m.receiveShadows = true;
-        m.checkCollisions = false; // visual doesn't collide, root does
+      // Animation Setup
+      if (this.skeleton) {
+        this.skeleton.animationPropertiesOverride = new AnimationPropertiesOverride();
+        this.skeleton.animationPropertiesOverride.enableBlending = true;
+        this.skeleton.animationPropertiesOverride.blendingSpeed = 0.05;
+        this.skeleton.animationPropertiesOverride.loopMode = 1;
 
-        // Critical: Apply Metadata so Weapon Raycast recognizes this as an Enemy
-        m.metadata = { type: 'enemy', pawn: this };
-        m.isPickable = true;
+        this.idleRange = this.skeleton.getAnimationRange('YBot_Idle');
 
-        // Also add children to shadow caster if needed?
-        // addShadowCaster(mesh, includeDescendants=true) already handles it if the loop is redundant.
-        // But 'visualMesh' is root.
-      });
+        if (!this.idleRange) {
+          this.skeleton.createAnimationRange('YBot_Idle', 0, 89);
+          this.skeleton.createAnimationRange('YBot_Walk', 90, 118);
+          this.skeleton.createAnimationRange('YBot_Run', 119, 135);
+          this.skeleton.createAnimationRange('YBot_LeftStrafeWalk', 136, 163);
+          this.skeleton.createAnimationRange('YBot_RightStrafeWalk', 164, 191);
+          this.idleRange = this.skeleton.getAnimationRange('YBot_Idle');
+        }
 
-      // Animation Setup (From Snippet)
-      if (skeleton) {
-        skeleton.animationPropertiesOverride = new AnimationPropertiesOverride();
-        skeleton.animationPropertiesOverride.enableBlending = true;
-        skeleton.animationPropertiesOverride.blendingSpeed = 0.05;
-        skeleton.animationPropertiesOverride.loopMode = 1;
+        this.walkRange = this.skeleton.getAnimationRange('YBot_Walk');
+        this.runRange = this.skeleton.getAnimationRange('YBot_Run');
+        this.leftRange = this.skeleton.getAnimationRange('YBot_LeftStrafeWalk');
+        this.rightRange = this.skeleton.getAnimationRange('YBot_RightStrafeWalk');
 
-        this.idleRange = skeleton.getAnimationRange('YBot_Idle');
-        this.walkRange = skeleton.getAnimationRange('YBot_Walk');
-        this.runRange = skeleton.getAnimationRange('YBot_Run');
-        this.leftRange = skeleton.getAnimationRange('YBot_LeftStrafeWalk');
-        this.rightRange = skeleton.getAnimationRange('YBot_RightStrafeWalk');
-
-        // Start Idle
         if (this.idleRange) {
-          this.scene.beginAnimation(skeleton, this.idleRange.from, this.idleRange.to, true);
+          this.scene.beginAnimation(this.skeleton, this.idleRange.from, this.idleRange.to, true);
         }
       }
 
-      console.log('Enemy Model Loaded');
+      // Now that animation is started and skeleton is linked, show the mesh
+      this.visualMesh.setEnabled(true);
 
       // Dispose Placeholder
       if (this.placeholderMesh) {
@@ -133,13 +144,11 @@ export class EnemyPawn extends BasePawn {
       }
     } catch (e) {
       console.error('Failed to load enemy model:', e);
-      // Fallback visualization already handled by invisible root?
-      // Maybe make root visible red box if failed
+      // Fallback visualization
       this.mesh.isVisible = true;
       const mat = new StandardMaterial('errMat', this.scene);
       mat.diffuseColor = Color3.Red();
       this.mesh.material = mat;
-      // Keep placeholder if failed
     }
   }
 
