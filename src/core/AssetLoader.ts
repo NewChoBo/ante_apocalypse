@@ -32,7 +32,7 @@ export class AssetLoader {
 
       const gunshotSound = await this.audioEngine.createSoundAsync(
         'gunshot',
-        '/sounds/gunshot.wav',
+        'sounds/gunshot.wav',
         {
           volume: 0.5,
         }
@@ -40,7 +40,7 @@ export class AssetLoader {
       this.sounds.set('gunshot', gunshotSound);
 
       try {
-        const swipeSound = await this.audioEngine.createSoundAsync('swipe', '/sounds/swipe.wav', {
+        const swipeSound = await this.audioEngine.createSoundAsync('swipe', 'sounds/swipe.wav', {
           volume: 0.6,
         });
         this.sounds.set('swipe', swipeSound);
