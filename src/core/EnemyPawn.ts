@@ -1,4 +1,15 @@
-import { Mesh, Vector3, Scene, StandardMaterial, Color3, MeshBuilder } from '@babylonjs/core';
+import {
+  Mesh,
+  Vector3,
+  Scene,
+  StandardMaterial,
+  Color3,
+  MeshBuilder,
+  SceneLoader,
+  Skeleton,
+  AnimationPropertiesOverride,
+  AbstractMesh,
+} from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { PickupManager } from './systems/PickupManager';
 
@@ -7,52 +18,97 @@ export class EnemyPawn extends BasePawn {
   private health = 100;
   public isDead = false;
 
+  // Visuals & Animation
+  private visualMesh: AbstractMesh | null = null;
+  private skeleton: Skeleton | null = null;
+
+  // Animation Ranges
+  private idleRange: any;
+  private walkRange: any;
+  private runRange: any;
+  private leftRange: any;
+  private rightRange: any;
+
   constructor(scene: Scene, position: Vector3) {
     super(scene);
 
-    // 적 모델 (Droid Geometry)
-    // 1. Torso
-    const torso = MeshBuilder.CreateCylinder('enemyTorso', { height: 0.9, diameter: 0.4 }, scene);
-    torso.position.y = 0.9;
-
-    // 2. Head
-    const head = MeshBuilder.CreateSphere('enemyHead', { diameter: 0.35 }, scene);
-    head.position.y = 1.6;
-
-    // 3. Arms (One box across)
-    const arms = MeshBuilder.CreateBox(
-      'enemyArms',
-      { width: 1.0, height: 0.1, depth: 0.15 },
-      scene
-    );
-    arms.position.y = 1.1;
-
-    // Merge meshes including position offsets
-    // Note: MergeMeshes with transform updates is creating a single mesh.
-    // The "pawn" logic assumes this.mesh is the main collider.
-    // We should make sure the origin is at the bottom (0,0,0).
-    // Our primitives are offsetted relative to (0,0,0) so merging them "as is" works if we don't parent them first (they are in world space), or we parent them to a root node.
-    // Simpler: Just merge them.
-
-    this.mesh = Mesh.MergeMeshes([torso, head, arms], true, true, undefined, false, true)!;
-
-    // Ensure the mesh was created
-    if (!this.mesh) {
-      // Fallback
-      this.mesh = MeshBuilder.CreateBox('enemyFallback', { size: 1 }, scene);
-    }
-
+    // 1. Create Root Collider (Invisible Box/Capsule)
+    // This allows the Pawn to exist and collide immediately while model loads
+    this.mesh = MeshBuilder.CreateBox('enemyRoot', { width: 0.5, height: 2, depth: 0.5 }, scene);
     this.mesh.position.copyFrom(position);
+    this.mesh.position.y += 1.0; // Pivot at center, so move up
     this.mesh.checkCollisions = true;
+    this.mesh.isVisible = false; // Hide collider
 
-    // 머티리얼 (Metallic Red)
-    const mat = new StandardMaterial('enemyMat', scene);
-    mat.diffuseColor = new Color3(0.8, 0.1, 0.1);
-    mat.specularColor = new Color3(1.0, 1.0, 1.0);
-    this.mesh.material = mat;
-
-    // 태그 설정 (레이캐스트 식별용)
+    // Metadata for Raycast/Tagging
     this.mesh.metadata = { type: 'enemy', pawn: this };
+
+    // 2. Load Visual Model asynchronously
+    this.loadModel();
+  }
+
+  private async loadModel(): Promise<void> {
+    try {
+      // Load YBot from BabylonJS Assets
+      const result = await SceneLoader.ImportMeshAsync(
+        '',
+        'https://models.babylonjs.com/',
+        'dummy3.babylon',
+        this.scene
+      );
+
+      const skeleton = result.skeletons[0];
+      this.skeleton = skeleton;
+      this.visualMesh = result.meshes[0];
+
+      // Parent to Root Collider
+      // Normalize position (YBot might need offset)
+      this.visualMesh.parent = this.mesh;
+      this.visualMesh.position = new Vector3(0, -1.0, 0); // Align feet to bottom of collider
+      this.visualMesh.rotation = Vector3.Zero();
+
+      // Shadow & Rendering setup
+      this.visualMesh.receiveShadows = true; // Root usually receives?
+      // User snippet: "newMeshes[index].receiveShadows = false;" for all?
+      // But typically we want shadows.
+      // Snippet says: shadowGenerator.addShadowCaster(scene.meshes[0], true);
+      // We will handle shadows in EnemyManager or Spawn logic if possible,
+      // but here we just ensure properties are sane.
+
+      result.meshes.forEach((m) => {
+        m.receiveShadows = true;
+        m.checkCollisions = false; // visual doesn't collide, root does
+      });
+
+      // Animation Setup (From Snippet)
+      if (skeleton) {
+        skeleton.animationPropertiesOverride = new AnimationPropertiesOverride();
+        skeleton.animationPropertiesOverride.enableBlending = true;
+        skeleton.animationPropertiesOverride.blendingSpeed = 0.05;
+        skeleton.animationPropertiesOverride.loopMode = 1;
+
+        this.idleRange = skeleton.getAnimationRange('YBot_Idle');
+        this.walkRange = skeleton.getAnimationRange('YBot_Walk');
+        this.runRange = skeleton.getAnimationRange('YBot_Run');
+        this.leftRange = skeleton.getAnimationRange('YBot_LeftStrafeWalk');
+        this.rightRange = skeleton.getAnimationRange('YBot_RightStrafeWalk');
+
+        // Start Idle
+        if (this.idleRange) {
+          this.scene.beginAnimation(skeleton, this.idleRange.from, this.idleRange.to, true);
+        }
+      }
+
+      console.log('Enemy Model Loaded');
+    } catch (e) {
+      console.error('Failed to load enemy model:', e);
+      // Fallback visualization already handled by invisible root?
+      // Maybe make root visible red box if failed
+      this.mesh.isVisible = true;
+      const mat = new StandardMaterial('errMat', this.scene);
+      mat.diffuseColor = Color3.Red();
+      this.mesh.material = mat;
+    }
   }
 
   public initialize(_scene: Scene): void {
@@ -67,14 +123,21 @@ export class EnemyPawn extends BasePawn {
     if (this.isDead) return;
 
     this.health -= amount;
-    // 피격 이펙트 (간단히 색상 깜빡임 등)
-    if (this.mesh.material instanceof StandardMaterial) {
-      const originalColor = this.mesh.material.emissiveColor.clone();
-      this.mesh.material.emissiveColor = new Color3(1, 1, 1);
-      setTimeout(() => {
-        if (!this.mesh || this.mesh.isDisposed()) return;
-        (this.mesh.material as StandardMaterial).emissiveColor = originalColor;
-      }, 100);
+
+    // Hit React (Flash)
+    if (this.visualMesh) {
+      // Traverse children or use skeleton?
+      // Simple material flash logic might need complex handling for GLB/BabylonPBR
+      // For now skip visual flash or implement later
+    } else if (this.mesh.isVisible) {
+      // Fallback box flash
+      if (this.mesh.material instanceof StandardMaterial) {
+        this.mesh.material.emissiveColor = Color3.White();
+        setTimeout(() => {
+          if (this.mesh.material instanceof StandardMaterial)
+            this.mesh.material.emissiveColor = Color3.Black();
+        }, 100);
+      }
     }
 
     if (this.health <= 0) {
@@ -88,7 +151,8 @@ export class EnemyPawn extends BasePawn {
     // 아이템 드롭
     PickupManager.getInstance().spawnRandomPickup(this.position);
 
-    // 사망 애니메이션 또는 제거
+    // Play Death? YBot doesn't seem to have Death.
+    // Just dispose for now.
     this.mesh.dispose();
     this.dispose();
   }
@@ -103,5 +167,46 @@ export class EnemyPawn extends BasePawn {
 
   public move(direction: Vector3, speed: number, deltaTime: number): void {
     this.mesh.moveWithCollisions(direction.scale(speed * deltaTime));
+
+    // Animation State Machine
+    if (this.skeleton && this.walkRange && this.idleRange) {
+      // Simple logic: if moving, Walk. If not, Idle.
+      // But 'move' is called every frame if moving.
+      // Need to track current state or speed.
+
+      // This is a naive implementation. For better blending, we need state tracking.
+      // Assuming 'move' is called only when moving.
+      // But tick resets it?
+
+      // Let's just play Walk if speed > 0.1?
+      // But move() doesn't set state persistent.
+      // For now, let's just make it walk if this method is called frequently.
+
+      // Better: Set a flag 'isMoving' and handle anim in tick().
+      this.isMoving = true;
+    }
+  }
+
+  private isMoving = false;
+  private currentAnim = 'idle';
+
+  // Override tick to handle anim reset
+  public updateComponents(deltaTime: number): void {
+    super.updateComponents(deltaTime);
+
+    if (this.skeleton) {
+      if (this.isMoving) {
+        if (this.currentAnim !== 'walk') {
+          this.scene.beginAnimation(this.skeleton, this.walkRange.from, this.walkRange.to, true);
+          this.currentAnim = 'walk';
+        }
+        this.isMoving = false; // Reset for next frame
+      } else {
+        if (this.currentAnim !== 'idle') {
+          this.scene.beginAnimation(this.skeleton, this.idleRange.from, this.idleRange.to, true);
+          this.currentAnim = 'idle';
+        }
+      }
+    }
   }
 }
