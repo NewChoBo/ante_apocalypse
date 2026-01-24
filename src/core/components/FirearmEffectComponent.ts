@@ -35,8 +35,11 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
           this.emitMuzzleFlash(
             payload.muzzleTransform.position,
             payload.muzzleTransform.direction,
-            payload.muzzleTransform.transformNode
+            payload.muzzleTransform.transformNode,
+            payload.muzzleTransform.localMuzzlePosition
           );
+        } else {
+          console.warn('No muzzle transform in payload');
         }
       }
     });
