@@ -130,8 +130,25 @@ export class Game {
     document.getElementById('start-overlay')!.style.display = 'none';
     document.getElementById('hud')!.style.display = 'block';
 
-    // 포인터 잠금
+    // 전체 화면 요청 (Keyboard Lock API는 전체 화면에서만 안정적으로 작동함)
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {
+        // Fullscreen request failed silently
+      });
+    }
+
+    // 포인터 잠금 및 키보드 잠금 (Ctrl+W 방지 등)
     this.canvas.requestPointerLock();
+
+    // 실험적 기능: 키보드 잠금 (Supported in Chrome/Edge Desktop)
+    if ('keyboard' in navigator && 'lock' in (navigator as any).keyboard) {
+      // Ctrl+W, Ctrl+S, Ctrl+D 등을 브라우저가 아닌 게임이 처리하도록 잠금 요청
+      (navigator as any).keyboard
+        .lock(['ControlLeft', 'ControlRight', 'KeyW', 'KeyS', 'KeyD', 'KeyA', 'Escape'])
+        .catch(() => {
+          // Keyboard lock failed silently
+        });
+    }
 
     // 오디오 엔진 언락 (Audio V2 대응)
     const audioEngine = AssetLoader.getInstance().getAudioEngine();

@@ -27,7 +27,19 @@ export class PlayerController extends BaseController {
   }
 
   private setupInputEvents(): void {
-    document.addEventListener('keydown', (e) => this.updateKeyState(e.code, true));
+    document.addEventListener('keydown', (e) => {
+      // 포인터가 잠겨있을 때 (게임 플레이 중)
+      if (document.pointerLockElement === this.canvas) {
+        // 브라우저 단축키 차단 (Ctrl+D, Ctrl+S, Ctrl+W 등)
+        if (e.ctrlKey || e.metaKey || e.key === 'Tab') {
+          // 디버깅용 F12/Ctrl+Shift+I 등은 허용 (필요 시 수정)
+          if (e.key !== 'F12' && !(e.ctrlKey && e.shiftKey && e.key === 'I')) {
+            e.preventDefault();
+          }
+        }
+      }
+      this.updateKeyState(e.code, true);
+    });
     document.addEventListener('keyup', (e) => this.updateKeyState(e.code, false));
     document.addEventListener('mousemove', (e) => {
       if (document.pointerLockElement === this.canvas) {
