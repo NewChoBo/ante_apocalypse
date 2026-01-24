@@ -695,3 +695,9 @@ body {
   color: #666;
   letter-spacing: 1px;
 }
+
+/* 바빌론 인스펙터 레이어 최상단 고정 */
+#scene-explorer-host,
+#inspector-host {
+  z-index: 5000 !important; /* 모든 UI(Pause: 4000)보다 위에 표시 */
+}
