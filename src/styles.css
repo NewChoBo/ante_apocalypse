@@ -191,6 +191,15 @@ body {
   }
 }
 
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 /* 오버레이 공통 스타일 */
 #start-overlay,
 #pause-overlay {

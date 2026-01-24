@@ -12,7 +12,7 @@ export class PickupManager implements ITickable {
   public readonly priority = 30;
 
   private constructor() {
-    TickManager.getInstance().register(this);
+    // Singleton
   }
 
   public static getInstance(): PickupManager {
@@ -25,6 +25,9 @@ export class PickupManager implements ITickable {
   public initialize(scene: Scene, player: PlayerPawn): void {
     this.scene = scene;
     this.player = player;
+
+    // 게임 재시작 시 TickManager가 초기화되므로 다시 등록해야 함
+    TickManager.getInstance().register(this);
   }
 
   public spawnPickup(position: Vector3, type: PickupType): void {
@@ -53,9 +56,16 @@ export class PickupManager implements ITickable {
         continue;
       }
 
-      // Collection check
-      const distance = Vector3.Distance(this.player.position, pickup.position);
-      if (distance < 2.0) {
+      // Collection check (Using 2D distance for more forgiving pickup)
+      const playerPos = this.player.mesh.getAbsolutePosition();
+      const pickupPos = pickup.mesh.getAbsolutePosition();
+      const dx = playerPos.x - pickupPos.x;
+      const dz = playerPos.z - pickupPos.z;
+      const distSq = dx * dx + dz * dz;
+      const collectionRange = 3.0; // 더 넓은 범위
+
+      if (distSq < collectionRange * collectionRange) {
+        console.log(`[PickupManager] Inside collection range. distSq: ${distSq.toFixed(2)}`);
         this.handleCollection(pickup);
         this.pickups.splice(i, 1);
       }
@@ -65,14 +75,42 @@ export class PickupManager implements ITickable {
   private handleCollection(pickup: PickupActor): void {
     if (!this.player) return;
 
-    if (pickup.type === 'health') {
-      (this.player as any).addHealth?.(30);
-    } else {
-      (this.player as any).addAmmo?.(50);
-    }
+    try {
+      if (pickup.type === 'health') {
+        this.player.addHealth(30);
+        this.showPopup('Health +30', '#4CAF50');
+      } else {
+        this.player.addAmmo(50);
+        this.showPopup('Ammo +50', '#2196F3');
+      }
 
-    pickup.collect();
-    console.log(`Collected ${pickup.type}`);
+      pickup.collect();
+      console.log(`[PickupManager] Collected ${pickup.type}`);
+    } catch (e) {
+      console.error(`[PickupManager] Error collecting ${pickup.type}:`, e);
+      // 에러가 나더라도 일단 박스는 제거 (무한 에러 방지)
+      pickup.collect();
+    }
+  }
+
+  private showPopup(text: string, color: string): void {
+    const popup = document.createElement('div');
+    popup.textContent = text;
+    popup.style.position = 'fixed';
+    popup.style.bottom = '20%';
+    popup.style.left = '50%';
+    popup.style.transform = 'translateX(-50%)';
+    popup.style.color = 'white';
+    popup.style.padding = '10px 20px';
+    popup.style.borderRadius = '5px';
+    popup.style.backgroundColor = color;
+    popup.style.fontWeight = 'bold';
+    popup.style.zIndex = '1000';
+    popup.style.pointerEvents = 'none';
+    popup.style.animation = 'fadeOut 1s forwards 0.5s';
+
+    document.body.appendChild(popup);
+    setTimeout(() => popup.remove(), 1500);
   }
 
   public clear(): void {

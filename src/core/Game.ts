@@ -246,6 +246,19 @@ export class Game {
         });
     }
 
+    // 디버그용 아이템 스폰 단축키 (H: Health, J: Ammo)
+    window.addEventListener('keydown', (e) => {
+      if (!this.isRunning || this.isPaused) return;
+      if (e.code === 'KeyH') {
+        PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'health');
+        console.log('[DEBUG] Spawned Health Pickup at player position');
+      }
+      if (e.code === 'KeyJ') {
+        PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'ammo');
+        console.log('[DEBUG] Spawned Ammo Pickup at player position');
+      }
+    });
+
     // 디버그 레이어 (인스펙터) 토글
     window.addEventListener('keydown', (e) => {
       // Shift+I 또는 그냥 I (게임 중에는 채팅이 없으므로 단순 키 할당)

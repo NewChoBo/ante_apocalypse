@@ -8,6 +8,7 @@ export class PickupActor {
   private lifeTime = 15; // 15 seconds
   private timeAlive = 0;
   private isCollected = false;
+  private baseY = 0;
 
   constructor(scene: Scene, position: Vector3, type: PickupType) {
     this.type = type;
@@ -16,6 +17,7 @@ export class PickupActor {
     this.mesh = MeshBuilder.CreateBox('pickup', { size: 0.3 }, scene);
     this.mesh.position.copyFrom(position);
     this.mesh.position.y += 0.5; // Spawn slightly above ground
+    this.baseY = this.mesh.position.y;
 
     const mat = new StandardMaterial('pickupMat', scene);
     if (type === 'health') {
@@ -35,7 +37,7 @@ export class PickupActor {
 
     // Floating/Rotating animation
     this.mesh.rotation.y += deltaTime * 2;
-    this.mesh.position.y += Math.sin(this.timeAlive * 3) * 0.002;
+    this.mesh.position.y = this.baseY + Math.sin(this.timeAlive * 3) * 0.1;
 
     // Expiry check
     if (this.timeAlive >= this.lifeTime) {
