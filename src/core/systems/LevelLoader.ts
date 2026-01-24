@@ -6,6 +6,7 @@ import {
   Vector3,
   ShadowGenerator,
   Mesh,
+  Texture,
 } from '@babylonjs/core';
 
 export interface LevelData {
@@ -87,6 +88,25 @@ export class LevelLoader {
 
       const mat = new StandardMaterial(`${wallData.name}Mat`, this.scene);
       mat.diffuseColor = Color3.FromArray(wallData.material.diffuse);
+
+      // Apply Analyzed Textures
+      if (wallData.name.includes('wall')) {
+        const diffUrl =
+          'https://patrickryanms.github.io/BabylonJStextures/Demos/tilingGround/assets/textures/ground_crackedMud_baseColor.png';
+        const normUrl =
+          'https://patrickryanms.github.io/BabylonJStextures/Demos/tilingGround/assets/textures/ground_crackedMud_normal.png';
+
+        const diffTex = new Texture(diffUrl, this.scene);
+        diffTex.uScale = wallData.size[0] / 8;
+        diffTex.vScale = wallData.size[1] / 8;
+        mat.diffuseTexture = diffTex;
+
+        const normTex = new Texture(normUrl, this.scene);
+        normTex.uScale = wallData.size[0] / 8;
+        normTex.vScale = wallData.size[1] / 8;
+        mat.bumpTexture = normTex;
+      }
+
       wall.material = mat;
     });
 
