@@ -166,6 +166,12 @@ export class InventoryUI {
       if (item) {
         slot.draggable = true;
         const meta = getItemMetadata(item.id);
+        const isEquipped = state.weaponSlots.includes(item.id);
+
+        if (isEquipped) {
+          slot.classList.add('equipped');
+        }
+
         slot.innerHTML = `
                 <div class="item-icon" style="font-size: 24px;">${meta?.icon || '📦'}</div>
                 <div class="item-count">x${item.count}</div>
@@ -173,11 +179,10 @@ export class InventoryUI {
 
         slot.addEventListener('click', (e) => {
           e.preventDefault();
-          if (item.type === 'weapon') {
-            InventoryManager.equipWeapon(this.selectedSlotIndex, item.id);
-          } else if (item.type === 'consumable') {
+          if (item.type === 'consumable') {
             InventoryManager.useItem(item.id);
           }
+          // Weapon click equip removed: equipping is now DnD only
         });
 
         slot.addEventListener('contextmenu', (e) => this.showContextMenu(e, item));

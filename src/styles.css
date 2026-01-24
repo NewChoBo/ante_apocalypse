@@ -412,6 +412,25 @@ body {
   border-radius: 4px;
 }
 
+.bag-slot.equipped::before {
+  content: 'EQUIPPED';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 8px;
+  background: #4fc3f7;
+  color: #000;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-weight: 900;
+  z-index: 1;
+}
+
+.bag-slot.equipped {
+  border-color: rgba(79, 195, 247, 0.5);
+  background: rgba(79, 195, 247, 0.05);
+}
+
 .inventory-slot.equipped {
   border-color: #4fc3f7;
   background: rgba(79, 195, 247, 0.1);
