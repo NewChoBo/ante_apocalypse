@@ -3,12 +3,13 @@ import {
   UniversalCamera,
   Vector3,
   MeshBuilder,
-  Color3,
   Animation,
+  Mesh,
+  Color3,
   PBRMaterial,
-  CSG,
 } from '@babylonjs/core';
 import { Firearm } from './Firearm.ts';
+import { AssetLoader } from '../core/utils/AssetLoader.ts';
 
 /**
  * 소총 (Rifle) - 연발 가능
@@ -30,125 +31,77 @@ export class Rifle extends Firearm {
     onScore?: (points: number) => void,
     applyRecoil?: (force: number) => void
   ) {
-    super(scene, camera, 30, 90, onScore, applyRecoil);
-    this.muzzleOffset = new Vector3(0, 0.05, -0.4); // 총구 상단 정렬, 모델 회전 고려
+    super(scene, camera, 30, 240, onScore, applyRecoil); // Rifle: 30발 탄창, 240발 예비 탄약
+    this.muzzleOffset = new Vector3(0, 0.06, 0.4); // 소총 총구 위치 조정 // 총구 상단 정렬, 모델 회전 고려
     this.createWeaponModel();
   }
 
-  private createWeaponModel(): void {
-    // 소총 본체 (Root Mesh)
-    this.weaponMesh = MeshBuilder.CreateBox('rifle_root', { size: 0.01 }, this.scene);
-    this.weaponMesh.isVisible = false;
+  private async createWeaponModel(): Promise<void> {
+    // 외부 모델 로드 (Microsoft MRTK Sample Gun)
+    // 현재 공식 리포지토리에 소총(Rifle) 모델이 없으므로,
+    // 고품질 Pistol 모델을 로드하되 크기를 키워 소총처럼 사용 (Placeholder)
+    const rootUrl =
+      'https://raw.githubusercontent.com/microsoft/MixedRealityToolkit/main/SpatialInput/Samples/DemoRoom/Media/Models/';
+    const fileName = 'Gun.glb';
 
-    // --- 재질 정의 (PBR) ---
-    const metalMat = new PBRMaterial('rifle_metal', this.scene);
-    metalMat.albedoColor = new Color3(0.12, 0.12, 0.12);
-    metalMat.metallic = 0.8;
-    metalMat.roughness = 0.4;
+    try {
+      const meshes = await AssetLoader.loadModel(this.scene, rootUrl, fileName);
 
-    const plasticMat = new PBRMaterial('rifle_plastic', this.scene);
-    plasticMat.albedoColor = new Color3(0.05, 0.05, 0.05);
-    plasticMat.metallic = 0.0;
-    plasticMat.roughness = 0.7;
+      // 루트 노드 설정
+      this.weaponMesh = meshes[0];
 
-    // --- 1. 몸체 (Receiver) ---
-    const receiver = MeshBuilder.CreateBox(
-      'rifle_receiver',
-      { width: 0.06, height: 0.08, depth: 0.4 },
-      this.scene
-    );
-    receiver.material = metalMat;
-    receiver.parent = this.weaponMesh;
+      // --- 모델 정규화 (Normalization) ---
+      // 1. 초기화
+      this.weaponMesh.parent = null;
+      this.weaponMesh.rotationQuaternion = null;
+      this.weaponMesh.rotation = Vector3.Zero();
+      this.weaponMesh.scaling = Vector3.One();
 
-    // --- 2. 핸드가드 (Handguard) with Vents (CSG) ---
-    const handguardBox = MeshBuilder.CreateBox(
-      'handguard_box',
-      { width: 0.065, height: 0.07, depth: 0.35 },
-      this.scene
-    );
-    handguardBox.position.z = 0.35; // 리시버 앞쪽
+      // 2. 바운딩 박스 계산 및 스케일 조정 (Rifle Scale)
+      const hierarchy = this.weaponMesh.getHierarchyBoundingVectors();
+      const size = hierarchy.max.subtract(hierarchy.min);
+      const maxDim = Math.max(size.x, size.y, size.z);
 
-    // 쿨링 벤트 (Cooling Vents) - 반복 구멍 뚫기
-    let handguardCSG = CSG.FromMesh(handguardBox);
+      // 목표 크기: 약 60cm ~ 70cm (0.6 unit) - 소총은 권총보다 큼
+      const targetSize = 0.6;
+      const scaleFactor = targetSize / maxDim;
 
-    // 왼쪽 벤트
-    for (let i = 0; i < 3; i++) {
-      const vent = MeshBuilder.CreateBox(
-        `vent_l_${i}`,
-        { width: 0.02, height: 0.02, depth: 0.08 },
-        this.scene
-      );
-      vent.position.set(-0.03, 0.01, 0.25 + i * 0.1);
-      const ventCSG = CSG.FromMesh(vent);
-      handguardCSG = handguardCSG.subtract(ventCSG);
-      vent.dispose();
+      // 소총 특화: 길이(Z)를 더 늘려 Long barrel 느낌 내기 (Non-uniform Scaling)
+      this.weaponMesh.scaling = new Vector3(scaleFactor, scaleFactor, scaleFactor * 1.6);
+
+      // 3. 카메라에 부착 및 위치 잡기
+      this.weaponMesh.parent = this.camera;
+
+      // 위치: 화면 오른쪽 아래 (소총은 좀 더 앞으로)
+      this.weaponMesh.position = new Vector3(0.25, -0.25, 0.6);
+      this.weaponMesh.rotation = new Vector3(0, Math.PI, 0);
+
+      // 초기 가시성 설정
+      this.weaponMesh.setEnabled(this.isActive);
+
+      // 재질 오버라이드 (색상 변경으로 구분)
+      meshes.forEach((m) => {
+        if (m instanceof Mesh) {
+          m.receiveShadows = true;
+          m.isPickable = false;
+
+          // 기존 재질이 있다면 색상 변조
+          if (m.material && m.material instanceof PBRMaterial) {
+            // 약간의 녹갈색(Military Olive) 틴트 추가하여 권총과 구분
+            m.material.albedoColor = new Color3(0.3, 0.35, 0.25);
+            m.material.roughness = 0.6; // 좀 더 거친 느낌
+          }
+        }
+      });
+
+      this.setIdleState();
+    } catch (e) {
+      console.error('Failed to load Gun.glb for Rifle, falling back to primitive', e);
+      // 실패 시 폴백
+      this.weaponMesh = MeshBuilder.CreateBox('rifle_fallback', { size: 0.1 }, this.scene);
+      this.weaponMesh.parent = this.camera;
+      this.weaponMesh.position = new Vector3(0.35, -0.25, 0.45);
     }
-    // 오른쪽 벤트
-    for (let i = 0; i < 3; i++) {
-      const vent = MeshBuilder.CreateBox(
-        `vent_r_${i}`,
-        { width: 0.02, height: 0.02, depth: 0.08 },
-        this.scene
-      );
-      vent.position.set(0.03, 0.01, 0.25 + i * 0.1);
-      const ventCSG = CSG.FromMesh(vent);
-      handguardCSG = handguardCSG.subtract(ventCSG);
-      vent.dispose();
-    }
-
-    const handguard = handguardCSG.toMesh('rifle_handguard', plasticMat, this.scene);
-    handguard.parent = this.weaponMesh;
-    handguardBox.dispose();
-
-    // --- 3. 총열 (Barrel) with CSG (Hollow Tip) ---
-    const barrelOut = MeshBuilder.CreateCylinder(
-      'barrel_out',
-      { diameter: 0.025, height: 0.5 },
-      this.scene
-    );
-    const barrelIn = MeshBuilder.CreateCylinder(
-      'barrel_in',
-      { diameter: 0.015, height: 0.55 },
-      this.scene
-    ); // 좀 더 길게 뚫기
-
-    const barrelOutCSG = CSG.FromMesh(barrelOut);
-    const barrelInCSG = CSG.FromMesh(barrelIn);
-    const booleanBarrelCSG = barrelOutCSG.subtract(barrelInCSG);
-
-    const barrel = booleanBarrelCSG.toMesh('rifle_barrel', metalMat, this.scene);
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.z = 0.45; // 핸드가드 너머까지
-    barrel.parent = this.weaponMesh;
-
-    barrelOut.dispose();
-    barrelIn.dispose();
-
-    // --- 4. 개머리판 (Stock) ---
-    const stock = MeshBuilder.CreateBox(
-      'rifle_stock',
-      { width: 0.05, height: 0.12, depth: 0.25 },
-      this.scene
-    );
-    stock.material = plasticMat;
-    stock.position.set(0, -0.02, -0.32);
-    stock.parent = this.weaponMesh;
-
-    // --- 5. 조준경/레일 (Rail) ---
-    const rail = MeshBuilder.CreateBox(
-      'rifle_rail',
-      { width: 0.04, height: 0.015, depth: 0.4 },
-      this.scene
-    );
-    rail.material = metalMat;
-    rail.position.y = 0.048; // 리시버 위
-    rail.parent = this.weaponMesh;
-
-    // 배치 및 설정
-    this.weaponMesh.parent = this.camera;
-    this.weaponMesh.position = new Vector3(0.4, -0.3, 0.6);
-    this.weaponMesh.rotation.y = Math.PI;
-    this.setIdleState();
   }
 
   protected onFire(): void {

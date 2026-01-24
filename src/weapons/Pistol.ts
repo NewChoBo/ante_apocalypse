@@ -22,8 +22,8 @@ export class Pistol extends Firearm {
     onScore?: (points: number) => void,
     applyRecoil?: (force: number) => void
   ) {
-    super(scene, camera, 12, 48, onScore, applyRecoil);
-    this.muzzleOffset = new Vector3(0, 0.05, -0.2); // 총구 상단 정렬
+    super(scene, camera, 12, 120, onScore, applyRecoil); // Pistol: 12발 탄창, 120발 예비 탄약
+    this.muzzleOffset = new Vector3(0, 0.06, 0.2); // 권총 총구 위치 조정
     this.createWeaponModel();
   }
 
@@ -65,6 +65,9 @@ export class Pistol extends Firearm {
       // 회전: Y축 180도 (보통 GLB는 -Z가 정면이므로)
       this.weaponMesh.position = new Vector3(0.2, -0.15, 0.4);
       this.weaponMesh.rotation = new Vector3(0, Math.PI, 0);
+
+      // 초기 가시성 설정 (현재 활성화 상태 따름)
+      this.weaponMesh.setEnabled(this.isActive);
 
       console.log(`Pistol Loaded. Original Size: ${maxDim}, Applied Scale: ${scaleFactor}`);
 
