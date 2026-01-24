@@ -19,6 +19,7 @@ export class PlayerController extends BaseController {
 
   private mouseDelta = { x: 0, y: 0 };
   private canvas: HTMLCanvasElement;
+  private isInputBlocked = false;
 
   constructor(id: string, canvas: HTMLCanvasElement) {
     super(id);
@@ -123,8 +124,18 @@ export class PlayerController extends BaseController {
     // 빙의 해제 시 추가 로직
   }
 
+  public setInputBlocked(blocked: boolean): void {
+    this.isInputBlocked = blocked;
+    if (blocked) {
+      // 입력 차단 시 모든 키 해제
+      Object.keys(this.keys).forEach((k) => (this.keys[k as keyof typeof this.keys] = false));
+      this.mouseDelta.x = 0;
+      this.mouseDelta.y = 0;
+    }
+  }
+
   public tick(deltaTime: number): void {
-    if (!this.possessedPawn) return;
+    if (!this.possessedPawn || this.isInputBlocked) return;
 
     // Pawn에게 입력 데이터 전달
     if (this.possessedPawn instanceof PlayerPawn) {

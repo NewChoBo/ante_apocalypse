@@ -19,6 +19,8 @@ import { CombatComponent } from './components/CombatComponent';
 import { TickManager } from './TickManager';
 import { AssetLoader } from './AssetLoader';
 import { PickupManager } from './systems/PickupManager';
+import { InventoryUI } from '../ui/InventoryUI';
+import { inventoryStore } from './store/GameStore';
 import '@babylonjs/inspector'; // 인스펙터 기능 활성화
 import { LevelLoader, LevelData } from './systems/LevelLoader';
 import { EnemyManager } from './systems/EnemyManager';
@@ -34,6 +36,7 @@ export class Game {
   private hud: HUD | null = null;
   private spawner: TargetSpawnerComponent | null = null;
   private enemyManager: EnemyManager | null = null;
+  private inventoryUI: InventoryUI | null = null;
   private healthUnsub: (() => void) | null = null;
 
   private isRunning = false;
@@ -53,6 +56,7 @@ export class Game {
     this.initCanvas(containerId);
     this.initEngine();
     this.initMenuScene(); // Scene 생성
+    this.setupGlobalInput(); // 입력 리스너 초기화 (1회)
 
     // 메뉴 화면 렌더링 시작
     this.engine.runRenderLoop(this.renderFunction);
@@ -153,6 +157,47 @@ export class Game {
     // 아이템 드랍 시스템 초기화
     PickupManager.getInstance().initialize(this.scene, this.playerPawn);
 
+    // 인벤토리 UI 초기화
+    this.inventoryUI = new InventoryUI({
+      onEquipWeapon: (slot, weaponId) => {
+        const state = inventoryStore.get();
+        const slots = [...state.weaponSlots];
+        slots[slot] = weaponId;
+        inventoryStore.setKey('weaponSlots', slots);
+
+        if (weaponId) {
+          const combat = this.playerPawn?.getComponent(CombatComponent);
+          if (combat instanceof CombatComponent) {
+            combat.equipWeapon(weaponId);
+          }
+        }
+      },
+      onUseItem: (itemId) => {
+        if (!this.playerPawn) return;
+        const state = inventoryStore.get();
+        const bag = [...state.bagItems];
+        const itemIndex = bag.findIndex((i) => i.id === itemId);
+
+        if (itemIndex !== -1) {
+          const item = bag[itemIndex];
+          if (item.id === 'health') {
+            this.playerPawn.addHealth(30);
+          } else if (item.id === 'ammo') {
+            this.playerPawn.addAmmo(50);
+          }
+
+          if (item.count > 1) {
+            const newItem = { ...item, count: item.count - 1 };
+            bag[itemIndex] = newItem;
+          } else {
+            bag.splice(itemIndex, 1);
+          }
+          inventoryStore.setKey('bagItems', bag);
+        }
+      },
+    });
+    this.syncInventoryStore();
+
     // 에셋 프리로딩
     await this.initPreloading();
   }
@@ -246,34 +291,9 @@ export class Game {
         });
     }
 
-    // 디버그용 아이템 스폰 단축키 (H: Health, J: Ammo)
-    window.addEventListener('keydown', (e) => {
-      if (!this.isRunning || this.isPaused) return;
-      if (e.code === 'KeyH') {
-        PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'health');
-        console.log('[DEBUG] Spawned Health Pickup at player position');
-      }
-      if (e.code === 'KeyJ') {
-        PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'ammo');
-        console.log('[DEBUG] Spawned Ammo Pickup at player position');
-      }
-    });
+    // 디버그 레이어/아이템 스폰/인벤토리 리스너는 생성자의 setupGlobalInput에서 통합 관리됨
 
-    // 디버그 레이어 (인스펙터) 토글
-    window.addEventListener('keydown', (e) => {
-      // Shift+I 또는 그냥 I (게임 중에는 채팅이 없으므로 단순 키 할당)
-      if (e.code === 'KeyI' && !e.repeat) {
-        if (this.scene.debugLayer.isVisible()) {
-          this.scene.debugLayer.hide();
-          // 인스펙터 닫으면 포인터 잠금 재요청 (게임으로 복귀)
-          if (!this.isPaused) this.canvas.requestPointerLock();
-        } else {
-          this.scene.debugLayer.show();
-          // 인스펙터 열면 포인터 잠금 해제 (마우스 사용)
-          document.exitPointerLock();
-        }
-      }
-    });
+    // 디버그 레이어 (인스펙터) 및 인벤토리 토글 로직은 setupGlobalInput에서 처리
 
     // 오디오 엔진 언락
     const audioEngine = AssetLoader.getInstance().getAudioEngine();
@@ -293,10 +313,66 @@ export class Game {
     // 그러면 메뉴 화면은 렌더링 안 되고 있었나? (확인 필요)
     // 생성자 수정 필요: 메뉴 화면도 렌더링 되어야 함.
 
-    // 일단 start에서는 호출하지 않고, 생성자에서 한 번만 호출하도록 변경하는 것이 좋음.
-    // 하지만 안전하게 가기 위해: 기존 루프 사용.
     this.engine.stopRenderLoop(this.renderFunction); // 혹시 모를 중복 방지
     this.engine.runRenderLoop(this.renderFunction);
+  }
+
+  private setupGlobalInput(): void {
+    window.addEventListener('keydown', (e) => {
+      if (!this.isRunning) return;
+
+      // 1. 디버그용 아이템 스폰 (H: Health, J: Ammo)
+      if (!this.isPaused) {
+        if (e.code === 'KeyH') {
+          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'health');
+          console.log('[DEBUG] Spawned Health Pickup');
+        }
+        if (e.code === 'KeyJ') {
+          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'ammo');
+          console.log('[DEBUG] Spawned Ammo Pickup');
+        }
+      }
+
+      // 2. 인스펙터 토글 (I)
+      if (e.code === 'KeyI' && !e.repeat) {
+        if (this.scene.debugLayer.isVisible()) {
+          this.scene.debugLayer.hide();
+          if (!this.isPaused) this.canvas.requestPointerLock();
+        } else {
+          this.scene.debugLayer.show();
+          document.exitPointerLock();
+        }
+      }
+
+      // 3. 인벤토리 토글 (Tab)
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        if (this.inventoryUI && this.playerController) {
+          const isOpen = this.inventoryUI.toggle();
+          this.playerController.setInputBlocked(isOpen);
+
+          if (!isOpen && !this.isPaused) {
+            this.canvas.requestPointerLock();
+          }
+        }
+      }
+    });
+  }
+
+  private syncInventoryStore(): void {
+    if (!this.playerPawn) return;
+    const combat = this.playerPawn.getComponent(CombatComponent);
+    if (!(combat instanceof CombatComponent)) return;
+
+    const weapons = combat.getWeapons();
+    const slots: (string | null)[] = [null, null, null, null];
+
+    // 초기화 시 가진 무기들을 슬롯에 순서대로 배치
+    weapons.forEach((w, i) => {
+      if (i < 4) slots[i] = w.name;
+    });
+
+    inventoryStore.setKey('weaponSlots', slots);
   }
 
   private update(deltaTime: number): void {

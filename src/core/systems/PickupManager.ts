@@ -3,6 +3,7 @@ import { PickupActor, PickupType } from '../entities/PickupActor';
 import { PlayerPawn } from '../PlayerPawn';
 import { ITickable } from '../interfaces/ITickable';
 import { TickManager } from '../TickManager';
+import { inventoryStore } from '../store/GameStore';
 
 export class PickupManager implements ITickable {
   private static instance: PickupManager;
@@ -76,18 +77,28 @@ export class PickupManager implements ITickable {
     if (!this.player) return;
 
     try {
-      if (pickup.type === 'health') {
-        this.player.addHealth(30);
-        this.showPopup('Health +30', '#4CAF50');
+      const state = inventoryStore.get();
+      const bagItems = [...state.bagItems];
+      const existingItem = bagItems.find((item) => item.id === pickup.type);
+
+      if (existingItem) {
+        existingItem.count += 1;
       } else {
-        this.player.addAmmo(50);
-        this.showPopup('Ammo +50', '#2196F3');
+        bagItems.push({
+          id: pickup.type,
+          name: pickup.type === 'health' ? 'Health Pack' : 'Ammo Pack',
+          type: 'consumable',
+          count: 1,
+        });
       }
 
+      inventoryStore.setKey('bagItems', bagItems);
+      this.showPopup(`Picked up ${pickup.type}`, '#FF9800');
+
       pickup.collect();
-      console.log(`[PickupManager] Collected ${pickup.type}`);
+      console.log(`[PickupManager] Stored ${pickup.type} in bag`);
     } catch (e) {
-      console.error(`[PickupManager] Error collecting ${pickup.type}:`, e);
+      console.error(`[PickupManager] Error storing ${pickup.type}:`, e);
       // 에러가 나더라도 일단 박스는 제거 (무한 에러 방지)
       pickup.collect();
     }

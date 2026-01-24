@@ -1,6 +1,7 @@
 import { Scene } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { WeaponInventoryComponent } from './WeaponInventoryComponent';
+import { IWeapon } from '../../types/IWeapon';
 import { WeaponInputComponent } from './WeaponInputComponent';
 import { HUDSyncComponent } from './HUDSyncComponent';
 import { FirearmEffectComponent } from './FirearmEffectComponent';
@@ -67,6 +68,14 @@ export class CombatComponent extends BaseComponent {
 
   public getCurrentWeapon() {
     return this.inventory.currentWeapon;
+  }
+
+  public getWeapons(): IWeapon[] {
+    return this.inventory.getWeapons();
+  }
+
+  public async equipWeapon(id: string): Promise<void> {
+    await this.inventory.equipWeaponById(id);
   }
 
   public addAmmoToAll(amount: number): void {

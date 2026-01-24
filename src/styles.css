@@ -191,6 +191,207 @@ body {
   }
 }
 
+/* 인벤토리 오버레이 */
+#inventory-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1500; /* 인벤토리: 중간 */
+  animation: fadeIn 0.3s ease-out;
+}
+
+.inventory-window {
+  width: 1000px;
+  max-width: 95vw;
+  height: 600px;
+  background: linear-gradient(135deg, rgba(30, 30, 45, 0.95), rgba(15, 15, 25, 0.98));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.inventory-header {
+  padding: 20px 30px;
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inventory-panels {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.equipment-side {
+  width: 350px;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.bag-side {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.section-title {
+  font-size: 14px;
+  color: #4fc3f7;
+  letter-spacing: 2px;
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.equipment-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.weapon-slot {
+  height: 100px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  position: relative;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.weapon-slot:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(79, 195, 247, 0.5);
+}
+
+.weapon-slot.active {
+  background: rgba(79, 195, 247, 0.1);
+  border-color: #4fc3f7;
+}
+
+.slot-number {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  font-size: 10px;
+  font-weight: bold;
+  opacity: 0.5;
+}
+
+.weapon-slot .item-icon {
+  font-size: 32px;
+  margin-right: 20px;
+  margin-bottom: 0;
+}
+
+.weapon-slot .item-name {
+  font-size: 14px;
+}
+
+.bag-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.bag-slot {
+  aspect-ratio: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bag-slot:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #4fc3f7;
+}
+
+.bag-slot .item-count {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 12px;
+  font-weight: bold;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.inventory-slot.equipped {
+  border-color: #4fc3f7;
+  background: rgba(79, 195, 247, 0.1);
+  box-shadow: inset 0 0 15px rgba(79, 195, 247, 0.2);
+}
+
+.inventory-slot.empty {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.inventory-footer {
+  padding: 20px 30px;
+  background: rgba(0, 0, 0, 0.3);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.usage-hint {
+  font-size: 12px;
+  color: #666;
+}
+
+/* 일시정지 오버레이 */
+#pause-overlay {
+  z-index: 2000; /* 일시정지: 최상단 */
+}
+
+.detail-name {
+  font-size: 20px;
+  font-weight: bold;
+  color: #4fc3f7;
+  margin-bottom: 4px;
+}
+
+.detail-description {
+  font-size: 14px;
+  color: #777;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes fadeOut {
   from {
     opacity: 1;

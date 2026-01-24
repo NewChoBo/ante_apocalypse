@@ -29,16 +29,16 @@ export class WeaponInputComponent {
 
     switch (e.code) {
       case 'Digit1':
-        this.inventory.switchWeapon(0);
+        this.inventory.switchWeaponBySlot(0);
         break;
       case 'Digit2':
-        this.inventory.switchWeapon(1);
+        this.inventory.switchWeaponBySlot(1);
         break;
       case 'Digit3':
-        this.inventory.switchWeapon(2);
+        this.inventory.switchWeaponBySlot(2);
         break;
       case 'Digit4':
-        this.inventory.switchWeapon(3);
+        this.inventory.switchWeaponBySlot(3);
         break;
       case 'KeyR':
         const weapon = this.inventory.currentWeapon;

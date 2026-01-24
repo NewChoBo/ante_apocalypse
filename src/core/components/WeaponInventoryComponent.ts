@@ -1,5 +1,6 @@
 import { Scene, UniversalCamera } from '@babylonjs/core';
 import { IWeapon } from '../../types/IWeapon';
+import { inventoryStore } from '../store/GameStore';
 import { Pistol } from '../../weapons/Pistol';
 import { Rifle } from '../../weapons/Rifle';
 import { Knife } from '../../weapons/Knife';
@@ -60,6 +61,25 @@ export class WeaponInventoryComponent {
     }
 
     this.isSwitching = false;
+  }
+
+  public getWeapons(): IWeapon[] {
+    return this.weapons;
+  }
+
+  public async switchWeaponBySlot(slotIndex: number): Promise<void> {
+    const state = inventoryStore.get();
+    const weaponId = state.weaponSlots[slotIndex];
+    if (weaponId) {
+      await this.equipWeaponById(weaponId);
+    }
+  }
+
+  public async equipWeaponById(id: string): Promise<void> {
+    const index = this.weapons.findIndex((w) => w.name === id);
+    if (index !== -1) {
+      await this.switchWeapon(index);
+    }
   }
 
   public update(deltaTime: number): void {
