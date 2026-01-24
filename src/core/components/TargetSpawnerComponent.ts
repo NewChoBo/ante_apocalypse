@@ -13,6 +13,7 @@ export class TargetSpawnerComponent {
   private shadowGenerator: ShadowGenerator;
   private targetIdCounter = 0;
   private registry: TargetRegistry;
+  private respawnTimeout: any;
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
     this.scene = scene;
@@ -35,6 +36,9 @@ export class TargetSpawnerComponent {
 
   /** 개별 타겟 스폰 */
   public spawnTarget(position: Vector3, isMoving: boolean): string {
+    // 씬이 제거되었으면 스폰 중단
+    if (this.scene.isDisposed) return '';
+
     const id = `target_${++this.targetIdCounter}`;
     let target: ITarget;
 
@@ -59,12 +63,18 @@ export class TargetSpawnerComponent {
 
   /** 일정 시간 후 리스폰 예약 */
   public scheduleRespawn(delayMs: number = 1500): void {
-    setTimeout(() => {
+    this.respawnTimeout = setTimeout(() => {
       const lane = Math.floor(Math.random() * 5);
       const x = (lane - 2) * 7;
       const z = 10 + Math.random() * 12;
       const isMoving = Math.random() > 0.4;
       this.spawnTarget(new Vector3(x, 1.0, z), isMoving);
     }, delayMs);
+  }
+
+  public dispose(): void {
+    if (this.respawnTimeout) {
+      clearTimeout(this.respawnTimeout);
+    }
   }
 }

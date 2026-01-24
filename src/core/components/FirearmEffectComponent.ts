@@ -59,18 +59,33 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
     }
   }
 
-  protected emitMuzzleFlash(position: Vector3, _direction: Vector3, transformNode?: any): void {
+  protected emitMuzzleFlash(
+    position: Vector3,
+    _direction: Vector3,
+    transformNode?: any,
+    localPosition?: Vector3
+  ): void {
     const flash = MeshBuilder.CreateSphere('muzzleFlash', { diameter: 0.15 }, this.scene);
     flash.isPickable = false;
     flash.material = this.flashMaterial;
+    // 초기화 (월드 원점)
+    flash.position = Vector3.Zero();
+    flash.rotation = Vector3.Zero();
 
-    flash.position = position;
     if (transformNode) {
-      flash.setParent(transformNode);
+      flash.parent = transformNode;
+      if (localPosition) {
+        flash.position.copyFrom(localPosition);
+      }
     } else {
       const player = this.owner as any;
       if (player.camera) {
-        flash.setParent(player.camera);
+        flash.parent = player.camera;
+        // 카메라 기준일 경우 월드 포지션을 로컬로 변환하거나(복잡),
+        // 단순히 카메라 앞(Z+)으로 고정 배치
+        flash.position = new Vector3(0, -0.1, 0.8);
+      } else {
+        flash.position = position;
       }
     }
 

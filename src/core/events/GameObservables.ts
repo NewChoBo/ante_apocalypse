@@ -1,4 +1,5 @@
 import { Observable, Vector3 } from '@babylonjs/core';
+import { MuzzleTransform } from '../../types/IWeapon.ts';
 
 /**
  * 타겟이 파괴되었을 때의 데이터 규격
@@ -21,7 +22,7 @@ export const GameObservables = {
     weaponId: string;
     ammoRemaining: number;
     fireType: 'firearm' | 'melee';
-    muzzleTransform?: { position: Vector3; direction: Vector3; transformNode?: any };
+    muzzleTransform?: MuzzleTransform;
   }>(),
 
   /** 타격 발생 (VFX 연출용) */

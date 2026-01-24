@@ -63,5 +63,6 @@ export class CombatComponent extends BaseComponent {
   public dispose(): void {
     super.dispose();
     this.inventory.dispose();
+    this.input.dispose();
   }
 }

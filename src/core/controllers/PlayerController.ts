@@ -26,40 +26,64 @@ export class PlayerController extends BaseController {
     this.setupInputEvents();
   }
 
-  private setupInputEvents(): void {
-    document.addEventListener('keydown', (e) => {
-      // 포인터가 잠겨있을 때 (게임 플레이 중)
-      if (document.pointerLockElement === this.canvas) {
-        // 브라우저 단축키 차단 (Ctrl+D, Ctrl+S, Ctrl+W 등)
-        if (e.ctrlKey || e.metaKey || e.key === 'Tab') {
-          // 디버깅용 F12/Ctrl+Shift+I 등은 허용 (필요 시 수정)
-          if (e.key !== 'F12' && !(e.ctrlKey && e.shiftKey && e.key === 'I')) {
-            e.preventDefault();
-          }
+  private onKeyDown = (e: KeyboardEvent) => {
+    // 포인터가 잠겨있을 때 (게임 플레이 중)
+    if (document.pointerLockElement === this.canvas) {
+      // 브라우저 단축키 차단 (Ctrl+D, Ctrl+S, Ctrl+W 등)
+      if (e.ctrlKey || e.metaKey || e.key === 'Tab') {
+        // 디버깅용 F12/Ctrl+Shift+I 등은 허용 (필요 시 수정)
+        if (e.key !== 'F12' && !(e.ctrlKey && e.shiftKey && e.key === 'I')) {
+          e.preventDefault();
         }
       }
-      this.updateKeyState(e.code, true);
-    });
-    document.addEventListener('keyup', (e) => this.updateKeyState(e.code, false));
-    document.addEventListener('mousemove', (e) => {
-      if (document.pointerLockElement === this.canvas) {
-        this.mouseDelta.x += e.movementX;
-        this.mouseDelta.y += e.movementY;
-      }
-    });
+    }
+    this.updateKeyState(e.code, true);
+  };
 
-    this.canvas.addEventListener('mousedown', (e) => {
-      if (e.button === 0) this.updateKeyState('MouseLeft', true);
-      if (e.button === 2) this.updateKeyState('MouseRight', true);
-    });
+  private onKeyUp = (e: KeyboardEvent) => {
+    this.updateKeyState(e.code, false);
+  };
 
-    this.canvas.addEventListener('mouseup', (e) => {
-      if (e.button === 0) this.updateKeyState('MouseLeft', false);
-      if (e.button === 2) this.updateKeyState('MouseRight', false);
-    });
+  private onMouseMove = (e: MouseEvent) => {
+    if (document.pointerLockElement === this.canvas) {
+      this.mouseDelta.x += e.movementX;
+      this.mouseDelta.y += e.movementY;
+    }
+  };
 
-    // 우클릭 컨텍스트 메뉴 방지 (정조준 용)
-    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  private onMouseDown = (e: MouseEvent) => {
+    if (e.button === 0) this.updateKeyState('MouseLeft', true);
+    if (e.button === 2) this.updateKeyState('MouseRight', true);
+  };
+
+  private onMouseUp = (e: MouseEvent) => {
+    if (e.button === 0) this.updateKeyState('MouseLeft', false);
+    if (e.button === 2) this.updateKeyState('MouseRight', false);
+  };
+
+  private onContextMenu = (e: Event) => {
+    e.preventDefault();
+  };
+
+  private setupInputEvents(): void {
+    document.addEventListener('keydown', this.onKeyDown);
+    document.addEventListener('keyup', this.onKeyUp);
+    document.addEventListener('mousemove', this.onMouseMove);
+
+    this.canvas.addEventListener('mousedown', this.onMouseDown);
+    this.canvas.addEventListener('mouseup', this.onMouseUp);
+    this.canvas.addEventListener('contextmenu', this.onContextMenu);
+  }
+
+  public dispose(): void {
+    super.dispose();
+    document.removeEventListener('keydown', this.onKeyDown);
+    document.removeEventListener('keyup', this.onKeyUp);
+    document.removeEventListener('mousemove', this.onMouseMove);
+
+    this.canvas.removeEventListener('mousedown', this.onMouseDown);
+    this.canvas.removeEventListener('mouseup', this.onMouseUp);
+    this.canvas.removeEventListener('contextmenu', this.onContextMenu);
   }
 
   private updateKeyState(code: string, isPressed: boolean): void {

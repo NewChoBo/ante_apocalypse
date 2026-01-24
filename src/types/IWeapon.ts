@@ -61,12 +61,26 @@ export interface IWeapon {
 /**
  * 총기류 전용 인터페이스
  */
-export interface IFirearm extends IWeapon, IMuzzleProvider {
+export interface MuzzleTransform {
+  position: Vector3;
+  direction: Vector3;
+  transformNode?: any;
+  localMuzzlePosition?: Vector3;
+}
+
+export interface IFirearm extends IWeapon {
   currentAmmo: number;
   magazineSize: number;
   reserveAmmo: number;
+
   fireRate: number;
   reloadTime: number;
   firingMode: 'semi' | 'auto';
+  recoilForce: number;
+
+  startFire(): void;
+  stopFire(): void;
   reload(): void;
+
+  getMuzzleTransform(): MuzzleTransform;
 }

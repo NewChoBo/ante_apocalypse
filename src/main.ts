@@ -15,6 +15,11 @@ resumeButton?.addEventListener('click', () => {
   game.resume();
 });
 
+const menuButton = document.getElementById('menu-button');
+menuButton?.addEventListener('click', () => {
+  game.quitToMenu();
+});
+
 // ESC 키로 일시정지/재개
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Escape') {

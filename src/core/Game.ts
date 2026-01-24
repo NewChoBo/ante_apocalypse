@@ -7,11 +7,13 @@ import {
   ShadowGenerator,
   Color3,
   Color4,
+  UniversalCamera,
 } from '@babylonjs/core';
 import { PlayerController } from './controllers/PlayerController';
 import { PlayerPawn } from './PlayerPawn';
 import { ShootingRange } from '../world/ShootingRange';
 import { TargetSpawnerComponent } from './components/TargetSpawnerComponent';
+import { TargetRegistry } from './systems/TargetRegistry';
 import { HUD } from '../ui/HUD';
 import { gameStateStore } from './store/GameStore.ts';
 import { CombatComponent } from './components/CombatComponent';
@@ -23,14 +25,31 @@ export class Game {
   private engine!: Engine;
   private scene!: Scene;
   private shadowGenerator!: ShadowGenerator;
+  private playerController: PlayerController | null = null;
+  private playerPawn: PlayerPawn | null = null;
+  private hud: HUD | null = null;
+  private spawner: TargetSpawnerComponent | null = null;
 
   private isRunning = false;
   private isPaused = false;
 
+  private renderFunction: () => void;
+
   constructor(containerId: string) {
+    this.renderFunction = () => {
+      if (!this.isPaused && this.scene && this.scene.activeCamera) {
+        const deltaTime = this.engine.getDeltaTime() / 1000;
+        this.update(deltaTime);
+        this.scene.render();
+      }
+    };
+
     this.initCanvas(containerId);
     this.initEngine();
-    this.initScene();
+    this.initMenuScene(); // Scene 생성
+
+    // 메뉴 화면 렌더링 시작
+    this.engine.runRenderLoop(this.renderFunction);
   }
 
   private initCanvas(containerId: string): void {
@@ -56,7 +75,7 @@ export class Game {
     });
   }
 
-  private initScene(): void {
+  private initMenuScene(): void {
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.1, 0.1, 0.15, 1);
 
@@ -78,49 +97,55 @@ export class Game {
     const shootingRange = new ShootingRange(this.scene, this.shadowGenerator);
     shootingRange.create();
 
+    // 메뉴 카메라 (배경 조망용)
+    const menuCamera = new UniversalCamera('menuCamera', new Vector3(0, 2, -10), this.scene);
+    menuCamera.setTarget(Vector3.Zero());
+    menuCamera.attachControl(this.canvas, true); // 마우스로 둘러보기 허용 (선택사항)
+  }
+
+  private async initGameSession(): Promise<void> {
+    // 메뉴 카메라 제거 (만약 있다면)
+    const menuCam = this.scene.getCameraByName('menuCamera');
+    if (menuCam) {
+      menuCam.dispose();
+    }
+
     // 하이브리드 아키텍처 시스템 초기화
-    const playerPawn = new PlayerPawn(this.scene);
-    const playerController = new PlayerController('player1', this.canvas);
-    playerController.possess(playerPawn);
+    this.playerPawn = new PlayerPawn(this.scene);
+    this.playerController = new PlayerController('player1', this.canvas);
+    this.playerController.possess(this.playerPawn);
 
     // HUD를 다른 시스템보다 먼저 초기화하여 초기 이벤트를 수신할 수 있게 합니다.
-    new HUD();
+    this.hud = new HUD();
 
     // 타겟 스폰 시스템 (Modular Component)
-    const spawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
-    spawner.spawnInitialTargets();
+    this.spawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
+    this.spawner.spawnInitialTargets();
 
     // 무기 시스템 (이제 Pawn의 CombatComponent가 소유)
-    const combatComp = new CombatComponent(playerPawn, this.scene);
-    playerPawn.addComponent(combatComp);
+    const combatComp = new CombatComponent(this.playerPawn, this.scene);
+    this.playerPawn.addComponent(combatComp);
 
-    // 에셋 프리로딩 시작
-    this.initPreloading();
+    // 에셋 프리로딩 (필요 시) 및 시작 버튼 제어는 main.ts나 여기서 처리
+    // 여기서는 이미 시작 버튼을 누른 후이므로 바로 로딩 대기
+    await this.initPreloading();
   }
 
   private async initPreloading(): Promise<void> {
-    const startBtn = document.getElementById('start-button') as HTMLButtonElement;
-    if (startBtn) {
-      startBtn.disabled = true;
-      startBtn.innerText = '로딩 중...';
-    }
-
+    // 기존 initPreloading 로직 재활용 또는 단순화
+    // 여기서는 로딩 중 UI 처리는 생략하거나 간소화 (이미 게임 시작 중이므로)
     try {
       await AssetLoader.getInstance().load(this.scene);
-      if (startBtn) {
-        startBtn.disabled = false;
-        startBtn.innerText = '시작하기';
-      }
     } catch (e) {
-      console.error('Failed to preload assets:', e);
-      if (startBtn) {
-        startBtn.innerText = '로드 실패';
-      }
+      console.error('Failed to load assets:', e);
     }
   }
 
-  public start(): void {
+  public async start(): Promise<void> {
     if (this.isRunning) return;
+
+    // 게임 세션 초기화 (지연 로딩)
+    await this.initGameSession();
 
     this.isRunning = true;
     this.isPaused = false;
@@ -130,40 +155,41 @@ export class Game {
     document.getElementById('start-overlay')!.style.display = 'none';
     document.getElementById('hud')!.style.display = 'block';
 
-    // 전체 화면 요청 (Keyboard Lock API는 전체 화면에서만 안정적으로 작동함)
+    // 전체 화면 요청
     if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch(() => {
-        // Fullscreen request failed silently
-      });
+      document.documentElement.requestFullscreen().catch(() => {});
     }
 
-    // 포인터 잠금 및 키보드 잠금 (Ctrl+W 방지 등)
+    // 포인터 잠금 및 키보드 잠금
     this.canvas.requestPointerLock();
-
-    // 실험적 기능: 키보드 잠금 (Supported in Chrome/Edge Desktop)
     if ('keyboard' in navigator && 'lock' in (navigator as any).keyboard) {
-      // Ctrl+W, Ctrl+S, Ctrl+D 등을 브라우저가 아닌 게임이 처리하도록 잠금 요청
       (navigator as any).keyboard
         .lock(['ControlLeft', 'ControlRight', 'KeyW', 'KeyS', 'KeyD', 'KeyA', 'Escape'])
-        .catch(() => {
-          // Keyboard lock failed silently
-        });
+        .catch(() => {});
     }
 
-    // 오디오 엔진 언락 (Audio V2 대응)
+    // 오디오 엔진 언락
     const audioEngine = AssetLoader.getInstance().getAudioEngine();
     if (audioEngine) {
       audioEngine.resumeAsync().catch((e) => console.error('Failed to resume AudioEngine:', e));
     }
 
-    // 렌더 루프 시작
-    this.engine.runRenderLoop(() => {
-      if (!this.isPaused) {
-        const deltaTime = this.engine.getDeltaTime() / 1000;
-        this.update(deltaTime);
-        this.scene.render();
-      }
-    });
+    // 렌더 루프 시작 (이미 돌아가고 있을 수 있으므로 확인 필요하지 않음, Engine handles it)
+    // 단, renderFunction 내에서 scene.activeCamera 확인하므로 안전함.
+    // 하지만 만약 기존에 메뉴 렌더링 중이었다면 중복 실행 방지 필요?
+    // Engine.runRenderLoop는 콜백을 추가함. 여러번 호출하면 여러번 실행됨.
+    // 따라서 기존 루프를 멈추고 다시 시작하거나, 하나의 루프에서 상태를 분기해야 함.
+    // 현재 구조: this.renderFunction은 하나임.
+    // 생성자에서 initMenuScene 호출 -> 루프 시작 안 함?
+    // 아, 생성자에는 runRenderLoop 호출이 없음.
+    // 기존 코드: start()에서 runRenderLoop 호출.
+    // 그러면 메뉴 화면은 렌더링 안 되고 있었나? (확인 필요)
+    // 생성자 수정 필요: 메뉴 화면도 렌더링 되어야 함.
+
+    // 일단 start에서는 호출하지 않고, 생성자에서 한 번만 호출하도록 변경하는 것이 좋음.
+    // 하지만 안전하게 가기 위해: 기존 루프 사용.
+    this.engine.stopRenderLoop(this.renderFunction); // 혹시 모를 중복 방지
+    this.engine.runRenderLoop(this.renderFunction);
   }
 
   private update(deltaTime: number): void {
@@ -196,5 +222,52 @@ export class Game {
     } else {
       this.pause();
     }
+  }
+
+  public quitToMenu(): void {
+    this.isPaused = false;
+    this.isRunning = false;
+
+    // UI 정리
+    document.getElementById('pause-overlay')!.style.display = 'none';
+    document.getElementById('hud')!.style.display = 'none';
+    document.getElementById('start-overlay')!.style.display = 'flex';
+
+    // 포인터 잠금 해제
+    document.exitPointerLock();
+
+    // 렌더링 중지 (일시적)
+    this.engine.stopRenderLoop(this.renderFunction);
+
+    // 게임 세션 정리
+    if (this.playerController) {
+      this.playerController.dispose();
+      this.playerController = null;
+    }
+    if (this.playerPawn) {
+      this.playerPawn.dispose();
+      this.playerPawn = null;
+    }
+    if (this.hud) {
+      this.hud.dispose();
+      this.hud = null;
+    }
+    if (this.spawner) {
+      this.spawner.dispose();
+      this.spawner = null;
+    }
+
+    // 싱글톤 상태 초기화
+    TickManager.getInstance().clear();
+    TargetRegistry.getInstance().clear();
+
+    // 씬 폐기 (Bullet holes, decals 등 청소)
+    this.scene.dispose();
+
+    // 메뉴 씬 재초기화 (배경 복구)
+    this.initMenuScene();
+
+    // 렌더 루프 재시작 (메뉴 화면 렌더링)
+    this.engine.runRenderLoop(this.renderFunction);
   }
 }

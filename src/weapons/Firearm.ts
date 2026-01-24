@@ -3,7 +3,7 @@ import { BaseWeapon } from './BaseWeapon.ts';
 import { TargetRegistry } from '../core/systems/TargetRegistry';
 import { GameObservables } from '../core/events/GameObservables.ts';
 import { ammoStore } from '../core/store/GameStore.ts';
-import { IFirearm } from '../types/IWeapon.ts';
+import { MuzzleTransform, IFirearm } from '../types/IWeapon.ts';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
@@ -49,12 +49,12 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
   }
 
   /** 총구 트랜스폼 정보 제공 (IMuzzleProvider 구현) */
-  public getMuzzleTransform(): { position: Vector3; direction: Vector3; transformNode?: any } {
+  public getMuzzleTransform(): MuzzleTransform {
     const forward = this.camera.getForwardRay().direction;
 
     if (this.weaponMesh) {
       this.camera.computeWorldMatrix();
-      this.weaponMesh.computeWorldMatrix();
+      this.weaponMesh.computeWorldMatrix(true);
       const worldPos = Vector3.TransformCoordinates(
         this.muzzleOffset,
         this.weaponMesh.getWorldMatrix()
@@ -64,6 +64,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
         position: worldPos,
         direction: forward,
         transformNode: this.weaponMesh,
+        localMuzzlePosition: this.muzzleOffset.clone(),
       };
     }
 

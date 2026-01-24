@@ -52,4 +52,9 @@ export class TargetRegistry {
   public get count(): number {
     return this.targets.size;
   }
+
+  /** 모든 타겟 등록 해제 (게임 리셋용) */
+  public clear(): void {
+    this.targets.clear();
+  }
 }
