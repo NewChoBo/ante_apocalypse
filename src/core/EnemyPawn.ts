@@ -4,7 +4,7 @@ import { BasePawn } from './BasePawn';
 export class EnemyPawn extends BasePawn {
   public mesh: Mesh;
   private health = 100;
-  private isDead = false;
+  public isDead = false;
 
   constructor(scene: Scene, position: Vector3) {
     super(scene);
@@ -55,6 +55,7 @@ export class EnemyPawn extends BasePawn {
     console.log('Enemy Died');
     // 사망 애니메이션 또는 제거
     this.mesh.dispose();
+    this.dispose();
   }
 
   public get position(): Vector3 {

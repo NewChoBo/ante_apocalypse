@@ -33,7 +33,12 @@ export class AIController extends BaseController {
   }
 
   public tick(deltaTime: number): void {
-    if (!this.enemyPawn || !this.targetPlayer) return;
+    if (!this.enemyPawn || !this.targetPlayer || this.enemyPawn.isDead) {
+      if (this.enemyPawn?.isDead) {
+        this.dispose();
+      }
+      return;
+    }
 
     this.timeSinceLastUpdate += deltaTime;
 
