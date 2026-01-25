@@ -41,4 +41,7 @@ export const GameObservables = {
     itemId: string;
     position: Vector3;
   }>(),
+
+  /** 플레이어 사망 */
+  playerDied: new Observable<null>(),
 };

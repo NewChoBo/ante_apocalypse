@@ -10,6 +10,9 @@ import { TickManager } from './TickManager';
 export abstract class BasePawn implements IPawn, ITickable {
   public abstract mesh: Mesh;
   public controllerId: string | null = null;
+  public id?: string;
+  public health: number = 100;
+  public isDead: boolean = false;
   public readonly priority = 20;
 
   protected scene: Scene;
@@ -23,6 +26,9 @@ export abstract class BasePawn implements IPawn, ITickable {
 
   /** ITickable 인터페이스 구현 (하위 클래스에서 상속받아 구현) */
   public abstract tick(deltaTime: number): void;
+
+  /** 데미지 처리 */
+  public abstract takeDamage(amount: number): void;
 
   /** 컴포넌트 추가 */
   public addComponent(component: BaseComponent): void {

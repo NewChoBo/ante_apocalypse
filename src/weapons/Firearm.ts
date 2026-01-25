@@ -12,6 +12,7 @@ import { BaseWeapon } from './BaseWeapon';
 import { GameObservables } from '../core/events/GameObservables';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon';
+import { NetworkManager } from '../core/systems/NetworkManager';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
@@ -102,6 +103,16 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
       ammoRemaining: this.currentAmmo,
       fireType: 'firearm',
       muzzleTransform: this.getMuzzleTransform(),
+    });
+
+    // 네트워크 발사 이벤트 전송
+    const muzzle = this.getMuzzleTransform();
+    NetworkManager.getInstance().fire({
+      weaponId: this.name,
+      muzzleTransform: {
+        position: { x: muzzle.position.x, y: muzzle.position.y, z: muzzle.position.z },
+        direction: { x: muzzle.direction.x, y: muzzle.direction.y, z: muzzle.direction.z },
+      },
     });
 
     // 자체 반동 처리

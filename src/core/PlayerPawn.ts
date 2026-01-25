@@ -29,13 +29,12 @@ export class PlayerPawn extends BasePawn {
   public mesh: Mesh;
   private movementComponent: CharacterMovementComponent;
   private cameraComponent: CameraComponent;
-  private _health = 100;
 
   constructor(scene: Scene) {
     super(scene);
 
     // 초기 체력 동기화
-    playerHealthStore.set(this._health);
+    playerHealthStore.set(this.health);
 
     // 단순한 히트박스 또는 투명 메쉬 (Pawn의 실체)
     this.mesh = Mesh.CreateBox('playerPawn', 0.5, scene);
@@ -44,8 +43,8 @@ export class PlayerPawn extends BasePawn {
 
     // 물리 충돌 설정
     this.mesh.checkCollisions = true;
-    this.mesh.ellipsoid = new Vector3(0.4, 0.875, 0.4); // 캐릭터의 충돌 볼륨 (너비, 높이의 절반, 깊이)
-    this.mesh.ellipsoidOffset = new Vector3(0, 0, 0);
+    this.mesh.ellipsoid = new Vector3(0.4, 0.875, 0.4); // 캐릭터의 충돌 볼륨 (높이 1.75m)
+    this.mesh.ellipsoidOffset = new Vector3(0, -0.875, 0); // 메쉬(눈높이)가 상단에 위치하도록 오프셋 설정
 
     // 카메라 컴포넌트 추가 (오프셋 0: 메쉬 위치가 눈 높이임)
     this.cameraComponent = new CameraComponent(this, scene, 0);
@@ -85,23 +84,23 @@ export class PlayerPawn extends BasePawn {
   }
 
   public takeDamage(amount: number): void {
-    if (this._health <= 0) return;
+    if (this.isDead || this.health <= 0) return;
 
-    this._health = Math.max(0, this._health - amount);
-    playerHealthStore.set(this._health);
+    this.health = Math.max(0, this.health - amount);
+    playerHealthStore.set(this.health);
 
-    console.log(`Player took ${amount} damage. Health: ${this._health}`);
+    console.log(`Player took ${amount} damage. Health: ${this.health}`);
 
-    if (this._health <= 0) {
+    if (this.health <= 0) {
       this.die();
     }
   }
 
   public addHealth(amount: number): void {
-    if (this._health <= 0) return;
-    this._health = Math.min(100, this._health + amount);
-    playerHealthStore.set(this._health);
-    console.log(`Player healed ${amount}. Health: ${this._health}`);
+    if (this.health <= 0) return;
+    this.health = Math.min(100, this.health + amount);
+    playerHealthStore.set(this.health);
+    console.log(`Player healed ${amount}. Health: ${this.health}`);
   }
 
   public addAmmo(amount: number): void {
@@ -112,6 +111,7 @@ export class PlayerPawn extends BasePawn {
   }
 
   private die(): void {
+    this.isDead = true;
     console.log('Player Died');
     // 게임 오버 처리는 나중에 Game 클래스나 전역 상태 관리에서 수행할 수도 있음
     // 일단 로그만 출력

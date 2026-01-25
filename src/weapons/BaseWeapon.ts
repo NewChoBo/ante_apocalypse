@@ -2,6 +2,9 @@ import { Scene, AbstractMesh, UniversalCamera, Vector3, Mesh } from '@babylonjs/
 import { IWeapon } from '../types/IWeapon.ts';
 import { TargetRegistry } from '../core/systems/TargetRegistry';
 import { GameObservables } from '../core/events/GameObservables';
+import { NetworkManager } from '../core/systems/NetworkManager';
+import { RemotePlayerPawn } from '../core/RemotePlayerPawn';
+import { EventCode } from '../core/network/NetworkProtocol';
 
 /**
  * 모든 무기의 최상위 추상 클래스.
@@ -140,36 +143,50 @@ export abstract class BaseWeapon implements IWeapon {
 
   /** 공통 히트 처리 로직 (적, 타겟 모두 포함) */
   protected processHit(pickedMesh: Mesh, pickedPoint: Vector3, damageAmount: number): boolean {
-    // 1. 적(Enemy) 피격 처리
+    // 1. Pawn (Enemy or Remote Player) 피격 처리
     const metadata = pickedMesh.metadata;
-    if (metadata && metadata.type === 'enemy' && metadata.pawn) {
-      const enemy = metadata.pawn;
+    if (metadata && metadata.pawn) {
+      const pawn = metadata.pawn;
       let finalDamage = damageAmount;
       let part = 'body';
 
       if (metadata.bodyPart === 'head') {
         finalDamage *= 2; // Headshot Multiplier
         part = 'head';
-        console.log('HEADSHOT! Damage:', finalDamage); // eslint-disable-line no-console
-      } else {
-        console.log('Body Hit. Damage:', finalDamage); // eslint-disable-line no-console
       }
 
-      if (typeof enemy.takeDamage === 'function') {
-        enemy.takeDamage(finalDamage);
+      if (typeof pawn.takeDamage === 'function') {
+        pawn.takeDamage(finalDamage);
       }
 
       GameObservables.targetHit.notifyObservers({
-        targetId: 'enemy',
+        targetId: pawn.id || 'unknown',
         part: part,
         damage: finalDamage,
         position: pickedPoint,
       });
 
-      // 적 처치는 별도 점수 처리 로직이 필요할 수 있음 (일단 기본 점수 부여 가능)
+      // 점수 처리
       if (this.onScoreCallback) {
         this.onScoreCallback(part === 'head' ? 100 : 50);
       }
+
+      // 네트워크 동기화
+      const type = metadata.type;
+      if (type === 'remote_player' || pawn instanceof RemotePlayerPawn) {
+        NetworkManager.getInstance().hit({
+          targetId: pawn.id,
+          damage: finalDamage,
+        });
+      } else if (type === 'enemy') {
+        const enemyId = Array.from(pickedMesh.name.matchAll(/enemy_(\d+)/g))[0]?.[0] || pawn.id;
+        NetworkManager.getInstance().sendEvent(
+          EventCode.ENEMY_HIT,
+          { id: enemyId || pawn.id, damage: finalDamage },
+          true
+        );
+      }
+
       return true;
     }
 
