@@ -27,6 +27,7 @@ import { LevelLoader, LevelData } from './systems/LevelLoader';
 import { EnemyManager } from './systems/EnemyManager';
 
 import { CustomLoadingScreen } from '../ui/CustomLoadingScreen';
+import { UIManager } from '../ui/UIManager';
 
 import trainingGroundData from '../assets/levels/training_ground.json';
 import combatZoneData from '../assets/levels/combat_zone.json';
@@ -145,6 +146,7 @@ export class Game {
     this.playerController.possess(this.playerPawn);
 
     // HUD 초기화
+    UIManager.initialize(this.scene);
     this.hud = new HUD();
 
     // 적 스폰 시스템 (TargetSpawner는 사격장용, EnemyManager는Combat용)
@@ -331,7 +333,6 @@ export class Game {
 
     // 오버레이 숨기기
     document.getElementById('start-overlay')!.style.display = 'none';
-    document.getElementById('hud')!.style.display = 'block';
 
     // 전체 화면 요청
     if (document.documentElement.requestFullscreen) {
@@ -411,7 +412,9 @@ export class Game {
           const isOpen = this.inventoryUI.toggle();
           this.playerController.setInputBlocked(isOpen);
 
-          if (!isOpen && !this.isPaused) {
+          if (isOpen) {
+            document.exitPointerLock();
+          } else if (!this.isPaused) {
             this.canvas.requestPointerLock();
           }
         }
@@ -489,7 +492,6 @@ export class Game {
 
     // UI 정리
     document.getElementById('pause-overlay')!.style.display = 'none';
-    document.getElementById('hud')!.style.display = 'none';
     document.getElementById('start-overlay')!.style.display = 'flex';
 
     // 포인터 잠금 해제

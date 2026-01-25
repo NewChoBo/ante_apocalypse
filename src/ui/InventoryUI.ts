@@ -1,6 +1,17 @@
-import { inventoryStore, BagItem } from '../core/store/GameStore';
+import { inventoryStore } from '../core/store/GameStore';
 import { getItemMetadata } from '../core/items/ItemDatabase';
-import { InventoryManager } from '../core/inventory/InventoryManager';
+import {
+  AdvancedDynamicTexture,
+  Rectangle,
+  Grid,
+  TextBlock,
+  Image,
+  Control,
+  Button,
+  StackPanel,
+} from '@babylonjs/gui';
+import { Observer } from '@babylonjs/core';
+import { UIManager } from './UIManager';
 
 export interface InventoryCallbacks {
   onEquipWeapon: (slot: number, weaponId: string | null) => void;
@@ -9,111 +20,170 @@ export interface InventoryCallbacks {
 }
 
 export class InventoryUI {
-  private container: HTMLElement;
-  private equipmentSlots: HTMLElement;
-  private bagGrid: HTMLElement;
-  private tooltip: HTMLElement;
-  private contextMenu: HTMLElement;
+  private ui: AdvancedDynamicTexture;
+  private container: Rectangle;
+  private equipmentGrid!: Grid;
+  private bagGrid!: Grid;
+  private tooltip!: Rectangle;
+  private tooltipText!: TextBlock;
 
   private isOpen = false;
   private callbacks: InventoryCallbacks;
   private selectedSlotIndex = 0;
 
-  // DnD state
-  private dragSource: { type: 'slot' | 'bag'; index: number; itemId: string | null } | null = null;
+  private unsub: (() => void) | null = null;
+  private pointerObserver: Observer<any> | null = null;
 
   constructor(callbacks: InventoryCallbacks) {
     this.callbacks = callbacks;
-    this.container = this.createUI();
-    this.equipmentSlots = this.container.querySelector('.equipment-slots')!;
-    this.bagGrid = this.container.querySelector('.bag-grid')!;
-    this.tooltip = this.createTooltip();
-    this.contextMenu = this.createContextMenu();
+    this.ui = UIManager.getInstance().getTexture();
 
-    document.body.appendChild(this.container);
-    document.body.appendChild(this.tooltip);
-    document.body.appendChild(this.contextMenu);
-
-    // Global listeners
-    document.addEventListener('mousemove', (e) => this.handleGlobalMouseMove(e));
-    document.addEventListener('click', () => this.hideContextMenu());
+    // Create UI Structure
+    this.container = this.createInventoryWindow();
+    this.createTooltip();
 
     // Subscribe to store changes
-    inventoryStore.subscribe(() => {
+    this.unsub = inventoryStore.subscribe(() => {
       if (this.isOpen) this.render();
     });
+
+    // Tooltip tracking
+    this.pointerObserver =
+      this.ui.getScene()?.onPointerObservable.add((pointerInfo) => {
+        if (this.tooltip.isVisible) {
+          const evt = pointerInfo.event as PointerEvent;
+          this.tooltip.left = evt.clientX + 15 + 'px';
+          this.tooltip.top = evt.clientY + 15 + 'px';
+        }
+      }) || null;
   }
 
-  private createTooltip(): HTMLElement {
-    const el = document.createElement('div');
-    el.id = 'inventory-tooltip';
-    el.style.position = 'fixed';
-    el.style.display = 'none';
-    el.style.zIndex = '2000';
-    return el;
-  }
+  private createInventoryWindow(): Rectangle {
+    // 1. Full Screen Overlay (Background)
+    const overlay = new Rectangle('inventoryOverlay');
+    overlay.width = 1;
+    overlay.height = 1;
+    overlay.background = 'rgba(0, 0, 0, 0.7)';
+    overlay.thickness = 0;
+    overlay.isVisible = false;
+    this.ui.addControl(overlay);
 
-  private createContextMenu(): HTMLElement {
-    const el = document.createElement('div');
-    el.id = 'inventory-context-menu';
-    el.style.position = 'fixed';
-    el.style.display = 'none';
-    el.style.zIndex = '2100';
-    return el;
-  }
+    // 2. Main Window
+    const window = new Rectangle('inventoryWindow');
+    window.width = '800px';
+    window.height = '600px';
+    window.background = '#222222';
+    window.color = 'white'; // Border
+    window.thickness = 2;
+    window.cornerRadius = 5;
+    overlay.addControl(window);
 
-  private handleGlobalMouseMove(e: MouseEvent): void {
-    if (!this.isOpen) return;
-    this.tooltip.style.left = `${e.clientX + 15}px`;
-    this.tooltip.style.top = `${e.clientY + 15}px`;
-  }
+    // 3. Header
+    const header = new StackPanel('header');
+    header.height = '60px';
+    header.isVertical = false;
+    header.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    header.top = '10px';
+    window.addControl(header);
 
-  private createUI(): HTMLElement {
-    const overlay = document.createElement('div');
-    overlay.id = 'inventory-overlay';
-    overlay.style.display = 'none';
+    const title = new TextBlock('title', 'SYSTEM INVENTORY V.2');
+    title.color = 'white';
+    title.fontSize = 28;
+    title.width = '500px';
+    header.addControl(title);
 
-    overlay.innerHTML = `
-      <div class="inventory-window">
-        <div class="inventory-header">
-          <h2>SYSTEM INVENTORY V.2</h2>
-          <div class="close-hint">PRESS [TAB] TO CLOSE</div>
-        </div>
-        <div class="inventory-panels">
-          <div class="equipment-side">
-            <div class="section-title">QUICK SLOTS (1-4)</div>
-            <div class="equipment-slots">
-                <!-- Weapon slots will be rendered here -->
-            </div>
-          </div>
-          <div class="bag-side">
-            <div class="section-title">MODULAR STORAGE</div>
-            <div class="bag-grid">
-                <!-- Bag items will be rendered here -->
-            </div>
-          </div>
-        </div>
-        <div class="inventory-footer">
-          <div class="usage-hint">
-            [L-Click] Equip | [R-Click] Menu | [Drag] Manage Gear
-          </div>
-        </div>
-      </div>
-    `;
+    const closeHint = new TextBlock('closeHint', 'PRESS [TAB] TO CLOSE');
+    closeHint.color = '#aaaaaa';
+    closeHint.fontSize = 14;
+    closeHint.width = '300px';
+    header.addControl(closeHint);
+
+    // 4. Main Content Grid (Left: Equipment, Right: Bag)
+    const contentGrid = new Grid('contentGrid');
+    contentGrid.height = '500px';
+    contentGrid.width = '760px';
+    contentGrid.top = '20px';
+    contentGrid.addColumnDefinition(0.3); // Equipment (30%)
+    contentGrid.addColumnDefinition(0.7); // Bag (70%)
+    window.addControl(contentGrid);
+
+    // --- Left Side: Equipment ---
+    const equipPanel = new StackPanel('equipPanel');
+    equipPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    contentGrid.addControl(equipPanel, 0, 0);
+
+    const equipLabel = new TextBlock('equipLabel', 'QUICK SLOTS (1-4)');
+    equipLabel.color = '#888888';
+    equipLabel.fontSize = 16;
+    equipLabel.height = '30px';
+    equipPanel.addControl(equipLabel);
+
+    // Equipment Slots Grid (4 rows)
+    this.equipmentGrid = new Grid('equipmentGrid');
+    this.equipmentGrid.width = '100%';
+    this.equipmentGrid.height = '400px';
+    this.equipmentGrid.addRowDefinition(0.25);
+    this.equipmentGrid.addRowDefinition(0.25);
+    this.equipmentGrid.addRowDefinition(0.25);
+    this.equipmentGrid.addRowDefinition(0.25);
+    equipPanel.addControl(this.equipmentGrid);
+
+    // --- Right Side: Bag ---
+    const bagPanel = new StackPanel('bagPanel');
+    bagPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    contentGrid.addControl(bagPanel, 0, 1);
+
+    const bagLabel = new TextBlock('bagLabel', 'MODULAR STORAGE');
+    bagLabel.color = '#888888';
+    bagLabel.fontSize = 16;
+    bagLabel.height = '30px';
+    bagPanel.addControl(bagLabel);
+
+    // Bag Grid (e.g. 4 columns x N rows)
+    this.bagGrid = new Grid('bagGrid');
+    this.bagGrid.width = '100%';
+    this.bagGrid.height = '450px';
+
+    // Initial definitions (Fixed 4x5 for ~20 items)
+    for (let i = 0; i < 4; i++) this.bagGrid.addColumnDefinition(0.25);
+    for (let i = 0; i < 5; i++) this.bagGrid.addRowDefinition(0.2);
+
+    bagPanel.addControl(this.bagGrid);
 
     return overlay;
   }
 
+  private createTooltip(): void {
+    this.tooltip = new Rectangle('tooltip');
+    this.tooltip.width = '200px';
+    this.tooltip.height = '80px';
+    this.tooltip.background = 'rgba(0,0,0,0.9)';
+    this.tooltip.color = '#aaaaaa';
+    this.tooltip.thickness = 1;
+    this.tooltip.isVisible = false;
+    this.tooltip.isHitTestVisible = false; // Mouse passes through
+    this.tooltip.linkOffsetX = 20;
+    this.tooltip.linkOffsetY = 20;
+    this.ui.addControl(this.tooltip);
+
+    this.tooltipText = new TextBlock('tooltipText');
+    this.tooltipText.color = 'white';
+    this.tooltipText.textWrapping = true;
+    this.tooltipText.paddingTop = '5px';
+    this.tooltipText.paddingBottom = '5px';
+    this.tooltipText.paddingLeft = '5px';
+    this.tooltipText.paddingRight = '5px';
+    this.tooltip.addControl(this.tooltipText);
+  }
+
   public toggle(force?: boolean): boolean {
     this.isOpen = force !== undefined ? force : !this.isOpen;
-    this.container.style.display = this.isOpen ? 'flex' : 'none';
+    this.container.isVisible = this.isOpen;
 
     if (this.isOpen) {
       this.render();
-      document.exitPointerLock();
     } else {
-      this.hideTooltip();
-      this.hideContextMenu();
+      this.tooltip.isVisible = false;
     }
     return this.isOpen;
   }
@@ -121,190 +191,160 @@ export class InventoryUI {
   private render(): void {
     const state = inventoryStore.get();
 
-    // Render Equipment Slots
-    this.equipmentSlots.innerHTML = '';
+    // Clear existing children (Babylon GUI Grid doesn't have clear(), have to dispose children)
+    this.equipmentGrid.children.forEach((c) => c.dispose());
+    // However, if we dispose children, we need to rebuild grid content.
+    // Actually Grid.children returns readonly array.
+    // We can iterate simple loop.
+    while (this.equipmentGrid.children.length > 0) {
+      this.equipmentGrid.children[0].dispose();
+    }
+    while (this.bagGrid.children.length > 0) {
+      this.bagGrid.children[0].dispose();
+    }
+
+    // --- Render Equipment Slots ---
     state.weaponSlots.forEach((weaponId, index) => {
-      const slot = document.createElement('div');
-      slot.className = `weapon-slot ${this.selectedSlotIndex === index ? 'active' : ''}`;
-      if (weaponId) slot.draggable = true;
+      const slotBtn = Button.CreateSimpleButton(`equipSlot_${index}`, '');
+      slotBtn.width = '90%';
+      slotBtn.height = '90%';
+      slotBtn.background = '#333333';
+      slotBtn.color = this.selectedSlotIndex === index ? '#4caf50' : 'white';
+      slotBtn.thickness = this.selectedSlotIndex === index ? 2 : 1;
+
+      // Slot Content Stack
+      const stack = new StackPanel();
+      slotBtn.addControl(stack);
 
       const meta = weaponId ? getItemMetadata(weaponId) : null;
-      const weaponName = meta?.name || 'Empty Slot';
-      const iconHtml = meta
-        ? `<img src="${meta.icon}" alt="${weaponName}" class="item-icon-img">`
-        : '➖';
+      const nameText = new TextBlock('name', meta ? meta.name : 'Empty');
+      nameText.color = 'white';
+      nameText.fontSize = 18;
+      nameText.height = '30px';
+      stack.addControl(nameText);
 
-      slot.innerHTML = `
-            <div class="slot-number">${index + 1}</div>
-            <div class="item-icon">${iconHtml}</div>
-            <div class="item-name">${weaponName}</div>
-        `;
+      // Icon (if available, using simple text or image)
+      if (meta && meta.icon) {
+        const img = new Image('icon', meta.icon);
+        img.width = '40px';
+        img.height = '40px';
+        stack.addControl(img);
+      }
 
-      // Interaction Listeners
-      slot.addEventListener('click', () => {
-        this.selectedSlotIndex = index;
-        if (weaponId) this.callbacks.onEquipWeapon(index, weaponId);
-        this.render();
+      // Interaction
+      slotBtn.onPointerClickObservable.add((info) => {
+        // Left Click: Select / Swap logic
+        if (info.buttonIndex === 0) {
+          this.selectedSlotIndex = index;
+          this.callbacks.onEquipWeapon(index, weaponId);
+          this.render(); // Re-render to update selection style
+        }
+        // Right Click: Unequip
+        else if (info.buttonIndex === 2) {
+          this.callbacks.onEquipWeapon(index, null);
+        }
       });
 
-      slot.addEventListener('mouseenter', () => {
-        if (meta) this.showTooltip(meta);
-      });
-      slot.addEventListener('mouseleave', () => this.hideTooltip());
+      // Tooltip
+      if (meta) {
+        slotBtn.onPointerEnterObservable.add(() => this.showTooltip(meta));
+        slotBtn.onPointerOutObservable.add(() => this.hideTooltip());
+      }
 
-      // DnD Listeners
-      this.setupDnD(slot, 'slot', index, weaponId);
-
-      this.equipmentSlots.appendChild(slot);
+      this.equipmentGrid.addControl(slotBtn, index, 0);
     });
 
-    // Render Bag
-    this.bagGrid.innerHTML = '';
+    // --- Render Bag Slots ---
+    const BAG_COLS = 4;
+    // Assume definitions are set in createInventoryWindow or we just add controls to cells.
+    // Ideally we should manage rows dynamically, but for now we rely on existing definitions or just adding to cells (which works if definitions exist).
+    // If we need to expand rows, we should check rowCount (private) or just add definitions safely?
+    // Let's just assume we have enough rows (e.g. 5) set in createInventoryWindow.
+
     for (let i = 0; i < state.maxBagSlots; i++) {
       const item = state.bagItems[i];
-      const slot = document.createElement('div');
-      slot.className = 'bag-slot';
+      const row = Math.floor(i / BAG_COLS);
+      const col = i % BAG_COLS;
+
+      const slotBtn = Button.CreateSimpleButton(`bagSlot_${i}`, '');
+      slotBtn.width = '95%';
+      slotBtn.height = '95%';
+      slotBtn.background = '#444444';
+      slotBtn.color = 'gray';
+      slotBtn.thickness = 1;
 
       if (item) {
-        slot.draggable = true;
+        slotBtn.background = '#555555';
+        slotBtn.color = 'white';
+
+        // Content
+        const stack = new StackPanel();
+        slotBtn.addControl(stack);
+
         const meta = getItemMetadata(item.id);
-        const isEquipped = state.weaponSlots.includes(item.id);
-
-        if (isEquipped) {
-          slot.classList.add('equipped');
+        if (meta?.icon) {
+          const img = new Image('icon', meta.icon);
+          img.width = '40px';
+          img.height = '40px';
+          stack.addControl(img);
         }
 
-        slot.innerHTML = `
-                <div class="item-icon"><img src="${meta?.icon || '/images/items/generic.png'}" alt="${meta?.name}" class="item-icon-img"></div>
-                <div class="item-count">x${item.count}</div>
-            `;
+        const count = new TextBlock('count', `x${item.count}`);
+        count.color = 'white';
+        count.fontSize = 14;
+        count.height = '20px';
+        stack.addControl(count);
 
-        slot.addEventListener('click', (e) => {
-          e.preventDefault();
+        // Interaction
+        slotBtn.onPointerClickObservable.add(() => {
+          // Consume or Equip
           if (item.type === 'consumable') {
-            InventoryManager.useItem(item.id);
+            this.callbacks.onUseItem(item.id);
+          } else if (item.type === 'weapon') {
+            this.callbacks.onEquipWeapon(this.selectedSlotIndex, item.id); // Equip to currently selected slot
           }
-          // Weapon click equip removed: equipping is now DnD only
         });
 
-        slot.addEventListener('contextmenu', (e) => this.showContextMenu(e, item));
-        slot.addEventListener('mouseenter', () => {
-          if (meta) this.showTooltip(meta);
-        });
-        slot.addEventListener('mouseleave', () => this.hideTooltip());
-
-        this.setupDnD(slot, 'bag', i, item.id);
-      } else {
-        this.setupDnD(slot, 'bag', i, null);
+        if (meta) {
+          slotBtn.onPointerEnterObservable.add(() => this.showTooltip(meta));
+          slotBtn.onPointerOutObservable.add(() => this.hideTooltip());
+        }
       }
 
-      this.bagGrid.appendChild(slot);
+      this.bagGrid.addControl(slotBtn, row, col);
     }
-  }
-
-  private setupDnD(
-    el: HTMLElement,
-    type: 'slot' | 'bag',
-    index: number,
-    itemId: string | null
-  ): void {
-    el.addEventListener('dragstart', (e) => {
-      if (!itemId) {
-        e.preventDefault();
-        return;
-      }
-      this.dragSource = { type, index, itemId };
-      el.style.opacity = '0.5';
-      if (e.dataTransfer) {
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', itemId);
-      }
-    });
-
-    el.addEventListener('dragend', () => {
-      el.style.opacity = '1';
-      this.dragSource = null;
-      const slots = this.container.querySelectorAll('.weapon-slot, .bag-slot');
-      slots.forEach((s) => s.classList.remove('drag-over'));
-    });
-
-    el.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      if (this.dragSource) {
-        el.classList.add('drag-over');
-        if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-      }
-    });
-
-    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
-
-    el.addEventListener('drop', (e) => {
-      e.preventDefault();
-      el.classList.remove('drag-over');
-      if (!this.dragSource) return;
-
-      const source = this.dragSource;
-
-      if (type === 'slot') {
-        // Drop into equipment slot
-        if (source.type === 'bag' || source.type === 'slot') {
-          InventoryManager.equipWeapon(index, source.itemId);
-        }
-      } else if (type === 'bag') {
-        if (source.type === 'slot') {
-          // Drop from slot back to bag -> Unequip
-          InventoryManager.equipWeapon(source.index, null);
-        } else if (source.type === 'bag') {
-          // Swap items in bag
-          InventoryManager.swapBagItems(source.index, index);
-        }
-      }
-    });
   }
 
   private showTooltip(item: { name: string; type: string; description: string }): void {
-    this.tooltip.innerHTML = `
-      <div class="tooltip-name">${item.name}</div>
-      <div class="tooltip-type">${item.type.toUpperCase()}</div>
-      <div class="tooltip-desc">${item.description}</div>
-    `;
-    this.tooltip.style.display = 'block';
+    this.tooltip.isVisible = true;
+    this.tooltipText.text = `${item.name}\n[${item.type.toUpperCase()}]\n${item.description}`;
+    // Position is handled by onPointerObservable in constructor
   }
 
   private hideTooltip(): void {
-    this.tooltip.style.display = 'none';
+    this.tooltip.isVisible = false;
   }
 
-  private showContextMenu(e: MouseEvent, item: BagItem): void {
-    e.preventDefault();
-    this.contextMenu.style.left = `${e.clientX}px`;
-    this.contextMenu.style.top = `${e.clientY}px`;
-    this.contextMenu.style.display = 'block';
-
-    this.contextMenu.innerHTML = '';
-
-    if (item.type === 'consumable') {
-      const useBtn = document.createElement('div');
-      useBtn.className = 'context-menu-item';
-      useBtn.innerHTML = `<span>USE ITEM</span>`;
-      useBtn.onclick = () => {
-        InventoryManager.useItem(item.id);
-        this.hideContextMenu();
-      };
-      this.contextMenu.appendChild(useBtn);
+  public dispose(): void {
+    // Unsubscribe from store
+    // actually class doesn't keep subscription reference.
+    // InventoryUI constructor calls inventoryStore.subscribe(...) but doesn't store unsub.
+    // Store subscribe returns unsubscribe function.
+    // We need to store it.
+    if (this.unsub) {
+      this.unsub();
+      this.unsub = null;
     }
 
-    const dropBtn = document.createElement('div');
-    dropBtn.className = 'context-menu-item';
-    dropBtn.innerHTML = `<span style="color: #ff5252;">DROP ITEM</span>`;
-    dropBtn.onclick = () => {
-      InventoryManager.dropItem(item.id);
-      this.hideContextMenu();
-    };
-    this.contextMenu.appendChild(dropBtn);
-  }
+    // Dispose UI
+    if (this.container) this.container.dispose();
+    if (this.tooltip) this.tooltip.dispose();
 
-  private hideContextMenu(): void {
-    this.contextMenu.style.display = 'none';
+    // Cleaning observable
+    // The pointer observable is added to scene. We need to remove it.
+    if (this.pointerObserver) {
+      this.ui.getScene()?.onPointerObservable.remove(this.pointerObserver);
+      this.pointerObserver = null;
+    }
   }
 }
