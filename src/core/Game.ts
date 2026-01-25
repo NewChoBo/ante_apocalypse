@@ -29,6 +29,7 @@ export class Game {
   private isRunning = false;
   private isPaused = false;
   private currentMode: GameMode = 'single';
+  private playerName: string = 'Anonymous';
   private renderFunction: () => void;
 
   constructor() {
@@ -82,9 +83,19 @@ export class Game {
     // Menu camera doesn't need control anymore if we use Babylon GUI exclusively
     // menuCamera.attachControl(this.canvas, true);
 
-    // Bind UI Actions
+    this.setupUIManagerEvents();
+    this.uiManager.showScreen(UIScreen.LOGIN);
+
+    if (!this.isRunning) {
+      this.engine.runRenderLoop(this.renderFunction);
+    }
+  }
+
+  private setupUIManagerEvents(): void {
+    // Clear old observers if any (UIManager.initialize already disposes old instance)
     this.uiManager.onLogin.add((name) => {
-      console.log(`Player logging in as: ${name}`);
+      this.playerName = name;
+      console.log(`Player logging in as: ${this.playerName}`);
       this.uiManager.showScreen(UIScreen.MAIN_MENU);
     });
 
@@ -93,16 +104,11 @@ export class Game {
     });
 
     this.uiManager.onStartMultiplayer.add(() => {
-      // For now, let's just go to lobby. In the lobby, we'll start actual multiplayer.
       this.uiManager.showScreen(UIScreen.LOBBY);
     });
 
     this.uiManager.onResume.add(() => this.resume());
     this.uiManager.onAbort.add(() => this.quitToMenu());
-
-    this.uiManager.showScreen(UIScreen.LOGIN);
-
-    this.engine.runRenderLoop(this.renderFunction);
   }
 
   public async start(mode: GameMode = 'single'): Promise<void> {
@@ -118,10 +124,7 @@ export class Game {
 
     const { scene, shadowGenerator } = await this.sceneManager.createGameScene();
     this.uiManager = UIManager.initialize(scene);
-
-    // Re-bind pause menu actions for the game scene UI
-    this.uiManager.onResume.add(() => this.resume());
-    this.uiManager.onAbort.add(() => this.quitToMenu());
+    this.setupUIManagerEvents();
 
     const levelLoader = new LevelLoader(scene, shadowGenerator);
     await levelLoader.loadLevelData(levelData);
@@ -133,7 +136,7 @@ export class Game {
     }
 
     this.sessionController = new SessionController(scene, this.canvas, shadowGenerator);
-    await this.sessionController.initialize(levelData, mode);
+    await this.sessionController.initialize(levelData, mode, this.playerName);
 
     // Ensure the player camera is active
     if (this.sessionController.getPlayerCamera()) {

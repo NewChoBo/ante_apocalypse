@@ -35,7 +35,11 @@ export class SessionController {
     this.shadowGenerator = shadowGenerator;
   }
 
-  public async initialize(levelData: LevelData, mode: GameMode = 'single'): Promise<void> {
+  public async initialize(
+    levelData: LevelData,
+    mode: GameMode = 'single',
+    playerName: string = 'Anonymous'
+  ): Promise<void> {
     this.playerPawn = new PlayerPawn(this.scene);
 
     if (levelData.playerSpawn) {
@@ -55,7 +59,7 @@ export class SessionController {
     this.setupInput();
 
     if (mode === 'multi') {
-      this.setupMultiplayer();
+      this.setupMultiplayer(playerName);
     }
   }
 
@@ -144,12 +148,13 @@ export class SessionController {
     );
   }
 
-  private setupMultiplayer(): void {
+  private setupMultiplayer(playerName: string): void {
     NetworkManager.getInstance().connect();
     this.multiplayerSystem = new MultiplayerSystem(
       this.scene,
       this.playerPawn!,
-      this.shadowGenerator
+      this.shadowGenerator,
+      playerName
     );
   }
 

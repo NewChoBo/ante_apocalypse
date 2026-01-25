@@ -87,15 +87,15 @@ export class NetworkManager {
       this.onPlayerLeft.notifyObservers(id);
     });
 
-    this.socket.on('playerFired', (data: any) => {
+    this.socket.on('playerFired', (data: FireEventData) => {
       this.onPlayerFired.notifyObservers(data);
     });
 
-    this.socket.on('playerHit', (data: any) => {
+    this.socket.on('playerHit', (data: HitEventData) => {
       this.onPlayerHit.notifyObservers(data);
     });
 
-    this.socket.on('playerDied', (data: any) => {
+    this.socket.on('playerDied', (data: DeathEventData) => {
       this.onPlayerDied.notifyObservers(data);
     });
   }
@@ -122,7 +122,13 @@ export class NetworkManager {
     });
   }
 
-  public fire(fireData: { weaponId: string; muzzleTransform?: any }): void {
+  public fire(fireData: {
+    weaponId: string;
+    muzzleTransform?: {
+      position: { x: number; y: number; z: number };
+      direction: { x: number; y: number; z: number };
+    };
+  }): void {
     // Sanitize Vector3 if present
     const sanitizedData = {
       weaponId: fireData.weaponId,

@@ -10,6 +10,8 @@ import {
 } from '@babylonjs/gui';
 import { Scene, Observable } from '@babylonjs/core';
 
+type TacticalButton = Button & { _updateStyles?: () => void };
+
 export enum UIScreen {
   LOGIN = 'LOGIN',
   MAIN_MENU = 'MAIN_MENU',
@@ -217,7 +219,7 @@ export class UIManager {
     mapGrid.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     stack.addControl(mapGrid);
 
-    const mapButtons: any[] = [];
+    const mapButtons: TacticalButton[] = [];
 
     const createMapBtn = (id: string, label: string) => {
       const btn = Button.CreateSimpleButton('map-btn-' + id, label);
@@ -239,11 +241,11 @@ export class UIManager {
 
       btn.onPointerUpObservable.add(() => {
         this.selectedMap = id;
-        mapButtons.forEach((b) => b._updateStyles());
+        mapButtons.forEach((b) => b._updateStyles?.());
       });
 
-      (btn as any)._updateStyles = updateStyles;
-      mapButtons.push(btn);
+      (btn as TacticalButton)._updateStyles = updateStyles;
+      mapButtons.push(btn as TacticalButton);
       return btn;
     };
 
@@ -293,7 +295,6 @@ export class UIManager {
     backBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
     backBtn.top = '40px';
     backBtn.left = '-40px';
-    backBtn.color = '#ff4d4d';
     backBtn.color = '#ff4d4d';
     backBtn.onPointerUpObservable.add(() => this.showScreen(UIScreen.MAIN_MENU));
     container.addControl(backBtn);
@@ -432,9 +433,9 @@ export class UIManager {
     if (canvas) {
       // In modern browsers, requestPointerLock returns a promise
       try {
-        const res = canvas.requestPointerLock() as any;
-        if (res && res.catch) {
-          res.catch((e: any) => {
+        const promise = canvas.requestPointerLock() as unknown as Promise<void>;
+        if (promise && promise.catch) {
+          promise.catch((e: Error) => {
             if (e.name !== 'SecurityError') {
               console.warn('PointerLock request failed:', e);
             }

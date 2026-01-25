@@ -13,15 +13,18 @@ export class MultiplayerSystem {
   private lastUpdateTime = 0;
   private updateInterval = 50; // 20Hz update rate
 
-  constructor(scene: Scene, localPlayer: PlayerPawn, shadowGenerator: ShadowGenerator) {
+  constructor(
+    scene: Scene,
+    localPlayer: PlayerPawn,
+    shadowGenerator: ShadowGenerator,
+    playerName: string = 'Anonymous'
+  ) {
     this.scene = scene;
     this.localPlayer = localPlayer;
     this.shadowGenerator = shadowGenerator;
     this.networkManager = NetworkManager.getInstance();
 
     this.setupListeners();
-    const playerNameInput = document.getElementById('player-name-input') as HTMLInputElement;
-    const playerName = playerNameInput?.value || 'Player_' + Math.floor(Math.random() * 1000);
     localStorage.setItem('playerName', playerName);
 
     // Join with initial state
