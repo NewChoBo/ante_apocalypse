@@ -1,9 +1,33 @@
+export enum EventCode {
+  JOIN = 1,
+  LEAVE = 2,
+  MOVE = 3,
+  ANIM_STATE = 4,
+  FIRE = 5,
+  HIT = 6,
+  SYNC_WEAPON = 7,
+  MAP_SYNC = 8,
+  ENEMY_MOVE = 9,
+  TARGET_HIT = 10,
+  TARGET_DESTROY = 11,
+  SPAWN_TARGET = 12,
+  REQ_INITIAL_STATE = 13,
+  INITIAL_STATE = 14,
+}
+
 export interface RoomInfo {
-  name: string;
-  playerCount: number;
+  id: string; // Changed from name to id for consistency
+  name: string; // Added for UI compatibility
   maxPlayers: number;
-  isOpen: boolean;
+  playerCount: number;
   customProperties?: any;
+  isOpen: boolean;
+}
+
+export interface PlayerInfo {
+  userId: string;
+  isMaster: boolean;
+  name?: string; // Added optional name
 }
 
 export enum NetworkState {
@@ -14,26 +38,3 @@ export enum NetworkState {
   InRoom = 'InRoom',
   Error = 'Error',
 }
-
-export const EventCode = {
-  JOIN: 1,
-  LEAVE: 2,
-  MOVE: 10, // Position, Rotation
-  FIRE: 20, // WeaponId, Origin, Direction
-  HIT: 21, // TargetId, Damage
-  SYNC_WEAPON: 30, // WeaponId
-  ENEMY_MOVE: 40, // EnemyId, Position, Rotation
-  ENEMY_HIT: 41, // EnemyId, Damage
-  SPAWN_ENEMY: 42, // Type, Position, ID, etc.
-  DESTROY_ENEMY: 43, // EnemyId
-
-  SPAWN_PICKUP: 50, // Type, Position, ID
-  DESTROY_PICKUP: 51, // PickupId
-
-  TARGET_HIT: 60, // TargetId, Part
-  TARGET_DESTROY: 61, // TargetId
-  SPAWN_TARGET: 62, // Type, Position, ID, IsMoving
-
-  REQ_INITIAL_STATE: 100,
-  INITIAL_STATE: 101, // List of players, List of enemies
-};

@@ -107,16 +107,16 @@ export class NetworkManager {
       this.onRoomListUpdated.notifyObservers(rooms);
     };
 
-    this.provider.onPlayerJoined = (id, name) => {
+    this.provider.onPlayerJoined = (user) => {
       const newState: PlayerState = {
-        id,
-        name,
+        id: user.userId,
+        name: user.name || 'Anonymous',
         position: { x: 0, y: 0, z: 0 },
         rotation: { x: 0, y: 0, z: 0 },
         weaponId: 'Pistol',
         health: 100,
       };
-      this.playerStates.set(id, newState);
+      this.playerStates.set(user.userId, newState);
       this.onPlayerJoined.notifyObservers(newState);
     };
 
@@ -229,7 +229,11 @@ export class NetworkManager {
   }
 
   public async createRoom(name: string, options?: { mapId: string }): Promise<boolean> {
-    return this.provider.createRoom(name, options);
+    return this.provider.createRoom({
+      roomName: name,
+      mapId: options?.mapId || 'training_ground',
+      maxPlayers: 4,
+    });
   }
 
   public async joinRoom(name: string): Promise<boolean> {
@@ -237,7 +241,7 @@ export class NetworkManager {
   }
 
   public leaveRoom(): void {
-    this.provider.leaveRoom();
+    this.provider.disconnect();
   }
 
   public isMasterClient(): boolean {
@@ -269,7 +273,6 @@ export class NetworkManager {
         health: 100,
       };
       this.playerStates.set(myId, myState);
-      // We don't notify onPlayerJoined for self here, as UI handles local join flow
     }
     this.updateState(data);
   }
@@ -316,7 +319,7 @@ export class NetworkManager {
   }
 
   public getSocketId(): string | undefined {
-    return (this.provider as any).client?.myActor()?.actorNr?.toString();
+    return this.provider.getLocalPlayerId() || undefined;
   }
 
   public refreshRoomList(): void {

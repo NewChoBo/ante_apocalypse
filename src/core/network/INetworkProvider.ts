@@ -1,23 +1,25 @@
-import { RoomInfo, NetworkState } from './NetworkProtocol';
+import { NetworkState, RoomInfo, PlayerInfo } from './NetworkProtocol';
 
 export interface INetworkProvider {
   // Methods
   connect(userId: string): Promise<boolean>;
   disconnect(): void;
-  createRoom(name: string, options?: { mapId: string }): Promise<boolean>;
-  joinRoom(name: string): Promise<boolean>;
-  leaveRoom(): void;
-  sendEvent(code: number, data: any, reliable?: boolean): void;
-  getCurrentRoomProperty(key: string): any;
-  /** 방 목록 갱신 요청 (선택적 구현) */
-  refreshRoomList?(): void;
+  createRoom(options: { roomName?: string; mapId: string; maxPlayers: number }): Promise<boolean>;
+  joinRoom(roomId: string): Promise<boolean>;
+  getRoomList(): Promise<RoomInfo[]>;
+  sendEvent(code: number, data: any, reliable: boolean): void;
+  getLocalPlayerId(): string | null;
+
+  // Additional methods used by NetworkManager
   isMasterClient(): boolean;
   getActors(): Map<string, { id: string; name: string }>;
+  getCurrentRoomProperty(key: string): any;
+  refreshRoomList?(): void;
 
-  // Event Listeners (Setters for callbacks)
-  onStateChanged: ((state: NetworkState) => void) | null;
-  onRoomListUpdated: ((rooms: RoomInfo[]) => void) | null;
-  onEvent: ((code: number, data: any, senderId: string) => void) | null;
-  onPlayerJoined: ((id: string, name: string) => void) | null;
-  onPlayerLeft: ((id: string) => void) | null;
+  // Event Handlers (Setters)
+  onStateChanged?: (state: NetworkState) => void;
+  onEvent?: (code: number, data: any, senderId: string) => void;
+  onPlayerJoined?: (user: PlayerInfo) => void;
+  onPlayerLeft?: (userId: string) => void;
+  onRoomListUpdated?: (rooms: RoomInfo[]) => void;
 }

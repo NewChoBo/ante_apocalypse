@@ -1,6 +1,6 @@
 import * as Photon from 'photon-realtime';
 import { INetworkProvider } from '../INetworkProvider';
-import { RoomInfo, NetworkState } from '../NetworkProtocol';
+import { RoomInfo, NetworkState, PlayerInfo } from '../NetworkProtocol';
 
 /**
  * Photon Realtime Cloud를 이용한 네트워크 프로바이더 구현체.
@@ -10,11 +10,11 @@ export class PhotonProvider implements INetworkProvider {
   private appId: string = import.meta.env.VITE_PHOTON_APP_ID || '';
   private appVersion: string = import.meta.env.VITE_PHOTON_APP_VERSION || '1.0';
 
-  public onStateChanged: ((state: NetworkState) => void) | null = null;
-  public onRoomListUpdated: ((rooms: RoomInfo[]) => void) | null = null;
-  public onEvent: ((code: number, data: any, senderId: string) => void) | null = null;
-  public onPlayerJoined: ((id: string, name: string) => void) | null = null;
-  public onPlayerLeft: ((id: string) => void) | null = null;
+  public onStateChanged?: (state: NetworkState) => void;
+  public onRoomListUpdated?: (rooms: RoomInfo[]) => void;
+  public onEvent?: (code: number, data: any, senderId: string) => void;
+  public onPlayerJoined?: (user: PlayerInfo) => void;
+  public onPlayerLeft?: (userId: string) => void;
 
   constructor() {
     // browser 환경에서 require('ws') 에러 방지를 위해 WebSocket 구현체 재설정
@@ -55,6 +55,7 @@ export class PhotonProvider implements INetworkProvider {
 
     this.client.onRoomListUpdate = (rooms: any[]) => {
       const roomInfos: RoomInfo[] = rooms.map((r) => ({
+        id: r.name,
         name: r.name,
         playerCount: r.playerCount,
         maxPlayers: r.maxPlayers,
@@ -73,7 +74,11 @@ export class PhotonProvider implements INetworkProvider {
         `[Photon] Actor Joined: ${actor.actorNr} (${actor.name}) | My ID: ${this.client.myActor().actorNr}`
       );
       if (actor.actorNr !== this.client.myActor().actorNr) {
-        this.onPlayerJoined?.(actor.actorNr.toString(), actor.name || 'Anonymous');
+        this.onPlayerJoined?.({
+          userId: actor.actorNr.toString(),
+          isMaster: actor.actorNr === this.client.myRoom().masterClientId,
+          name: actor.name,
+        });
       }
     };
 
@@ -116,8 +121,7 @@ export class PhotonProvider implements INetworkProvider {
     this.client.setUserId(userId);
     this.client.myActor().setName(userId);
 
-    // NameServer 접속 시도 (이후 자동으로 로비 진입하도록 설정됨)
-    // connectToNameServer 또는 connectToRegionMaster 호출
+    // NameServer 접속 시도
     return this.client.connectToRegionMaster('kr');
   }
 
@@ -125,21 +129,41 @@ export class PhotonProvider implements INetworkProvider {
     this.client.disconnect();
   }
 
-  public async createRoom(name: string, options?: { mapId: string }): Promise<boolean> {
+  public async createRoom(options: {
+    roomName?: string;
+    mapId: string;
+    maxPlayers: number;
+  }): Promise<boolean> {
+    const roomName = options.roomName || `${this.client.myActor().name}'s Room`;
     const roomOptions: any = {
       isVisible: true,
       isOpen: true,
-      maxPlayers: 4,
-      customGameProperties: { mapId: options?.mapId || 'training_ground' },
+      maxPlayers: options.maxPlayers || 4,
+      customGameProperties: { mapId: options.mapId || 'training_ground' },
+      propsListedInLobby: ['mapId'],
     };
-    // 로비에서 보일 속성 설정
-    roomOptions.propsListedInLobby = ['mapId'];
 
-    return this.client.createRoom(name, roomOptions);
+    return this.client.createRoom(roomName, roomOptions);
   }
 
-  public async joinRoom(name: string): Promise<boolean> {
-    return this.client.joinRoom(name);
+  public async joinRoom(roomId: string): Promise<boolean> {
+    return this.client.joinRoom(roomId);
+  }
+
+  public getRoomList(): Promise<RoomInfo[]> {
+    // Photon LoadBalancingClient automatically updates availableRooms
+    // We can return the current scheduled/cached list or wrap a one-time fetch if needed.
+    // However, LoadBalancingClient usually syncs rooms via callbacks.
+    // We will return a resolved promise with the current known list.
+    const rooms = this.client.availableRooms() || [];
+    const roomInfos: RoomInfo[] = rooms.map((r: any) => ({
+      id: r.name, // Use name as ID
+      maxPlayers: r.maxPlayers,
+      playerCount: r.playerCount,
+      customProperties: r.getCustomProperties(),
+      isOpen: r.isOpen,
+    }));
+    return Promise.resolve(roomInfos);
   }
 
   public leaveRoom(): void {
@@ -151,6 +175,10 @@ export class PhotonProvider implements INetworkProvider {
       receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.Others,
       cache: reliable ? 1 : 0,
     });
+  }
+
+  public getLocalPlayerId(): string | null {
+    return this.client.myActor()?.actorNr?.toString() || null;
   }
 
   public getCurrentRoomProperty(key: string): any {
@@ -187,6 +215,7 @@ export class PhotonProvider implements INetworkProvider {
     const rooms = this.client.availableRooms() || [];
     console.log('[Photon] Manual room list refresh:', rooms);
     const roomInfos: RoomInfo[] = rooms.map((r: any) => ({
+      id: r.name,
       name: r.name,
       playerCount: r.playerCount,
       maxPlayers: r.maxPlayers,
