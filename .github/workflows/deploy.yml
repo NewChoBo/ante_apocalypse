@@ -41,6 +41,8 @@ jobs:
         run: npm ci
         
       - name: Build
+        env:
+          VITE_PHOTON_APP_ID: ${{ secrets.VITE_PHOTON_APP_ID }}
         run: npm run build
         
       - name: Setup Pages
