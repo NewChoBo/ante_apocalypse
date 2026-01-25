@@ -1,36 +1,48 @@
-import { atom, map } from 'nanostores';
+import { atom, map, WritableAtom, MapStore } from 'nanostores';
 
-/**
- * 게임의 전역 점수 저장소
- */
-export const scoreStore = atom<number>(0);
-
-/**
- * 게임 상태 저장소 (READY, PLAYING, PAUSED, GAME_OVER)
- */
-export const gameStateStore = atom<'READY' | 'PLAYING' | 'PAUSED' | 'GAME_OVER'>('READY');
-
-/**
- * 현재 선택된 무기의 탄약 정보 저장소
- */
-export interface AmmoState {
-  current: number;
-  reserve: number;
-  weaponName: string;
-  showAmmo: boolean;
+declare global {
+  interface Window {
+    __GAME_STORES__?: {
+      scoreStore: WritableAtom<number>;
+      gameStateStore: WritableAtom<'READY' | 'PLAYING' | 'PAUSED' | 'GAME_OVER'>;
+      ammoStore: MapStore<AmmoState>;
+      playerHealthStore: WritableAtom<number>;
+      inventoryStore: MapStore<InventoryState>;
+    };
+  }
 }
 
-export const ammoStore = map<AmmoState>({
-  current: 0,
-  reserve: 0,
-  weaponName: 'None',
-  showAmmo: true,
-});
+function initStores() {
+  if (window.__GAME_STORES__) {
+    console.log('[GameStore] Reusing existing global stores (Singleton)');
+    return window.__GAME_STORES__;
+  }
 
-/**
- * 플레이어 체력 저장소 (0~100)
- */
-export const playerHealthStore = atom<number>(100);
+  console.log('[GameStore] Initializing new global stores');
+  const stores = {
+    scoreStore: atom<number>(0),
+    gameStateStore: atom<'READY' | 'PLAYING' | 'PAUSED' | 'GAME_OVER'>('READY'),
+    ammoStore: map<AmmoState>({
+      current: 0,
+      reserve: 0,
+      weaponName: 'None',
+      showAmmo: true,
+    }),
+    playerHealthStore: atom<number>(100),
+    inventoryStore: map<InventoryState>({
+      weaponSlots: ['pistol', 'rifle', 'knife', 'bat'],
+      bagItems: [
+        { id: 'health_pack', name: 'First Aid Kit', type: 'consumable', count: 2 },
+        { id: 'ammo_box', name: 'Ammo Crate', type: 'consumable', count: 1 },
+        { id: 'ammo_generic', name: 'Generic Ammo', type: 'consumable', count: 5 },
+      ],
+      maxBagSlots: 24,
+    }),
+  };
+
+  window.__GAME_STORES__ = stores;
+  return stores;
+}
 
 /**
  * 인벤토리 아이템 정보
@@ -47,13 +59,18 @@ export interface BagItem extends InventoryItem {
 }
 
 export interface InventoryState {
-  weaponSlots: (string | null)[]; // 1, 2, 3, 4번 슬롯에 장착된 무기 ID
-  bagItems: BagItem[]; // 소비형 아이템들
+  weaponSlots: (string | null)[];
+  bagItems: BagItem[];
   maxBagSlots: number;
 }
 
-export const inventoryStore = map<InventoryState>({
-  weaponSlots: ['Pistol', 'Rifle', 'Knife', 'Bat'],
-  bagItems: [],
-  maxBagSlots: 24,
-});
+export interface AmmoState {
+  current: number;
+  reserve: number;
+  weaponName: string;
+  showAmmo: boolean;
+}
+
+const { scoreStore, gameStateStore, ammoStore, playerHealthStore, inventoryStore } = initStores();
+
+export { scoreStore, gameStateStore, ammoStore, playerHealthStore, inventoryStore };

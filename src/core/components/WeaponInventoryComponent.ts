@@ -1,4 +1,4 @@
-import { Scene, UniversalCamera } from '@babylonjs/core';
+import { Scene, UniversalCamera, Observable } from '@babylonjs/core';
 import { IWeapon } from '../../types/IWeapon';
 import { inventoryStore } from '../store/GameStore';
 import { Pistol } from '../../weapons/Pistol';
@@ -12,21 +12,16 @@ import { Bat } from '../../weapons/Bat';
 export class WeaponInventoryComponent {
   private weapons: IWeapon[] = [];
   private currentWeaponIndex = 0;
-  private onWeaponChanged?: (weapon: IWeapon) => void;
 
-  public setOnWeaponChanged(callback: (weapon: IWeapon) => void): void {
-    this.onWeaponChanged = callback;
-  }
+  /** 무기가 변경될 때 호출되는 Observable */
+  public onWeaponChanged = new Observable<IWeapon>();
 
   constructor(
     scene: Scene,
     camera: UniversalCamera,
     onScore: (points: number) => void,
-    applyRecoil?: (force: number) => void,
-    onWeaponChanged?: (weapon: IWeapon) => void
+    applyRecoil?: (force: number) => void
   ) {
-    this.onWeaponChanged = onWeaponChanged;
-
     this.weapons = [
       new Pistol(scene, camera, onScore, applyRecoil),
       new Rifle(scene, camera, onScore, applyRecoil),
@@ -60,9 +55,7 @@ export class WeaponInventoryComponent {
     // 3. 새 무기 올리기
     this.currentWeapon.raise();
 
-    if (this.onWeaponChanged) {
-      this.onWeaponChanged(this.currentWeapon);
-    }
+    this.onWeaponChanged.notifyObservers(this.currentWeapon);
 
     this.isSwitching = false;
   }

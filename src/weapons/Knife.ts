@@ -7,9 +7,9 @@ import {
   Color3,
   Mesh,
 } from '@babylonjs/core';
-import { MeleeWeapon } from './MeleeWeapon.ts';
+import { MeleeWeapon } from './MeleeWeapon';
 import { TargetRegistry } from '../core/systems/TargetRegistry';
-import { GameObservables } from '../core/events/GameObservables.ts';
+import { GameObservables } from '../core/events/GameObservables';
 
 /**
  * 근접 공격용 칼(Knife) 클래스.

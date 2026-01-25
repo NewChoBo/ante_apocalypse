@@ -1,7 +1,7 @@
 import { Scene, Vector3, MeshBuilder, StandardMaterial, Color3, PointLight } from '@babylonjs/core';
 import { BaseWeaponEffectComponent } from './BaseWeaponEffectComponent';
 import { AssetLoader } from '../AssetLoader';
-import { GameObservables } from '../events/GameObservables.ts';
+import { GameObservables } from '../events/GameObservables';
 import type { BasePawn } from '../BasePawn';
 
 /**

@@ -1,7 +1,7 @@
 import { Scene, AbstractMesh, UniversalCamera, Vector3, Mesh } from '@babylonjs/core';
 import { IWeapon } from '../types/IWeapon.ts';
 import { TargetRegistry } from '../core/systems/TargetRegistry';
-import { GameObservables } from '../core/events/GameObservables.ts';
+import { GameObservables } from '../core/events/GameObservables';
 
 /**
  * 모든 무기의 최상위 추상 클래스.

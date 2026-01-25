@@ -33,9 +33,11 @@ export class CombatComponent extends BaseComponent {
       scene,
       cameraComp.camera,
       (points) => this.hudSync.updateScore(points),
-      (force) => cameraComp.applyRecoil(force),
-      (newWeapon) => this.hudSync.syncAmmo(newWeapon)
+      (force) => cameraComp.applyRecoil(force)
     );
+
+    // 무기 변경 시 HUD 동기화 리스너 등록
+    this.inventory.onWeaponChanged.add((newWeapon) => this.hudSync.syncAmmo(newWeapon));
 
     // 2. 입력 처리 초기화
     this.input = new WeaponInputComponent(this.inventory);
@@ -79,7 +81,7 @@ export class CombatComponent extends BaseComponent {
   }
 
   public onWeaponChanged(callback: (weapon: IWeapon) => void): void {
-    this.inventory.setOnWeaponChanged(callback);
+    this.inventory.onWeaponChanged.add(callback);
   }
 
   public addAmmoToAll(amount: number): void {

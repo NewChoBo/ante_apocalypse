@@ -8,10 +8,10 @@ import {
   StandardMaterial,
   Color3,
 } from '@babylonjs/core';
-import { BaseWeapon } from './BaseWeapon.ts';
-import { GameObservables } from '../core/events/GameObservables.ts';
-import { ammoStore } from '../core/store/GameStore.ts';
-import { MuzzleTransform, IFirearm } from '../types/IWeapon.ts';
+import { BaseWeapon } from './BaseWeapon';
+import { GameObservables } from '../core/events/GameObservables';
+import { ammoStore } from '../core/store/GameStore';
+import { MuzzleTransform, IFirearm } from '../types/IWeapon';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.

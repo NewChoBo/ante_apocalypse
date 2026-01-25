@@ -8,7 +8,7 @@ import {
   ShadowGenerator,
   Animation,
 } from '@babylonjs/core';
-import { BaseTarget } from './BaseTarget.ts';
+import { BaseTarget } from './BaseTarget';
 
 /**
  * 이동 타겟 구현체.

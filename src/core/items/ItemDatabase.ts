@@ -1,9 +1,12 @@
+import type { PlayerPawn } from '../PlayerPawn';
+
 export interface ItemMetadata {
   id: string;
   name: string;
   type: 'weapon' | 'consumable';
   icon: string;
   description: string;
+  onUse?: (player: PlayerPawn) => void;
 }
 
 import pistolIcon from '../../assets/images/items/pistol.png';
@@ -48,6 +51,7 @@ export const ITEM_DATABASE: Record<string, ItemMetadata> = {
     type: 'consumable',
     icon: healthIcon,
     description: 'Restores 30 HP on use.',
+    onUse: (player: PlayerPawn) => player.addHealth(30),
   },
   ammo_box: {
     id: 'ammo_box',
@@ -55,6 +59,15 @@ export const ITEM_DATABASE: Record<string, ItemMetadata> = {
     type: 'consumable',
     icon: ammoIcon,
     description: 'Restores 50 rounds for all weapons.',
+    onUse: (player: PlayerPawn) => player.addAmmo(50),
+  },
+  ammo_generic: {
+    id: 'ammo_generic',
+    name: 'Generic Ammo',
+    type: 'consumable',
+    icon: ammoIcon, // 임시로 같은 아이콘 사용 (필요 시 교체 가능)
+    description: 'A few extra rounds for your weapons.',
+    onUse: (player: PlayerPawn) => player.addAmmo(20),
   },
 };
 
