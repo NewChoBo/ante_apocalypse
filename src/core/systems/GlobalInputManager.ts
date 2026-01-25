@@ -76,6 +76,7 @@ export class GlobalInputManager {
 
     // 3. 인벤토리 토글 (Tab)
     if (e.code === 'Tab') {
+      if (isPaused) return;
       e.preventDefault();
       const isOpen = this.inventoryUI.toggle();
       this.playerController.setInputBlocked(isOpen);

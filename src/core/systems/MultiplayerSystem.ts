@@ -9,11 +9,11 @@ export class MultiplayerSystem {
   private localPlayer: PlayerPawn;
   private remotePlayers: Map<string, RemotePlayerPawn> = new Map();
   private networkManager: NetworkManager;
-  private shadowGenerator: any; // Type as ShadowGenerator if imported
+  private shadowGenerator: ShadowGenerator;
   private lastUpdateTime = 0;
   private updateInterval = 50; // 20Hz update rate
 
-  constructor(scene: Scene, localPlayer: PlayerPawn, shadowGenerator: any) {
+  constructor(scene: Scene, localPlayer: PlayerPawn, shadowGenerator: ShadowGenerator) {
     this.scene = scene;
     this.localPlayer = localPlayer;
     this.shadowGenerator = shadowGenerator;

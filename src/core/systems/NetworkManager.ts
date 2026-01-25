@@ -10,6 +10,27 @@ export interface PlayerState {
   health: number;
 }
 
+export interface FireEventData {
+  playerId: string;
+  weaponId: string;
+  muzzleTransform?: {
+    position: { x: number; y: number; z: number };
+    direction: { x: number; y: number; z: number };
+  };
+}
+
+export interface HitEventData {
+  playerId: string;
+  damage: number;
+  newHealth: number;
+  attackerId: string;
+}
+
+export interface DeathEventData {
+  playerId: string;
+  attackerId: string;
+}
+
 export class NetworkManager {
   private static instance: NetworkManager;
   private socket: Socket | null = null;
@@ -18,9 +39,9 @@ export class NetworkManager {
   public onPlayerJoined = new Observable<PlayerState>();
   public onPlayerUpdated = new Observable<PlayerState>();
   public onPlayerLeft = new Observable<string>();
-  public onPlayerFired = new Observable<any>();
-  public onPlayerHit = new Observable<any>();
-  public onPlayerDied = new Observable<any>();
+  public onPlayerFired = new Observable<FireEventData>();
+  public onPlayerHit = new Observable<HitEventData>();
+  public onPlayerDied = new Observable<DeathEventData>();
 
   private constructor() {}
 
