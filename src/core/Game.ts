@@ -251,7 +251,11 @@ export class Game {
 
     // 멀티플레이어 초기화
     NetworkManager.getInstance().connect();
-    this.multiplayerSystem = new MultiplayerSystem(this.scene, this.playerPawn);
+    this.multiplayerSystem = new MultiplayerSystem(
+      this.scene,
+      this.playerPawn,
+      this.shadowGenerator
+    );
   }
 
   private gameOver(): void {

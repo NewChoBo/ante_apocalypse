@@ -44,8 +44,8 @@ export class PlayerPawn extends BasePawn {
 
     // 물리 충돌 설정
     this.mesh.checkCollisions = true;
-    this.mesh.ellipsoid = new Vector3(0.4, 0.875, 0.4); // 캐릭터의 충돌 볼륨 (너비, 높이의 절반, 깊이)
-    this.mesh.ellipsoidOffset = new Vector3(0, 0, 0);
+    this.mesh.ellipsoid = new Vector3(0.4, 0.875, 0.4); // 캐릭터의 충돌 볼륨 (높이 1.75m)
+    this.mesh.ellipsoidOffset = new Vector3(0, -0.875, 0); // 메쉬(눈높이)가 상단에 위치하도록 오프셋 설정
 
     // 카메라 컴포넌트 추가 (오프셋 0: 메쉬 위치가 눈 높이임)
     this.cameraComponent = new CameraComponent(this, scene, 0);

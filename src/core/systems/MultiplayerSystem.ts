@@ -1,4 +1,4 @@
-import { Scene, Vector3 } from '@babylonjs/core';
+import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
 import { NetworkManager, PlayerState } from './NetworkManager';
 import { RemotePlayerPawn } from '../RemotePlayerPawn';
 import { PlayerPawn } from '../PlayerPawn';
@@ -9,12 +9,14 @@ export class MultiplayerSystem {
   private localPlayer: PlayerPawn;
   private remotePlayers: Map<string, RemotePlayerPawn> = new Map();
   private networkManager: NetworkManager;
+  private shadowGenerator: any; // Type as ShadowGenerator if imported
   private lastUpdateTime = 0;
   private updateInterval = 50; // 20Hz update rate
 
-  constructor(scene: Scene, localPlayer: PlayerPawn) {
+  constructor(scene: Scene, localPlayer: PlayerPawn, shadowGenerator: any) {
     this.scene = scene;
     this.localPlayer = localPlayer;
+    this.shadowGenerator = shadowGenerator;
     this.networkManager = NetworkManager.getInstance();
 
     this.setupListeners();
@@ -83,7 +85,7 @@ export class MultiplayerSystem {
     const name = player.name || 'Anonymous';
     console.log(`[Multiplayer] Spawning remote player: ${player.id} (${name})`);
 
-    const remote = new RemotePlayerPawn(this.scene, player.id, name);
+    const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, name);
     remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
     this.remotePlayers.set(player.id, remote);
   }
@@ -96,7 +98,11 @@ export class MultiplayerSystem {
 
       this.networkManager.updateState({
         position: this.localPlayer.mesh.position,
-        rotation: this.localPlayer.camera.rotation,
+        rotation: new Vector3(
+          this.localPlayer.camera.rotation.x,
+          this.localPlayer.mesh.rotation.y, // Use mesh yaw for synchronization
+          0
+        ),
         weaponId: weaponId,
       });
       this.lastUpdateTime = now;
