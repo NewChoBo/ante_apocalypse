@@ -56,6 +56,17 @@ export class NetworkManager {
   // New Observables for Lobby/State
   public onRoomListUpdated = new Observable<RoomInfo[]>();
   public onStateChanged = new Observable<NetworkState>();
+  public onEvent = new Observable<{ code: number; data: any; senderId: string }>();
+
+  // Target Observables
+  public onTargetHit = new Observable<{ targetId: string; part: string; damage: number }>();
+  public onTargetDestroy = new Observable<{ targetId: string }>();
+  public onTargetSpawn = new Observable<{
+    type: string;
+    position: Vector3;
+    id: string;
+    isMoving: boolean;
+  }>();
 
   private playerStates: Map<string, PlayerState> = new Map();
   private currentState: NetworkState = NetworkState.Disconnected;
@@ -115,6 +126,8 @@ export class NetworkManager {
     };
 
     this.provider.onEvent = (code, data, senderId) => {
+      this.onEvent.notifyObservers({ code, data, senderId });
+
       switch (code) {
         case EventCode.MOVE:
           if (this.playerStates.has(senderId)) {
@@ -153,10 +166,29 @@ export class NetworkManager {
             rotation: data.rotation,
           });
           break;
-        case EventCode.ENEMY_HIT:
           this.onEnemyHit.notifyObservers({
             id: data.id,
             damage: data.damage,
+          });
+          break;
+        case EventCode.TARGET_HIT:
+          this.onTargetHit.notifyObservers({
+            targetId: data.targetId,
+            part: data.part,
+            damage: data.damage,
+          });
+          break;
+        case EventCode.TARGET_DESTROY:
+          this.onTargetDestroy.notifyObservers({
+            targetId: data.targetId,
+          });
+          break;
+        case EventCode.SPAWN_TARGET:
+          this.onTargetSpawn.notifyObservers({
+            type: data.type,
+            position: new Vector3(data.position.x, data.position.y, data.position.z),
+            id: data.id,
+            isMoving: data.isMoving,
           });
           break;
         case EventCode.REQ_INITIAL_STATE:

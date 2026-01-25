@@ -16,7 +16,6 @@ export class LobbyUI {
   private container: Container;
   private roomListPanel: StackPanel;
   private networkManager: NetworkManager;
-  private currentMapId: string = 'training_ground';
   private uiManager: UIManager;
   private roomNameInput: InputText | null = null;
 

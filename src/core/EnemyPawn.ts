@@ -13,6 +13,7 @@ import {
 import { BasePawn } from './BasePawn';
 import { AssetLoader } from './AssetLoader';
 import { PickupManager } from './systems/PickupManager';
+import { DynamicTexture } from '@babylonjs/core';
 
 export class EnemyPawn extends BasePawn {
   public mesh: Mesh;
@@ -23,6 +24,8 @@ export class EnemyPawn extends BasePawn {
   private placeholderMesh: Mesh | null = null;
   private skeleton: Skeleton | null = null;
   private shadowGenerator: ShadowGenerator;
+  private _healthBar: Mesh | null = null;
+  private _healthBarTexture: DynamicTexture | null = null;
 
   // Animation Ranges
   private idleRange: any;
@@ -45,6 +48,8 @@ export class EnemyPawn extends BasePawn {
 
     // Metadata for Raycast/Tagging
     this.mesh.metadata = { type: 'enemy', pawn: this };
+
+    this.createHealthBar(scene);
 
     // 2. Placeholder (prevent pop-in)
     this.placeholderMesh = MeshBuilder.CreateCylinder(
@@ -199,6 +204,7 @@ export class EnemyPawn extends BasePawn {
     if (this.isDead) return;
 
     this.health -= amount;
+    this.updateHealthBar(this.health);
 
     // Hit React (Flash)
     if (this.visualMesh) {
@@ -230,11 +236,66 @@ export class EnemyPawn extends BasePawn {
     // Play Death? YBot doesn't seem to have Death.
     // Just dispose for now.
     this.mesh.dispose();
+    this.mesh.dispose();
+    if (this._healthBar) this._healthBar.dispose();
+    if (this._healthBarTexture) this._healthBarTexture.dispose();
     this.dispose();
+  }
+
+  private createHealthBar(scene: Scene): void {
+    const plane = MeshBuilder.CreatePlane(
+      'enemyHealthBar_' + Math.random(),
+      { width: 1.0, height: 0.15 },
+      scene
+    );
+    plane.position.y = 2.0; // Above head
+    plane.parent = this.mesh;
+    plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
+
+    const texture = new DynamicTexture(
+      'enemyHealthTex_' + Math.random(),
+      { width: 300, height: 40 },
+      scene,
+      true
+    );
+    texture.hasAlpha = true;
+    this._healthBarTexture = texture;
+    this.updateHealthBar(100);
+
+    const mat = new StandardMaterial('enemyHealthMat', scene);
+    mat.diffuseTexture = texture;
+    mat.emissiveColor = Color3.White();
+    mat.backFaceCulling = false;
+    plane.material = mat;
+    this._healthBar = plane;
+  }
+
+  public updateHealthBar(health: number): void {
+    if (!this._healthBarTexture) return;
+    const ctx = this._healthBarTexture.getContext();
+    const width = 300;
+    const height = 40;
+    const healthPct = Math.max(0, health) / 100;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // Background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(0, 0, width, height);
+
+    // Health
+    ctx.fillStyle = healthPct > 0.5 ? '#ff0000' : '#880000'; // Enemies always red/dark red
+    ctx.fillRect(2, 2, (width - 4) * healthPct, height - 4);
+
+    this._healthBarTexture.update();
   }
 
   public get position(): Vector3 {
     return this.mesh.position;
+  }
+
+  public isDisposed(): boolean {
+    return this.mesh.isDisposed();
   }
 
   public lookAt(targetPoint: Vector3): void {

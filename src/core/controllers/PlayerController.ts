@@ -1,6 +1,6 @@
 import { BaseController } from './BaseController';
 import { IPawn } from '../../types/IPawn';
-import { PlayerPawn, InputState, MouseDelta } from '../PlayerPawn';
+import { PlayerPawn } from '../PlayerPawn';
 
 /**
  * 실제 플레이어의 입력을 처리하는 컨트롤러.
