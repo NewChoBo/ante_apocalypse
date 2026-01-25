@@ -32,6 +32,13 @@ export abstract class BaseTarget implements ITarget, IWorldEntity {
     if (!this.isActive) return;
     this.isActive = false;
     this.isDead = true;
+
+    // 시각적으로 즉시 제거 (슈터 화면에서 안 지워지는 문제 해결)
+    if (this.mesh) {
+      this.mesh.setEnabled(false);
+      this.mesh.isVisible = false;
+    }
+
     this.onDestroy();
   }
 
@@ -46,6 +53,7 @@ export abstract class BaseTarget implements ITarget, IWorldEntity {
     // Note: WorldEntityManager handles part multipliers now.
     // This method just applies the final amount.
     this.health -= amount;
+    console.log(`[BaseTarget] ${this.id} took ${amount} damage. Current health: ${this.health}`);
     this.onHit(amount, hitPoint);
 
     if (this.health <= 0) {

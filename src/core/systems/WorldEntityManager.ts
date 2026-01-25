@@ -62,13 +62,22 @@ export class WorldEntityManager {
   public removeEntity(id: string): void {
     const entity = this.entities.get(id);
     if (entity) {
+      console.log(
+        `[WorldEntityManager] Attempting to remove entity: ${id}, isDead: ${entity.isDead}`
+      );
       if (!entity.isDead) {
         entity.die();
       }
+
+      // 엔티티 타입에 따라 즉시 삭제할지, 연출을 기다릴지 결정할 수 있지만
+      // 안전을 위해 일단 내부 맵에서 제거하고 dispose를 호출합니다.
+      // (타겟 등의 애니메이션이 끊길 수 있으므로 나중에 개선 여지가 있음)
       entity.dispose();
       this.entities.delete(id);
       this.onEntityRemoved.notifyObservers(id);
-      console.log(`[WorldEntityManager] Entity removed: ${id}`);
+      console.log(`[WorldEntityManager] Entity successfully removed: ${id}`);
+    } else {
+      console.warn(`[WorldEntityManager] Tried to remove non-existent entity: ${id}`);
     }
   }
 
@@ -114,8 +123,12 @@ export class WorldEntityManager {
     }
 
     // 사망 시 처리
-    if (entity.isDead && broadcast) {
-      this.broadcastDestroy(entity);
+    if (entity.isDead) {
+      console.log(`[WorldEntityManager] Entity is dead after hit: ${id}, broadcast: ${broadcast}`);
+      if (broadcast || (entity.type === 'enemy' && this.networkManager.isMasterClient())) {
+        this.broadcastDestroy(entity);
+      }
+      this.removeEntity(id);
     }
   }
 
@@ -125,7 +138,7 @@ export class WorldEntityManager {
     } else if (entity.type === 'remote_player') {
       this.networkManager.hit({ targetId: entity.id, damage });
     } else {
-      // General target
+      // General target (StaticTarget, MovingTarget, HumanoidTarget)
       this.networkManager.sendEvent(EventCode.TARGET_HIT, { targetId: entity.id, part, damage });
     }
   }

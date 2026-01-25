@@ -27,6 +27,10 @@ export class TargetSpawnerComponent {
     this.networkManager.onTargetSpawn.add((data) => {
       this.spawnTarget(data.position, data.isMoving, data.id, data.type);
     });
+
+    this.networkManager.onTargetDestroy.add(() => {
+      this.scheduleRespawn();
+    });
   }
 
   /** 초기 타겟 자동 스폰 */
