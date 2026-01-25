@@ -64,13 +64,7 @@ export class EnemyManager {
   }
 
   public spawnEnemies(spawnPoints: number[][], targetPlayer: PlayerPawn): void {
-    // If we are master, we spawn and manage.
-    // If not master, should we spawn?
-    // If we use authoritative spawning, non-master should NOT spawn from level data,
-    // but wait for INITIAL_STATE or SPAWN_ENEMY events.
-    // However, for simplicity in "Level Loading", deterministic spawn is okay IF we sync IDs.
-    // But to fully support "Master Spawn Authority", let's let Master spawn and others wait.
-
+    // Master client handles initial enemy spawning
     if (this.networkManager.isMasterClient() || !this.networkManager.getSocketId()) {
       spawnPoints.forEach((point, index) => {
         const id = `enemy_${index}`;
@@ -82,6 +76,7 @@ export class EnemyManager {
 
   public createEnemy(id: string, position: Vector3, target?: PlayerPawn): EnemyPawn {
     const enemy = new EnemyPawn(this.scene, position, this.shadowGenerator);
+    enemy.id = id;
     this.enemies.set(id, enemy);
 
     // AI Controller only if Master
@@ -92,39 +87,39 @@ export class EnemyManager {
       }
     }
 
-    // Hook into death to broadcast
-    // We need a way to know when it dies.
-    // Polling isDead in update or existing listener?
-    // EnemyPawn doesn't have onDeath observable yet.
-    // Let's rely on update loop checking isDead for now,
-    // as we already do for broadcasting moves.
-
     return enemy;
   }
 
   public update(deltaTime: number): void {
-    // 1. Tick local controllers (only for Master)
+    // 1. Tick local controllers (only for Master/Authority)
     this.controllers.forEach((c) => c.tick(deltaTime));
 
-    // 2. Broadcast positions if Master
+    // 2. Clean up dead entities (All clients should do this to keep Maps in sync)
+    this.enemies.forEach((enemy, id) => {
+      // Check if it's dead or already disposed by other means
+      if (enemy.isDead || enemy.mesh.isDisposed()) {
+        // Broadcasters (Master) send the destroy event to others
+        if (this.networkManager.isMasterClient()) {
+          this.networkManager.sendEvent(EventCode.DESTROY_ENEMY, { id });
+        }
+
+        // Everyone removes from local maps and disposes
+        enemy.dispose();
+        this.enemies.delete(id);
+        this.controllers.get(id)?.dispose();
+        this.controllers.delete(id);
+
+        console.log(`[EnemyManager] Cleaned up enemy: ${id}`);
+      }
+    });
+
+    // 3. Broadcast positions if Master
     if (this.networkManager.isMasterClient()) {
       const now = performance.now();
-
-      // Clean up dead enemies and broadcast destroy
-      this.enemies.forEach((enemy, id) => {
-        if (enemy.isDead && !enemy.isDisposed()) {
-          this.networkManager.sendEvent(EventCode.DESTROY_ENEMY, { id });
-          enemy.dispose();
-          this.enemies.delete(id);
-          this.controllers.get(id)?.dispose();
-          this.controllers.delete(id);
-        }
-      });
-
       if (now - this.lastSyncTime > this.syncInterval) {
         this.enemies.forEach((enemy, id) => {
-          if (!enemy.isDead) {
-            // Only sync alive enemies
+          // Double check alive status
+          if (!enemy.isDead && !enemy.mesh.isDisposed()) {
             this.networkManager.sendEvent(
               EventCode.ENEMY_MOVE,
               {

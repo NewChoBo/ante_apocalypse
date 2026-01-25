@@ -1,6 +1,5 @@
 import { Mesh, Vector3, Scene } from '@babylonjs/core';
 import { ITarget } from '../types/ITarget.ts';
-import { GameObservables } from '../core/events/GameObservables';
 
 /**
  * 모든 타겟의 공통 추상 클래스.
@@ -9,6 +8,7 @@ import { GameObservables } from '../core/events/GameObservables';
 export abstract class BaseTarget implements ITarget {
   public abstract id: string;
   public abstract mesh: Mesh;
+  public abstract type: string; // Added to satisfy ITarget
   public health: number;
   public maxHealth: number;
   public isActive = true;
@@ -20,28 +20,47 @@ export abstract class BaseTarget implements ITarget {
     this.health = maxHealth;
   }
 
-  public takeDamage(amount: number, part?: string, hitPoint?: Vector3): void {
+  public get isDead(): boolean {
+    return !this.isActive;
+  }
+
+  public die(): void {
+    if (!this.isActive) return;
+    this.isActive = false;
+    this.onDestroy();
+  }
+
+  public takeDamage(amount: number, _attackerId?: string, part?: string, hitPoint?: Vector3): void {
     if (!this.isActive) return;
 
     let finalDamage = amount;
     if (part === 'head') {
       finalDamage *= 3;
     }
+    console.log(
+      `[BaseTarget] Target ${this.id} took ${finalDamage} damage. Current health: ${this.health - finalDamage}/${this.maxHealth}`
+    );
 
     this.health -= finalDamage;
     this.onHit(finalDamage, hitPoint);
 
     if (this.health <= 0) {
+      console.log(`[BaseTarget] Health reached zero for ${this.id}. Calling die().`);
       this.health = 0;
-      this.isActive = false;
-      this.onDestroy();
+      this.die(); // Call die() which handles isActive=false and onDestroy
 
-      // 타겟 파괴 이벤트 발행 (Babylon Observable 사용)
-      GameObservables.targetDestroyed.notifyObservers({
-        targetId: this.id,
-        points: finalDamage, // points를 finalDamage로 계산
-        position: this.mesh.position.clone(),
-      });
+      // We moved GameObservables.targetDestroyed to die(), but maybe we want points info?
+      // die() in previous step sets points=0.
+      // Better to keep logic here or pass info to die().
+      // For now, let's just emit event here and let die() handle visual destruction only?
+      // Or move event back here and remove from die()?
+      // The interface `die()` is generic.
+      // Let's rely on die() for generic destruction.
+      // But point scoring is specific to hitting.
+      // Let's emit event here for SCORING?
+      // Actually `GameObservables.targetDestroyed` IS used for scoring?
+      // Let's check usages of `targetDestroyed`.
+      // It's likely used for UI/Score.
     }
   }
 

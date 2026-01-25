@@ -110,10 +110,9 @@ export class PlayerPawn extends BasePawn {
     }
   }
 
-  private die(): void {
+  public die(): void {
     this.isDead = true;
     console.log('Player Died');
-    // 게임 오버 처리는 나중에 Game 클래스나 전역 상태 관리에서 수행할 수도 있음
-    // 일단 로그만 출력
+    // TODO: Handle Game Over logic (UI, Respawn, etc.)
   }
 }

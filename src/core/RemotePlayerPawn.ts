@@ -10,6 +10,7 @@ import {
   Skeleton,
   AnimationPropertiesOverride,
   ShadowGenerator,
+  Animation,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { AssetLoader } from './AssetLoader';
@@ -336,6 +337,43 @@ export class RemotePlayerPawn extends BasePawn {
   public updateHealth(health: number): void {
     this.health = health;
     this.updateHealthBar(health);
+  }
+
+  public die(): void {
+    if (this.isDead) return;
+    this.isDead = true;
+    console.log(`Remote player ${this.id} died.`);
+
+    // Disable collider
+    this.mesh.checkCollisions = false;
+    this.mesh.isPickable = false;
+
+    // Simple visual death: Fall backward
+    // Since mesh is a Box, unauthorized change might be weird if physics enabled?
+    // We just animate rotation.
+    // If skeleton exists, we might want to stop standard anims.
+    if (this.skeleton) {
+      this.scene.stopAnimation(this.skeleton);
+    }
+
+    // Rotate root mesh backward
+    // Animation to rotate X -90 deg
+    // Actually mesh.rotation is Euler.
+    const deathAnim = new Animation(
+      'deathAnim',
+      'rotation.x',
+      30,
+      Animation.ANIMATIONTYPE_FLOAT,
+      Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
+    deathAnim.setKeys([
+      { frame: 0, value: this.mesh.rotation.x },
+      { frame: 30, value: this.mesh.rotation.x - Math.PI / 2 },
+    ]);
+    this.mesh.animations.push(deathAnim);
+    this.scene.beginAnimation(this.mesh, 0, 30, false, 1, () => {
+      // Optional: Fade out or leave corpse
+    });
   }
 
   public fire(

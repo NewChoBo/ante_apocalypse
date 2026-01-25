@@ -24,7 +24,7 @@ export class TargetRegistry {
     this.networkManager.onTargetDestroy.add((data) => {
       const target = this.targets.get(data.targetId);
       if (target && target.isActive) {
-        target.takeDamage(10000, 'head'); // Force destroy
+        target.takeDamage(10000, 'network', 'head'); // Force destroy
       }
     });
   }
@@ -66,9 +66,9 @@ export class TargetRegistry {
     const target = this.targets.get(targetId);
     if (!target || !target.isActive) return false;
 
-    target.takeDamage(damage, part);
+    target.takeDamage(damage, 'local', part);
 
-    if (broadcast && (this.networkManager.isMasterClient() || !this.networkManager.getSocketId())) {
+    if (broadcast) {
       // Broadcast Hit (Note: NetworkManager.hit is for PlayerHit, we need custom event)
       this.networkManager.sendEvent(EventCode.TARGET_HIT, {
         targetId,

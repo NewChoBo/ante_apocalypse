@@ -183,6 +183,12 @@ export class NetworkManager {
             damage: data.damage,
           });
           break;
+        case EventCode.PLAYER_DEATH:
+          this.onPlayerDied.notifyObservers({
+            playerId: data.playerId,
+            attackerId: data.attackerId,
+          });
+          break;
         case EventCode.TARGET_DESTROY:
           this.onTargetDestroy.notifyObservers({
             targetId: data.targetId,

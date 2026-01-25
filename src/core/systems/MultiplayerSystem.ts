@@ -37,8 +37,6 @@ export class MultiplayerSystem {
       weaponId: weaponId,
       name: playerName,
     });
-
-    // this.syncExistingPlayers(); // [DEPRECATED] Handled by INITIAL_STATE sync
   }
 
   public applyPlayerStates(states: any[]): void {
@@ -55,22 +53,6 @@ export class MultiplayerSystem {
       }
     });
   }
-
-  // private syncExistingPlayers(): void {
-  //   const actors = this.networkManager.getActors();
-  //   actors.forEach((actor, id) => {
-  //     if (id !== this.networkManager.getSocketId()) {
-  //       this.spawnRemotePlayer({
-  //         id,
-  //         name: actor.name,
-  //         position: { x: 0, y: 0, z: 0 },
-  //         rotation: { x: 0, y: 0, z: 0 },
-  //         weaponId: 'Pistol',
-  //         health: 100,
-  //       });
-  //     }
-  //   });
-  // }
 
   private setupListeners(): void {
     this.networkManager.onPlayersList.add((players) => {
@@ -114,6 +96,15 @@ export class MultiplayerSystem {
         if (remote) {
           remote.takeDamage(data.damage);
         }
+      }
+    });
+
+    this.networkManager.onPlayerDied.add((data) => {
+      // If it's me, localPlayer.die() is already called by SessionController logic (health <= 0)
+      // If it's remote:
+      const remote = this.remotePlayers.get(data.playerId);
+      if (remote) {
+        remote.die();
       }
     });
   }

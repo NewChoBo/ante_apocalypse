@@ -227,19 +227,26 @@ export class EnemyPawn extends BasePawn {
     }
   }
 
-  private die(): void {
+  public die(): void {
+    if (this.isDead) return;
     this.isDead = true;
     console.log('Enemy Died');
+
     // 아이템 드롭
     PickupManager.getInstance().spawnRandomPickup(this.position);
 
-    // Play Death? YBot doesn't seem to have Death.
-    // Just dispose for now.
-    this.mesh.dispose();
-    this.mesh.dispose();
+    // 죽었음을 시각적으로 표시 (일단 비활성화)
+    // 실제로는 사망 애니메이션을 재생하거나 래그돌을 적용할 수 있음
+    this.mesh.setEnabled(false);
+
+    if (this._healthBar) this._healthBar.isVisible = false;
+  }
+
+  public dispose(): void {
+    super.dispose();
+    if (this.mesh && !this.mesh.isDisposed()) this.mesh.dispose();
     if (this._healthBar) this._healthBar.dispose();
     if (this._healthBarTexture) this._healthBarTexture.dispose();
-    this.dispose();
   }
 
   private createHealthBar(scene: Scene): void {

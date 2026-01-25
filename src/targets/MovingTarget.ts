@@ -98,10 +98,16 @@ export class MovingTarget extends BaseTarget {
   }
 
   public onDestroy(): void {
+    console.log(`[MovingTarget] onDestroy called for ${this.id}`);
     this.playDestroyAnimation();
   }
 
   private playDestroyAnimation(): void {
+    if (!this.mesh || this.mesh.isDisposed()) return;
+
+    // 기존 이동 애니메이션 중지 (매우 중요)
+    this.scene.stopAnimation(this.mesh);
+
     const scaleAnim = new Animation(
       'destroyScale',
       'scaling',
@@ -118,6 +124,7 @@ export class MovingTarget extends BaseTarget {
 
     this.mesh.animations = [scaleAnim];
     this.scene.beginAnimation(this.mesh, 0, 20, false, 1, () => {
+      console.log(`[MovingTarget] Animation ended, disposing mesh for ${this.id}`);
       this.mesh.dispose();
     });
   }

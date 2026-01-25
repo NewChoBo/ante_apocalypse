@@ -179,10 +179,10 @@ export abstract class BaseWeapon implements IWeapon {
           damage: finalDamage,
         });
       } else if (type === 'enemy') {
-        const enemyId = Array.from(pickedMesh.name.matchAll(/enemy_(\d+)/g))[0]?.[0] || pawn.id;
+        const enemyId = pawn.id;
         NetworkManager.getInstance().sendEvent(
           EventCode.ENEMY_HIT,
-          { id: enemyId || pawn.id, damage: finalDamage },
+          { id: enemyId, damage: finalDamage },
           true
         );
       }

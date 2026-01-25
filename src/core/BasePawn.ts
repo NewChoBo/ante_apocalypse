@@ -3,11 +3,12 @@ import { IPawn } from '../types/IPawn';
 import { BaseComponent } from './components/BaseComponent';
 import { ITickable } from './interfaces/ITickable';
 import { TickManager } from './TickManager';
+import { IDestructible } from './interfaces/IDestructible';
 
 /**
  * 모든 Pawn의 공통 기능을 담은 추상 클래스.
  */
-export abstract class BasePawn implements IPawn, ITickable {
+export abstract class BasePawn implements IPawn, ITickable, IDestructible {
   public abstract mesh: Mesh;
   public controllerId: string | null = null;
   public id?: string;
@@ -28,7 +29,10 @@ export abstract class BasePawn implements IPawn, ITickable {
   public abstract tick(deltaTime: number): void;
 
   /** 데미지 처리 */
-  public abstract takeDamage(amount: number): void;
+  public abstract takeDamage(amount: number, attackerId?: string): void;
+
+  /** 사망 처리 */
+  public abstract die(): void;
 
   /** 컴포넌트 추가 */
   public addComponent(component: BaseComponent): void {
