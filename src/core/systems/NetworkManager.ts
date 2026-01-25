@@ -163,6 +163,16 @@ export class NetworkManager {
           this.onInitialStateRequested.notifyObservers({ senderId });
           break;
         case EventCode.INITIAL_STATE:
+          // Update internal state with received players
+          if (data.players && Array.isArray(data.players)) {
+            data.players.forEach((p: PlayerState) => {
+              this.playerStates.set(p.id, p);
+            });
+            console.log(
+              `[NetworkManager] Synced ${data.players.length} players from Initial State`
+            );
+          }
+
           this.onInitialStateReceived.notifyObservers({
             players: data.players,
             enemies: data.enemies,

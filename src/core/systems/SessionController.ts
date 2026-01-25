@@ -186,6 +186,11 @@ export class SessionController {
         this.multiplayerSystem.applyPlayerStates(data.players);
       }
     });
+
+    if (!network.isMasterClient()) {
+      console.log('[Session] Requesting initial state from Master Client...');
+      network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
+    }
   }
 
   private syncInventoryStore(): void {

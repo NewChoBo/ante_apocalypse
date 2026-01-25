@@ -69,12 +69,16 @@ export class PhotonProvider implements INetworkProvider {
     };
 
     this.client.onActorJoin = (actor: any) => {
+      console.log(
+        `[Photon] Actor Joined: ${actor.actorNr} (${actor.name}) | My ID: ${this.client.myActor().actorNr}`
+      );
       if (actor.actorNr !== this.client.myActor().actorNr) {
         this.onPlayerJoined?.(actor.actorNr.toString(), actor.name || 'Anonymous');
       }
     };
 
     this.client.onActorLeave = (actor: any) => {
+      console.log(`[Photon] Actor Left: ${actor.actorNr}`);
       this.onPlayerLeft?.(actor.actorNr.toString());
     };
 

@@ -42,6 +42,7 @@ export class MultiplayerSystem {
   }
 
   public applyPlayerStates(states: any[]): void {
+    console.log(`[Multiplayer] Applying ${states.length} player states from sync`);
     states.forEach((p) => {
       if (p.id !== this.networkManager.getSocketId()) {
         const remote = this.remotePlayers.get(p.id);
@@ -121,7 +122,9 @@ export class MultiplayerSystem {
     if (this.remotePlayers.has(player.id)) return;
 
     const name = player.name || 'Anonymous';
-    console.log(`[Multiplayer] Spawning remote player: ${player.id} (${name})`);
+    console.log(
+      `[Multiplayer] Spawning remote player: ${player.id} (${name}) at ${player.position.x}, ${player.position.y}, ${player.position.z}`
+    );
 
     const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, name);
     remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
