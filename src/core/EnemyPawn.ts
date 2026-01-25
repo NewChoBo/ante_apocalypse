@@ -28,9 +28,9 @@ export class EnemyPawn extends BasePawn {
   // Animation Ranges
   private idleRange: any;
   private walkRange: any;
-  private runRange: any;
-  private leftRange: any;
-  private rightRange: any;
+  // private runRange: any;
+  // private leftRange: any;
+  // private rightRange: any;
 
   constructor(scene: Scene, position: Vector3, shadowGenerator: ShadowGenerator) {
     super(scene);
@@ -125,9 +125,9 @@ export class EnemyPawn extends BasePawn {
         }
 
         this.walkRange = this.skeleton.getAnimationRange('YBot_Walk');
-        this.runRange = this.skeleton.getAnimationRange('YBot_Run');
-        this.leftRange = this.skeleton.getAnimationRange('YBot_LeftStrafeWalk');
-        this.rightRange = this.skeleton.getAnimationRange('YBot_RightStrafeWalk');
+        // this.runRange = this.skeleton.getAnimationRange('YBot_Run');
+        // this.leftRange = this.skeleton.getAnimationRange('YBot_LeftStrafeWalk');
+        // this.rightRange = this.skeleton.getAnimationRange('YBot_RightStrafeWalk');
 
         if (this.idleRange) {
           this.scene.beginAnimation(this.skeleton, this.idleRange.from, this.idleRange.to, true);
@@ -136,6 +136,37 @@ export class EnemyPawn extends BasePawn {
 
       // Now that animation is started and skeleton is linked, show the mesh
       this.visualMesh.setEnabled(true);
+
+      // Create Head Hitbox
+      if (this.skeleton) {
+        const headBone = this.skeleton.bones.find((b) => b.name.toLowerCase().includes('head'));
+        if (headBone) {
+          const headBox = MeshBuilder.CreateBox('headBox', { size: 0.25 }, this.scene);
+
+          const transformNode = headBone.getTransformNode();
+          if (transformNode) {
+            console.log('[EnemyPawn] Attaching headBox to TransformNode'); // eslint-disable-line no-console
+            headBox.parent = transformNode;
+            headBox.position = Vector3.Zero();
+            headBox.rotation = Vector3.Zero();
+          } else {
+            console.log('[EnemyPawn] Attaching headBox using attachToBone'); // eslint-disable-line no-console
+            try {
+              headBox.attachToBone(headBone, this.visualMesh);
+            } catch (e) {
+              console.error('[EnemyPawn] Failed to attach to bone', e); // eslint-disable-line no-console
+            }
+          }
+
+          headBox.visibility = 0; // Invisible but pickable
+          headBox.isPickable = true;
+          headBox.metadata = { type: 'enemy', pawn: this, bodyPart: 'head' };
+
+          // Removed redundant parenting to visualMesh
+        } else {
+          console.warn('[EnemyPawn] Head bone not found in skeleton');
+        }
+      }
 
       // Dispose Placeholder
       if (this.placeholderMesh) {

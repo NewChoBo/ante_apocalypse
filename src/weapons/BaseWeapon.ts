@@ -144,20 +144,31 @@ export abstract class BaseWeapon implements IWeapon {
     const metadata = pickedMesh.metadata;
     if (metadata && metadata.type === 'enemy' && metadata.pawn) {
       const enemy = metadata.pawn;
+      let finalDamage = damageAmount;
+      let part = 'body';
+
+      if (metadata.bodyPart === 'head') {
+        finalDamage *= 2; // Headshot Multiplier
+        part = 'head';
+        console.log('HEADSHOT! Damage:', finalDamage); // eslint-disable-line no-console
+      } else {
+        console.log('Body Hit. Damage:', finalDamage); // eslint-disable-line no-console
+      }
+
       if (typeof enemy.takeDamage === 'function') {
-        enemy.takeDamage(damageAmount);
+        enemy.takeDamage(finalDamage);
       }
 
       GameObservables.targetHit.notifyObservers({
         targetId: 'enemy',
-        part: 'body',
-        damage: damageAmount,
+        part: part,
+        damage: finalDamage,
         position: pickedPoint,
       });
 
       // 적 처치는 별도 점수 처리 로직이 필요할 수 있음 (일단 기본 점수 부여 가능)
       if (this.onScoreCallback) {
-        this.onScoreCallback(50);
+        this.onScoreCallback(part === 'head' ? 100 : 50);
       }
       return true;
     }
