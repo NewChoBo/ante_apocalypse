@@ -203,9 +203,9 @@ export class Game {
 
         if (itemIndex !== -1) {
           const item = bag[itemIndex];
-          if (item.id === 'health') {
+          if (item.id === 'health_pack') {
             this.playerPawn.addHealth(30);
-          } else if (item.id === 'ammo') {
+          } else if (item.id === 'ammo_box') {
             this.playerPawn.addAmmo(50);
           }
 
@@ -384,11 +384,11 @@ export class Game {
       // 1. 디버그용 아이템 스폰 (H: Health, J: Ammo)
       if (!this.isPaused) {
         if (e.code === 'KeyH') {
-          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'health');
+          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'health_pack');
           console.log('[DEBUG] Spawned Health Pickup');
         }
         if (e.code === 'KeyJ') {
-          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'ammo');
+          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'ammo_box');
           console.log('[DEBUG] Spawned Ammo Pickup');
         }
       }
