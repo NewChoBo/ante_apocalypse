@@ -24,6 +24,16 @@ export const EventCode = {
   SYNC_WEAPON: 30, // WeaponId
   ENEMY_MOVE: 40, // EnemyId, Position, Rotation
   ENEMY_HIT: 41, // EnemyId, Damage
+  SPAWN_ENEMY: 42, // Type, Position, ID, etc.
+  DESTROY_ENEMY: 43, // EnemyId
+
+  SPAWN_PICKUP: 50, // Type, Position, ID
+  DESTROY_PICKUP: 51, // PickupId
+
+  TARGET_HIT: 60, // TargetId, Part
+  TARGET_DESTROY: 61, // TargetId
+  SPAWN_TARGET: 62, // Type, Position, ID, IsMoving
+
   REQ_INITIAL_STATE: 100,
   INITIAL_STATE: 101, // List of players, List of enemies
 };

@@ -1,5 +1,4 @@
 import { Scene, Vector3, ParticleSystem, Texture, Color4 } from '@babylonjs/core';
-import { BaseWeaponEffectComponent } from './BaseWeaponEffectComponent';
 import { BaseComponent } from './BaseComponent';
 import { GameObservables } from '../events/GameObservables';
 import type { BasePawn } from '../BasePawn';

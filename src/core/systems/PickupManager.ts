@@ -5,16 +5,19 @@ import { ITickable } from '../interfaces/ITickable';
 import { TickManager } from '../TickManager';
 import { inventoryStore, BagItem } from '../store/GameStore';
 import { GameObservables } from '../events/GameObservables';
+import { NetworkManager } from './NetworkManager';
+import { EventCode } from '../network/NetworkProtocol';
 
 export class PickupManager implements ITickable {
   private static instance: PickupManager;
   private scene: Scene | null = null;
   private player: PlayerPawn | null = null;
-  private pickups: PickupActor[] = [];
+  private pickups: Map<string, PickupActor> = new Map();
   public readonly priority = 30;
+  private networkManager: NetworkManager;
 
   private constructor() {
-    // Singleton
+    this.networkManager = NetworkManager.getInstance();
   }
 
   public static getInstance(): PickupManager {
@@ -28,17 +31,71 @@ export class PickupManager implements ITickable {
     this.scene = scene;
     this.player = player;
 
+    this.player = player;
+    this.networkManager = NetworkManager.getInstance();
+
+    // Networking
+    this.networkManager.onEvent.add((event) => {
+      if (event.code === EventCode.SPAWN_PICKUP) {
+        this.handleSpawnEvent(event.data);
+      } else if (event.code === EventCode.DESTROY_PICKUP) {
+        this.handleDestroyEvent(event.data);
+      }
+    });
+
     // 게임 재시작 시 TickManager가 초기화되므로 다시 등록해야 함
     TickManager.getInstance().register(this);
   }
 
-  public spawnPickup(position: Vector3, type: PickupType): void {
+  private handleSpawnEvent(data: any): void {
+    if (this.pickups.has(data.id)) return;
+    const pos = new Vector3(data.position.x, data.position.y, data.position.z);
+    this.spawnPickup(pos, data.type, data.id, false); // False = don't broadcast
+  }
+
+  private handleDestroyEvent(data: any): void {
+    const pickup = this.pickups.get(data.id);
+    if (pickup) {
+      pickup.collect();
+      this.pickups.delete(data.id);
+    }
+  }
+
+  public spawnPickup(
+    position: Vector3,
+    type: PickupType,
+    id?: string,
+    broadcast: boolean = true
+  ): void {
     if (!this.scene) return;
+
+    // ID generation if not provided (Master origin)
+    const pickupId = id || `pickup_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
     const pickup = new PickupActor(this.scene, position, type);
-    this.pickups.push(pickup);
+    // Attach ID to pickup for Lookup? Or just use Map.
+    // We need to know ID when collecting.
+    (pickup as any).networkId = pickupId;
+
+    this.pickups.set(pickupId, pickup);
+
+    if (broadcast && (this.networkManager.isMasterClient() || !this.networkManager.getSocketId())) {
+      // Only Master broadcasts spawns ideally, but if we allow local spawn...
+      // Plan: Only Master logic calls this without ID.
+      if (this.networkManager.isMasterClient()) {
+        this.networkManager.sendEvent(EventCode.SPAWN_PICKUP, {
+          id: pickupId,
+          type,
+          position: { x: position.x, y: position.y, z: position.z },
+        });
+      }
+    }
   }
 
   public spawnRandomPickup(position: Vector3): void {
+    // Only Master decides spawning drops
+    if (!this.networkManager.isMasterClient() && this.networkManager.getSocketId()) return;
+
     // 40% chance to spawn an item
     if (Math.random() > 0.4) return;
 
@@ -47,19 +104,19 @@ export class PickupManager implements ITickable {
   }
 
   public tick(deltaTime: number): void {
-    if (!this.player) return;
+    const player = this.player;
+    if (!player) return;
 
-    for (let i = this.pickups.length - 1; i >= 0; i--) {
-      const pickup = this.pickups[i];
+    this.pickups.forEach((pickup, id) => {
       pickup.update(deltaTime);
 
       if (pickup.destroyed) {
-        this.pickups.splice(i, 1);
-        continue;
+        this.pickups.delete(id);
+        return;
       }
 
-      // Collection check (Using 2D distance for more forgiving pickup)
-      const playerPos = this.player.mesh.getAbsolutePosition();
+      // Collection check. Use local player const to satisfy TS.
+      const playerPos = player.mesh.getAbsolutePosition();
       const pickupPos = pickup.mesh.getAbsolutePosition();
       const dx = playerPos.x - pickupPos.x;
       const dz = playerPos.z - pickupPos.z;
@@ -68,16 +125,16 @@ export class PickupManager implements ITickable {
 
       if (distSq < collectionRange * collectionRange) {
         console.log(`[PickupManager] Inside collection range. distSq: ${distSq.toFixed(2)}`);
-        this.handleCollection(pickup);
-        this.pickups.splice(i, 1);
+        this.handleCollection(pickup, id);
       }
-    }
+    }); // End forEach
   }
 
-  private handleCollection(pickup: PickupActor): void {
+  private handleCollection(pickup: PickupActor, id: string): void {
     if (!this.player) return;
 
     try {
+      // Logic for inventory addition...
       const { bagItems } = inventoryStore.get();
       const existingItemIndex = bagItems.findIndex((item) => item.id === pickup.type);
 
@@ -108,12 +165,18 @@ export class PickupManager implements ITickable {
         position: pickup.mesh.getAbsolutePosition(),
       });
 
+      // Notify others
+      this.networkManager.sendEvent(EventCode.DESTROY_PICKUP, { id });
+
       pickup.collect();
+      this.pickups.delete(id);
+
       console.log(`[PickupManager] Stored ${pickup.type} in bag`);
     } catch (e) {
       console.error(`[PickupManager] Error storing ${pickup.type}:`, e);
       // 에러가 나더라도 일단 박스는 제거 (무한 에러 방지)
       pickup.collect();
+      this.pickups.delete(id);
     }
   }
 
@@ -139,6 +202,6 @@ export class PickupManager implements ITickable {
 
   public clear(): void {
     this.pickups.forEach((p) => p.dispose());
-    this.pickups = [];
+    this.pickups.clear();
   }
 }

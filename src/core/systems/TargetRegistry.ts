@@ -1,4 +1,6 @@
 import { ITarget } from '../../types/ITarget';
+import { NetworkManager } from './NetworkManager';
+import { EventCode } from '../network/NetworkProtocol';
 
 /**
  * 활성화된 모든 타겟을 중앙에서 관리하는 시스템.
@@ -7,8 +9,25 @@ import { ITarget } from '../../types/ITarget';
 export class TargetRegistry {
   private static instance: TargetRegistry;
   private targets: Map<string, ITarget> = new Map();
+  private networkManager: NetworkManager;
 
-  private constructor() {}
+  private constructor() {
+    this.networkManager = NetworkManager.getInstance();
+    this.setupNetworkListeners();
+  }
+
+  private setupNetworkListeners(): void {
+    this.networkManager.onTargetHit.add((data) => {
+      this.hitTarget(data.targetId, data.part, data.damage, false); // False = don't broadcast
+    });
+
+    this.networkManager.onTargetDestroy.add((data) => {
+      const target = this.targets.get(data.targetId);
+      if (target && target.isActive) {
+        target.takeDamage(10000, 'head'); // Force destroy
+      }
+    });
+  }
 
   public static getInstance(): TargetRegistry {
     if (!TargetRegistry.instance) {
@@ -38,13 +57,34 @@ export class TargetRegistry {
   }
 
   /** 타겟 피격 처리 */
-  public hitTarget(targetId: string, part: string, damage: number): boolean {
+  public hitTarget(
+    targetId: string,
+    part: string,
+    damage: number,
+    broadcast: boolean = true
+  ): boolean {
     const target = this.targets.get(targetId);
     if (!target || !target.isActive) return false;
 
     target.takeDamage(damage, part);
 
-    // 타겟이 파괴되었는지 여부 반환
+    if (broadcast && (this.networkManager.isMasterClient() || !this.networkManager.getSocketId())) {
+      // Broadcast Hit (Note: NetworkManager.hit is for PlayerHit, we need custom event)
+      this.networkManager.sendEvent(EventCode.TARGET_HIT, {
+        targetId,
+        part,
+        damage,
+      });
+    }
+
+    // Check destruction
+    if (!target.isActive && broadcast) {
+      // If it died from this hit, and we are authority (or allowed to claim kill), broadcast destroy
+      // Actually typically Master tracks health. But for targets, maybe simplistic:
+      // If damage kills it locally, tell everyone.
+      this.networkManager.sendEvent(EventCode.TARGET_DESTROY, { targetId });
+    }
+
     return !target.isActive;
   }
 
