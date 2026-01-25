@@ -1,4 +1,4 @@
-import { scoreStore, ammoStore, playerHealthStore } from '../core/store/GameStore';
+import { scoreStore, ammoStore, playerHealthStore, AmmoState } from '../core/store/GameStore';
 import { GameObservables } from '../core/events/GameObservables';
 import { Observer } from '@babylonjs/core';
 import { AdvancedDynamicTexture, TextBlock, Rectangle, Control } from '@babylonjs/gui';
@@ -154,7 +154,7 @@ export class HUD {
 
   private setupSubscriptions(): void {
     // Ammo
-    this.curAmmoUnsub = ammoStore.subscribe((state) => {
+    this.curAmmoUnsub = ammoStore.subscribe((state: AmmoState) => {
       this.currentAmmoText.text = state.current.toString();
       this.totalAmmoText.text = `/ ${state.reserve}`;
 

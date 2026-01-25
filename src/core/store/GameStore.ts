@@ -1,13 +1,13 @@
-import { atom, map } from 'nanostores';
+import { atom, map, WritableAtom, MapStore } from 'nanostores';
 
 declare global {
   interface Window {
     __GAME_STORES__?: {
-      scoreStore: any;
-      gameStateStore: any;
-      ammoStore: any;
-      playerHealthStore: any;
-      inventoryStore: any;
+      scoreStore: WritableAtom<number>;
+      gameStateStore: WritableAtom<'READY' | 'PLAYING' | 'PAUSED' | 'GAME_OVER'>;
+      ammoStore: MapStore<AmmoState>;
+      playerHealthStore: WritableAtom<number>;
+      inventoryStore: MapStore<InventoryState>;
     };
   }
 }
