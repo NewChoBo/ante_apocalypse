@@ -51,7 +51,11 @@ export class NetworkManager {
 
   // State Synchronization
   public onInitialStateRequested = new Observable<{ senderId: string }>();
-  public onInitialStateReceived = new Observable<{ players: any[]; enemies: any[] }>();
+  public onInitialStateReceived = new Observable<{
+    players: any[];
+    enemies: any[];
+    targets?: any[];
+  }>();
 
   // New Observables for Lobby/State
   public onRoomListUpdated = new Observable<RoomInfo[]>();
@@ -208,6 +212,7 @@ export class NetworkManager {
           this.onInitialStateReceived.notifyObservers({
             players: data.players,
             enemies: data.enemies,
+            targets: data.targets,
           });
           break;
       }

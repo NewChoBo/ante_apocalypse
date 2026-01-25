@@ -17,6 +17,8 @@ import { BaseTarget } from './BaseTarget';
 export class HumanoidTarget extends BaseTarget {
   public id: string;
   public mesh: Mesh;
+  public type: string = 'humanoid';
+  public isMoving: boolean = false;
   private shadowGenerator: ShadowGenerator;
 
   constructor(scene: Scene, id: string, position: Vector3, shadowGenerator: ShadowGenerator) {

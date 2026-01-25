@@ -24,4 +24,8 @@ export interface ITarget {
 
   /** 활성화 여부 */
   isActive: boolean;
+
+  /** 타겟 타입 (sync용) */
+  type: string;
+  isMoving?: boolean;
 }

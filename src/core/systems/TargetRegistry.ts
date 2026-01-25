@@ -97,4 +97,15 @@ export class TargetRegistry {
   public clear(): void {
     this.targets.clear();
   }
+  /** 현재 활성화된 타겟들의 상태를 직렬화하여 반환 (Initial State Sync용) */
+  public getSerializedTargets(): any[] {
+    return Array.from(this.targets.values())
+      .filter((t) => t.isActive)
+      .map((t) => ({
+        id: t.id,
+        type: t.type,
+        position: { x: t.mesh.position.x, y: t.mesh.position.y, z: t.mesh.position.z },
+        isMoving: t.isMoving,
+      }));
+  }
 }

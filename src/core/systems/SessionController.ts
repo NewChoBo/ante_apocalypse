@@ -11,6 +11,7 @@ import { NetworkManager } from './NetworkManager';
 import { MultiplayerSystem } from './MultiplayerSystem';
 import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
+import { TargetRegistry } from './TargetRegistry';
 import { EnemyManager } from './EnemyManager';
 import { EventCode } from '../network/NetworkProtocol';
 import { GameObservables } from '../events/GameObservables';
@@ -29,6 +30,7 @@ export class SessionController {
   private hud: HUD | null = null;
   private inventoryUI: InventoryUI | null = null;
   private enemyManager: EnemyManager | null = null;
+  private targetSpawner: TargetSpawnerComponent | null = null;
   private healthUnsub: (() => void) | null = null;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, shadowGenerator: ShadowGenerator) {
@@ -66,8 +68,8 @@ export class SessionController {
   }
 
   private setupSystems(levelData: LevelData): void {
-    const spawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
-    spawner.spawnInitialTargets();
+    this.targetSpawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
+    this.targetSpawner.spawnInitialTargets();
 
     if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
       this.enemyManager = new EnemyManager(this.scene, this.shadowGenerator);
@@ -169,10 +171,12 @@ export class SessionController {
         const enemyStates = this.enemyManager?.getEnemyStates() || [];
         // Extract player states from NetworkManager
         const playerStates = network.getAllPlayerStates();
+        const targetStates = TargetRegistry.getInstance().getSerializedTargets();
 
         network.sendEvent(EventCode.INITIAL_STATE, {
           players: playerStates,
           enemies: enemyStates,
+          targets: targetStates,
         });
       }
     });
@@ -184,6 +188,16 @@ export class SessionController {
       }
       if (this.multiplayerSystem) {
         this.multiplayerSystem.applyPlayerStates(data.players);
+      }
+      if (data.targets && this.targetSpawner) {
+        data.targets.forEach((t: any) => {
+          this.targetSpawner!.spawnTarget(
+            new Vector3(t.position.x, t.position.y, t.position.z),
+            t.isMoving,
+            t.id,
+            t.type
+          );
+        });
       }
     });
 

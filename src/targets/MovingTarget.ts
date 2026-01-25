@@ -17,6 +17,8 @@ import { BaseTarget } from './BaseTarget';
 export class MovingTarget extends BaseTarget {
   public id: string;
   public mesh: Mesh;
+  public type: string = 'moving';
+  public isMoving: boolean = true;
   private shadowGenerator: ShadowGenerator;
   private basePosition: Vector3;
 
