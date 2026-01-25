@@ -191,10 +191,9 @@ export abstract class BaseWeapon implements IWeapon {
     }
 
     // 2. 타겟(Target) 피격 처리
-    if (pickedMesh.name.startsWith('target')) {
-      const nameParts = pickedMesh.name.split('_');
-      const targetId = `${nameParts[0]}_${nameParts[1]}`;
-      const part = nameParts[2] || 'body';
+    if (pickedMesh.metadata && pickedMesh.metadata.targetId) {
+      const targetId = pickedMesh.metadata.targetId;
+      const part = pickedMesh.metadata.part || 'body';
 
       const isHeadshot = part === 'head';
       const destroyed = TargetRegistry.getInstance().hitTarget(targetId, part, damageAmount);

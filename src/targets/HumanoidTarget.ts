@@ -57,6 +57,9 @@ export class HumanoidTarget extends BaseTarget {
     this.shadowGenerator.addShadowCaster(body);
     this.shadowGenerator.addShadowCaster(head);
 
+    body.metadata = { targetId: this.id, part: 'body' };
+    head.metadata = { targetId: this.id, part: 'head' };
+
     return body;
   }
 

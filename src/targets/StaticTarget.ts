@@ -40,6 +40,7 @@ export class StaticTarget extends BaseTarget {
     target.material = material;
 
     this.shadowGenerator.addShadowCaster(target);
+    target.metadata = { targetId: this.id };
 
     // 중앙 원 (노란색)
     const center = MeshBuilder.CreateCylinder(

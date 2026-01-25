@@ -170,6 +170,7 @@ export class NetworkManager {
             rotation: data.rotation,
           });
           break;
+        case EventCode.ENEMY_HIT:
           this.onEnemyHit.notifyObservers({
             id: data.id,
             damage: data.damage,

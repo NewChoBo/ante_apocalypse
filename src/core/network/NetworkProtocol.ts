@@ -13,6 +13,11 @@ export enum EventCode {
   SPAWN_TARGET = 12,
   REQ_INITIAL_STATE = 13,
   INITIAL_STATE = 14,
+  ENEMY_HIT = 15,
+  SPAWN_ENEMY = 16,
+  DESTROY_ENEMY = 17,
+  SPAWN_PICKUP = 18,
+  DESTROY_PICKUP = 19,
 }
 
 export interface RoomInfo {
