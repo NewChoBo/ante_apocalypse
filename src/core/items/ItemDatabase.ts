@@ -6,47 +6,54 @@ export interface ItemMetadata {
   description: string;
 }
 
+import pistolIcon from '../../assets/images/items/pistol.png';
+import rifleIcon from '../../assets/images/items/rifle.png';
+import knifeIcon from '../../assets/images/items/knife.png';
+import batIcon from '../../assets/images/items/bat.png';
+import healthIcon from '../../assets/images/items/health_pack.png';
+import ammoIcon from '../../assets/images/items/ammo_box.png';
+
 export const ITEM_DATABASE: Record<string, ItemMetadata> = {
   pistol: {
     id: 'pistol',
     name: 'Military Pistol',
     type: 'weapon',
-    icon: '/images/items/pistol.png',
+    icon: pistolIcon,
     description: 'Standard sidearm. Reliable and fast.',
   },
   rifle: {
     id: 'rifle',
     name: 'Assault Rifle',
     type: 'weapon',
-    icon: '/images/items/rifle.png',
+    icon: rifleIcon,
     description: 'Powerful long-range weapon.',
   },
   knife: {
     id: 'knife',
     name: 'Combat Knife',
     type: 'weapon',
-    icon: '/images/items/knife.png',
+    icon: knifeIcon,
     description: 'Sharp combat knife for silent kills.',
   },
   bat: {
     id: 'bat',
     name: 'Spiked Bat',
     type: 'weapon',
-    icon: '/images/items/bat.png',
+    icon: batIcon,
     description: 'Melee weapon for heavy impact.',
   },
   health_pack: {
     id: 'health_pack',
     name: 'First Aid Kit',
     type: 'consumable',
-    icon: '/images/items/health_pack.png',
+    icon: healthIcon,
     description: 'Restores 30 HP on use.',
   },
   ammo_box: {
     id: 'ammo_box',
     name: 'Ammo Crate',
     type: 'consumable',
-    icon: '/images/items/ammo_box.png',
+    icon: ammoIcon,
     description: 'Restores 50 rounds for all weapons.',
   },
 };

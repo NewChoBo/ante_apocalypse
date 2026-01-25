@@ -2,6 +2,7 @@ import { Scene, Vector3, ParticleSystem, Texture, Color4 } from '@babylonjs/core
 import { BaseComponent } from './BaseComponent';
 import { GameObservables } from '../events/GameObservables.ts';
 import type { BasePawn } from '../BasePawn';
+import flareUrl from '../../assets/textures/Flare.png?url';
 
 /**
  * 타격 이펙트(Impact)를 담당하는 컴포넌트.
@@ -29,7 +30,7 @@ export class ImpactEffectComponent extends BaseComponent {
   private createParticleSystem(): ParticleSystem {
     // 텍스처 없이 포인트 입자 사용 가능하도록 설정하거나 기본 텍스처 사용
     const ps = new ParticleSystem('impactParticles', 100, this.scene);
-    ps.particleTexture = new Texture('https://www.babylonjs.com/assets/Flare.png', this.scene);
+    ps.particleTexture = new Texture(flareUrl, this.scene);
 
     ps.emitter = Vector3.Zero(); // 나중에 위치 설정
     ps.minEmitPower = 1;

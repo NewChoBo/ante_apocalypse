@@ -8,6 +8,8 @@ import {
   Mesh,
   Texture,
 } from '@babylonjs/core';
+import diffUrl from '../../assets/textures/ground_crackedMud_baseColor.png?url';
+import normUrl from '../../assets/textures/ground_crackedMud_normal.png?url';
 
 export interface LevelData {
   ground: {
@@ -54,6 +56,14 @@ export class LevelLoader {
     }
   }
 
+  public async loadLevelData(data: LevelData): Promise<void> {
+    try {
+      this.buildLevel(data);
+    } catch (e) {
+      console.error('LevelLoader error:', e);
+    }
+  }
+
   private buildLevel(data: LevelData): void {
     // 1. Ground
     if (data.ground) {
@@ -91,11 +101,6 @@ export class LevelLoader {
 
       // Apply Analyzed Textures
       if (wallData.name.includes('wall')) {
-        const diffUrl =
-          'https://patrickryanms.github.io/BabylonJStextures/Demos/tilingGround/assets/textures/ground_crackedMud_baseColor.png';
-        const normUrl =
-          'https://patrickryanms.github.io/BabylonJStextures/Demos/tilingGround/assets/textures/ground_crackedMud_normal.png';
-
         const diffTex = new Texture(diffUrl, this.scene);
         diffTex.uScale = wallData.size[0] / 8;
         diffTex.vScale = wallData.size[1] / 8;

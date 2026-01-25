@@ -1,6 +1,6 @@
 import { Mesh, Scene, Vector3, MeshBuilder, StandardMaterial, Color3 } from '@babylonjs/core';
 
-export type PickupType = 'health' | 'ammo';
+export type PickupType = 'health_pack' | 'ammo_box';
 
 export class PickupActor {
   public mesh: Mesh;
@@ -20,7 +20,7 @@ export class PickupActor {
     this.baseY = this.mesh.position.y;
 
     const mat = new StandardMaterial('pickupMat', scene);
-    if (type === 'health') {
+    if (type === 'health_pack') {
       mat.diffuseColor = new Color3(0, 1, 0); // Green
       mat.emissiveColor = new Color3(0, 0.2, 0);
     } else {

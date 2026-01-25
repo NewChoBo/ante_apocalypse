@@ -1,0 +1,63 @@
+{
+  "ground": {
+    "width": 50,
+    "height": 50,
+    "material": { "diffuse": [0.25, 0.25, 0.28], "specular": [0.1, 0.1, 0.1] }
+  },
+  "playerSpawn": [0, 2, -20],
+  "enemySpawns": [
+    [-15, 2, 15],
+    [15, 2, 15],
+    [-15, 2, 0],
+    [15, 2, 0]
+  ],
+  "walls": [
+    {
+      "name": "outerWallN",
+      "position": [0, 3, 25],
+      "size": [50, 6, 1],
+      "material": { "diffuse": [0.4, 0.4, 0.42] }
+    },
+    {
+      "name": "outerWallS",
+      "position": [0, 3, -25],
+      "size": [50, 6, 1],
+      "material": { "diffuse": [0.4, 0.4, 0.42] }
+    },
+    {
+      "name": "outerWallW",
+      "position": [-25, 3, 0],
+      "size": [1, 6, 50],
+      "material": { "diffuse": [0.4, 0.4, 0.42] }
+    },
+    {
+      "name": "outerWallE",
+      "position": [25, 3, 0],
+      "size": [1, 6, 50],
+      "material": { "diffuse": [0.4, 0.4, 0.42] }
+    }
+  ],
+  "props": [
+    {
+      "type": "box",
+      "name": "centerCover",
+      "position": [0, 1.5, 0],
+      "size": [4, 3, 4],
+      "material": { "diffuse": [0.5, 0.3, 0.2] }
+    },
+    {
+      "type": "box",
+      "name": "leftCover",
+      "position": [-10, 1, 5],
+      "size": [3, 2, 1],
+      "material": { "diffuse": [0.3, 0.3, 0.5] }
+    },
+    {
+      "type": "box",
+      "name": "rightCover",
+      "position": [10, 1, 5],
+      "size": [3, 2, 1],
+      "material": { "diffuse": [0.3, 0.3, 0.5] }
+    }
+  ]
+}

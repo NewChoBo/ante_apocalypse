@@ -25,7 +25,17 @@ import { inventoryStore } from './store/GameStore';
 import '@babylonjs/inspector'; // 인스펙터 기능 활성화
 import { LevelLoader, LevelData } from './systems/LevelLoader';
 import { EnemyManager } from './systems/EnemyManager';
+
 import { CustomLoadingScreen } from '../ui/CustomLoadingScreen';
+
+import trainingGroundData from '../assets/levels/training_ground.json';
+import combatZoneData from '../assets/levels/combat_zone.json';
+import studioEnvUrl from '../assets/environments/studio.env?url';
+
+const LEVELS: Record<string, LevelData> = {
+  training_ground: trainingGroundData as LevelData,
+  combat_zone: combatZoneData as LevelData,
+};
 
 export class Game {
   private canvas!: HTMLCanvasElement;
@@ -92,11 +102,7 @@ export class Game {
     this.scene.clearColor = new Color4(0.1, 0.1, 0.15, 1);
 
     // PBR 환경 맵 로드 (Studio Lighting)
-    // Babylon.js 호스팅 에셋 사용
-    const envTexture = CubeTexture.CreateFromPrefilteredData(
-      'https://assets.babylonjs.com/environments/studio.env',
-      this.scene
-    );
+    const envTexture = CubeTexture.CreateFromPrefilteredData(studioEnvUrl, this.scene);
     this.scene.environmentTexture = envTexture;
     this.scene.environmentIntensity = 1.0; // 조명 강도 조절
 
@@ -116,7 +122,7 @@ export class Game {
 
     // 레벨 로더 초기화
     const levelLoader = new LevelLoader(this.scene, this.shadowGenerator);
-    await levelLoader.loadLevel('/levels/training_ground.json');
+    await levelLoader.loadLevelData(LEVELS['training_ground']);
 
     // 메뉴 카메라 (배경 조망용)
     const menuCamera = new UniversalCamera('menuCamera', new Vector3(0, 2, -10), this.scene);
@@ -197,9 +203,9 @@ export class Game {
 
         if (itemIndex !== -1) {
           const item = bag[itemIndex];
-          if (item.id === 'health') {
+          if (item.id === 'health_pack') {
             this.playerPawn.addHealth(30);
-          } else if (item.id === 'ammo') {
+          } else if (item.id === 'ammo_box') {
             this.playerPawn.addAmmo(50);
           }
 
@@ -237,9 +243,6 @@ export class Game {
       },
     });
     this.syncInventoryStore();
-
-    // 에셋 프리로딩
-    await this.initPreloading();
   }
 
   private gameOver(): void {
@@ -270,7 +273,9 @@ export class Game {
 
     // 1. 선택된 맵 URL 가져오기
     const select = document.getElementById('map-select') as HTMLSelectElement;
-    const levelUrl = select ? select.value : '/levels/training_ground.json';
+    // 1. 선택된 맵 URL 가져오기
+
+    const levelKey = select ? select.value : 'training_ground';
 
     // 2. 현재 메뉴 씬 폐기
     this.engine.stopRenderLoop(this.renderFunction);
@@ -293,11 +298,26 @@ export class Game {
 
     // 4. 레벨 로드 (로딩 화면 표시)
     this.engine.displayLoadingUI();
+
     const levelLoader = new LevelLoader(this.scene, this.shadowGenerator);
-    const levelData = await levelLoader.loadLevel(levelUrl);
+
+    const data = LEVELS[levelKey];
+    if (data) {
+      await levelLoader.loadLevelData(data);
+    } else {
+      console.error(`Level data for key "${levelKey}" not found.`);
+    }
+
+    // LevelData is already loaded (it's JSON), but we need to pass it to initGameSession.
+    // However, LevelLoader.loadLevelData returns void.
+    // We can just use the 'data' variable.
+    const levelData = data;
+
+    // 4.5 필수 에셋 프리로딩 (게임 세션 시작 전 완료 필수)
+    await this.initPreloading();
     this.engine.hideLoadingUI();
 
-    // 5. 게임 세션 초기화 (지연 로딩)
+    // 5. 게임 세션 초기화
     if (levelData) {
       await this.initGameSession(levelData);
     } else {
@@ -364,11 +384,11 @@ export class Game {
       // 1. 디버그용 아이템 스폰 (H: Health, J: Ammo)
       if (!this.isPaused) {
         if (e.code === 'KeyH') {
-          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'health');
+          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'health_pack');
           console.log('[DEBUG] Spawned Health Pickup');
         }
         if (e.code === 'KeyJ') {
-          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'ammo');
+          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'ammo_box');
           console.log('[DEBUG] Spawned Ammo Pickup');
         }
       }
@@ -505,6 +525,7 @@ export class Game {
     TickManager.getInstance().clear();
     TargetRegistry.getInstance().clear();
     PickupManager.getInstance().clear();
+    AssetLoader.getInstance().clear(); // 추가: 씬이 바뀔 때 에셋 캐시도 정리하여 다음 게임에서 정상 로드되도록 함.
 
     if (this.healthUnsub) {
       this.healthUnsub();

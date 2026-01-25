@@ -41,7 +41,7 @@ export class PickupManager implements ITickable {
     // 40% chance to spawn an item
     if (Math.random() > 0.4) return;
 
-    const type: PickupType = Math.random() > 0.5 ? 'health' : 'ammo';
+    const type: PickupType = Math.random() > 0.5 ? 'health_pack' : 'ammo_box';
     this.spawnPickup(position, type);
   }
 
@@ -86,7 +86,7 @@ export class PickupManager implements ITickable {
       } else {
         bagItems.push({
           id: pickup.type,
-          name: pickup.type === 'health' ? 'Health Pack' : 'Ammo Pack',
+          name: pickup.type === 'health_pack' ? 'First Aid Kit' : 'Ammo Crate',
           type: 'consumable',
           count: 1,
         });
