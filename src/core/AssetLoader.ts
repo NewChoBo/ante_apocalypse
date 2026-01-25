@@ -7,6 +7,8 @@ import {
   Mesh,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
+import gunshotUrl from '../assets/sounds/gunshot.wav';
+import swipeUrl from '../assets/sounds/swipe.wav';
 
 // Audio V2 타입을 위해 가져옵니다.
 import type { AudioEngineV2 } from '@babylonjs/core';
@@ -117,15 +119,13 @@ export class AssetLoader {
       // 2. Load Sounds
       if (this.sounds.size === 0) {
         console.log(`[AssetLoader][Load#${id}] Loading default sound effects...`);
-        const gunshotSound = await this.audioEngine.createSoundAsync(
-          'gunshot',
-          'sounds/gunshot.wav',
-          { volume: 0.5 }
-        );
+        const gunshotSound = await this.audioEngine.createSoundAsync('gunshot', gunshotUrl, {
+          volume: 0.5,
+        });
         this.sounds.set('gunshot', gunshotSound);
 
         try {
-          const swipeSound = await this.audioEngine.createSoundAsync('swipe', 'sounds/swipe.wav', {
+          const swipeSound = await this.audioEngine.createSoundAsync('swipe', swipeUrl, {
             volume: 0.6,
           });
           this.sounds.set('swipe', swipeSound);

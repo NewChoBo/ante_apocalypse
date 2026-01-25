@@ -54,6 +54,14 @@ export class LevelLoader {
     }
   }
 
+  public async loadLevelData(data: LevelData): Promise<void> {
+    try {
+      this.buildLevel(data);
+    } catch (e) {
+      console.error('LevelLoader error:', e);
+    }
+  }
+
   private buildLevel(data: LevelData): void {
     // 1. Ground
     if (data.ground) {
