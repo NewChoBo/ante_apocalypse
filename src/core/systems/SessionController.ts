@@ -12,6 +12,7 @@ import { MultiplayerSystem } from './MultiplayerSystem';
 import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
 import { EnemyManager } from './EnemyManager';
+import { EventCode } from '../network/NetworkProtocol';
 import { GameObservables } from '../events/GameObservables';
 import { AssetLoader } from '../AssetLoader';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
@@ -27,6 +28,7 @@ export class SessionController {
   private multiplayerSystem: MultiplayerSystem | null = null;
   private hud: HUD | null = null;
   private inventoryUI: InventoryUI | null = null;
+  private enemyManager: EnemyManager | null = null;
   private healthUnsub: (() => void) | null = null;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, shadowGenerator: ShadowGenerator) {
@@ -68,8 +70,8 @@ export class SessionController {
     spawner.spawnInitialTargets();
 
     if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
-      const enemyManager = new EnemyManager(this.scene, this.shadowGenerator);
-      enemyManager.spawnEnemies(levelData.enemySpawns, this.playerPawn!);
+      this.enemyManager = new EnemyManager(this.scene, this.shadowGenerator);
+      this.enemyManager.spawnEnemies(levelData.enemySpawns, this.playerPawn!);
     }
 
     PickupManager.getInstance().initialize(this.scene, this.playerPawn!);
@@ -152,12 +154,38 @@ export class SessionController {
   }
 
   private setupMultiplayer(playerName: string): void {
+    const network = NetworkManager.getInstance();
     this.multiplayerSystem = new MultiplayerSystem(
       this.scene,
       this.playerPawn!,
       this.shadowGenerator,
       playerName
     );
+
+    // Initial State Sync Logic
+    network.onInitialStateRequested.add(() => {
+      if (network.isMasterClient()) {
+        console.log('[Session] Providing initial state to new player');
+        const enemyStates = this.enemyManager?.getEnemyStates() || [];
+        // Extract player states from NetworkManager
+        const playerStates = network.getAllPlayerStates();
+
+        network.sendEvent(EventCode.INITIAL_STATE, {
+          players: playerStates,
+          enemies: enemyStates,
+        });
+      }
+    });
+
+    network.onInitialStateReceived.add((data) => {
+      console.log('[Session] Received initial state sync');
+      if (this.enemyManager) {
+        this.enemyManager.applyEnemyStates(data.enemies);
+      }
+      if (this.multiplayerSystem) {
+        this.multiplayerSystem.applyPlayerStates(data.players);
+      }
+    });
   }
 
   private syncInventoryStore(): void {
@@ -196,9 +224,12 @@ export class SessionController {
     this.playerController?.setInputBlocked(blocked);
   }
 
-  public update(): void {
+  public update(deltaTime: number): void {
     if (this.multiplayerSystem) {
       this.multiplayerSystem.update();
+    }
+    if (this.enemyManager) {
+      this.enemyManager.update(deltaTime);
     }
   }
 
@@ -209,6 +240,7 @@ export class SessionController {
     this.hud?.dispose();
     this.inventoryUI?.dispose();
     this.multiplayerSystem?.dispose();
+    this.enemyManager?.dispose();
     // Managers are singletons, cleared in Game.ts for now or we could add clear here
   }
 }

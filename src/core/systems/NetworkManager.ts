@@ -45,12 +45,21 @@ export class NetworkManager {
   public onPlayerHit = new Observable<HitEventData>();
   public onPlayerDied = new Observable<DeathEventData>();
 
+  // Enemy Synchronization
+  public onEnemyUpdated = new Observable<{ id: string; position: any; rotation: any }>();
+  public onEnemyHit = new Observable<{ id: string; damage: number }>();
+
+  // State Synchronization
+  public onInitialStateRequested = new Observable<{ senderId: string }>();
+  public onInitialStateReceived = new Observable<{ players: any[]; enemies: any[] }>();
+
   // New Observables for Lobby/State
   public onRoomListUpdated = new Observable<RoomInfo[]>();
   public onStateChanged = new Observable<NetworkState>();
 
   private playerStates: Map<string, PlayerState> = new Map();
   private currentState: NetworkState = NetworkState.Disconnected;
+  private lastRoomList: RoomInfo[] = [];
 
   private constructor() {
     this.provider = new PhotonProvider();
@@ -83,6 +92,7 @@ export class NetworkManager {
     };
 
     this.provider.onRoomListUpdated = (rooms) => {
+      this.lastRoomList = rooms;
       this.onRoomListUpdated.notifyObservers(rooms);
     };
 
@@ -136,6 +146,28 @@ export class NetworkManager {
             this.onPlayerUpdated.notifyObservers(state);
           }
           break;
+        case EventCode.ENEMY_MOVE:
+          this.onEnemyUpdated.notifyObservers({
+            id: data.id,
+            position: data.position,
+            rotation: data.rotation,
+          });
+          break;
+        case EventCode.ENEMY_HIT:
+          this.onEnemyHit.notifyObservers({
+            id: data.id,
+            damage: data.damage,
+          });
+          break;
+        case EventCode.REQ_INITIAL_STATE:
+          this.onInitialStateRequested.notifyObservers({ senderId });
+          break;
+        case EventCode.INITIAL_STATE:
+          this.onInitialStateReceived.notifyObservers({
+            players: data.players,
+            enemies: data.enemies,
+          });
+          break;
       }
     };
   }
@@ -166,6 +198,14 @@ export class NetworkManager {
     this.provider.leaveRoom();
   }
 
+  public isMasterClient(): boolean {
+    return this.provider.isMasterClient();
+  }
+
+  public getActors(): Map<string, { id: string; name: string }> {
+    return this.provider.getActors();
+  }
+
   public getMapId(): string | null {
     return this.provider.getCurrentRoomProperty('mapId');
   }
@@ -176,10 +216,31 @@ export class NetworkManager {
     weaponId: string;
     name: string;
   }): void {
+    const myId = this.getSocketId();
+    if (myId) {
+      const myState: PlayerState = {
+        id: myId,
+        name: data.name,
+        position: { x: data.position.x, y: data.position.y, z: data.position.z },
+        rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
+        weaponId: data.weaponId,
+        health: 100,
+      };
+      this.playerStates.set(myId, myState);
+      // We don't notify onPlayerJoined for self here, as UI handles local join flow
+    }
     this.updateState(data);
   }
 
   public updateState(data: { position: Vector3; rotation: Vector3; weaponId: string }): void {
+    const myId = this.getSocketId();
+    if (myId && this.playerStates.has(myId)) {
+      const state = this.playerStates.get(myId)!;
+      state.position = { x: data.position.x, y: data.position.y, z: data.position.z };
+      state.rotation = { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z };
+      state.weaponId = data.weaponId;
+    }
+
     this.provider.sendEvent(
       EventCode.MOVE,
       {
@@ -204,11 +265,28 @@ export class NetworkManager {
     this.provider.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
   }
 
+  public sendEvent(code: number, data: any, reliable: boolean = true): void {
+    this.provider.sendEvent(code, data, reliable);
+  }
+
   public hit(hitData: { targetId: string; damage: number }): void {
     this.provider.sendEvent(EventCode.HIT, hitData, true);
   }
 
   public getSocketId(): string | undefined {
     return (this.provider as any).client?.myActor()?.actorNr?.toString();
+  }
+
+  public refreshRoomList(): void {
+    console.log('[NetworkManager] Requesting room list refresh...');
+    this.provider.refreshRoomList?.();
+  }
+
+  public getRoomList(): RoomInfo[] {
+    return this.lastRoomList;
+  }
+
+  public getAllPlayerStates(): PlayerState[] {
+    return Array.from(this.playerStates.values());
   }
 }

@@ -37,7 +37,39 @@ export class MultiplayerSystem {
       weaponId: weaponId,
       name: playerName,
     });
+
+    // this.syncExistingPlayers(); // [DEPRECATED] Handled by INITIAL_STATE sync
   }
+
+  public applyPlayerStates(states: any[]): void {
+    states.forEach((p) => {
+      if (p.id !== this.networkManager.getSocketId()) {
+        const remote = this.remotePlayers.get(p.id);
+        if (remote) {
+          remote.updateNetworkState(p.position, p.rotation);
+          if (p.weaponId) remote.updateWeapon(p.weaponId);
+        } else {
+          this.spawnRemotePlayer(p);
+        }
+      }
+    });
+  }
+
+  // private syncExistingPlayers(): void {
+  //   const actors = this.networkManager.getActors();
+  //   actors.forEach((actor, id) => {
+  //     if (id !== this.networkManager.getSocketId()) {
+  //       this.spawnRemotePlayer({
+  //         id,
+  //         name: actor.name,
+  //         position: { x: 0, y: 0, z: 0 },
+  //         rotation: { x: 0, y: 0, z: 0 },
+  //         weaponId: 'Pistol',
+  //         health: 100,
+  //       });
+  //     }
+  //   });
+  // }
 
   private setupListeners(): void {
     this.networkManager.onPlayersList.add((players) => {

@@ -16,7 +16,6 @@ import { PickupManager } from './systems/PickupManager';
 
 export class EnemyPawn extends BasePawn {
   public mesh: Mesh;
-  private health = 100;
   public isDead = false;
 
   // Visuals & Animation

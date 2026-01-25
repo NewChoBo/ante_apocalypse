@@ -9,6 +9,10 @@ export interface INetworkProvider {
   leaveRoom(): void;
   sendEvent(code: number, data: any, reliable?: boolean): void;
   getCurrentRoomProperty(key: string): any;
+  /** 방 목록 갱신 요청 (선택적 구현) */
+  refreshRoomList?(): void;
+  isMasterClient(): boolean;
+  getActors(): Map<string, { id: string; name: string }>;
 
   // Event Listeners (Setters for callbacks)
   onStateChanged: ((state: NetworkState) => void) | null;

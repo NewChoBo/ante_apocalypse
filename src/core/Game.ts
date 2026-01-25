@@ -245,6 +245,6 @@ export class Game {
 
   private update(deltaTime: number): void {
     TickManager.getInstance().tick(deltaTime);
-    this.sessionController?.update();
+    this.sessionController?.update(deltaTime);
   }
 }

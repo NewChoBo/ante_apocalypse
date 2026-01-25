@@ -41,7 +41,16 @@ export class PhotonProvider implements INetworkProvider {
     this.client.onStateChange = (state: number) => {
       const mappedState = this.mapState(state);
       console.log(`[Photon] State changed: ${mappedState}`);
+
+      // Auto-join lobby when connected to master
       this.onStateChanged?.(mappedState);
+
+      if (mappedState === NetworkState.InLobby) {
+        // Initial fetch with slight delay to ensure list is populated
+        setTimeout(() => {
+          this.updateRoomListFromClient();
+        }, 500);
+      }
     };
 
     this.client.onRoomListUpdate = (rooms: any[]) => {
@@ -145,5 +154,41 @@ export class PhotonProvider implements INetworkProvider {
       return this.client.myRoom().getCustomProperty(key);
     }
     return null;
+  }
+
+  public isMasterClient(): boolean {
+    if (!this.client.isJoinedToRoom()) return false;
+    return this.client.myActor().actorNr === this.client.myRoom().masterClientId;
+  }
+
+  public getActors(): Map<string, { id: string; name: string }> {
+    const actors = new Map<string, { id: string; name: string }>();
+    if (this.client.isJoinedToRoom()) {
+      const roomActors = this.client.myRoom().actors;
+      for (const nr in roomActors) {
+        const a = roomActors[nr];
+        actors.set(nr.toString(), { id: nr.toString(), name: a.name || 'Anonymous' });
+      }
+    }
+    return actors;
+  }
+
+  public refreshRoomList(): void {
+    this.updateRoomListFromClient();
+  }
+
+  private updateRoomListFromClient(): void {
+    if (!this.client || typeof this.client.availableRooms !== 'function') return;
+
+    const rooms = this.client.availableRooms() || [];
+    console.log('[Photon] Manual room list refresh:', rooms);
+    const roomInfos: RoomInfo[] = rooms.map((r: any) => ({
+      name: r.name,
+      playerCount: r.playerCount,
+      maxPlayers: r.maxPlayers,
+      isOpen: r.isOpen,
+      customProperties: r.getCustomProperties(),
+    }));
+    this.onRoomListUpdated?.(roomInfos);
   }
 }

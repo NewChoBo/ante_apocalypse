@@ -11,8 +11,20 @@ export interface IPawn {
   /** 현재 위치 */
   position: Vector3;
 
+  /** 체력 */
+  health: number;
+
   /** 소유하고 있는 컨트롤러 ID (없으면 null) */
   controllerId: string | null;
+
+  /** 고유 ID */
+  id?: string;
+
+  /** 사망 상태 */
+  isDead: boolean;
+
+  /** 데미지 처리 */
+  takeDamage(amount: number): void;
 
   /** Pawn 초기화 */
   initialize(scene: Scene): void;

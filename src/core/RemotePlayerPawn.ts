@@ -64,7 +64,7 @@ export class RemotePlayerPawn extends BasePawn {
 
     this.mesh.isPickable = true;
     this.mesh.metadata = {
-      type: 'enemy',
+      type: 'remote_player',
       pawn: this,
       bodyPart: 'body',
     };
@@ -135,7 +135,7 @@ export class RemotePlayerPawn extends BasePawn {
         }
         node.getChildMeshes().forEach((m) => {
           m.isPickable = true;
-          m.metadata = { type: 'enemy', pawn: this, bodyPart: 'body' };
+          m.metadata = { type: 'remote_player', pawn: this, bodyPart: 'body' };
           if (this.skeleton) m.skeleton = this.skeleton;
         });
       });
@@ -272,7 +272,9 @@ export class RemotePlayerPawn extends BasePawn {
   }
 
   public takeDamage(amount: number): void {
+    if (this.isDead) return;
     console.log(`Remote player ${this.id} hit for ${amount} damage.`);
+    // Remote health is synced from network, but we can play effects here
   }
 
   public dispose(): void {

@@ -22,4 +22,8 @@ export const EventCode = {
   FIRE: 20, // WeaponId, Origin, Direction
   HIT: 21, // TargetId, Damage
   SYNC_WEAPON: 30, // WeaponId
+  ENEMY_MOVE: 40, // EnemyId, Position, Rotation
+  ENEMY_HIT: 41, // EnemyId, Damage
+  REQ_INITIAL_STATE: 100,
+  INITIAL_STATE: 101, // List of players, List of enemies
 };
