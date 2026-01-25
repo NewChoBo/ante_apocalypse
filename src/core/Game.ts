@@ -30,6 +30,7 @@ import { CustomLoadingScreen } from '../ui/CustomLoadingScreen';
 
 import trainingGroundData from '../assets/levels/training_ground.json';
 import combatZoneData from '../assets/levels/combat_zone.json';
+import studioEnvUrl from '../assets/environments/studio.env?url';
 
 const LEVELS: Record<string, LevelData> = {
   training_ground: trainingGroundData as LevelData,
@@ -101,11 +102,7 @@ export class Game {
     this.scene.clearColor = new Color4(0.1, 0.1, 0.15, 1);
 
     // PBR 환경 맵 로드 (Studio Lighting)
-    // Babylon.js 호스팅 에셋 사용
-    const envTexture = CubeTexture.CreateFromPrefilteredData(
-      'https://assets.babylonjs.com/environments/studio.env',
-      this.scene
-    );
+    const envTexture = CubeTexture.CreateFromPrefilteredData(studioEnvUrl, this.scene);
     this.scene.environmentTexture = envTexture;
     this.scene.environmentIntensity = 1.0; // 조명 강도 조절
 

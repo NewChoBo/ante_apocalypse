@@ -9,6 +9,8 @@ import {
 import '@babylonjs/loaders/glTF';
 import gunshotUrl from '../assets/sounds/gunshot.wav';
 import swipeUrl from '../assets/sounds/swipe.wav';
+import dummy3Url from '../assets/models/dummy3.babylon?url';
+import gunUrl from '../assets/models/Gun.glb?url';
 
 // Audio V2 타입을 위해 가져옵니다.
 import type { AudioEngineV2 } from '@babylonjs/core';
@@ -139,13 +141,8 @@ export class AssetLoader {
       // 3. Load Mesh Containers
       console.log(`[AssetLoader][Load#${id}] Loading model containers for Scene#${sceneId}...`);
       await Promise.all([
-        this.loadMeshToContainer(scene, 'enemy', 'https://models.babylonjs.com/', 'dummy3.babylon'),
-        this.loadMeshToContainer(
-          scene,
-          'rifle',
-          'https://raw.githubusercontent.com/microsoft/MixedRealityToolkit/main/SpatialInput/Samples/DemoRoom/Media/Models/',
-          'Gun.glb'
-        ),
+        this.loadMeshToContainer(scene, 'enemy', '', dummy3Url),
+        this.loadMeshToContainer(scene, 'rifle', '', gunUrl),
       ]);
 
       if (scene.isDisposed) throw new Error('Scene disposed during mesh loading');
