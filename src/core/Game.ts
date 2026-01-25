@@ -30,6 +30,8 @@ import { InventoryUI } from '../ui/inventory/InventoryUI';
 import { TickManager } from './TickManager';
 import { PickupManager } from './systems/PickupManager';
 import { GlobalInputManager } from './systems/GlobalInputManager';
+import { NetworkManager } from './systems/NetworkManager';
+import { MultiplayerSystem } from './systems/MultiplayerSystem';
 
 import trainingGroundData from '../assets/levels/training_ground.json';
 import combatZoneData from '../assets/levels/combat_zone.json';
@@ -52,6 +54,7 @@ export class Game {
   private enemyManager: EnemyManager | null = null;
   private inventoryUI: InventoryUI | null = null;
   private healthUnsub: (() => void) | null = null;
+  private multiplayerSystem: MultiplayerSystem | null = null;
 
   private isRunning = false;
   private isPaused = false;
@@ -241,10 +244,14 @@ export class Game {
     GlobalInputManager.getInstance().initialize(
       this.scene,
       this.canvas,
-      this.playerPawn,
-      this.playerController,
+      this.playerPawn!,
+      this.playerController!,
       this.inventoryUI
     );
+
+    // 멀티플레이어 초기화
+    NetworkManager.getInstance().connect();
+    this.multiplayerSystem = new MultiplayerSystem(this.scene, this.playerPawn);
   }
 
   private gameOver(): void {
@@ -412,6 +419,9 @@ export class Game {
 
   private update(deltaTime: number): void {
     TickManager.getInstance().tick(deltaTime);
+    if (this.multiplayerSystem) {
+      this.multiplayerSystem.update();
+    }
   }
 
   public pause(): void {
@@ -477,6 +487,11 @@ export class Game {
     if (this.enemyManager) {
       this.enemyManager.dispose();
       this.enemyManager = null;
+    }
+
+    if (this.multiplayerSystem) {
+      this.multiplayerSystem.dispose();
+      this.multiplayerSystem = null;
     }
 
     // 싱글톤 상태 초기화

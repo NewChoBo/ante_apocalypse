@@ -2,6 +2,8 @@ import { Scene, AbstractMesh, UniversalCamera, Vector3, Mesh } from '@babylonjs/
 import { IWeapon } from '../types/IWeapon.ts';
 import { TargetRegistry } from '../core/systems/TargetRegistry';
 import { GameObservables } from '../core/events/GameObservables';
+import { NetworkManager } from '../core/systems/NetworkManager';
+import { RemotePlayerPawn } from '../core/RemotePlayerPawn';
 
 /**
  * 모든 무기의 최상위 추상 클래스.
@@ -170,6 +172,15 @@ export abstract class BaseWeapon implements IWeapon {
       if (this.onScoreCallback) {
         this.onScoreCallback(part === 'head' ? 100 : 50);
       }
+
+      // 플레이어(RemotePlayerPawn)인 경우 네트워크에 타격 이벤트 전송
+      if (enemy instanceof RemotePlayerPawn) {
+        NetworkManager.getInstance().hit({
+          targetId: (enemy as RemotePlayerPawn).id,
+          damage: finalDamage,
+        });
+      }
+
       return true;
     }
 

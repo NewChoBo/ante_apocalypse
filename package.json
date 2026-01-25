@@ -28,6 +28,8 @@
     "@babylonjs/core": "^8.47.0",
     "@babylonjs/gui": "^8.47.0",
     "@babylonjs/loaders": "^8.47.0",
-    "nanostores": "^1.1.0"
+    "nanostores": "^1.1.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
   }
 }
