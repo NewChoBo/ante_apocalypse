@@ -1,0 +1,149 @@
+import * as Photon from 'photon-realtime';
+import { INetworkProvider } from '../INetworkProvider';
+import { RoomInfo, NetworkState } from '../NetworkProtocol';
+
+/**
+ * Photon Realtime Cloud를 이용한 네트워크 프로바이더 구현체.
+ */
+export class PhotonProvider implements INetworkProvider {
+  private client: any;
+  private appId: string = import.meta.env.VITE_PHOTON_APP_ID || '';
+  private appVersion: string = import.meta.env.VITE_PHOTON_APP_VERSION || '1.0';
+
+  public onStateChanged: ((state: NetworkState) => void) | null = null;
+  public onRoomListUpdated: ((rooms: RoomInfo[]) => void) | null = null;
+  public onEvent: ((code: number, data: any, senderId: string) => void) | null = null;
+  public onPlayerJoined: ((id: string, name: string) => void) | null = null;
+  public onPlayerLeft: ((id: string) => void) | null = null;
+
+  constructor() {
+    // browser 환경에서 require('ws') 에러 방지를 위해 WebSocket 구현체 재설정
+    if (typeof window !== 'undefined' && (Photon as any).PhotonPeer) {
+      (Photon as any).PhotonPeer.setWebSocketImpl(WebSocket);
+    }
+
+    if (!this.appId || this.appId === 'YOUR_APP_ID_HERE') {
+      console.error(
+        '[PhotonProvider] AppID is missing! Please set VITE_PHOTON_APP_ID in your .env file.'
+      );
+    }
+
+    this.client = new (Photon as any).LoadBalancing.LoadBalancingClient(
+      (Photon as any).ConnectionProtocol.Wss,
+      this.appId,
+      this.appVersion
+    );
+
+    this.setupListeners();
+  }
+
+  private setupListeners(): void {
+    this.client.onStateChange = (state: number) => {
+      const mappedState = this.mapState(state);
+      console.log(`[Photon] State changed: ${mappedState}`);
+      this.onStateChanged?.(mappedState);
+    };
+
+    this.client.onRoomListUpdate = (rooms: any[]) => {
+      const roomInfos: RoomInfo[] = rooms.map((r) => ({
+        name: r.name,
+        playerCount: r.playerCount,
+        maxPlayers: r.maxPlayers,
+        isOpen: r.isOpen,
+        customProperties: r.getCustomProperties(),
+      }));
+      this.onRoomListUpdated?.(roomInfos);
+    };
+
+    this.client.onEvent = (code: number, content: any, actorNr: number) => {
+      this.onEvent?.(code, content, actorNr.toString());
+    };
+
+    this.client.onActorJoin = (actor: any) => {
+      if (actor.actorNr !== this.client.myActor().actorNr) {
+        this.onPlayerJoined?.(actor.actorNr.toString(), actor.name || 'Anonymous');
+      }
+    };
+
+    this.client.onActorLeave = (actor: any) => {
+      this.onPlayerLeft?.(actor.actorNr.toString());
+    };
+
+    this.client.onError = (errorCode: number, errorMsg: string) => {
+      console.error(`[Photon] Error ${errorCode}: ${errorMsg}`);
+      this.onStateChanged?.(NetworkState.Error);
+    };
+  }
+
+  private mapState(photonState: number): NetworkState {
+    const States = (Photon as any).LoadBalancing.LoadBalancingClient.State;
+    switch (photonState) {
+      case States.Uninitialized:
+      case States.Disconnected:
+        return NetworkState.Disconnected;
+      case States.ConnectingToNameServer:
+      case States.ConnectingToMasterserver:
+      case States.ConnectingToGameserver:
+        return NetworkState.Connecting;
+      case States.ConnectedToNameServer:
+      case States.ConnectedToMaster:
+        return NetworkState.ConnectedToMaster;
+      case States.JoinedLobby:
+        return NetworkState.InLobby;
+      case States.Joined:
+        return NetworkState.InRoom;
+      case States.Error:
+        return NetworkState.Error;
+      default:
+        return NetworkState.Disconnected;
+    }
+  }
+
+  public async connect(userId: string): Promise<boolean> {
+    this.client.setUserId(userId);
+    this.client.myActor().setName(userId);
+
+    // NameServer 접속 시도 (이후 자동으로 로비 진입하도록 설정됨)
+    // connectToNameServer 또는 connectToRegionMaster 호출
+    return this.client.connectToRegionMaster('kr');
+  }
+
+  public disconnect(): void {
+    this.client.disconnect();
+  }
+
+  public async createRoom(name: string, options?: { mapId: string }): Promise<boolean> {
+    const roomOptions: any = {
+      isVisible: true,
+      isOpen: true,
+      maxPlayers: 4,
+      customGameProperties: { mapId: options?.mapId || 'training_ground' },
+    };
+    // 로비에서 보일 속성 설정
+    roomOptions.propsListedInLobby = ['mapId'];
+
+    return this.client.createRoom(name, roomOptions);
+  }
+
+  public async joinRoom(name: string): Promise<boolean> {
+    return this.client.joinRoom(name);
+  }
+
+  public leaveRoom(): void {
+    this.client.leaveRoom();
+  }
+
+  public sendEvent(code: number, data: any, reliable: boolean = true): void {
+    this.client.raiseEvent(code, data, {
+      receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.Others,
+      cache: reliable ? 1 : 0,
+    });
+  }
+
+  public getCurrentRoomProperty(key: string): any {
+    if (this.client.isJoinedToRoom()) {
+      return this.client.myRoom().getCustomProperty(key);
+    }
+    return null;
+  }
+}

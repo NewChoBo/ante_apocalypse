@@ -24,13 +24,15 @@ export class RemotePlayerPawn extends BasePawn {
   private lerpSpeed = 10;
   public id: string;
   public playerName: string;
-  private nameLabel: Mesh | null = null;
+  private _nameLabel: Mesh | null = null;
 
   // Visuals & Animation
   private visualMesh: AbstractMesh | null = null;
   private skeleton: Skeleton | null = null;
   private headBoneNode: any = null;
   private shadowGenerator: ShadowGenerator;
+  private weaponMesh: AbstractMesh | null = null;
+  private currentWeaponId: string | null = null;
 
   // Animation Ranges
   private idleRange: any;
@@ -95,7 +97,8 @@ export class RemotePlayerPawn extends BasePawn {
     mat.emissiveColor = new Color3(1, 1, 1);
     mat.backFaceCulling = false;
     plane.material = mat;
-    this.nameLabel = plane;
+    this._nameLabel = plane;
+    console.log(`[RemotePlayer] Created name label for ${name}`);
   }
 
   public initialize(): void {}
@@ -162,6 +165,56 @@ export class RemotePlayerPawn extends BasePawn {
     }
   }
 
+  public updateWeapon(_weaponId: string): void {
+    // Map weaponId to asset key (currently only 'rifle' is available)
+    const assetKey = 'rifle';
+    if (this.currentWeaponId === assetKey) return;
+    this.currentWeaponId = assetKey;
+    this.loadWeaponModel(assetKey);
+  }
+
+  private async loadWeaponModel(assetKey: string): Promise<void> {
+    try {
+      if (this.weaponMesh) {
+        this.weaponMesh.dispose();
+        this.weaponMesh = null;
+      }
+
+      const entries = AssetLoader.getInstance().instantiateMesh(
+        assetKey,
+        'remoteWeapon_' + this.id
+      );
+      if (!entries) return;
+
+      this.weaponMesh = entries.rootNodes[0] as AbstractMesh;
+      this.weaponMesh.parent = this.mesh;
+
+      // Pivot/Attachment logic:
+      // Hand bone search
+      const handBone = this.skeleton?.bones.find(
+        (b) =>
+          b.name.toLowerCase().includes('righthand') || b.name.toLowerCase().includes('right_hand')
+      );
+
+      if (handBone) {
+        // Attach to bone
+        const boneNode = (handBone as any).getTransformNode();
+        if (boneNode) {
+          this.weaponMesh.parent = boneNode;
+          this.weaponMesh.position = new Vector3(0, 0, 0);
+          this.weaponMesh.rotation = new Vector3(Math.PI / 2, 0, 0);
+        }
+      } else {
+        // Fallback: position relative to root
+        this.weaponMesh.position = new Vector3(0.3, -0.5, 0.5);
+      }
+
+      this.shadowGenerator.addShadowCaster(this.weaponMesh, true);
+    } catch (e) {
+      console.error('Failed to load remote weapon model:', e);
+    }
+  }
+
   public updateNetworkState(
     position: { x: number; y: number; z: number },
     rotation: { x: number; y: number; z: number }
@@ -224,5 +277,7 @@ export class RemotePlayerPawn extends BasePawn {
 
   public dispose(): void {
     super.dispose();
+    if (this.weaponMesh) this.weaponMesh.dispose();
+    if (this._nameLabel) this._nameLabel.dispose();
   }
 }

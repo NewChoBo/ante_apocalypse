@@ -58,6 +58,9 @@ export class MultiplayerSystem {
       const remote = this.remotePlayers.get(player.id);
       if (remote) {
         remote.updateNetworkState(player.position, player.rotation);
+        if (player.weaponId) {
+          remote.updateWeapon(player.weaponId);
+        }
       }
     });
 

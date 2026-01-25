@@ -90,8 +90,11 @@ export class SessionController {
       }
     });
 
-    combatComp.onWeaponChanged(() => {
+    combatComp.onWeaponChanged((newWeapon) => {
       this.syncInventoryStore();
+      if (this.multiplayerSystem) {
+        NetworkManager.getInstance().syncWeapon(newWeapon.name);
+      }
     });
   }
 
@@ -149,7 +152,6 @@ export class SessionController {
   }
 
   private setupMultiplayer(playerName: string): void {
-    NetworkManager.getInstance().connect();
     this.multiplayerSystem = new MultiplayerSystem(
       this.scene,
       this.playerPawn!,

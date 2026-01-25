@@ -10,6 +10,8 @@ import { UIManager, UIScreen } from '../ui/UIManager';
 import { SceneManager } from './systems/SceneManager';
 import { SessionController } from './systems/SessionController';
 import { GameMode } from '../types/GameMode';
+import { NetworkManager } from './systems/NetworkManager';
+import { NetworkState } from './network/NetworkProtocol';
 
 import trainingGroundData from '../assets/levels/training_ground.json';
 import combatZoneData from '../assets/levels/combat_zone.json';
@@ -104,19 +106,43 @@ export class Game {
     });
 
     this.uiManager.onStartMultiplayer.add(() => {
+      // Start connection to Network (Photon)
+      NetworkManager.getInstance().connect(this.playerName);
       this.uiManager.showScreen(UIScreen.LOBBY);
     });
 
+    // Listen for room join
+    NetworkManager.getInstance().onStateChanged.removeCallback((state) =>
+      this.handleNetworkStateChange(state)
+    );
+    NetworkManager.getInstance().onStateChanged.add((state) =>
+      this.handleNetworkStateChange(state)
+    );
+
     this.uiManager.onResume.add(() => this.resume());
     this.uiManager.onAbort.add(() => this.quitToMenu());
+  }
+
+  private handleNetworkStateChange(state: NetworkState): void {
+    if (state === NetworkState.InRoom && !this.isRunning) {
+      console.log('[Game] Joined room, starting multiplayer game...');
+      this.start('multi');
+    }
   }
 
   public async start(mode: GameMode = 'single'): Promise<void> {
     if (this.isRunning) return;
     this.currentMode = mode;
 
-    // Use map selected from UI
-    const mapKey = this.uiManager.getSelectedMap();
+    // Use map selected from UI (or synchronized from room if multi)
+    let mapKey = this.uiManager.getSelectedMap();
+    if (mode === 'multi') {
+      const syncedMap = NetworkManager.getInstance().getMapId();
+      if (syncedMap) {
+        mapKey = syncedMap;
+        console.log(`[Game] Using synchronized map: ${mapKey}`);
+      }
+    }
     const levelData = LEVELS[mapKey] || LEVELS['training_ground'];
 
     this.engine.stopRenderLoop(this.renderFunction);
@@ -209,6 +235,10 @@ export class Game {
     TargetRegistry.getInstance().clear();
     PickupManager.getInstance().clear();
     AssetLoader.getInstance().clear();
+
+    if (this.currentMode === 'multi') {
+      NetworkManager.getInstance().leaveRoom();
+    }
 
     this.initMenu();
   }

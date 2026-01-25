@@ -1,5 +1,7 @@
-import { io, Socket } from 'socket.io-client';
 import { Observable, Vector3 } from '@babylonjs/core';
+import { INetworkProvider } from '../network/INetworkProvider';
+import { PhotonProvider } from '../network/providers/PhotonProvider';
+import { RoomInfo, NetworkState, EventCode } from '../network/NetworkProtocol';
 
 export interface PlayerState {
   id: string;
@@ -33,7 +35,7 @@ export interface DeathEventData {
 
 export class NetworkManager {
   private static instance: NetworkManager;
-  private socket: Socket | null = null;
+  private provider: INetworkProvider;
 
   public onPlayersList = new Observable<PlayerState[]>();
   public onPlayerJoined = new Observable<PlayerState>();
@@ -43,7 +45,17 @@ export class NetworkManager {
   public onPlayerHit = new Observable<HitEventData>();
   public onPlayerDied = new Observable<DeathEventData>();
 
-  private constructor() {}
+  // New Observables for Lobby/State
+  public onRoomListUpdated = new Observable<RoomInfo[]>();
+  public onStateChanged = new Observable<NetworkState>();
+
+  private playerStates: Map<string, PlayerState> = new Map();
+  private currentState: NetworkState = NetworkState.Disconnected;
+
+  private constructor() {
+    this.provider = new PhotonProvider();
+    this.setupProviderListeners();
+  }
 
   public clearObservers(): void {
     this.onPlayersList.clear();
@@ -53,6 +65,8 @@ export class NetworkManager {
     this.onPlayerFired.clear();
     this.onPlayerHit.clear();
     this.onPlayerDied.clear();
+    this.onRoomListUpdated.clear();
+    this.onStateChanged.clear();
   }
 
   public static getInstance(): NetworkManager {
@@ -62,42 +76,98 @@ export class NetworkManager {
     return NetworkManager.instance;
   }
 
-  public connect(url: string = 'http://localhost:3000'): void {
-    if (this.socket) return;
+  private setupProviderListeners(): void {
+    this.provider.onStateChanged = (state) => {
+      this.currentState = state;
+      this.onStateChanged.notifyObservers(state);
+    };
 
-    this.socket = io(url);
+    this.provider.onRoomListUpdated = (rooms) => {
+      this.onRoomListUpdated.notifyObservers(rooms);
+    };
 
-    this.socket.on('connect', () => {
-      console.log('Connected to server');
-    });
+    this.provider.onPlayerJoined = (id, name) => {
+      const newState: PlayerState = {
+        id,
+        name,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 },
+        weaponId: 'Pistol',
+        health: 100,
+      };
+      this.playerStates.set(id, newState);
+      this.onPlayerJoined.notifyObservers(newState);
+    };
 
-    this.socket.on('playersList', (players: PlayerState[]) => {
-      this.onPlayersList.notifyObservers(players);
-    });
-
-    this.socket.on('playerJoined', (player: PlayerState) => {
-      this.onPlayerJoined.notifyObservers(player);
-    });
-
-    this.socket.on('playerUpdated', (player: PlayerState) => {
-      this.onPlayerUpdated.notifyObservers(player);
-    });
-
-    this.socket.on('playerLeft', (id: string) => {
+    this.provider.onPlayerLeft = (id) => {
+      this.playerStates.delete(id);
       this.onPlayerLeft.notifyObservers(id);
-    });
+    };
 
-    this.socket.on('playerFired', (data: FireEventData) => {
-      this.onPlayerFired.notifyObservers(data);
-    });
+    this.provider.onEvent = (code, data, senderId) => {
+      switch (code) {
+        case EventCode.MOVE:
+          if (this.playerStates.has(senderId)) {
+            const state = this.playerStates.get(senderId)!;
+            state.position = data.position;
+            state.rotation = data.rotation;
+            this.onPlayerUpdated.notifyObservers(state);
+          }
+          break;
+        case EventCode.FIRE:
+          this.onPlayerFired.notifyObservers({
+            playerId: senderId,
+            weaponId: data.weaponId,
+            muzzleTransform: data.muzzleTransform,
+          });
+          break;
+        case EventCode.HIT:
+          this.onPlayerHit.notifyObservers({
+            playerId: data.targetId,
+            damage: data.damage,
+            newHealth: data.newHealth || 0,
+            attackerId: senderId,
+          });
+          break;
+        case EventCode.SYNC_WEAPON:
+          if (this.playerStates.has(senderId)) {
+            const state = this.playerStates.get(senderId)!;
+            state.weaponId = data.weaponId;
+            this.onPlayerUpdated.notifyObservers(state);
+          }
+          break;
+      }
+    };
+  }
 
-    this.socket.on('playerHit', (data: HitEventData) => {
-      this.onPlayerHit.notifyObservers(data);
-    });
+  public connect(userId: string): void {
+    // Prevent redundant connection attempts using internal state
+    if (
+      this.currentState !== NetworkState.Disconnected &&
+      this.currentState !== NetworkState.Error
+    ) {
+      return;
+    }
 
-    this.socket.on('playerDied', (data: DeathEventData) => {
-      this.onPlayerDied.notifyObservers(data);
+    this.provider.connect(userId).catch((e) => {
+      console.error('[NetworkManager] Connect failed:', e);
     });
+  }
+
+  public async createRoom(name: string, options?: { mapId: string }): Promise<boolean> {
+    return this.provider.createRoom(name, options);
+  }
+
+  public async joinRoom(name: string): Promise<boolean> {
+    return this.provider.joinRoom(name);
+  }
+
+  public leaveRoom(): void {
+    this.provider.leaveRoom();
+  }
+
+  public getMapId(): string | null {
+    return this.provider.getCurrentRoomProperty('mapId');
   }
 
   public join(data: {
@@ -106,20 +176,18 @@ export class NetworkManager {
     weaponId: string;
     name: string;
   }): void {
-    this.socket?.emit('join', {
-      position: { x: data.position.x, y: data.position.y, z: data.position.z },
-      rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
-      weaponId: data.weaponId,
-      name: data.name,
-    });
+    this.updateState(data);
   }
 
   public updateState(data: { position: Vector3; rotation: Vector3; weaponId: string }): void {
-    this.socket?.emit('updateState', {
-      position: { x: data.position.x, y: data.position.y, z: data.position.z },
-      rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
-      weaponId: data.weaponId,
-    });
+    this.provider.sendEvent(
+      EventCode.MOVE,
+      {
+        position: { x: data.position.x, y: data.position.y, z: data.position.z },
+        rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
+      },
+      false
+    );
   }
 
   public fire(fireData: {
@@ -129,32 +197,18 @@ export class NetworkManager {
       direction: { x: number; y: number; z: number };
     };
   }): void {
-    // Sanitize Vector3 if present
-    const sanitizedData = {
-      weaponId: fireData.weaponId,
-      muzzleTransform: fireData.muzzleTransform
-        ? {
-            position: {
-              x: fireData.muzzleTransform.position.x,
-              y: fireData.muzzleTransform.position.y,
-              z: fireData.muzzleTransform.position.z,
-            },
-            direction: {
-              x: fireData.muzzleTransform.direction.x,
-              y: fireData.muzzleTransform.direction.y,
-              z: fireData.muzzleTransform.direction.z,
-            },
-          }
-        : undefined,
-    };
-    this.socket?.emit('fire', sanitizedData);
+    this.provider.sendEvent(EventCode.FIRE, fireData, true);
+  }
+
+  public syncWeapon(weaponId: string): void {
+    this.provider.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
   }
 
   public hit(hitData: { targetId: string; damage: number }): void {
-    this.socket?.emit('hit', hitData);
+    this.provider.sendEvent(EventCode.HIT, hitData, true);
   }
 
   public getSocketId(): string | undefined {
-    return this.socket?.id;
+    return (this.provider as any).client?.myActor()?.actorNr?.toString();
   }
 }

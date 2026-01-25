@@ -9,6 +9,7 @@ import {
   Container,
 } from '@babylonjs/gui';
 import { Scene, Observable } from '@babylonjs/core';
+import { LobbyUI } from './LobbyUI';
 
 type TacticalButton = Button & { _updateStyles?: () => void };
 
@@ -27,6 +28,7 @@ export class UIManager {
   // UI Containers
   private screens: Map<UIScreen, Container> = new Map();
   private currentScreen: UIScreen = UIScreen.NONE;
+  private lobbyUI: LobbyUI | null = null;
 
   // Visual Constants
   private readonly PRIMARY_COLOR = '#ffc400';
@@ -266,39 +268,9 @@ export class UIManager {
   }
 
   private createLobbyScreen(): Container {
-    const container = new Rectangle('lobby-container');
-    container.width = '100%';
-    container.height = '100%';
-    container.background = this.BG_COLOR;
-    container.thickness = 0;
+    this.lobbyUI = new LobbyUI(this);
+    const container = this.lobbyUI.getContainer();
     this.ui.addControl(container);
-
-    const header = new TextBlock();
-    header.text = 'JOINT_OPERATIONS_CENTER';
-    header.color = this.PRIMARY_COLOR;
-    header.fontSize = 24;
-    header.fontFamily = this.FONT_TACTICAL;
-    header.top = '50px';
-    header.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    container.addControl(header);
-
-    const placeholder = new TextBlock();
-    placeholder.text = 'SCANNING_FOR_ACTIVE_SERVERS...';
-    placeholder.color = 'rgba(255, 255, 255, 0.2)';
-    placeholder.fontSize = 14;
-    placeholder.fontFamily = this.FONT_MONO;
-    container.addControl(placeholder);
-
-    // Back Button
-    const backBtn = this.createTacticalButton('RETURN', '150px', '40px');
-    backBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    backBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
-    backBtn.top = '40px';
-    backBtn.left = '-40px';
-    backBtn.color = '#ff4d4d';
-    backBtn.onPointerUpObservable.add(() => this.showScreen(UIScreen.MAIN_MENU));
-    container.addControl(backBtn);
-
     return container;
   }
 
