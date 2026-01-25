@@ -25,7 +25,12 @@ export class InventoryUI {
   private equipmentGrid!: Grid;
   private bagGrid!: Grid;
   private tooltip!: Rectangle;
-  private tooltipText!: TextBlock;
+  private tooltipName!: TextBlock;
+  private tooltipType!: TextBlock;
+  private tooltipDesc!: TextBlock;
+
+  private contextMenu!: Rectangle;
+  private activeContextItemId: string | null = null;
 
   private isOpen = false;
   private callbacks: InventoryCallbacks;
@@ -47,13 +52,17 @@ export class InventoryUI {
       if (this.isOpen) this.render();
     });
 
-    // Tooltip tracking
+    // Tooltip tracking: Follow mouse using scene pointer coordinates
     this.pointerObserver =
       this.ui.getScene()?.onPointerObservable.add((pointerInfo) => {
-        if (this.tooltip.isVisible) {
-          const evt = pointerInfo.event as PointerEvent;
-          this.tooltip.left = evt.clientX + 15 + 'px';
-          this.tooltip.top = evt.clientY + 15 + 'px';
+        // Only update on move when tooltip is visible
+        if (pointerInfo.type === 0x01 && this.tooltip.isVisible) {
+          // 0x01 is PointerEventTypes.POINTERMOVE
+          const scene = this.ui.getScene();
+          if (scene) {
+            this.tooltip.left = scene.pointerX + 20 + 'px';
+            this.tooltip.top = scene.pointerY + 20 + 'px';
+          }
         }
       }) || null;
   }
@@ -67,6 +76,10 @@ export class InventoryUI {
     overlay.thickness = 0;
     overlay.isVisible = false;
     this.ui.addControl(overlay);
+
+    overlay.onPointerDownObservable.add(() => {
+      this.hideContextMenu();
+    });
 
     // 2. Main Window
     const window = new Rectangle('inventoryWindow');
@@ -155,25 +168,99 @@ export class InventoryUI {
 
   private createTooltip(): void {
     this.tooltip = new Rectangle('tooltip');
-    this.tooltip.width = '200px';
-    this.tooltip.height = '80px';
-    this.tooltip.background = 'rgba(0,0,0,0.9)';
-    this.tooltip.color = '#aaaaaa';
+    this.tooltip.width = '240px';
+    this.tooltip.height = '120px';
+    this.tooltip.background = 'rgba(10, 10, 10, 0.95)';
+    this.tooltip.color = 'rgba(255, 255, 255, 0.1)';
     this.tooltip.thickness = 1;
     this.tooltip.isVisible = false;
-    this.tooltip.isHitTestVisible = false; // Mouse passes through
-    this.tooltip.linkOffsetX = 20;
-    this.tooltip.linkOffsetY = 20;
+    this.tooltip.isHitTestVisible = false;
+    this.tooltip.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.tooltip.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.tooltip.zIndex = 100;
     this.ui.addControl(this.tooltip);
 
-    this.tooltipText = new TextBlock('tooltipText');
-    this.tooltipText.color = 'white';
-    this.tooltipText.textWrapping = true;
-    this.tooltipText.paddingTop = '5px';
-    this.tooltipText.paddingBottom = '5px';
-    this.tooltipText.paddingLeft = '5px';
-    this.tooltipText.paddingRight = '5px';
-    this.tooltip.addControl(this.tooltipText);
+    // Accent Bar (Left)
+    const accent = new Rectangle('accent');
+    accent.width = '4px';
+    accent.height = '100%';
+    accent.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    accent.background = '#ffc400';
+    accent.thickness = 0;
+    this.tooltip.addControl(accent);
+
+    const stack = new StackPanel();
+    stack.paddingLeft = '15px';
+    stack.paddingRight = '10px';
+    stack.paddingTop = '10px';
+    stack.isVertical = true;
+    stack.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.tooltip.addControl(stack);
+
+    this.tooltipName = new TextBlock('tName', '');
+    this.tooltipName.color = 'white';
+    this.tooltipName.fontSize = 20;
+    this.tooltipName.fontFamily = 'Rajdhani, sans-serif';
+    this.tooltipName.fontWeight = 'bold';
+    this.tooltipName.height = '30px';
+    this.tooltipName.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    stack.addControl(this.tooltipName);
+
+    this.tooltipType = new TextBlock('tType', '');
+    this.tooltipType.color = '#ffc400';
+    this.tooltipType.fontSize = 12;
+    this.tooltipType.height = '20px';
+    this.tooltipType.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    stack.addControl(this.tooltipType);
+
+    this.tooltipDesc = new TextBlock('tDesc', '');
+    this.tooltipDesc.color = '#aaaaaa';
+    this.tooltipDesc.fontSize = 14;
+    this.tooltipDesc.textWrapping = true;
+    this.tooltipDesc.height = '50px';
+    this.tooltipDesc.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    stack.addControl(this.tooltipDesc);
+
+    // --- Create Context Menu ---
+    this.contextMenu = new Rectangle('contextMenu');
+    this.contextMenu.width = '120px';
+    this.contextMenu.height = '80px';
+    this.contextMenu.background = '#111111';
+    this.contextMenu.color = '#ffc400';
+    this.contextMenu.thickness = 1;
+    this.contextMenu.isVisible = false;
+    this.contextMenu.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    this.contextMenu.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.contextMenu.zIndex = 110;
+    this.ui.addControl(this.contextMenu);
+
+    const contextStack = new StackPanel();
+    this.contextMenu.addControl(contextStack);
+
+    const createMenuBtn = (text: string, onClick: () => void) => {
+      const btn = Button.CreateSimpleButton(text, text);
+      btn.height = '40px';
+      btn.color = 'white';
+      btn.background = 'transparent';
+      btn.thickness = 0;
+      btn.onPointerEnterObservable.add(() => (btn.background = '#ffc400'));
+      btn.onPointerOutObservable.add(() => (btn.background = 'transparent'));
+      btn.onPointerClickObservable.add(onClick);
+      return btn;
+    };
+
+    contextStack.addControl(
+      createMenuBtn('USE ITEM', () => {
+        if (this.activeContextItemId) this.callbacks.onUseItem(this.activeContextItemId);
+        this.hideContextMenu();
+      })
+    );
+    contextStack.addControl(
+      createMenuBtn('DROP', () => {
+        if (this.activeContextItemId) this.callbacks.onDropItem(this.activeContextItemId);
+        this.hideContextMenu();
+      })
+    );
   }
 
   public toggle(force?: boolean): boolean {
@@ -184,6 +271,7 @@ export class InventoryUI {
       this.render();
     } else {
       this.tooltip.isVisible = false;
+      this.hideContextMenu(); // Ensure context menu closes with inventory
     }
     return this.isOpen;
   }
@@ -232,20 +320,17 @@ export class InventoryUI {
       }
 
       // Interaction
-      slotBtn.onPointerClickObservable.add((info) => {
-        // Left Click: Select / Swap logic
+      slotBtn.onPointerUpObservable.add((info) => {
         if (info.buttonIndex === 0) {
           this.selectedSlotIndex = index;
           this.callbacks.onEquipWeapon(index, weaponId);
-          this.render(); // Re-render to update selection style
-        }
-        // Right Click: Unequip
-        else if (info.buttonIndex === 2) {
-          this.callbacks.onEquipWeapon(index, null);
+          this.render();
+        } else if (info.buttonIndex === 2 && weaponId) {
+          // Right Click on equipped weapon: Drop it
+          this.showContextMenu(weaponId, info.x, info.y);
         }
       });
 
-      // Tooltip
       if (meta) {
         slotBtn.onPointerEnterObservable.add(() => this.showTooltip(meta));
         slotBtn.onPointerOutObservable.add(() => this.hideTooltip());
@@ -256,10 +341,6 @@ export class InventoryUI {
 
     // --- Render Bag Slots ---
     const BAG_COLS = 4;
-    // Assume definitions are set in createInventoryWindow or we just add controls to cells.
-    // Ideally we should manage rows dynamically, but for now we rely on existing definitions or just adding to cells (which works if definitions exist).
-    // If we need to expand rows, we should check rowCount (private) or just add definitions safely?
-    // Let's just assume we have enough rows (e.g. 5) set in createInventoryWindow.
 
     for (let i = 0; i < state.maxBagSlots; i++) {
       const item = state.bagItems[i];
@@ -277,7 +358,6 @@ export class InventoryUI {
         slotBtn.background = '#555555';
         slotBtn.color = 'white';
 
-        // Content
         const stack = new StackPanel();
         slotBtn.addControl(stack);
 
@@ -295,13 +375,14 @@ export class InventoryUI {
         count.height = '20px';
         stack.addControl(count);
 
-        // Interaction
-        slotBtn.onPointerClickObservable.add(() => {
-          // Consume or Equip
-          if (item.type === 'consumable') {
-            this.callbacks.onUseItem(item.id);
-          } else if (item.type === 'weapon') {
-            this.callbacks.onEquipWeapon(this.selectedSlotIndex, item.id); // Equip to currently selected slot
+        // Interaction: Right Click for Context Menu
+        slotBtn.onPointerUpObservable.add((info) => {
+          if (info.buttonIndex === 2) {
+            // Right Click
+            this.showContextMenu(item.id, info.x, info.y);
+          } else if (info.buttonIndex === 0 && item.type === 'weapon') {
+            // Left Click for weapon: quick equip
+            this.callbacks.onEquipWeapon(this.selectedSlotIndex, item.id);
           }
         });
 
@@ -316,32 +397,43 @@ export class InventoryUI {
   }
 
   private showTooltip(item: { name: string; type: string; description: string }): void {
+    const scene = this.ui.getScene();
+    if (scene) {
+      this.tooltip.left = scene.pointerX + 20 + 'px';
+      this.tooltip.top = scene.pointerY + 20 + 'px';
+    }
     this.tooltip.isVisible = true;
-    this.tooltipText.text = `${item.name}\n[${item.type.toUpperCase()}]\n${item.description}`;
-    // Position is handled by onPointerObservable in constructor
+    this.tooltipName.text = item.name.toUpperCase();
+    this.tooltipType.text = `[ ${item.type.toUpperCase()} ]`;
+    this.tooltipDesc.text = item.description;
   }
 
   private hideTooltip(): void {
     this.tooltip.isVisible = false;
   }
 
+  private showContextMenu(itemId: string, x: number, y: number): void {
+    this.activeContextItemId = itemId;
+    this.contextMenu.left = x + 'px';
+    this.contextMenu.top = y + 'px';
+    this.contextMenu.isVisible = true;
+  }
+
+  private hideContextMenu(): void {
+    this.contextMenu.isVisible = false;
+    this.activeContextItemId = null;
+  }
+
   public dispose(): void {
-    // Unsubscribe from store
-    // actually class doesn't keep subscription reference.
-    // InventoryUI constructor calls inventoryStore.subscribe(...) but doesn't store unsub.
-    // Store subscribe returns unsubscribe function.
-    // We need to store it.
     if (this.unsub) {
       this.unsub();
       this.unsub = null;
     }
 
-    // Dispose UI
     if (this.container) this.container.dispose();
     if (this.tooltip) this.tooltip.dispose();
+    if (this.contextMenu) this.contextMenu.dispose();
 
-    // Cleaning observable
-    // The pointer observable is added to scene. We need to remove it.
     if (this.pointerObserver) {
       this.ui.getScene()?.onPointerObservable.remove(this.pointerObserver);
       this.pointerObserver = null;
