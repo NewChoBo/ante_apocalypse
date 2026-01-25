@@ -17,6 +17,8 @@ import { TargetSpawnerComponent } from './components/TargetSpawnerComponent';
 import { TargetRegistry } from './systems/TargetRegistry';
 import { HUD } from '../ui/HUD';
 import { gameStateStore, playerHealthStore, inventoryStore } from './store/GameStore';
+import { GameObservables } from './events/GameObservables';
+import { InventoryManager } from './inventory/InventoryManager';
 import '@babylonjs/inspector'; // 인스펙터 기능 활성화
 import { LevelLoader, LevelData } from './systems/LevelLoader';
 import { EnemyManager } from './systems/EnemyManager';
@@ -27,7 +29,7 @@ import { CombatComponent } from './components/CombatComponent';
 import { InventoryUI } from '../ui/inventory/InventoryUI';
 import { TickManager } from './TickManager';
 import { PickupManager } from './systems/PickupManager';
-import { getItemMetadata } from './items/ItemDatabase';
+import { GlobalInputManager } from './systems/GlobalInputManager';
 
 import trainingGroundData from '../assets/levels/training_ground.json';
 import combatZoneData from '../assets/levels/combat_zone.json';
@@ -68,7 +70,6 @@ export class Game {
     this.initCanvas(containerId);
     this.initEngine();
     this.initMenuScene(); // Scene 생성
-    this.setupGlobalInput(); // 입력 리스너 초기화 (1회)
 
     // 메뉴 화면 렌더링 시작
     this.engine.runRenderLoop(this.renderFunction);
@@ -175,6 +176,14 @@ export class Game {
     // 아이템 드랍 시스템 초기화
     PickupManager.getInstance().initialize(this.scene, this.playerPawn);
 
+    // 아이템 획득 사운드 리스너
+    GameObservables.itemCollection.add(() => {
+      const swipeSound = AssetLoader.getInstance().getSound('swipe');
+      if (swipeSound) {
+        swipeSound.play();
+      }
+    });
+
     const combat = this.playerPawn.getComponent(CombatComponent);
     if (combat instanceof CombatComponent) {
       combat.onWeaponChanged(() => {
@@ -199,46 +208,8 @@ export class Game {
       },
       onUseItem: (itemId) => {
         if (!this.playerPawn) return;
-        const metadata = getItemMetadata(itemId);
-        if (!metadata) return;
-
-        const state = inventoryStore.get();
-        const bag = [...state.bagItems];
-        const itemIndex = bag.findIndex((i) => i.id === itemId);
-
-        if (itemIndex !== -1) {
-          const item = bag[itemIndex];
-
-          if (metadata.type === 'consumable') {
-            if (item.id === 'health_pack') {
-              this.playerPawn.addHealth(30);
-            } else if (item.id === 'ammo_box') {
-              this.playerPawn.addAmmo(50);
-            } else if (item.id === 'ammo_generic') {
-              this.playerPawn.addAmmo(20);
-            }
-
-            // 소모 처리
-            if (item.count > 1) {
-              bag[itemIndex] = { ...item, count: item.count - 1 };
-            } else {
-              bag.splice(itemIndex, 1);
-            }
-            inventoryStore.setKey('bagItems', bag);
-          } else if (metadata.type === 'weapon') {
-            // 가방에 있는 무기를 현재 슬롯에 장착 (기존 무기와 교체는 아직 미구현)
-            const slots = [...state.weaponSlots];
-            slots[this.inventoryUI?.getSelectedSlot() || 0] = itemId;
-            inventoryStore.setKey('weaponSlots', slots);
-
-            const combat = this.playerPawn.getComponent(CombatComponent);
-            if (combat instanceof CombatComponent) {
-              combat.equipWeapon(itemId);
-            }
-          }
-
-          this.syncInventoryStore();
-        }
+        InventoryManager.useItem(itemId, this.playerPawn);
+        this.syncInventoryStore();
       },
       onDropItem: (itemId) => {
         if (!this.playerPawn) return;
@@ -265,6 +236,15 @@ export class Game {
       },
     });
     this.syncInventoryStore();
+
+    // 전역 입력 시스템 초기화
+    GlobalInputManager.getInstance().initialize(
+      this.scene,
+      this.canvas,
+      this.playerPawn,
+      this.playerController,
+      this.inventoryUI
+    );
   }
 
   private gameOver(): void {
@@ -396,50 +376,6 @@ export class Game {
 
     this.engine.stopRenderLoop(this.renderFunction); // 혹시 모를 중복 방지
     this.engine.runRenderLoop(this.renderFunction);
-  }
-
-  private setupGlobalInput(): void {
-    window.addEventListener('keydown', (e) => {
-      if (!this.isRunning) return;
-
-      // 1. 디버그용 아이템 스폰 (H: Health, J: Ammo)
-      if (!this.isPaused) {
-        if (e.code === 'KeyH') {
-          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'health_pack');
-          console.log('[DEBUG] Spawned Health Pickup');
-        }
-        if (e.code === 'KeyJ') {
-          PickupManager.getInstance().spawnPickup(this.playerPawn!.mesh.position, 'ammo_box');
-          console.log('[DEBUG] Spawned Ammo Pickup');
-        }
-      }
-
-      // 2. 인스펙터 토글 (I)
-      if (e.code === 'KeyI' && !e.repeat) {
-        if (this.scene.debugLayer.isVisible()) {
-          this.scene.debugLayer.hide();
-          if (!this.isPaused) this.canvas.requestPointerLock();
-        } else {
-          this.scene.debugLayer.show();
-          document.exitPointerLock();
-        }
-      }
-
-      // 3. 인벤토리 토글 (Tab)
-      if (e.code === 'Tab') {
-        e.preventDefault();
-        if (this.inventoryUI && this.playerController) {
-          const isOpen = this.inventoryUI.toggle();
-          this.playerController.setInputBlocked(isOpen);
-
-          if (isOpen) {
-            document.exitPointerLock();
-          } else if (!this.isPaused) {
-            this.canvas.requestPointerLock();
-          }
-        }
-      }
-    });
   }
 
   private syncInventoryStore(): void {

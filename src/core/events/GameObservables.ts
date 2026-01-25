@@ -35,4 +35,10 @@ export const GameObservables = {
     damage: number;
     position: Vector3;
   }>(),
+
+  /** 아이템 획득 */
+  itemCollection: new Observable<{
+    itemId: string;
+    position: Vector3;
+  }>(),
 };

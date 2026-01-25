@@ -3,7 +3,8 @@ import { PickupActor, PickupType } from '../entities/PickupActor';
 import { PlayerPawn } from '../PlayerPawn';
 import { ITickable } from '../interfaces/ITickable';
 import { TickManager } from '../TickManager';
-import { inventoryStore } from '../store/GameStore';
+import { inventoryStore, BagItem } from '../store/GameStore';
+import { GameObservables } from '../events/GameObservables';
 
 export class PickupManager implements ITickable {
   private static instance: PickupManager;
@@ -80,7 +81,7 @@ export class PickupManager implements ITickable {
       const { bagItems } = inventoryStore.get();
       const existingItemIndex = bagItems.findIndex((item) => item.id === pickup.type);
 
-      let newBagItems;
+      let newBagItems: BagItem[];
       if (existingItemIndex !== -1) {
         // 불변성 유지를 위해 인덱스를 사용하여 새로운 배열 생성
         newBagItems = bagItems.map((item, idx) =>
@@ -94,13 +95,18 @@ export class PickupManager implements ITickable {
             name: pickup.type === 'health_pack' ? 'First Aid Kit' : 'Ammo Crate',
             type: 'consumable',
             count: 1,
-            // ITEM_DATABASE에서 아이콘 로드 가능하도록 ID만 정확히 전달
-          },
+          } as BagItem,
         ];
       }
 
       inventoryStore.setKey('bagItems', newBagItems);
       this.showPopup(`Picked up ${pickup.type}`, '#FF9800');
+
+      // Notify collection for audio/VFX
+      GameObservables.itemCollection.notifyObservers({
+        itemId: pickup.type,
+        position: pickup.mesh.getAbsolutePosition(),
+      });
 
       pickup.collect();
       console.log(`[PickupManager] Stored ${pickup.type} in bag`);

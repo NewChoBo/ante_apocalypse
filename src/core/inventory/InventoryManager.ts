@@ -1,5 +1,6 @@
 import { inventoryStore, BagItem } from '../store/GameStore';
 import { getItemMetadata } from '../items/ItemDatabase';
+import type { PlayerPawn } from '../PlayerPawn';
 
 export class InventoryManager {
   /**
@@ -57,24 +58,36 @@ export class InventoryManager {
   /**
    * 아이템 사용
    */
-  static useItem(itemId: string): void {
+  static useItem(itemId: string, player: PlayerPawn): void {
     const state = inventoryStore.get();
     const itemIndex = state.bagItems.findIndex((i) => i.id === itemId);
     if (itemIndex === -1) return;
 
     const item = state.bagItems[itemIndex];
+    const meta = getItemMetadata(itemId);
+    if (!meta) return;
 
-    // 사용 로직 (나중에 구체화)
-    console.log(`Using item: ${item.name}`);
+    // 사용 로직 (소모품인 경우 효과 적용)
+    if (meta.type === 'consumable') {
+      console.log(`Using consumable: ${item.name}`);
 
-    // 개수 감소 및 소모
-    if (item.count > 1) {
-      const newBagItems = [...state.bagItems];
-      newBagItems[itemIndex] = { ...item, count: item.count - 1 };
-      inventoryStore.setKey('bagItems', newBagItems);
-    } else {
-      const newBagItems = state.bagItems.filter((i) => i.id !== itemId);
-      inventoryStore.setKey('bagItems', newBagItems);
+      if (meta.onUse) {
+        meta.onUse(player);
+      }
+
+      // 개수 감소 및 소모
+      if (item.count > 1) {
+        const newBagItems = [...state.bagItems];
+        newBagItems[itemIndex] = { ...item, count: item.count - 1 };
+        inventoryStore.setKey('bagItems', newBagItems);
+      } else {
+        const newBagItems = state.bagItems.filter((i) => i.id !== itemId);
+        inventoryStore.setKey('bagItems', newBagItems);
+      }
+    } else if (meta.type === 'weapon') {
+      // 무기인 경우 장착 로직 (이미 장착되어있지 않은 경우)
+      // 이 로직은 보통 UI 콜백이나 Controller에서 호출될 것을 예상
+      console.log(`Weapon selected: ${item.name}`);
     }
   }
 
