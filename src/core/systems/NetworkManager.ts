@@ -46,7 +46,12 @@ export class NetworkManager {
   public onPlayerDied = new Observable<DeathEventData>();
 
   // Enemy Synchronization
-  public onEnemyUpdated = new Observable<{ id: string; position: any; rotation: any }>();
+  public onEnemyUpdated = new Observable<{
+    id: string;
+    position: any;
+    rotation: any;
+    isMoving?: boolean;
+  }>();
   public onEnemyHit = new Observable<{ id: string; damage: number }>();
 
   // State Synchronization
@@ -168,6 +173,7 @@ export class NetworkManager {
             id: data.id,
             position: data.position,
             rotation: data.rotation,
+            isMoving: data.isMoving,
           });
           break;
         case EventCode.ENEMY_HIT:
@@ -332,6 +338,10 @@ export class NetworkManager {
 
   public getSocketId(): string | undefined {
     return this.provider.getLocalPlayerId() || undefined;
+  }
+
+  public getServerTime(): number {
+    return this.provider.getServerTime();
   }
 
   public refreshRoomList(): void {

@@ -9,6 +9,7 @@ import {
   Animation,
 } from '@babylonjs/core';
 import { BaseTarget } from './BaseTarget';
+import { NetworkManager } from '../core/systems/NetworkManager';
 
 /**
  * 이동 타겟 구현체.
@@ -17,7 +18,7 @@ import { BaseTarget } from './BaseTarget';
 export class MovingTarget extends BaseTarget {
   public id: string;
   public mesh: Mesh;
-  public type: string = 'moving';
+  public type: string = 'moving_target';
   public isMoving: boolean = true;
   private shadowGenerator: ShadowGenerator;
   private basePosition: Vector3;
@@ -28,7 +29,11 @@ export class MovingTarget extends BaseTarget {
     this.shadowGenerator = shadowGenerator;
     this.basePosition = position.clone();
     this.mesh = this.createMesh(position);
-    this.addMovementAnimation();
+    this.damageProfile = {
+      multipliers: { head: 3.0, body: 1.0 },
+      defaultMultiplier: 1.0,
+    };
+    this.startSyncedMovement();
   }
 
   private createMesh(position: Vector3): Mesh {
@@ -64,25 +69,21 @@ export class MovingTarget extends BaseTarget {
     return target;
   }
 
-  private addMovementAnimation(): void {
-    const anim = new Animation(
-      'targetMove',
-      'position.x',
-      30,
-      Animation.ANIMATIONTYPE_FLOAT,
-      Animation.ANIMATIONLOOPMODE_CYCLE
-    );
-
+  private startSyncedMovement(): void {
+    const networkManager = NetworkManager.getInstance();
     const moveRange = 2;
-    const keys = [
-      { frame: 0, value: this.basePosition.x - moveRange },
-      { frame: 60, value: this.basePosition.x + moveRange },
-      { frame: 120, value: this.basePosition.x - moveRange },
-    ];
+    const speed = 0.002; // Roughly matching the previous 120 frames at 30fps (4 sec cycle)
 
-    anim.setKeys(keys);
-    this.mesh.animations = [anim];
-    this.scene.beginAnimation(this.mesh, 0, 120, true);
+    this.scene.onBeforeRenderObservable.add(() => {
+      if (!this.isActive || this.mesh.isDisposed()) return;
+
+      const serverTime = networkManager.getServerTime();
+      // Sinusoidal movement based on server time: -moveRange to +moveRange
+      // Math.sin range is -1 to 1.
+      // Cycle: 2 * Math.PI.
+      const phase = serverTime * speed;
+      this.mesh.position.x = this.basePosition.x + Math.sin(phase) * moveRange;
+    });
   }
 
   protected onHit(_amount: number, _hitPoint?: Vector3): void {

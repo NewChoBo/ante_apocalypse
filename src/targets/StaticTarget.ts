@@ -17,7 +17,7 @@ import { BaseTarget } from './BaseTarget';
 export class StaticTarget extends BaseTarget {
   public id: string;
   public mesh: Mesh;
-  public type: string = 'static';
+  public type: string = 'static_target';
   public isMoving: boolean = false;
   private shadowGenerator: ShadowGenerator;
 
@@ -26,6 +26,10 @@ export class StaticTarget extends BaseTarget {
     this.id = id;
     this.shadowGenerator = shadowGenerator;
     this.mesh = this.createMesh(position);
+    this.damageProfile = {
+      multipliers: { head: 3.0, body: 1.0 },
+      defaultMultiplier: 1.0,
+    };
   }
 
   private createMesh(position: Vector3): Mesh {

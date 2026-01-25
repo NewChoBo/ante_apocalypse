@@ -17,7 +17,7 @@ import { BaseTarget } from './BaseTarget';
 export class HumanoidTarget extends BaseTarget {
   public id: string;
   public mesh: Mesh;
-  public type: string = 'humanoid';
+  public type: string = 'humanoid_target';
   public isMoving: boolean = false;
   private shadowGenerator: ShadowGenerator;
 
@@ -27,6 +27,10 @@ export class HumanoidTarget extends BaseTarget {
     this.id = id;
     this.shadowGenerator = shadowGenerator;
     this.mesh = this.createHumanoidMesh(position);
+    this.damageProfile = {
+      multipliers: { head: 4.0, body: 1.0 }, // Humanoid target gets higher head multiplier
+      defaultMultiplier: 1.0,
+    };
   }
 
   private createHumanoidMesh(position: Vector3): Mesh {

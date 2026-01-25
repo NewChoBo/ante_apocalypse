@@ -18,6 +18,8 @@ import { DynamicTexture } from '@babylonjs/core';
 export class EnemyPawn extends BasePawn {
   public mesh: Mesh;
   public isDead = false;
+  private _lastPosition: Vector3 = new Vector3();
+  public type = 'enemy';
 
   // Visuals & Animation
   private visualMesh: AbstractMesh | null = null;
@@ -37,6 +39,10 @@ export class EnemyPawn extends BasePawn {
   constructor(scene: Scene, position: Vector3, shadowGenerator: ShadowGenerator) {
     super(scene);
     this.shadowGenerator = shadowGenerator;
+    this.damageProfile = {
+      multipliers: { head: 2.0, body: 1.0 },
+      defaultMultiplier: 1.0,
+    };
 
     // 1. Create Root Collider (Invisible Box/Capsule)
     // This allows the Pawn to exist and collide immediately while model loads
@@ -191,16 +197,38 @@ export class EnemyPawn extends BasePawn {
     // 필요한 경우 초기화 로직
   }
 
+  private _lastMoveTime: number = 0;
+
   public tick(deltaTime: number): void {
+    // 1. Calculate movement state by displacement with grace period to avoid network stutter
+    const currentPos = this.mesh.position;
+    const distance = Vector3.Distance(currentPos, this._lastPosition);
+    const now = performance.now();
+
+    if (distance > 0.005) {
+      this.isMoving = true;
+      this._lastMoveTime = now;
+    } else if (now - this._lastMoveTime > 200) {
+      // 200ms grace period bridges the 100ms (10Hz) network sync gap
+      this.isMoving = false;
+    }
+
     this.updateComponents(deltaTime);
 
-    // Apply Gravity (Simple constant downward force)
+    // Apply Gravity
     if (this.mesh) {
       this.mesh.moveWithCollisions(new Vector3(0, -9.81 * deltaTime, 0));
     }
+
+    this._lastPosition.copyFrom(this.mesh.position);
   }
 
-  public takeDamage(amount: number): void {
+  public takeDamage(
+    amount: number,
+    _attackerId?: string,
+    _part?: string,
+    _hitPoint?: Vector3
+  ): void {
     if (this.isDead) return;
 
     this.health -= amount;
@@ -331,20 +359,19 @@ export class EnemyPawn extends BasePawn {
     }
   }
 
-  private isMoving = false;
+  public isMoving = false;
   private currentAnim = 'idle';
 
   // Override tick to handle anim reset
   public updateComponents(deltaTime: number): void {
     super.updateComponents(deltaTime);
 
-    if (this.skeleton) {
+    if (this.skeleton && this.walkRange && this.idleRange) {
       if (this.isMoving) {
         if (this.currentAnim !== 'walk') {
           this.scene.beginAnimation(this.skeleton, this.walkRange.from, this.walkRange.to, true);
           this.currentAnim = 'walk';
         }
-        this.isMoving = false; // Reset for next frame
       } else {
         if (this.currentAnim !== 'idle') {
           this.scene.beginAnimation(this.skeleton, this.idleRange.from, this.idleRange.to, true);

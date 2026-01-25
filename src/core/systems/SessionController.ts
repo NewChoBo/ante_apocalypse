@@ -11,7 +11,7 @@ import { NetworkManager } from './NetworkManager';
 import { MultiplayerSystem } from './MultiplayerSystem';
 import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
-import { TargetRegistry } from './TargetRegistry';
+import { WorldEntityManager } from './WorldEntityManager';
 import { EnemyManager } from './EnemyManager';
 import { EventCode } from '../network/NetworkProtocol';
 import { GameObservables } from '../events/GameObservables';
@@ -45,6 +45,7 @@ export class SessionController {
     playerName: string = 'Anonymous'
   ): Promise<void> {
     this.playerPawn = new PlayerPawn(this.scene);
+    WorldEntityManager.getInstance().registerEntity(this.playerPawn);
 
     if (levelData.playerSpawn) {
       this.playerPawn.position = Vector3.FromArray(levelData.playerSpawn);
@@ -178,7 +179,16 @@ export class SessionController {
         const enemyStates = this.enemyManager?.getEnemyStates() || [];
         // Extract player states from NetworkManager
         const playerStates = network.getAllPlayerStates();
-        const targetStates = TargetRegistry.getInstance().getSerializedTargets();
+
+        // Get non-pawn entities (targets) from WorldEntityManager
+        const targetStates = WorldEntityManager.getInstance()
+          .getEntitiesByType('static_target', 'moving_target', 'humanoid_target')
+          .map((t) => ({
+            id: t.id,
+            type: t.type,
+            position: { x: t.position.x, y: t.position.y, z: t.position.z },
+            isMoving: (t as any).isMoving || false,
+          }));
 
         network.sendEvent(EventCode.INITIAL_STATE, {
           players: playerStates,

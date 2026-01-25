@@ -18,7 +18,7 @@ export interface IPawn {
   controllerId: string | null;
 
   /** 고유 ID */
-  id?: string;
+  id: string;
 
   /** 사망 상태 */
   isDead: boolean;

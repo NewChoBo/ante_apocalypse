@@ -181,6 +181,20 @@ export class PhotonProvider implements INetworkProvider {
     return this.client.myActor()?.actorNr?.toString() || null;
   }
 
+  public getServerTime(): number {
+    // Photon Realtime JS (4.x) 에서 서버 시간은 loadBalancingPeer를 통해 가져옵니다.
+    if (
+      this.client &&
+      this.client.loadBalancingPeer &&
+      typeof this.client.loadBalancingPeer.getServerTime === 'function'
+    ) {
+      return this.client.loadBalancingPeer.getServerTime();
+    }
+
+    // 기본값으로 현재 로컬 시간을 반환 (동기화 정밀도는 떨어질 수 있음)
+    return Date.now();
+  }
+
   public getCurrentRoomProperty(key: string): any {
     if (this.client.isJoinedToRoom()) {
       return this.client.myRoom().getCustomProperty(key);

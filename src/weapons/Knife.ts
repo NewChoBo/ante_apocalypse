@@ -8,7 +8,6 @@ import {
   Mesh,
 } from '@babylonjs/core';
 import { MeleeWeapon } from './MeleeWeapon';
-import { TargetRegistry } from '../core/systems/TargetRegistry';
 import { GameObservables } from '../core/events/GameObservables';
 
 /**
@@ -101,25 +100,8 @@ export class Knife extends MeleeWeapon {
     });
 
     // 공격 판정 (보정된 다중 레이캐스트 적용)
-    const hitResult = this.checkMeleeHit();
-
-    if (hitResult) {
-      const { targetId, part, pickedPoint } = hitResult;
-      const destroyed = TargetRegistry.getInstance().hitTarget(targetId, part, this.damage);
-
-      // 히트 이벤트 발행 (이펙트 연출용)
-      GameObservables.targetHit.notifyObservers({
-        targetId,
-        part,
-        damage: this.damage,
-        position: pickedPoint,
-      });
-
-      if (this.onScoreCallback) {
-        const score = destroyed ? 150 : 30; // 근접 공격은 점수를 조금 더 줌
-        this.onScoreCallback(score);
-      }
-    }
+    // MeleeWeapon.checkMeleeHit internaly calls processHit which handles damage/points.
+    this.checkMeleeHit();
 
     // 일정 시간 후 공격 가능 상태로 복귀
     setTimeout(() => {

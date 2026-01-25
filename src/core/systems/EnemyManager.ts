@@ -4,13 +4,19 @@ import { AIController } from '../controllers/AIController';
 import { PlayerPawn } from '../PlayerPawn';
 import { NetworkManager } from './NetworkManager';
 import { EventCode } from '../network/NetworkProtocol';
+import { WorldEntityManager } from './WorldEntityManager';
 
+/**
+ * 적(Enemy) 실체의 생성 및 AI 업데이트를 담당합니다.
+ * 실제 피격 처리는 WorldEntityManager에서 수행됩니다.
+ */
 export class EnemyManager {
   private scene: Scene;
   private shadowGenerator: ShadowGenerator;
   private enemies: Map<string, EnemyPawn> = new Map();
   private controllers: Map<string, AIController> = new Map();
   private networkManager: NetworkManager;
+  private worldManager: WorldEntityManager;
   private lastSyncTime = 0;
   private syncInterval = 100; // 10Hz sync
 
@@ -18,6 +24,7 @@ export class EnemyManager {
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
     this.networkManager = NetworkManager.getInstance();
+    this.worldManager = WorldEntityManager.getInstance();
     this.setupNetworkListeners();
   }
 
@@ -28,16 +35,14 @@ export class EnemyManager {
         if (enemy) {
           enemy.position.set(data.position.x, data.position.y, data.position.z);
           enemy.mesh.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+          if (data.isMoving !== undefined) {
+            enemy.isMoving = data.isMoving;
+          }
         }
       }
     });
 
-    this.networkManager.onEnemyHit.add((data) => {
-      const enemy = this.enemies.get(data.id);
-      if (enemy) {
-        enemy.takeDamage(data.damage);
-      }
-    });
+    // onEnemyHit is now handled by WorldEntityManager
 
     this.networkManager.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
 
@@ -59,12 +64,11 @@ export class EnemyManager {
   private handleDestroyEnemy(data: any): void {
     const enemy = this.enemies.get(data.id);
     if (enemy) {
-      enemy.takeDamage(10000); // Force kill
+      this.worldManager.removeEntity(data.id);
     }
   }
 
   public spawnEnemies(spawnPoints: number[][], targetPlayer: PlayerPawn): void {
-    // Master client handles initial enemy spawning
     if (this.networkManager.isMasterClient() || !this.networkManager.getSocketId()) {
       spawnPoints.forEach((point, index) => {
         const id = `enemy_${index}`;
@@ -79,7 +83,9 @@ export class EnemyManager {
     enemy.id = id;
     this.enemies.set(id, enemy);
 
-    // AI Controller only if Master
+    // WorldManager에 등록하여 전역 피격 및 관리가 가능하게 함
+    this.worldManager.registerEntity(enemy);
+
     if (this.networkManager.isMasterClient() || !this.networkManager.getSocketId()) {
       if (target) {
         const controller = new AIController(`ai_${id}`, enemy, target);
@@ -91,34 +97,28 @@ export class EnemyManager {
   }
 
   public update(deltaTime: number): void {
-    // 1. Tick local controllers (only for Master/Authority)
     this.controllers.forEach((c) => c.tick(deltaTime));
 
-    // 2. Clean up dead entities (All clients should do this to keep Maps in sync)
     this.enemies.forEach((enemy, id) => {
-      // Check if it's dead or already disposed by other means
+      // 사망 혹은 제거 체크
       if (enemy.isDead || enemy.mesh.isDisposed()) {
-        // Broadcasters (Master) send the destroy event to others
+        // Master인 경우 파괴 이벤트 전송 (WorldManager에서 처리할 수도 있지만 여기서 보장)
         if (this.networkManager.isMasterClient()) {
           this.networkManager.sendEvent(EventCode.DESTROY_ENEMY, { id });
         }
 
-        // Everyone removes from local maps and disposes
-        enemy.dispose();
+        // 제거 처리
+        this.worldManager.removeEntity(id);
         this.enemies.delete(id);
         this.controllers.get(id)?.dispose();
         this.controllers.delete(id);
-
-        console.log(`[EnemyManager] Cleaned up enemy: ${id}`);
       }
     });
 
-    // 3. Broadcast positions if Master
     if (this.networkManager.isMasterClient()) {
       const now = performance.now();
       if (now - this.lastSyncTime > this.syncInterval) {
         this.enemies.forEach((enemy, id) => {
-          // Double check alive status
           if (!enemy.isDead && !enemy.mesh.isDisposed()) {
             this.networkManager.sendEvent(
               EventCode.ENEMY_MOVE,
@@ -130,6 +130,7 @@ export class EnemyManager {
                   y: enemy.mesh.rotation.y,
                   z: enemy.mesh.rotation.z,
                 },
+                isMoving: enemy.isMoving,
               },
               false
             );
@@ -164,26 +165,20 @@ export class EnemyManager {
       if (enemy) {
         enemy.position.set(state.position.x, state.position.y, state.position.z);
         enemy.mesh.rotation.set(state.rotation.x, state.rotation.y, state.rotation.z);
-        enemy.updateHealthBar(state.health); // Sync health visual
+        enemy.updateHealthBar(state.health);
         if (state.isDead && !enemy.isDead) {
-          enemy.takeDamage(1000); // Kill it
+          this.worldManager.processHit(state.id, 10000, 'body', false);
         }
-      } else {
-        // Late joiner or sync missed spawn? Create it.
-        if (!enemy && !state.isDead) {
-          const pos = new Vector3(state.position.x, state.position.y, state.position.z);
-          this.createEnemy(state.id, pos);
-          // Update health immediately
-          const newEnemy = this.enemies.get(state.id);
-          if (newEnemy) newEnemy.updateHealthBar(state.health);
-        }
+      } else if (!state.isDead) {
+        const pos = new Vector3(state.position.x, state.position.y, state.position.z);
+        this.createEnemy(state.id, pos);
       }
     });
   }
 
   public dispose(): void {
     this.controllers.forEach((c) => c.dispose());
-    this.enemies.forEach((e) => e.dispose());
+    // Entities are disposed via worldManager.clear or individual removeEntity calls
     this.enemies.clear();
     this.controllers.clear();
   }

@@ -27,11 +27,17 @@ import { playerHealthStore } from './store/GameStore';
  */
 export class PlayerPawn extends BasePawn {
   public mesh: Mesh;
+  public type = 'player';
   private movementComponent: CharacterMovementComponent;
   private cameraComponent: CameraComponent;
 
   constructor(scene: Scene) {
     super(scene);
+    this.id = 'player_local'; // Local player ID
+    this.damageProfile = {
+      multipliers: { head: 2.0, body: 1.0 },
+      defaultMultiplier: 1.0,
+    };
 
     // 초기 체력 동기화
     playerHealthStore.set(this.health);
@@ -83,7 +89,12 @@ export class PlayerPawn extends BasePawn {
     this.updateComponents(deltaTime);
   }
 
-  public takeDamage(amount: number): void {
+  public takeDamage(
+    amount: number,
+    _attackerId?: string,
+    _part?: string,
+    _hitPoint?: Vector3
+  ): void {
     if (this.isDead || this.health <= 0) return;
 
     this.health = Math.max(0, this.health - amount);

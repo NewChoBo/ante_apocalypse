@@ -9,6 +9,7 @@ export interface INetworkProvider {
   getRoomList(): Promise<RoomInfo[]>;
   sendEvent(code: number, data: any, reliable: boolean): void;
   getLocalPlayerId(): string | null;
+  getServerTime(): number;
 
   // Additional methods used by NetworkManager
   isMasterClient(): boolean;

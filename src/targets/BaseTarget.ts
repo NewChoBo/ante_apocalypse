@@ -1,18 +1,26 @@
 import { Mesh, Vector3, Scene } from '@babylonjs/core';
 import { ITarget } from '../types/ITarget.ts';
+import { IWorldEntity, DamageProfile } from '../types/IWorldEntity';
 
 /**
  * 모든 타겟의 공통 추상 클래스.
  * 체력 관리 및 기본 물리 상호작용을 담당합니다.
  */
-export abstract class BaseTarget implements ITarget {
+export abstract class BaseTarget implements ITarget, IWorldEntity {
   public abstract id: string;
   public abstract mesh: Mesh;
   public abstract type: string; // Added to satisfy ITarget
   public health: number;
   public maxHealth: number;
   public isActive = true;
+  public isDead = false;
   protected scene: Scene;
+
+  public get position(): Vector3 {
+    return this.mesh.position;
+  }
+
+  public damageProfile?: DamageProfile;
 
   constructor(scene: Scene, maxHealth: number) {
     this.scene = scene;
@@ -20,29 +28,25 @@ export abstract class BaseTarget implements ITarget {
     this.health = maxHealth;
   }
 
-  public get isDead(): boolean {
-    return !this.isActive;
-  }
-
   public die(): void {
     if (!this.isActive) return;
     this.isActive = false;
+    this.isDead = true;
     this.onDestroy();
   }
 
-  public takeDamage(amount: number, _attackerId?: string, part?: string, hitPoint?: Vector3): void {
+  public takeDamage(
+    amount: number,
+    _attackerId?: string,
+    _part?: string,
+    hitPoint?: Vector3
+  ): void {
     if (!this.isActive) return;
 
-    let finalDamage = amount;
-    if (part === 'head') {
-      finalDamage *= 3;
-    }
-    console.log(
-      `[BaseTarget] Target ${this.id} took ${finalDamage} damage. Current health: ${this.health - finalDamage}/${this.maxHealth}`
-    );
-
-    this.health -= finalDamage;
-    this.onHit(finalDamage, hitPoint);
+    // Note: WorldEntityManager handles part multipliers now.
+    // This method just applies the final amount.
+    this.health -= amount;
+    this.onHit(amount, hitPoint);
 
     if (this.health <= 0) {
       console.log(`[BaseTarget] Health reached zero for ${this.id}. Calling die().`);
@@ -61,6 +65,12 @@ export abstract class BaseTarget implements ITarget {
       // Actually `GameObservables.targetDestroyed` IS used for scoring?
       // Let's check usages of `targetDestroyed`.
       // It's likely used for UI/Score.
+    }
+  }
+
+  public dispose(): void {
+    if (this.mesh && !this.mesh.isDisposed()) {
+      this.mesh.dispose();
     }
   }
 

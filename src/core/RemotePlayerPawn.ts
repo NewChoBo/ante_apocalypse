@@ -29,6 +29,8 @@ export class RemotePlayerPawn extends BasePawn {
   private _nameLabel: Mesh | null = null;
   private _healthBar: Mesh | null = null;
   private _healthBarTexture: DynamicTexture | null = null;
+  public type = 'remote_player';
+  public isMoving = false;
 
   // Visuals & Animation
   private visualMesh: AbstractMesh | null = null;
@@ -41,7 +43,6 @@ export class RemotePlayerPawn extends BasePawn {
   // Animation Ranges
   private idleRange: any;
   private walkRange: any;
-  private isMoving = false;
   private currentAnim = 'idle';
 
   constructor(
@@ -54,6 +55,10 @@ export class RemotePlayerPawn extends BasePawn {
     this.id = id;
     this.playerName = name;
     this.shadowGenerator = shadowGenerator;
+    this.damageProfile = {
+      multipliers: { head: 2.0, body: 1.0 },
+      defaultMultiplier: 1.0,
+    };
 
     // 1. Root Collider (Pivot at eye level: 1.75m)
     this.mesh = MeshBuilder.CreateBox('remotePlayerRoot_' + id, { size: 0.1 }, scene);
@@ -324,10 +329,13 @@ export class RemotePlayerPawn extends BasePawn {
     this.updateComponents(deltaTime);
   }
 
-  public takeDamage(amount: number): void {
+  public takeDamage(
+    amount: number,
+    _attackerId?: string,
+    _part?: string,
+    _hitPoint?: Vector3
+  ): void {
     if (this.isDead) return;
-    console.log(`Remote player ${this.id} hit for ${amount} damage.`);
-    // Remote health is synced from network, but we can play effects here
     console.log(`Remote player ${this.id} hit for ${amount} damage.`);
     // Note: Actual health sync comes from NetworkManager/MultiplayerSystem updates
     // But if we want local prediction or visual feedback:

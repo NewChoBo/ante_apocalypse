@@ -3,6 +3,7 @@ import { NetworkManager, PlayerState } from './NetworkManager';
 import { RemotePlayerPawn } from '../RemotePlayerPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { CombatComponent } from '../components/CombatComponent';
+import { WorldEntityManager } from './WorldEntityManager';
 
 export class MultiplayerSystem {
   private scene: Scene;
@@ -82,6 +83,7 @@ export class MultiplayerSystem {
     this.networkManager.onPlayerLeft.add((id) => {
       const remote = this.remotePlayers.get(id);
       if (remote) {
+        WorldEntityManager.getInstance().removeEntity(id);
         remote.dispose();
         this.remotePlayers.delete(id);
       }
@@ -120,6 +122,7 @@ export class MultiplayerSystem {
     const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, name);
     remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
     this.remotePlayers.set(player.id, remote);
+    WorldEntityManager.getInstance().registerEntity(remote);
   }
 
   public update(): void {
