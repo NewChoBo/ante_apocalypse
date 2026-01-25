@@ -12,22 +12,22 @@ import {
 } from '@babylonjs/core';
 import { PlayerController } from './controllers/PlayerController';
 import { PlayerPawn } from './PlayerPawn';
+import { AssetLoader } from './AssetLoader';
 import { TargetSpawnerComponent } from './components/TargetSpawnerComponent';
 import { TargetRegistry } from './systems/TargetRegistry';
 import { HUD } from '../ui/HUD';
-import { gameStateStore, playerHealthStore } from './store/GameStore.ts';
-import { CombatComponent } from './components/CombatComponent';
-import { TickManager } from './TickManager';
-import { AssetLoader } from './AssetLoader';
-import { PickupManager } from './systems/PickupManager';
-import { InventoryUI } from '../ui/InventoryUI';
-import { inventoryStore } from './store/GameStore';
+import { gameStateStore, playerHealthStore, inventoryStore } from './store/GameStore';
 import '@babylonjs/inspector'; // 인스펙터 기능 활성화
 import { LevelLoader, LevelData } from './systems/LevelLoader';
 import { EnemyManager } from './systems/EnemyManager';
 
 import { CustomLoadingScreen } from '../ui/CustomLoadingScreen';
 import { UIManager } from '../ui/UIManager';
+import { CombatComponent } from './components/CombatComponent';
+import { InventoryUI } from '../ui/inventory/InventoryUI';
+import { TickManager } from './TickManager';
+import { PickupManager } from './systems/PickupManager';
+import { getItemMetadata } from './items/ItemDatabase';
 
 import trainingGroundData from '../assets/levels/training_ground.json';
 import combatZoneData from '../assets/levels/combat_zone.json';
@@ -199,25 +199,45 @@ export class Game {
       },
       onUseItem: (itemId) => {
         if (!this.playerPawn) return;
+        const metadata = getItemMetadata(itemId);
+        if (!metadata) return;
+
         const state = inventoryStore.get();
         const bag = [...state.bagItems];
         const itemIndex = bag.findIndex((i) => i.id === itemId);
 
         if (itemIndex !== -1) {
           const item = bag[itemIndex];
-          if (item.id === 'health_pack') {
-            this.playerPawn.addHealth(30);
-          } else if (item.id === 'ammo_box') {
-            this.playerPawn.addAmmo(50);
+
+          if (metadata.type === 'consumable') {
+            if (item.id === 'health_pack') {
+              this.playerPawn.addHealth(30);
+            } else if (item.id === 'ammo_box') {
+              this.playerPawn.addAmmo(50);
+            } else if (item.id === 'ammo_generic') {
+              this.playerPawn.addAmmo(20);
+            }
+
+            // 소모 처리
+            if (item.count > 1) {
+              bag[itemIndex] = { ...item, count: item.count - 1 };
+            } else {
+              bag.splice(itemIndex, 1);
+            }
+            inventoryStore.setKey('bagItems', bag);
+          } else if (metadata.type === 'weapon') {
+            // 가방에 있는 무기를 현재 슬롯에 장착 (기존 무기와 교체는 아직 미구현)
+            const slots = [...state.weaponSlots];
+            slots[this.inventoryUI?.getSelectedSlot() || 0] = itemId;
+            inventoryStore.setKey('weaponSlots', slots);
+
+            const combat = this.playerPawn.getComponent(CombatComponent);
+            if (combat instanceof CombatComponent) {
+              combat.equipWeapon(itemId);
+            }
           }
 
-          if (item.count > 1) {
-            const newItem = { ...item, count: item.count - 1 };
-            bag[itemIndex] = newItem;
-          } else {
-            bag.splice(itemIndex, 1);
-          }
-          inventoryStore.setKey('bagItems', bag);
+          this.syncInventoryStore();
         }
       },
       onDropItem: (itemId) => {

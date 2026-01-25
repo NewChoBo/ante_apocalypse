@@ -1,6 +1,6 @@
 import { Mesh, Vector3, Scene } from '@babylonjs/core';
 import { ITarget } from '../types/ITarget.ts';
-import { GameObservables } from '../core/events/GameObservables.ts';
+import { GameObservables } from '../core/events/GameObservables';
 
 /**
  * 모든 타겟의 공통 추상 클래스.

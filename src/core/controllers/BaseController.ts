@@ -1,4 +1,4 @@
-import { IPawn } from '../../types/IPawn.ts';
+import { IPawn } from '../../types/IPawn';
 import { ITickable } from '../interfaces/ITickable';
 import { TickManager } from '../TickManager';
 

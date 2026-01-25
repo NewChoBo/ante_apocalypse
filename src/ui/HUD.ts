@@ -1,5 +1,5 @@
-import { scoreStore, ammoStore, playerHealthStore } from '../core/store/GameStore.ts';
-import { GameObservables } from '../core/events/GameObservables.ts';
+import { scoreStore, ammoStore, playerHealthStore } from '../core/store/GameStore';
+import { GameObservables } from '../core/events/GameObservables';
 import { Observer } from '@babylonjs/core';
 import { AdvancedDynamicTexture, TextBlock, Rectangle, Control } from '@babylonjs/gui';
 import { UIManager } from './UIManager';
@@ -177,7 +177,7 @@ export class HUD {
       this.previousHealth = health;
 
       const healthPercent = Math.max(0, health / 100);
-      this.healthBar.width = healthPercent; // Babylon GUI Rectangle width is 0..1 when not string
+      this.healthBar.width = `${healthPercent * 100}%`;
       this.healthValueText.text = Math.ceil(health).toString();
 
       // Health Color

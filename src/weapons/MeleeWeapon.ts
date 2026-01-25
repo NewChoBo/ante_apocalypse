@@ -1,5 +1,5 @@
 import { Scene, UniversalCamera, Vector3, Mesh } from '@babylonjs/core';
-import { BaseWeapon } from './BaseWeapon.ts';
+import { BaseWeapon } from './BaseWeapon';
 
 /**
  * 근접 무기(Melee Weapons)를 위한 중간 추상 클래스.

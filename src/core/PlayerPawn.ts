@@ -1,5 +1,5 @@
 import { Mesh, Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
-import { BasePawn } from './BasePawn.ts';
+import { BasePawn } from './BasePawn';
 import { CharacterMovementComponent } from './components/CharacterMovementComponent';
 import { CameraComponent } from './components/CameraComponent';
 import { CombatComponent } from './components/CombatComponent';
@@ -20,7 +20,7 @@ export interface MouseDelta {
   y: number;
 }
 
-import { playerHealthStore } from './store/GameStore.ts';
+import { playerHealthStore } from './store/GameStore';
 
 /**
  * 1인칭 플레이어 캐릭터 실체 (Pawn).

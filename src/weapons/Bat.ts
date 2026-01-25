@@ -7,9 +7,9 @@ import {
   Color3,
   Mesh,
 } from '@babylonjs/core';
-import { MeleeWeapon } from './MeleeWeapon.ts';
+import { MeleeWeapon } from './MeleeWeapon';
 import { TargetRegistry } from '../core/systems/TargetRegistry';
-import { GameObservables } from '../core/events/GameObservables.ts';
+import { GameObservables } from '../core/events/GameObservables';
 
 /**
  * 야구 방망이 (Bat) - 근접 무기

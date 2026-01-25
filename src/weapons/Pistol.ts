@@ -7,8 +7,8 @@ import {
   MeshBuilder,
   AbstractMesh,
 } from '@babylonjs/core';
-import { Firearm } from './Firearm.ts';
-import { AssetLoader } from '../core/AssetLoader.ts';
+import { Firearm } from './Firearm';
+import { AssetLoader } from '../core/AssetLoader';
 
 /**
  * 권총 (Pistol) - 단발

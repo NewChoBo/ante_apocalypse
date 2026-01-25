@@ -1,5 +1,5 @@
 import { Mesh, Vector3, Scene } from '@babylonjs/core';
-import { IPawn } from '../types/IPawn.ts';
+import { IPawn } from '../types/IPawn';
 import { BaseComponent } from './components/BaseComponent';
 import { ITickable } from './interfaces/ITickable';
 import { TickManager } from './TickManager';

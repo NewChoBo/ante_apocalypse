@@ -56,6 +56,13 @@ export const ITEM_DATABASE: Record<string, ItemMetadata> = {
     icon: ammoIcon,
     description: 'Restores 50 rounds for all weapons.',
   },
+  ammo_generic: {
+    id: 'ammo_generic',
+    name: 'Generic Ammo',
+    type: 'consumable',
+    icon: ammoIcon, // 임시로 같은 아이콘 사용 (필요 시 교체 가능)
+    description: 'A few extra rounds for your weapons.',
+  },
 };
 
 export function getItemMetadata(id: string): ItemMetadata | undefined {

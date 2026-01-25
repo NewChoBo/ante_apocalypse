@@ -1,5 +1,5 @@
 import { Observable, Vector3 } from '@babylonjs/core';
-import { MuzzleTransform } from '../../types/IWeapon.ts';
+import { MuzzleTransform } from '../../types/IWeapon';
 
 /**
  * 타겟이 파괴되었을 때의 데이터 규격
