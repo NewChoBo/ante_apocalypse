@@ -52,12 +52,10 @@ export class InventoryUI {
       if (this.isOpen) this.render();
     });
 
-    // Tooltip tracking: Follow mouse using scene pointer coordinates
+    // Tooltip tracking: Update position every frame while visible for smooth movement
     this.pointerObserver =
-      this.ui.getScene()?.onPointerObservable.add((pointerInfo) => {
-        // Only update on move when tooltip is visible
-        if (pointerInfo.type === 0x01 && this.tooltip.isVisible) {
-          // 0x01 is PointerEventTypes.POINTERMOVE
+      this.ui.getScene()?.onBeforeRenderObservable.add(() => {
+        if (this.tooltip.isVisible) {
           const scene = this.ui.getScene();
           if (scene) {
             this.tooltip.left = scene.pointerX + 20 + 'px';
@@ -435,7 +433,7 @@ export class InventoryUI {
     if (this.contextMenu) this.contextMenu.dispose();
 
     if (this.pointerObserver) {
-      this.ui.getScene()?.onPointerObservable.remove(this.pointerObserver);
+      this.ui.getScene()?.onBeforeRenderObservable.remove(this.pointerObserver);
       this.pointerObserver = null;
     }
   }
