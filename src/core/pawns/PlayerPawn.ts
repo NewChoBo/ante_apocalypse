@@ -3,23 +3,7 @@ import { BasePawn } from './BasePawn';
 import { CharacterMovementComponent } from '../components/movement/CharacterMovementComponent';
 import { CameraComponent } from '../components/movement/CameraComponent';
 import { CombatComponent } from '../components/combat/CombatComponent';
-
-export interface InputState {
-  forward: boolean;
-  backward: boolean;
-  left: boolean;
-  right: boolean;
-  sprint: boolean;
-  jump: boolean;
-  crouch: boolean;
-  aim: boolean;
-}
-
-export interface MouseDelta {
-  x: number;
-  y: number;
-}
-
+import { InputComponent } from '../components/input/InputComponent';
 import { playerHealthStore } from '../store/GameStore';
 
 /**
@@ -30,6 +14,7 @@ export class PlayerPawn extends BasePawn {
   public type = 'player';
   private movementComponent: CharacterMovementComponent;
   private cameraComponent: CameraComponent;
+  private inputComponent: InputComponent;
 
   constructor(scene: Scene) {
     super(scene);
@@ -52,7 +37,11 @@ export class PlayerPawn extends BasePawn {
     this.mesh.ellipsoid = new Vector3(0.4, 0.875, 0.4); // 캐릭터의 충돌 볼륨 (높이 1.75m)
     this.mesh.ellipsoidOffset = new Vector3(0, -0.875, 0); // 메쉬(눈높이)가 상단에 위치하도록 오프셋 설정
 
-    // 카메라 컴포넌트 추가 (오프셋 0: 메쉬 위치가 눈 높이임)
+    // 입력 컴포넌트 추가
+    this.inputComponent = new InputComponent(this, scene);
+    this.addComponent(this.inputComponent);
+
+    // 카메라 컴포넌트 추가
     this.cameraComponent = new CameraComponent(this, scene, 0);
     this.addComponent(this.cameraComponent);
 
@@ -67,21 +56,6 @@ export class PlayerPawn extends BasePawn {
 
   public initialize(): void {
     // 추가 초기화 로직
-  }
-
-  /** Controller로부터 입력을 받아 처리 */
-  public handleInput(keys: InputState, mouseDelta: MouseDelta, deltaTime: number): void {
-    // 1. 회전 처리를 컴포넌트에 위임
-    this.cameraComponent.handleRotation(mouseDelta);
-
-    // 2. 정조준 상태 업데이트 (무기 시스템에서 통합 관리)
-    const combatComp = this.getComponent(CombatComponent);
-    if (combatComp instanceof CombatComponent) {
-      combatComp.setAiming(keys.aim);
-    }
-
-    // 3. 이동 처리를 컴포넌트에 위임
-    this.movementComponent.handleMovement(keys, deltaTime);
   }
 
   public tick(deltaTime: number): void {

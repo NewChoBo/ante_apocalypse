@@ -1,6 +1,6 @@
 import { BaseController } from './BaseController';
 import { IPawn } from '../../types/IPawn';
-import { PlayerPawn } from '../pawns/PlayerPawn';
+import { InputComponent } from '../components/input/InputComponent';
 
 /**
  * 실제 플레이어의 입력을 처리하는 컨트롤러.
@@ -15,6 +15,12 @@ export class PlayerController extends BaseController {
     jump: false,
     crouch: false,
     aim: false,
+    fire: false,
+    reload: false,
+    slot1: false,
+    slot2: false,
+    slot3: false,
+    slot4: false,
   };
 
   private mouseDelta = { x: 0, y: 0 };
@@ -113,6 +119,24 @@ export class PlayerController extends BaseController {
       case 'MouseRight':
         this.keys.aim = isPressed;
         break;
+      case 'MouseLeft':
+        this.keys.fire = isPressed;
+        break;
+      case 'KeyR':
+        this.keys.reload = isPressed;
+        break;
+      case 'Digit1':
+        this.keys.slot1 = isPressed;
+        break;
+      case 'Digit2':
+        this.keys.slot2 = isPressed;
+        break;
+      case 'Digit3':
+        this.keys.slot3 = isPressed;
+        break;
+      case 'Digit4':
+        this.keys.slot4 = isPressed;
+        break;
     }
   }
 
@@ -134,12 +158,15 @@ export class PlayerController extends BaseController {
     }
   }
 
-  public tick(deltaTime: number): void {
+  public tick(_deltaTime: number): void {
     if (!this.possessedPawn || this.isInputBlocked) return;
 
-    // Pawn에게 입력 데이터 전달
-    if (this.possessedPawn instanceof PlayerPawn) {
-      this.possessedPawn.handleInput(this.keys, this.mouseDelta, deltaTime);
+    // Pawn의 InputComponent 업데이트
+    if (this.possessedPawn) {
+      const inputComp = this.possessedPawn.getComponent(InputComponent);
+      if (inputComp instanceof InputComponent) {
+        inputComp.updateInput(this.keys, this.mouseDelta);
+      }
     }
 
     // 델타값 초기화

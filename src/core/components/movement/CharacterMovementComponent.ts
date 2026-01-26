@@ -1,18 +1,8 @@
 import { Vector3, Scene, Ray } from '@babylonjs/core';
 import { BaseComponent } from '@/core/components/base/BaseComponent';
 import { CombatComponent } from '../combat/CombatComponent';
+import { InputComponent } from '../input/InputComponent';
 import type { IPawn } from '../../../types/IPawn';
-
-export interface MovementInput {
-  forward: boolean;
-  backward: boolean;
-  left: boolean;
-  right: boolean;
-  sprint: boolean;
-  jump: boolean;
-  crouch: boolean;
-  aim: boolean;
-}
 
 /**
  * 캐릭터의 이동, 중력, 점프 로직을 담당하는 컴포넌트.
@@ -37,8 +27,30 @@ export class CharacterMovementComponent extends BaseComponent {
     this.currentHeight = this.playerHeight;
   }
 
-  /** 입력 데이터에 기반해 이동 처리 */
-  public handleMovement(input: MovementInput, deltaTime: number): void {
+  public update(deltaTime: number): void {
+    // 1. 중력 처리 (항상 실행)
+    this.updateGravity(deltaTime);
+
+    // 2. 입력 처리 (InputComponent가 있는 경우)
+    const inputComp = this.owner.getComponent(InputComponent);
+    if (inputComp instanceof InputComponent) {
+      this.processMovement(inputComp.state, deltaTime);
+    }
+  }
+
+  private processMovement(
+    input: {
+      forward: boolean;
+      backward: boolean;
+      left: boolean;
+      right: boolean;
+      sprint: boolean;
+      jump: boolean;
+      crouch: boolean;
+      aim: boolean;
+    },
+    deltaTime: number
+  ): void {
     // 1. 앉기 상태 처리 (높이 변경)
     const targetHeight = input.crouch ? this.crouchHeight : this.playerHeight;
     this.currentHeight = targetHeight;
@@ -76,10 +88,6 @@ export class CharacterMovementComponent extends BaseComponent {
       this.velocityY = this.jumpForce;
       this.isGrounded = false;
     }
-  }
-
-  public update(deltaTime: number): void {
-    this.updateGravity(deltaTime);
   }
 
   private updateGravity(deltaTime: number): void {

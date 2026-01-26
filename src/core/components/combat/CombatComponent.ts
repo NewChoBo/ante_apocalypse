@@ -58,10 +58,6 @@ export class CombatComponent extends BaseComponent {
     return comp;
   }
 
-  public setAiming(isAiming: boolean): void {
-    this.input.setAiming(isAiming);
-  }
-
   public update(deltaTime: number): void {
     this.inventory.update(deltaTime);
   }

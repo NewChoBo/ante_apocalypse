@@ -1,5 +1,6 @@
 import { UniversalCamera, Vector3, Scene } from '@babylonjs/core';
 import { BaseComponent } from '@/core/components/base/BaseComponent';
+import { InputComponent } from '../input/InputComponent';
 import { CombatComponent } from '../combat/CombatComponent';
 import type { IPawn } from '../../../types/IPawn';
 
@@ -36,8 +37,45 @@ export class CameraComponent extends BaseComponent {
     this.camera.inputs.clear(); // 컨트롤러에서 제어하므로 입력 해제
   }
 
-  /** 마우스 델타값에 기반해 회전 처리 */
-  public handleRotation(delta: RotationInput): void {
+  public update(deltaTime: number): void {
+    const combatComp = this.owner.getComponent(CombatComponent);
+    if (!combatComp) return;
+
+    // 1. 회전 처리 (InputComponent)
+    const inputComp = this.owner.getComponent(InputComponent);
+    if (inputComp instanceof InputComponent) {
+      const delta = inputComp.consumeMouseDelta();
+      // Apply sensitivity
+      if (delta.x !== 0 || delta.y !== 0) {
+        this.applyRotation(delta);
+      }
+    }
+
+    // 2. FOV 처리
+    const weapon = combatComp.getCurrentWeapon();
+    const targetFOV = weapon ? weapon.getDesiredFOV(this.defaultFOV) : this.defaultFOV;
+
+    this.currentFOV = this.currentFOV + (targetFOV - this.currentFOV) * (10 * deltaTime);
+    this.camera.fov = this.currentFOV;
+
+    // 3. 반동 처리 (Recoil)
+    // 현재 반동 상태를 목표값으로 보간 (Kick)
+    const previousOffset = this.currentRecoilOffset;
+    this.currentRecoilOffset = this.lerp(
+      this.currentRecoilOffset,
+      this.targetRecoilOffset,
+      15 * deltaTime
+    );
+
+    // 이번 프레임의 반동 델타를 카메라에 적용
+    const recoilDelta = this.currentRecoilOffset - previousOffset;
+    this.camera.rotation.x -= recoilDelta;
+
+    // 목표 반동값을 0으로 복구 (Recovery)
+    this.targetRecoilOffset = this.lerp(this.targetRecoilOffset, 0, 5 * deltaTime);
+  }
+
+  private applyRotation(delta: { x: number; y: number }): void {
     // 1. 몸체 회전 (Yaw - Y축)
     this.owner.mesh.rotation.y += delta.x * this.mouseSensitivity;
 
@@ -55,34 +93,6 @@ export class CameraComponent extends BaseComponent {
   public applyRecoil(force: number): void {
     // 목표 반동값을 증가시킴
     this.targetRecoilOffset += force;
-  }
-
-  public update(deltaTime: number): void {
-    const combatComp = this.owner.getComponent(CombatComponent);
-    if (!combatComp) return;
-
-    // 1. FOV 처리
-    const weapon = combatComp.getCurrentWeapon();
-    const targetFOV = weapon ? weapon.getDesiredFOV(this.defaultFOV) : this.defaultFOV;
-
-    this.currentFOV = this.currentFOV + (targetFOV - this.currentFOV) * (10 * deltaTime);
-    this.camera.fov = this.currentFOV;
-
-    // 2. 반동 처리 (Recoil)
-    // 현재 반동 상태를 목표값으로 보간 (Kick)
-    const previousOffset = this.currentRecoilOffset;
-    this.currentRecoilOffset = this.lerp(
-      this.currentRecoilOffset,
-      this.targetRecoilOffset,
-      15 * deltaTime
-    );
-
-    // 이번 프레임의 반동 델타를 카메라에 적용
-    const recoilDelta = this.currentRecoilOffset - previousOffset;
-    this.camera.rotation.x -= recoilDelta;
-
-    // 목표 반동값을 0으로 복구 (Recovery)
-    this.targetRecoilOffset = this.lerp(this.targetRecoilOffset, 0, 5 * deltaTime);
   }
 
   private lerp(start: number, end: number, amt: number): number {
