@@ -1,6 +1,6 @@
 import { Mesh, Vector3, Scene, Observer, Nullable } from '@babylonjs/core';
 import { IPawn } from '../../types/IPawn';
-import { BaseComponent } from '../components/base/BaseComponent';
+import { BaseComponent, ComponentConstructor } from '../components/base/BaseComponent';
 import { IWorldEntity, DamageProfile } from '../../types/IWorldEntity';
 
 /**
@@ -54,11 +54,7 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
     }
   }
 
-  /** 특정 타입의 컴포넌트 찾기 (Babylon.js behaviors 목록에서 검색) */
-  public getComponent<T extends BaseComponent>(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    type: abstract new (...args: any[]) => T
-  ): T | undefined {
+  public getComponent<T extends BaseComponent>(type: ComponentConstructor<T>): T | undefined {
     if (!this.mesh) return undefined;
     return this.mesh.behaviors.find((b) => b instanceof type) as T;
   }

@@ -1,5 +1,5 @@
 import { Mesh, Vector3, Scene } from '@babylonjs/core';
-import type { BaseComponent } from '../core/components/base/BaseComponent';
+import { BaseComponent, ComponentConstructor } from '../core/components/base/BaseComponent';
 
 /**
  * Unreal의 Pawn 개념을 도입한 인터페이스.
@@ -48,9 +48,7 @@ export interface IPawn {
   /** 컴포넌트 추가 */
   addComponent(component: BaseComponent): void;
 
-  /** 특정 타입의 컴포넌트 찾기 */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getComponent<T extends BaseComponent>(type: abstract new (...args: any[]) => T): T | undefined;
+  getComponent<T extends BaseComponent>(type: ComponentConstructor<T>): T | undefined;
 
   /** 자원 해제 */
   dispose(): void;

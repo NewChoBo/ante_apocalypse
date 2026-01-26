@@ -1,6 +1,10 @@
 import { Scene, Mesh, Behavior, Observer, Nullable } from '@babylonjs/core';
 import type { IPawn } from '../../../types/IPawn';
 
+// Generic constraint typically requires any[], as unknown[] is too strict for constructors
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type ComponentConstructor<T extends BaseComponent> = abstract new (...args: any[]) => T;
+
 /**
  * 모든 컴포넌트의 가상 기본 클래스.
  * Babylon.js의 Behavior 패턴을 상속하여 엔진의 표준 수명 주기를 따릅니다.
