@@ -1,6 +1,6 @@
 import * as Photon from 'photon-realtime';
 import { INetworkProvider } from '../INetworkProvider';
-import { RoomInfo, NetworkState, PlayerInfo, EventData } from '../NetworkProtocol';
+import { RoomData, NetworkState, PlayerDataModel, EventData } from '../NetworkProtocol';
 import { IPhotonClient, IPhotonRoom, IPhotonActor, IPhotonNamespace } from './PhotonTypes';
 
 const PhotonTyped = Photon as unknown as IPhotonNamespace;
@@ -14,9 +14,9 @@ export class PhotonProvider implements INetworkProvider {
   private appVersion: string = import.meta.env.VITE_PHOTON_APP_VERSION || '1.0';
 
   public onStateChanged?: (state: NetworkState) => void;
-  public onRoomListUpdated?: (rooms: RoomInfo[]) => void;
+  public onRoomListUpdated?: (rooms: RoomData[]) => void;
   public onEvent?: (code: number, data: EventData, senderId: string) => void;
-  public onPlayerJoined?: (user: PlayerInfo) => void;
+  public onPlayerJoined?: (user: PlayerDataModel) => void;
   public onPlayerLeft?: (userId: string) => void;
 
   constructor() {
@@ -57,7 +57,7 @@ export class PhotonProvider implements INetworkProvider {
     };
 
     this.client.onRoomListUpdate = (rooms: IPhotonRoom[]): void => {
-      const roomInfos: RoomInfo[] = rooms.map((r: IPhotonRoom) => ({
+      const roomInfos: RoomData[] = rooms.map((r: IPhotonRoom) => ({
         id: r.name,
         name: r.name,
         playerCount: r.playerCount,
@@ -156,14 +156,14 @@ export class PhotonProvider implements INetworkProvider {
     return this.client.joinRoom(roomId);
   }
 
-  public getRoomList(): Promise<RoomInfo[]> {
+  public getRoomList(): Promise<RoomData[]> {
     // Photon LoadBalancingClient automatically updates availableRooms
     // We can return the current scheduled/cached list or wrap a one-time fetch if needed.
     // However, LoadBalancingClient usually syncs rooms via callbacks.
     // We will return a resolved promise with the current known list.
 
     const rooms = this.client.availableRooms() || [];
-    const roomInfos: RoomInfo[] = rooms.map((r: IPhotonRoom) => ({
+    const roomInfos: RoomData[] = rooms.map((r: IPhotonRoom) => ({
       id: r.name, // Use name as ID
       name: r.name,
       maxPlayers: r.maxPlayers,
@@ -236,7 +236,7 @@ export class PhotonProvider implements INetworkProvider {
 
     const rooms = this.client.availableRooms() || [];
     console.log('[Photon] Manual room list refresh:', rooms);
-    const roomInfos: RoomInfo[] = rooms.map((r: IPhotonRoom) => ({
+    const roomInfos: RoomData[] = rooms.map((r: IPhotonRoom) => ({
       id: r.name,
       name: r.name,
       playerCount: r.playerCount,

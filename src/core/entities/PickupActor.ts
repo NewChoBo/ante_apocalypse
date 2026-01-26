@@ -63,4 +63,8 @@ export class PickupActor {
   public get destroyed(): boolean {
     return this.isCollected || this.timeAlive >= this.lifeTime;
   }
+
+  public set destroyed(value: boolean) {
+    this.isCollected = value;
+  }
 }

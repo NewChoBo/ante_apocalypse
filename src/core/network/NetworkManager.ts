@@ -2,17 +2,14 @@ import { Observable } from '@babylonjs/core';
 import { INetworkProvider } from './INetworkProvider';
 import { PhotonProvider } from './providers/PhotonProvider';
 import {
-  RoomInfo,
+  RoomData,
   NetworkState,
   EventCode,
   EventData,
   MovePayload,
   FirePayload,
-  HitPayload,
   SyncWeaponPayload,
   EnemyUpdateData,
-  EnemyHitPayload,
-  TargetHitPayload,
   InitialStatePayload,
   PlayerDeathPayload,
   TargetDestroyData,
@@ -38,13 +35,6 @@ export interface FireEventData {
   };
 }
 
-export interface HitEventData {
-  playerId: string;
-  damage: number;
-  newHealth: number;
-  attackerId: string;
-}
-
 export interface DeathEventData {
   playerId: string;
   attackerId: string;
@@ -59,29 +49,26 @@ export class NetworkManager {
   public onPlayerUpdated = new Observable<PlayerState>();
   public onPlayerLeft = new Observable<string>();
   public onPlayerFired = new Observable<FireEventData>();
-  public onPlayerHit = new Observable<HitEventData>();
   public onPlayerDied = new Observable<DeathEventData>();
 
   // Enemy Synchronization
   public onEnemyUpdated = new Observable<EnemyUpdateData>();
-  public onEnemyHit = new Observable<EnemyHitPayload>();
 
   // State Synchronization
   public onInitialStateRequested = new Observable<ReqInitialStatePayload & { senderId: string }>();
   public onInitialStateReceived = new Observable<InitialStatePayload>();
 
   // New Observables for Lobby/State
-  public onRoomListUpdated = new Observable<RoomInfo[]>();
+  public onRoomListUpdated = new Observable<RoomData[]>();
   public onStateChanged = new Observable<NetworkState>();
   public onEvent = new Observable<{ code: number; data: EventData; senderId: string }>();
 
   // Target Observables
-  public onTargetHit = new Observable<TargetHitPayload>();
   public onTargetDestroy = new Observable<TargetDestroyData>();
   public onTargetSpawn = new Observable<TargetSpawnData>();
 
   private playerStates: Map<string, PlayerState> = new Map();
-  private lastRoomList: RoomInfo[] = [];
+  private lastRoomList: RoomData[] = [];
 
   private constructor() {
     this.provider = new PhotonProvider();
@@ -146,16 +133,6 @@ export class NetworkManager {
           });
           break;
         }
-        case EventCode.HIT: {
-          const hitData = data as HitPayload;
-          this.onPlayerHit.notifyObservers({
-            playerId: hitData.targetId,
-            damage: hitData.damage,
-            newHealth: 0, // Should be synced via state if needed
-            attackerId: senderId,
-          });
-          break;
-        }
         case EventCode.SYNC_WEAPON: {
           const syncData = data as SyncWeaponPayload;
           if (this.playerStates.has(senderId)) {
@@ -167,12 +144,6 @@ export class NetworkManager {
         }
         case EventCode.ENEMY_MOVE:
           this.onEnemyUpdated.notifyObservers(data as EnemyUpdateData);
-          break;
-        case EventCode.ENEMY_HIT:
-          this.onEnemyHit.notifyObservers(data as EnemyHitPayload);
-          break;
-        case EventCode.TARGET_HIT:
-          this.onTargetHit.notifyObservers(data as TargetHitPayload);
           break;
         case EventCode.PLAYER_DEATH:
           this.onPlayerDied.notifyObservers(data as PlayerDeathPayload);
@@ -244,7 +215,7 @@ export class NetworkManager {
     this.provider.refreshRoomList?.();
   }
 
-  public getRoomList(): RoomInfo[] {
+  public getRoomList(): RoomData[] {
     return this.lastRoomList;
   }
 

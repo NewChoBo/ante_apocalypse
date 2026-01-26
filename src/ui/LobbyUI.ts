@@ -10,7 +10,7 @@ import {
 } from '@babylonjs/gui';
 import { NetworkManager } from '../core/network/NetworkManager';
 import { UIManager, UIScreen } from './UIManager';
-import { RoomInfo } from '../core/network/NetworkProtocol';
+import { RoomData } from '../core/network/NetworkProtocol';
 
 export class LobbyUI {
   private container: Container;
@@ -170,7 +170,7 @@ export class LobbyUI {
     this.updateRoomList(this.networkManager.getRoomList());
   }
 
-  private updateRoomList(rooms: RoomInfo[]): void {
+  private updateRoomList(rooms: RoomData[]): void {
     this.roomListPanel.clearControls();
 
     if (rooms.length === 0) {
@@ -190,7 +190,7 @@ export class LobbyUI {
     });
   }
 
-  private createRoomRow(room: RoomInfo): Container {
+  private createRoomRow(room: RoomData): Container {
     const rect = new Rectangle();
     rect.width = '100%';
     rect.height = '60px';

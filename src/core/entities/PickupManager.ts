@@ -44,6 +44,18 @@ export class PickupManager implements IGameSystem {
       this.handleDestroyEvent(data);
     });
 
+    // Master: Handle pickup requests
+    this.networkMediator.onPickupRequested.add((data) => {
+      if (this.networkMediator.isMasterClient()) {
+        this.processPickupRequest(data.id, data.requesterId);
+      }
+    });
+
+    // Client: Handle granted pickup
+    this.networkMediator.onPickupGranted.add((data) => {
+      this.grantPickupToInventory(data.id, data.type, data.ownerId);
+    });
+
     // 게임 재시작 시 TickManager가 초기화되므로 다시 등록해야 함
     TickManager.getInstance().register({
       priority: this.priority,
@@ -140,51 +152,86 @@ export class PickupManager implements IGameSystem {
   private handleCollection(pickup: PickupActor, id: string): void {
     if (!this.player) return;
 
-    try {
-      // Logic for inventory addition...
-      const { bagItems } = inventoryStore.get();
-      const existingItemIndex = bagItems.findIndex((item) => item.id === pickup.type);
+    // Server-Authoritative: Request pickup instead of taking it immediately
+    // Ideally, we could optimistically hide it, but for now we wait for server response.
+    // If not connected (Single player), assume Master authority immediately.
 
-      let newBagItems: BagItem[];
-      if (existingItemIndex !== -1) {
-        // 불변성 유지를 위해 인덱스를 사용하여 새로운 배열 생성
-        newBagItems = bagItems.map((item, idx) =>
-          idx === existingItemIndex ? { ...item, count: item.count + 1 } : item
-        );
-      } else {
-        newBagItems = [
-          ...bagItems,
-          {
-            id: pickup.type,
-            name: pickup.type === 'health_pack' ? 'First Aid Kit' : 'Ammo Crate',
-            type: 'consumable',
-            count: 1,
-          } as BagItem,
-        ];
-      }
-
-      inventoryStore.setKey('bagItems', newBagItems);
-      this.showPopup(`Picked up ${pickup.type}`, '#FF9800');
-
-      // Notify collection for audio/VFX
-      GameObservables.itemCollection.notifyObservers({
-        itemId: pickup.type,
-        position: pickup.mesh.getAbsolutePosition(),
-      });
-
-      // Notify others
-      this.networkMediator.sendEvent(EventCode.DESTROY_PICKUP, { id });
-
+    if (!this.networkMediator.getSocketId()) {
+      // Single player mode: Grant immediately
+      this.grantPickupToInventory(id, pickup.type, this.networkMediator.getSocketId() || 'local');
+      this.pickups.delete(id); // Local cleanup
       pickup.collect();
-      this.pickups.delete(id);
-
-      pickup.collect();
-      this.pickups.delete(id);
-    } catch {
-      // 에러가 나더라도 일단 박스는 제거 (무한 에러 방지)
-      pickup.collect();
-      this.pickups.delete(id);
+      return;
     }
+
+    // Multiplayer: Send Request
+    // Debounce: Avoid spamming requests for same item in same frame
+    // (Simple check: if it's already destroyed locally, ignore)
+    if (pickup.destroyed) return;
+
+    this.networkMediator.sendEvent(EventCode.REQ_PICKUP, { id });
+
+    // Optimistic: Hide visual immediately to prevent double usage?
+    // No, wait for confirmation to avoid desync if denied.
+  }
+
+  // Executed on Master Client
+  private processPickupRequest(pickupId: string, requesterId: string): void {
+    const pickup = this.pickups.get(pickupId);
+    if (!pickup || pickup.destroyed) {
+      return;
+    }
+
+    // Valid Request.
+    // 1. Mark as destroyed locally/Master side to prevent double grant
+    pickup.destroyed = true;
+
+    // 2. Grant to requester
+    this.networkMediator.sendEvent(EventCode.PICKUP_GRANTED, {
+      id: pickupId,
+      type: pickup.type,
+      ownerId: requesterId,
+    });
+
+    // 3. Notify everyone to destroy the mesh (Visual sync)
+    // Note: PICKUP_GRANTED is also broadcasted, so maybe we rely on that?
+    // But DESTROY_PICKUP is explicit for mesh removal.
+    this.networkMediator.sendEvent(EventCode.DESTROY_PICKUP, { id: pickupId });
+  }
+
+  private grantPickupToInventory(_id: string, type: string, ownerId: string): void {
+    // Only process if I am the owner
+    if (ownerId !== this.networkMediator.getSocketId()) return;
+
+    // Logic for inventory addition...
+    const { bagItems } = inventoryStore.get();
+    const existingItemIndex = bagItems.findIndex((item) => item.id === type);
+
+    let newBagItems: BagItem[];
+    if (existingItemIndex !== -1) {
+      newBagItems = bagItems.map((item, idx) =>
+        idx === existingItemIndex ? { ...item, count: item.count + 1 } : item
+      );
+    } else {
+      newBagItems = [
+        ...bagItems,
+        {
+          id: type,
+          name: type === 'health_pack' ? 'First Aid Kit' : 'Ammo Crate',
+          type: 'consumable',
+          count: 1,
+        } as BagItem,
+      ];
+    }
+
+    inventoryStore.setKey('bagItems', newBagItems);
+    this.showPopup(`Picked up ${type}`, '#FF9800');
+
+    // Play local sound
+    GameObservables.itemCollection.notifyObservers({
+      itemId: type,
+      position: this.player?.mesh.getAbsolutePosition() || Vector3.Zero(),
+    });
   }
 
   private showPopup(text: string, color: string): void {

@@ -2,23 +2,22 @@ export enum EventCode {
   JOIN = 1,
   LEAVE = 2,
   MOVE = 3,
-  ANIM_STATE = 4,
   FIRE = 5,
-  HIT = 6,
   SYNC_WEAPON = 7,
-  MAP_SYNC = 8,
   ENEMY_MOVE = 9,
-  TARGET_HIT = 10,
   TARGET_DESTROY = 11,
   SPAWN_TARGET = 12,
   REQ_INITIAL_STATE = 13,
   INITIAL_STATE = 14,
-  ENEMY_HIT = 15,
   SPAWN_ENEMY = 16,
   DESTROY_ENEMY = 17,
   SPAWN_PICKUP = 18,
   DESTROY_PICKUP = 19,
   PLAYER_DEATH = 20,
+  REQ_PICKUP = 21,
+  PICKUP_GRANTED = 22,
+  REQ_HIT = 23,
+  CONFIRM_HIT = 24,
 }
 
 export class RoomData {
@@ -32,9 +31,6 @@ export class RoomData {
   ) {}
 }
 
-/** Legacy support interface if needed, but RoomData class is preferred */
-export type RoomInfo = RoomData;
-
 export class PlayerDataModel {
   constructor(
     public readonly userId: string,
@@ -42,9 +38,6 @@ export class PlayerDataModel {
     public readonly name?: string
   ) {}
 }
-
-/** Legacy support interface */
-export type PlayerInfo = PlayerDataModel;
 
 export enum NetworkState {
   Disconnected = 'Disconnected',
@@ -99,28 +92,8 @@ export class FirePayload {
   ) {}
 }
 
-export class HitPayload {
-  constructor(
-    public readonly targetId: string,
-    public readonly damage: number,
-    public readonly part?: string,
-    public readonly position?: Position
-  ) {}
-}
-
-export class AnimStatePayload {
-  constructor(
-    public readonly state: string,
-    public readonly speed?: number
-  ) {}
-}
-
 export class SyncWeaponPayload {
   constructor(public readonly weaponId: string) {}
-}
-
-export class MapSyncPayload {
-  constructor(public readonly mapId: string) {}
 }
 
 export class EnemyUpdateData {
@@ -174,21 +147,6 @@ export class PickupDestroyData {
   constructor(public readonly id: string) {}
 }
 
-export class EnemyHitPayload {
-  constructor(
-    public readonly id: string,
-    public readonly damage: number
-  ) {}
-}
-
-export class TargetHitPayload {
-  constructor(
-    public readonly targetId: string,
-    public readonly part: string,
-    public readonly damage: number
-  ) {}
-}
-
 export class ReqInitialStatePayload {
   constructor(public readonly senderId?: string) {}
 }
@@ -208,23 +166,51 @@ export class PlayerDeathPayload {
   ) {}
 }
 
+export class ReqPickupPayload {
+  constructor(public readonly id: string) {}
+}
+
+export class PickupGrantedPayload {
+  constructor(
+    public readonly id: string,
+    public readonly type: string,
+    public readonly ownerId: string
+  ) {}
+}
+
+export class ReqHitPayload {
+  constructor(
+    public readonly targetId: string,
+    public readonly damage: number,
+    public readonly hitPosition: Position,
+    public readonly hitNormal?: Position
+  ) {}
+}
+
+export class ConfirmHitPayload {
+  constructor(
+    public readonly targetId: string,
+    public readonly damage: number,
+    public readonly remainingHealth: number
+  ) {}
+}
+
 export type EventData =
   | MovePayload
   | FirePayload
-  | HitPayload
-  | AnimStatePayload
+  | SyncWeaponPayload
   | EnemySpawnData
   | EnemyDestroyData
   | PickupSpawnData
   | PickupDestroyData
-  | SyncWeaponPayload
-  | MapSyncPayload
-  | EnemyHitPayload
-  | TargetHitPayload
   | TargetSpawnData
   | TargetDestroyData
   | ReqInitialStatePayload
   | InitialStatePayload
   | PlayerDeathPayload
   | EnemyUpdateData
-  | PlayerData;
+  | PlayerData
+  | ReqPickupPayload
+  | PickupGrantedPayload
+  | ReqHitPayload
+  | ConfirmHitPayload;

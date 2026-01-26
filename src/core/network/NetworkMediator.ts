@@ -11,6 +11,10 @@ import {
   TargetDestroyData,
   PickupSpawnData,
   PickupDestroyData,
+  ReqPickupPayload,
+  PickupGrantedPayload,
+  ReqHitPayload,
+  ConfirmHitPayload,
   EventData,
 } from '../network/NetworkProtocol';
 
@@ -33,6 +37,10 @@ export class NetworkMediator {
   public onTargetDestroyed = new Observable<TargetDestroyData>();
   public onPickupSpawnRequested = new Observable<PickupSpawnData>();
   public onPickupDestroyRequested = new Observable<PickupDestroyData>();
+  public onPickupRequested = new Observable<{ id: string; requesterId: string }>();
+  public onPickupGranted = new Observable<PickupGrantedPayload>();
+  public onHitRequested = new Observable<ReqHitPayload & { shooterId: string }>();
+  public onHitConfirmed = new Observable<ConfirmHitPayload>();
   public onStateChanged = new Observable<NetworkState>();
 
   private constructor() {
@@ -93,6 +101,27 @@ export class NetworkMediator {
         this.onPickupSpawnRequested.notifyObservers(event.data as PickupSpawnData);
       } else if (event.code === EventCode.DESTROY_PICKUP) {
         this.onPickupDestroyRequested.notifyObservers(event.data as PickupDestroyData);
+      } else if (event.code === EventCode.REQ_PICKUP) {
+        // Need to pass sender ID if available. NetworkManager currently doesn't pass sender ID in simplified EventData.
+        // Assuming NetworkManager.onEvent provides { code: ..., data: ..., senderId: ... }
+        // Verify NetworkManager.ts implementation.
+        // If not, we rely on the payload having it or NetworkManager structure being compatible.
+        // Assuming `event` object has `senderId`.
+        const payload = event.data as ReqPickupPayload;
+        this.onPickupRequested.notifyObservers({
+          id: payload.id,
+          requesterId: event.senderId || '',
+        });
+      } else if (event.code === EventCode.PICKUP_GRANTED) {
+        this.onPickupGranted.notifyObservers(event.data as PickupGrantedPayload);
+      } else if (event.code === EventCode.REQ_HIT) {
+        const payload = event.data as ReqHitPayload;
+        this.onHitRequested.notifyObservers({
+          ...payload,
+          shooterId: event.senderId || '',
+        });
+      } else if (event.code === EventCode.CONFIRM_HIT) {
+        this.onHitConfirmed.notifyObservers(event.data as ConfirmHitPayload);
       }
     });
   }
