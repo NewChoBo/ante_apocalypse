@@ -27,7 +27,7 @@ export class Pistol extends Firearm {
     // Scale: 0.3, Pos: (0.2, -0.15, 0.4), Rot: (0, PI, 0)
     // Using 'rifle' asset for pistol (placeholder logic maintained)
     this.instantiateWeaponModel(
-      'rifle' as any,
+      'rifle',
       0.3,
       new Vector3(0.2, -0.15, 0.4),
       new Vector3(0, Math.PI, 0)

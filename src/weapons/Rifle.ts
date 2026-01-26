@@ -25,7 +25,7 @@ export class Rifle extends Firearm {
     this.muzzleOffset = new Vector3(0, 0.06, 0.4);
 
     this.instantiateWeaponModel(
-      'rifle' as any,
+      'rifle',
       0.6,
       new Vector3(0.25, -0.25, 0.6),
       new Vector3(0, Math.PI, 0),
