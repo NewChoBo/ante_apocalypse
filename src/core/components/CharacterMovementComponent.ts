@@ -1,7 +1,7 @@
 import { Vector3, Scene, Ray } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { CombatComponent } from './CombatComponent';
-import type { BasePawn } from '../BasePawn';
+import type { IPawn } from '../../types/IPawn';
 
 export interface MovementInput {
   forward: boolean;
@@ -31,7 +31,7 @@ export class CharacterMovementComponent extends BaseComponent {
   private isGrounded = false;
   private currentHeight = 1.75;
 
-  constructor(owner: BasePawn, scene: Scene) {
+  constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
     this.currentHeight = this.playerHeight;
   }
@@ -40,7 +40,6 @@ export class CharacterMovementComponent extends BaseComponent {
   public handleMovement(input: MovementInput, deltaTime: number): void {
     // 1. 앉기 상태 처리 (높이 변경)
     const targetHeight = input.crouch ? this.crouchHeight : this.playerHeight;
-    // 부드러운 전환을 위해 보간 사용 (옵션, 여기서는 즉시 변경)
     this.currentHeight = targetHeight;
 
     const combatComp = this.owner.getComponent(CombatComponent);
@@ -108,7 +107,6 @@ export class CharacterMovementComponent extends BaseComponent {
     this.isGrounded = !!pickInfo?.hit;
   }
 
-  // 외부에서 상태 설정을 위해 필요한 경우 메서드 추가 가능
   public setMovementSpeed(speed: number): void {
     this.moveSpeed = speed;
   }

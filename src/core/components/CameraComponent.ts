@@ -1,7 +1,7 @@
 import { UniversalCamera, Vector3, Scene } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { CombatComponent } from './CombatComponent';
-import type { BasePawn } from '../BasePawn';
+import type { IPawn } from '../../types/IPawn';
 
 export interface RotationInput {
   x: number;
@@ -24,7 +24,7 @@ export class CameraComponent extends BaseComponent {
   private currentRecoilOffset = 0;
   private targetRecoilOffset = 0;
 
-  constructor(owner: BasePawn, scene: Scene, initialHeight: number = 0) {
+  constructor(owner: IPawn, scene: Scene, initialHeight: number = 0) {
     super(owner, scene);
 
     this.camera = new UniversalCamera('pawnCamera', Vector3.Zero(), scene);

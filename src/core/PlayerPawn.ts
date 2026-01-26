@@ -100,8 +100,6 @@ export class PlayerPawn extends BasePawn {
     this.health = Math.max(0, this.health - amount);
     playerHealthStore.set(this.health);
 
-    console.log(`Player took ${amount} damage. Health: ${this.health}`);
-
     if (this.health <= 0) {
       this.die();
     }
@@ -111,7 +109,6 @@ export class PlayerPawn extends BasePawn {
     if (this.health <= 0) return;
     this.health = Math.min(100, this.health + amount);
     playerHealthStore.set(this.health);
-    console.log(`Player healed ${amount}. Health: ${this.health}`);
   }
 
   public addAmmo(amount: number): void {
@@ -123,7 +120,5 @@ export class PlayerPawn extends BasePawn {
 
   public die(): void {
     this.isDead = true;
-    console.log('Player Died');
-    // TODO: Handle Game Over logic (UI, Respawn, etc.)
   }
 }

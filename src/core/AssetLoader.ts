@@ -5,6 +5,7 @@ import {
   AssetContainer,
   InstantiatedEntries,
   Mesh,
+  Sound,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import gunshotUrl from '../assets/sounds/gunshot.wav';
@@ -21,14 +22,12 @@ import type { AudioEngineV2 } from '@babylonjs/core';
  */
 export class AssetLoader {
   private static instance: AssetLoader;
-  private sounds: Map<string, any> = new Map();
+  private sounds: Map<string, any> = new Map(); // Sound type from Babylon is used via createSoundAsync
   private containers: Map<string, AssetContainer> = new Map();
   private isLoaded = false;
   private lastScene: Scene | null = null;
   private loadingPromise: Promise<void> | null = null;
   private audioEngine: AudioEngineV2 | null = null;
-
-  private currentLoadId = 0;
 
   private constructor() {}
 
@@ -43,15 +42,11 @@ export class AssetLoader {
    * 캐시된 에셋을 모두 해제하고 상태를 초기화합니다.
    */
   public clear(): void {
-    const id = this.currentLoadId;
-    console.log(`[AssetLoader][Load#${id}] Cleaning up cache for scene change...`);
-    this.containers.forEach((container, key) => {
-      console.log(`[AssetLoader][Load#${id}] Disposing container: ${key}`);
+    this.containers.forEach((container: AssetContainer, _key: string): void => {
       container.dispose();
     });
     this.containers.clear();
-    this.sounds.forEach((sound, key) => {
-      console.log(`[AssetLoader][Load#${id}] Disposing sound: ${key}`);
+    this.sounds.forEach((sound: Sound, _key: string): void => {
       sound.dispose();
     });
     this.sounds.clear();
@@ -67,16 +62,14 @@ export class AssetLoader {
   public async load(scene: Scene): Promise<void> {
     // 이미 로딩 중인 약속이 있다면 그것을 기다립니다.
     if (this.loadingPromise) {
-      console.log(
-        `[AssetLoader] Waiting for active loading session (current scene: ${this.lastScene?.uniqueId || 'unknown'})`
-      );
       await this.loadingPromise;
     }
 
     // 필수 에셋 존재 여부 확인
     const requiredAssets = ['enemy', 'rifle'];
-    const allContainersPresent = requiredAssets.every((key) => this.containers.has(key));
-
+    const allContainersPresent = requiredAssets.every((key: string): boolean =>
+      this.containers.has(key)
+    );
     // 로딩이 완료되었고 같은 씬이며 모든 데이터가 있다면 바로 리턴
     if (this.isLoaded && this.lastScene === scene && allContainersPresent) {
       console.log(`[AssetLoader] Assets already loaded and valid for Scene#${scene.uniqueId}.`);
@@ -93,26 +86,22 @@ export class AssetLoader {
   }
 
   private async _executeLoad(scene: Scene): Promise<void> {
-    const id = ++this.currentLoadId;
     const sceneId = scene.uniqueId;
 
     // 씬 전환 감지 및 초기화
     if (this.lastScene && this.lastScene !== scene) {
       console.log(
-        `[AssetLoader][Load#${id}] Transition detected: Scene#${this.lastScene.uniqueId} -> Scene#${sceneId}. Resetting cache.`
+        `[AssetLoader] Transition detected: Scene#${this.lastScene.uniqueId} -> Scene#${sceneId}. Resetting cache.`
       );
       this.clear();
-      this.currentLoadId = id; // clear()에서 초기화된 ID 복구
     }
 
     this.lastScene = scene;
-    console.log(`[AssetLoader][Load#${id}] Starting preload on Scene#${sceneId}`);
     const startTime = performance.now();
 
     try {
       // 1. Audio Engine Init
       if (!this.audioEngine) {
-        console.log(`[AssetLoader][Load#${id}] Initializing AudioEngine...`);
         this.audioEngine = await CreateAudioEngineAsync();
       }
 
@@ -120,7 +109,6 @@ export class AssetLoader {
 
       // 2. Load Sounds
       if (this.sounds.size === 0) {
-        console.log(`[AssetLoader][Load#${id}] Loading default sound effects...`);
         const gunshotSound = await this.audioEngine.createSoundAsync('gunshot', gunshotUrl, {
           volume: 0.5,
         });
@@ -131,16 +119,15 @@ export class AssetLoader {
             volume: 0.6,
           });
           this.sounds.set('swipe', swipeSound);
-        } catch (e) {
-          console.warn(`[AssetLoader][Load#${id}] Non-critical sound "swipe" failed.`);
+        } catch {
+          console.warn(`[AssetLoader] Non-critical sound "swipe" failed.`);
         }
       }
 
       if (scene.isDisposed) throw new Error('Scene disposed during sound loading');
 
       // 3. Load Mesh Containers
-      console.log(`[AssetLoader][Load#${id}] Loading model containers for Scene#${sceneId}...`);
-      await Promise.all([
+      await Promise.all<void>([
         this.loadMeshToContainer(scene, 'enemy', '', dummy3Url),
         this.loadMeshToContainer(scene, 'rifle', '', gunUrl),
       ]);
@@ -149,18 +136,18 @@ export class AssetLoader {
 
       // 최종 확인
       const requiredAssets = ['enemy', 'rifle'];
-      const success = requiredAssets.every((key) => this.containers.has(key));
+      const success = requiredAssets.every((key: string): boolean => this.containers.has(key));
 
       if (success) {
         this.isLoaded = true;
         console.log(
-          `[AssetLoader][Load#${id}] Successfully preloaded Scene#${sceneId} in ${(performance.now() - startTime).toFixed(2)}ms.`
+          `[AssetLoader] Successfully preloaded Scene#${sceneId} in ${(performance.now() - startTime).toFixed(2)}ms.`
         );
       } else {
         throw new Error('Some critical assets failed to load into containers.');
       }
     } catch (e) {
-      console.error(`[AssetLoader][Load#${id}] FAILED loading Scene#${sceneId}:`, e);
+      console.error(`[AssetLoader] FAILED loading Scene#${sceneId}:`, e);
       this.isLoaded = false;
       throw e;
     } finally {
@@ -177,13 +164,11 @@ export class AssetLoader {
     rootUrl: string,
     fileName: string
   ): Promise<void> {
-    const id = this.currentLoadId;
     try {
-      console.log(`[AssetLoader][Load#${id}] [${key}] Fetching from ${rootUrl}${fileName}`);
       const container = await SceneLoader.LoadAssetContainerAsync(rootUrl, fileName, scene);
       this.containers.set(key, container);
     } catch (e) {
-      console.error(`[AssetLoader][Load#${id}] [${key}] Load FAILED:`, e);
+      console.error(`[AssetLoader] [${key}] Load FAILED:`, e);
       throw e;
     }
   }
@@ -204,7 +189,7 @@ export class AssetLoader {
 
     // instantiateModelsToScene creates clones of the meshes/skeletons/anims
     const entries = container.instantiateModelsToScene(
-      (n) => (rootName ? `${rootName}_${n}` : n),
+      (n: string): string => (rootName ? `${rootName}_${n}` : n),
       false,
       { doNotInstantiate: true } // FORCE CLONE: Required for skeletal animation
     );
@@ -214,7 +199,7 @@ export class AssetLoader {
       // Access scene via any mesh or the container's scene property
       const scene = (container as any).scene;
       const wrapper = new Mesh(rootName || `${name}_wrapper`, scene);
-      entries.rootNodes.forEach((node) => {
+      entries.rootNodes.forEach((node: any): void => {
         node.parent = wrapper;
       });
       (entries as any).rootNodes = [wrapper];

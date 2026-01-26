@@ -82,8 +82,11 @@ export abstract class BasePawn implements IPawn, ITickable, IDestructible, IWorl
     for (const component of this.components) {
       component.dispose();
     }
+    this.components = [];
+
     if (this.mesh) {
       this.mesh.dispose();
+      (this as any).mesh = null;
     }
   }
 }

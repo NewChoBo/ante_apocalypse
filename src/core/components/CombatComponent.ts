@@ -8,7 +8,7 @@ import { FirearmEffectComponent } from './FirearmEffectComponent';
 import { MeleeEffectComponent } from './MeleeEffectComponent';
 import { ImpactEffectComponent } from './ImpactEffectComponent';
 import { CameraComponent } from './CameraComponent';
-import type { BasePawn } from '../BasePawn';
+import type { IPawn } from '../../types/IPawn';
 
 /**
  * 캐릭터의 무기 인벤토리, 입력, UI 동기화를 조율하는 컴포넌트.
@@ -18,7 +18,7 @@ export class CombatComponent extends BaseComponent {
   private input: WeaponInputComponent;
   private hudSync: HUDSyncComponent;
 
-  constructor(owner: BasePawn, scene: Scene) {
+  constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
 
     const cameraComp = owner.getComponent(CameraComponent);
@@ -53,7 +53,7 @@ export class CombatComponent extends BaseComponent {
   }
 
   private attachEffect<T extends BaseComponent>(
-    componentClass: new (owner: BasePawn, scene: Scene) => T
+    componentClass: new (owner: IPawn, scene: Scene) => T
   ): T {
     const comp = new componentClass(this.owner, this.scene);
     this.owner.addComponent(comp);

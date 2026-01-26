@@ -12,6 +12,7 @@ import { SessionController } from './systems/SessionController';
 import { GameMode } from '../types/GameMode';
 import { NetworkManager } from './systems/NetworkManager';
 import { NetworkState } from './network/NetworkProtocol';
+import { LifetimeManager } from './systems/LifetimeManager';
 
 import trainingGroundData from '../assets/levels/training_ground.json';
 import combatZoneData from '../assets/levels/combat_zone.json';
@@ -35,7 +36,7 @@ export class Game {
   private renderFunction: () => void;
 
   constructor() {
-    this.renderFunction = () => {
+    this.renderFunction = (): void => {
       const scene = this.sceneManager.getScene();
       if (scene) {
         if (scene.activeCamera) {
@@ -69,7 +70,7 @@ export class Game {
       stencil: true,
     });
 
-    window.addEventListener('resize', () => this.engine.resize());
+    window.addEventListener('resize', (): void => this.engine.resize());
   }
 
   private async initMenu(): Promise<void> {
@@ -82,9 +83,6 @@ export class Game {
     const menuCamera = new UniversalCamera('menuCamera', new Vector3(0, 2, -10), scene);
     menuCamera.setTarget(Vector3.Zero());
     scene.activeCamera = menuCamera;
-    // Menu camera doesn't need control anymore if we use Babylon GUI exclusively
-    // menuCamera.attachControl(this.canvas, true);
-
     this.setupUIManagerEvents();
     this.uiManager.showScreen(UIScreen.LOGIN);
 
@@ -92,40 +90,53 @@ export class Game {
       this.engine.runRenderLoop(this.renderFunction);
     }
   }
-
   private setupUIManagerEvents(): void {
-    // Clear old observers if any (UIManager.initialize already disposes old instance)
-    this.uiManager.onLogin.add((name) => {
-      this.playerName = name;
-      console.log(`Player logging in as: ${this.playerName}`);
-      this.uiManager.showScreen(UIScreen.MAIN_MENU);
-    });
+    const lm = LifetimeManager.getInstance();
 
-    this.uiManager.onStartSingleplayer.add(() => {
-      this.start('single');
-    });
+    lm.trackObserver(
+      this.uiManager.onLogin,
+      this.uiManager.onLogin.add((name: string): void => {
+        this.playerName = name;
+        console.log(`Player logging in as: ${this.playerName}`);
+        this.uiManager.showScreen(UIScreen.MAIN_MENU);
+      })
+    );
 
-    this.uiManager.onStartMultiplayer.add(() => {
-      // Start connection to Network (Photon)
-      NetworkManager.getInstance().connect(this.playerName);
-      this.uiManager.showScreen(UIScreen.LOBBY);
-    });
+    lm.trackObserver(
+      this.uiManager.onStartSingleplayer,
+      this.uiManager.onStartSingleplayer.add(() => {
+        this.start('single');
+      })
+    );
+
+    lm.trackObserver(
+      this.uiManager.onStartMultiplayer,
+      this.uiManager.onStartMultiplayer.add(() => {
+        // Start connection to Network (Photon)
+        NetworkManager.getInstance().connect(this.playerName);
+        this.uiManager.showScreen(UIScreen.LOBBY);
+      })
+    );
 
     // Listen for room join
-    NetworkManager.getInstance().onStateChanged.removeCallback((state) =>
-      this.handleNetworkStateChange(state)
-    );
-    NetworkManager.getInstance().onStateChanged.add((state) =>
-      this.handleNetworkStateChange(state)
+    const nm = NetworkManager.getInstance();
+    lm.trackObserver(
+      nm.onStateChanged,
+      nm.onStateChanged.add((state) => this.handleNetworkStateChange(state))
     );
 
-    this.uiManager.onResume.add(() => this.resume());
-    this.uiManager.onAbort.add(() => this.quitToMenu());
+    lm.trackObserver(
+      this.uiManager.onResume,
+      this.uiManager.onResume.add(() => this.resume())
+    );
+    lm.trackObserver(
+      this.uiManager.onAbort,
+      this.uiManager.onAbort.add(() => this.quitToMenu())
+    );
   }
 
   private handleNetworkStateChange(state: NetworkState): void {
     if (state === NetworkState.InRoom && !this.isRunning) {
-      console.log('[Game] Joined room, starting multiplayer game...');
       this.start('multi');
     }
   }
@@ -170,9 +181,12 @@ export class Game {
     }
 
     // Listen for player death to trigger Game Over
-    GameObservables.playerDied.add(() => {
-      if (this.isRunning && !this.isPaused) this.gameOver();
-    });
+    LifetimeManager.getInstance().trackObserver(
+      GameObservables.playerDied,
+      GameObservables.playerDied.add(() => {
+        if (this.isRunning && !this.isPaused) this.gameOver();
+      })
+    );
 
     this.engine.hideLoadingUI();
     this.isRunning = true;
@@ -216,7 +230,11 @@ export class Game {
 
   public togglePause(): void {
     if (!this.isRunning) return;
-    this.isPaused ? this.resume() : this.pause();
+    if (this.isPaused) {
+      this.resume();
+    } else {
+      this.pause();
+    }
   }
 
   public quitToMenu(): void {
@@ -231,6 +249,7 @@ export class Game {
     this.sessionController = null;
 
     // Reset Managers
+    LifetimeManager.getInstance().dispose();
     TickManager.getInstance().clear();
     WorldEntityManager.getInstance().clear();
     PickupManager.getInstance().clear();

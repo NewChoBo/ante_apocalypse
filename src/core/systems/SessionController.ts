@@ -18,6 +18,7 @@ import { GameObservables } from '../events/GameObservables';
 import { AssetLoader } from '../AssetLoader';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
 import { GameMode } from '../../types/GameMode';
+import { LifetimeManager } from './LifetimeManager';
 
 export class SessionController {
   private scene: Scene;
@@ -57,7 +58,6 @@ export class SessionController {
     this.playerController.possess(this.playerPawn);
 
     this.hud = new HUD();
-
     this.setupSystems(levelData);
     this.setupCombat();
     this.setupInventory();
@@ -79,30 +79,37 @@ export class SessionController {
 
     PickupManager.getInstance().initialize(this.scene, this.playerPawn!);
 
-    GameObservables.itemCollection.add(() => {
-      const swipeSound = AssetLoader.getInstance().getSound('swipe');
-      swipeSound?.play();
-    });
+    const lm = LifetimeManager.getInstance();
+    lm.trackObserver(
+      GameObservables.itemCollection,
+      GameObservables.itemCollection.add(() => {
+        const swipeSound = AssetLoader.getInstance().getSound('swipe');
+        swipeSound?.play();
+      })
+    );
   }
 
   private setupCombat(): void {
     const combatComp = new CombatComponent(this.playerPawn!, this.scene);
     this.playerPawn!.addComponent(combatComp);
 
-    this.healthUnsub = playerHealthStore.subscribe((health) => {
-      if (health <= 0) {
-        GameObservables.playerDied.notifyObservers(null);
-        if (this.multiplayerSystem) {
-          const nm = NetworkManager.getInstance();
-          nm.sendEvent(EventCode.PLAYER_DEATH, {
-            playerId: nm.getSocketId(),
-            attackerId: 'unknown',
-          });
+    const lm = LifetimeManager.getInstance();
+    lm.trackUnsub(
+      playerHealthStore.subscribe((health: number) => {
+        if (health <= 0) {
+          GameObservables.playerDied.notifyObservers(null);
+          if (this.multiplayerSystem) {
+            const nm = NetworkManager.getInstance();
+            nm.sendEvent(EventCode.PLAYER_DEATH, {
+              playerId: nm.getSocketId(),
+              attackerId: 'unknown',
+            });
+          }
         }
-      }
-    });
+      })
+    );
 
-    combatComp.onWeaponChanged((newWeapon) => {
+    combatComp.onWeaponChanged((newWeapon: any) => {
       this.syncInventoryStore();
       if (this.multiplayerSystem) {
         NetworkManager.getInstance().syncWeapon(newWeapon.name);
@@ -112,7 +119,7 @@ export class SessionController {
 
   private setupInventory(): void {
     this.inventoryUI = new InventoryUI({
-      onEquipWeapon: (slot, weaponId) => {
+      onEquipWeapon: (slot: number, weaponId: string | null): void => {
         const state = inventoryStore.get();
         const slots = [...state.weaponSlots];
         slots[slot] = weaponId;
@@ -123,13 +130,13 @@ export class SessionController {
           combat?.equipWeapon(weaponId);
         }
       },
-      onUseItem: (itemId) => {
+      onUseItem: (itemId: string): void => {
         if (this.playerPawn) {
           InventoryManager.useItem(itemId, this.playerPawn);
           this.syncInventoryStore();
         }
       },
-      onDropItem: (itemId) => {
+      onDropItem: (itemId: string): void => {
         if (!this.playerPawn) return;
         const state = inventoryStore.get();
         const bag = [...state.bagItems];
@@ -172,54 +179,58 @@ export class SessionController {
       playerName
     );
 
+    const lm = LifetimeManager.getInstance();
     // Initial State Sync Logic
-    network.onInitialStateRequested.add(() => {
-      if (network.isMasterClient()) {
-        console.log('[Session] Providing initial state to new player');
-        const enemyStates = this.enemyManager?.getEnemyStates() || [];
-        // Extract player states from NetworkManager
-        const playerStates = network.getAllPlayerStates();
+    lm.trackObserver(
+      network.onInitialStateRequested,
+      network.onInitialStateRequested.add(() => {
+        if (network.isMasterClient()) {
+          const enemyStates = this.enemyManager?.getEnemyStates() || [];
+          // Extract player states from NetworkManager
+          const playerStates = network.getAllPlayerStates();
 
-        // Get non-pawn entities (targets) from WorldEntityManager
-        const targetStates = WorldEntityManager.getInstance()
-          .getEntitiesByType('static_target', 'moving_target', 'humanoid_target')
-          .map((t) => ({
-            id: t.id,
-            type: t.type,
-            position: { x: t.position.x, y: t.position.y, z: t.position.z },
-            isMoving: (t as any).isMoving || false,
-          }));
+          // Get non-pawn entities (targets) from WorldEntityManager
+          const targetStates = WorldEntityManager.getInstance()
+            .getEntitiesByType('static_target', 'moving_target', 'humanoid_target')
+            .map((t) => ({
+              id: t.id,
+              type: t.type,
+              position: { x: t.position.x, y: t.position.y, z: t.position.z },
+              isMoving: (t as { isMoving?: boolean }).isMoving || false,
+            }));
 
-        network.sendEvent(EventCode.INITIAL_STATE, {
-          players: playerStates,
-          enemies: enemyStates,
-          targets: targetStates,
-        });
-      }
-    });
+          network.sendEvent(EventCode.INITIAL_STATE, {
+            players: playerStates,
+            enemies: enemyStates,
+            targets: targetStates,
+          });
+        }
+      })
+    );
 
-    network.onInitialStateReceived.add((data) => {
-      console.log('[Session] Received initial state sync');
-      if (this.enemyManager) {
-        this.enemyManager.applyEnemyStates(data.enemies);
-      }
-      if (this.multiplayerSystem) {
-        this.multiplayerSystem.applyPlayerStates(data.players);
-      }
-      if (data.targets && this.targetSpawner) {
-        data.targets.forEach((t: any) => {
-          this.targetSpawner!.spawnTarget(
-            new Vector3(t.position.x, t.position.y, t.position.z),
-            t.isMoving,
-            t.id,
-            t.type
-          );
-        });
-      }
-    });
+    lm.trackObserver(
+      network.onInitialStateReceived,
+      network.onInitialStateReceived.add((data) => {
+        if (this.enemyManager) {
+          this.enemyManager.applyEnemyStates(data.enemies);
+        }
+        if (this.multiplayerSystem) {
+          this.multiplayerSystem.applyPlayerStates(data.players);
+        }
+        if (data.targets && this.targetSpawner) {
+          data.targets.forEach((t: any) => {
+            this.targetSpawner!.spawnTarget(
+              new Vector3(t.position.x, t.position.y, t.position.z),
+              t.isMoving,
+              t.id,
+              t.type
+            );
+          });
+        }
+      })
+    );
 
     if (!network.isMasterClient()) {
-      console.log('[Session] Requesting initial state from Master Client...');
       network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
     }
   }

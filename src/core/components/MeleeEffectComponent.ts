@@ -2,7 +2,7 @@ import { Scene } from '@babylonjs/core';
 import { BaseWeaponEffectComponent } from './BaseWeaponEffectComponent';
 import { AssetLoader } from '../AssetLoader';
 import { GameObservables } from '../events/GameObservables';
-import type { BasePawn } from '../BasePawn';
+import type { IPawn } from '../../types/IPawn';
 
 /**
  * 근접 무기 전용 시각적 피드백 컴포넌트.
@@ -11,7 +11,7 @@ import type { BasePawn } from '../BasePawn';
 export class MeleeEffectComponent extends BaseWeaponEffectComponent {
   private swipeSound: any;
 
-  constructor(owner: BasePawn, scene: Scene) {
+  constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
 
     this.swipeSound = AssetLoader.getInstance().getSound('swipe');

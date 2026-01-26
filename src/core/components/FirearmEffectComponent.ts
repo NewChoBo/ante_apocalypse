@@ -2,7 +2,8 @@ import { Scene, Vector3, MeshBuilder, StandardMaterial, Color3, PointLight } fro
 import { BaseWeaponEffectComponent } from './BaseWeaponEffectComponent';
 import { AssetLoader } from '../AssetLoader';
 import { GameObservables } from '../events/GameObservables';
-import type { BasePawn } from '../BasePawn';
+import { LifetimeManager } from '../systems/LifetimeManager';
+import type { IPawn } from '../../types/IPawn';
 
 /**
  * 총기류 전용 시각적 피드백 컴포넌트.
@@ -13,9 +14,7 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
   private muzzleLight: PointLight;
   private gunshotSound: any;
 
-  private observer: any = null;
-
-  constructor(owner: BasePawn, scene: Scene) {
+  constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
 
     this.flashMaterial = new StandardMaterial('muzzleFlashMat', this.scene);
@@ -30,23 +29,22 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
     this.gunshotSound = AssetLoader.getInstance().getSound('gunshot');
 
     // 이벤트 구독: 'firearm' 타입인 경우에만 총구 화염 및 소리 발생
-    this.observer = GameObservables.weaponFire.add((payload) => {
-      // console.log('WeaponFire Event:', payload); // [DEBUG]
-      if (payload.fireType === 'firearm') {
-        this.playGunshot();
-        if (payload.muzzleTransform) {
-          // console.log('Muzzle Transform Rx:', payload.muzzleTransform); // [DEBUG]
-          this.emitMuzzleFlash(
-            payload.muzzleTransform.position,
-            payload.muzzleTransform.direction,
-            payload.muzzleTransform.transformNode,
-            payload.muzzleTransform.localMuzzlePosition
-          );
-        } else {
-          console.warn('No muzzle transform in payload');
+    LifetimeManager.getInstance().trackObserver(
+      GameObservables.weaponFire,
+      GameObservables.weaponFire.add((payload) => {
+        if (payload.fireType === 'firearm') {
+          this.playGunshot();
+          if (payload.muzzleTransform) {
+            this.emitMuzzleFlash(
+              payload.muzzleTransform.position,
+              payload.muzzleTransform.direction,
+              payload.muzzleTransform.transformNode,
+              payload.muzzleTransform.localMuzzlePosition
+            );
+          }
         }
-      }
-    });
+      })
+    );
   }
 
   private playGunshot(): void {
@@ -82,16 +80,12 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
     if (transformNode) {
       flash.parent = transformNode;
       if (localPosition) {
-        // [DEBUG] 위치 확인용 로그
-        // console.log('Applying Muzzle Offset:', localPosition.toString());
         flash.position.copyFrom(localPosition);
       }
     } else {
       const player = this.owner as any;
       if (player.camera) {
         flash.parent = player.camera;
-        // 카메라 기준일 경우 월드 포지션을 로컬로 변환하거나(복잡),
-        // 단순히 카메라 앞(Z+)으로 고정 배치
         flash.position = new Vector3(0, -0.1, 0.8);
       } else {
         flash.position = position;
@@ -102,7 +96,6 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
     flash.scaling.setAll(0.8 + Math.random() * 0.4);
 
     flash.computeWorldMatrix(true);
-    // console.log('Flash World Pos:', flash.absolutePosition.toString()); // [DEBUG]
 
     this.muzzleLight.position.copyFrom(flash.absolutePosition);
     this.muzzleLight.intensity = 0.8;
@@ -117,10 +110,5 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
     super.dispose();
     this.flashMaterial.dispose();
     this.muzzleLight.dispose();
-
-    if (this.observer) {
-      GameObservables.weaponFire.remove(this.observer);
-      this.observer = null;
-    }
   }
 }

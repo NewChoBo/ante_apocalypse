@@ -1,7 +1,7 @@
 import { Scene, Vector3, MeshBuilder, StandardMaterial, Color3 } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { GameObservables } from '../events/GameObservables';
-import type { BasePawn } from '../BasePawn';
+import type { IPawn } from '../../types/IPawn';
 
 /**
  * 모든 무기 이펙트 컴포넌트의 추상 베이스 클래스.
@@ -10,7 +10,7 @@ import type { BasePawn } from '../BasePawn';
 export abstract class BaseWeaponEffectComponent extends BaseComponent {
   protected hitSparkMaterial: StandardMaterial;
 
-  constructor(owner: BasePawn, scene: Scene) {
+  constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
 
     this.hitSparkMaterial = new StandardMaterial('hitSparkMat', this.scene);

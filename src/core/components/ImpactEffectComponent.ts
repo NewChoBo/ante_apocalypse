@@ -1,7 +1,7 @@
 import { Scene, Vector3, ParticleSystem, Texture, Color4 } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { GameObservables } from '../events/GameObservables';
-import type { BasePawn } from '../BasePawn';
+import type { IPawn } from '../../types/IPawn';
 import flareUrl from '../../assets/textures/Flare.png?url';
 
 /**
@@ -11,7 +11,7 @@ import flareUrl from '../../assets/textures/Flare.png?url';
 export class ImpactEffectComponent extends BaseComponent {
   private particleSystem: ParticleSystem;
 
-  constructor(owner: BasePawn, scene: Scene) {
+  constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
 
     // 파티클 시스템 미리 생성 (풀링 방식이 이상적이나 간소화)

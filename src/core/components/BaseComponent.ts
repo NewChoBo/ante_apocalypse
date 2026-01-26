@@ -1,14 +1,14 @@
 import { Scene } from '@babylonjs/core';
-import type { BasePawn } from '../BasePawn';
+import type { IPawn } from '../../types/IPawn';
 
 /**
  * 모든 컴포넌트의 가상 기본 클래스.
  */
 export abstract class BaseComponent {
-  protected owner: BasePawn;
+  protected owner: IPawn;
   protected scene: Scene;
 
-  constructor(owner: BasePawn, scene: Scene) {
+  constructor(owner: IPawn, scene: Scene) {
     this.owner = owner;
     this.scene = scene;
   }
