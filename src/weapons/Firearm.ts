@@ -7,12 +7,15 @@ import {
   MeshBuilder,
   StandardMaterial,
   Color3,
+  AbstractMesh,
+  Animation,
 } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon';
 import { GameObservables } from '../core/events/GameObservables';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon';
 import { NetworkManager } from '../core/network/NetworkManager';
+import { AssetLoader, GameAssets } from '../core/loaders/AssetLoader';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
@@ -281,6 +284,98 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     if (this.isActive) {
       this.updateAmmoStore();
     }
+  }
+
+  protected async instantiateWeaponModel(
+    assetName: keyof GameAssets,
+    targetSize: number,
+    position: Vector3,
+    rotation: Vector3,
+    scalingZMultiplier: number = 1.0,
+    materialTinter?: (mesh: Mesh) => void
+  ): Promise<void> {
+    try {
+      const entries = AssetLoader.getInstance().instantiateMesh(assetName);
+
+      if (!entries) {
+        throw new Error(
+          `Asset '${assetName}' not preloaded. Loader status: isReady=${AssetLoader.getInstance().ready}`
+        );
+      }
+
+      this.weaponMesh = entries.rootNodes[0] as AbstractMesh;
+      if (!this.weaponMesh) {
+        throw new Error(`[${this.name}] Failed to find root node in asset '${assetName}'`);
+      }
+
+      // --- Normalization ---
+      this.weaponMesh.parent = null;
+      this.weaponMesh.rotationQuaternion = null;
+      this.weaponMesh.rotation = Vector3.Zero();
+      this.weaponMesh.scaling = Vector3.One();
+
+      // --- Scaling ---
+      const hierarchy = this.weaponMesh.getHierarchyBoundingVectors();
+      const size = hierarchy.max.subtract(hierarchy.min);
+      const maxDim = Math.max(size.x, size.y, size.z);
+
+      const scaleFactor = targetSize / (maxDim || 1);
+      this.weaponMesh.scaling = new Vector3(
+        scaleFactor,
+        scaleFactor,
+        scaleFactor * scalingZMultiplier
+      );
+
+      // --- Positioning ---
+      this.weaponMesh.parent = this.camera;
+      this.weaponMesh.position = position;
+      this.weaponMesh.rotation = rotation;
+
+      // --- Visibility ---
+      this.weaponMesh.setEnabled(this.isActive);
+
+      // --- Materials & Shadows ---
+      const allMeshes = this.weaponMesh.getChildMeshes(false);
+      allMeshes.forEach((m) => {
+        if (m instanceof Mesh) {
+          m.receiveShadows = true;
+          m.isPickable = false;
+          if (materialTinter) {
+            materialTinter(m);
+          }
+        }
+      });
+
+      this.setIdleState();
+      console.log(`[${this.name}] Instantiated. Scale: ${scaleFactor}`);
+    } catch (e) {
+      console.error(`Failed to instantiate ${this.name} model:`, e);
+      // Fallback
+      this.weaponMesh = MeshBuilder.CreateBox(`${this.name}_fallback`, { size: 0.1 }, this.scene);
+      this.weaponMesh.parent = this.camera;
+      this.weaponMesh.position = position;
+    }
+  }
+
+  protected playRecoilAnimation(intensity: number, duration: number, peakFrame: number = 2): void {
+    if (!this.weaponMesh) return;
+
+    const recoilAnim = new Animation(
+      'recoil',
+      'rotation.x',
+      60,
+      Animation.ANIMATIONTYPE_FLOAT,
+      Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
+
+    recoilAnim.setKeys([
+      { frame: 0, value: 0 },
+      { frame: peakFrame, value: intensity },
+      { frame: duration, value: 0 },
+    ]);
+
+    this.weaponMesh.animations = [recoilAnim];
+    this.scene.beginAnimation(this.weaponMesh, 0, duration, false);
   }
 
   public dispose(): void {
