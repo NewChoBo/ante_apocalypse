@@ -7,7 +7,6 @@ import {
   MeshBuilder,
   StandardMaterial,
   Color3,
-  AbstractMesh,
   Animation,
 } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon';
@@ -15,7 +14,8 @@ import { GameObservables } from '../core/events/GameObservables';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon';
 import { NetworkManager } from '../core/network/NetworkManager';
-import { AssetLoader, GameAssets } from '../core/loaders/AssetLoader';
+import { GameAssets } from '../core/loaders/AssetLoader';
+import { WeaponUtils } from '../utils/WeaponUtils';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
@@ -294,66 +294,23 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     scalingZMultiplier: number = 1.0,
     materialTinter?: (mesh: Mesh) => void
   ): Promise<void> {
-    try {
-      const entries = AssetLoader.getInstance().instantiateMesh(assetName);
+    const mesh = await WeaponUtils.createWeaponMesh(this.scene, {
+      assetName,
+      targetSize,
+      parent: this.camera,
+      position,
+      rotation,
+      scalingZMultiplier,
+      materialTinter,
+      isPickable: false,
+      receiveShadows: true,
+    });
 
-      if (!entries) {
-        throw new Error(
-          `Asset '${assetName}' not preloaded. Loader status: isReady=${AssetLoader.getInstance().ready}`
-        );
-      }
-
-      this.weaponMesh = entries.rootNodes[0] as AbstractMesh;
-      if (!this.weaponMesh) {
-        throw new Error(`[${this.name}] Failed to find root node in asset '${assetName}'`);
-      }
-
-      // --- Normalization ---
-      this.weaponMesh.parent = null;
-      this.weaponMesh.rotationQuaternion = null;
-      this.weaponMesh.rotation = Vector3.Zero();
-      this.weaponMesh.scaling = Vector3.One();
-
-      // --- Scaling ---
-      const hierarchy = this.weaponMesh.getHierarchyBoundingVectors();
-      const size = hierarchy.max.subtract(hierarchy.min);
-      const maxDim = Math.max(size.x, size.y, size.z);
-
-      const scaleFactor = targetSize / (maxDim || 1);
-      this.weaponMesh.scaling = new Vector3(
-        scaleFactor,
-        scaleFactor,
-        scaleFactor * scalingZMultiplier
-      );
-
-      // --- Positioning ---
-      this.weaponMesh.parent = this.camera;
-      this.weaponMesh.position = position;
-      this.weaponMesh.rotation = rotation;
-
-      // --- Visibility ---
+    if (mesh) {
+      this.weaponMesh = mesh;
       this.weaponMesh.setEnabled(this.isActive);
-
-      // --- Materials & Shadows ---
-      const allMeshes = this.weaponMesh.getChildMeshes(false);
-      allMeshes.forEach((m) => {
-        if (m instanceof Mesh) {
-          m.receiveShadows = true;
-          m.isPickable = false;
-          if (materialTinter) {
-            materialTinter(m);
-          }
-        }
-      });
-
       this.setIdleState();
-      console.log(`[${this.name}] Instantiated. Scale: ${scaleFactor}`);
-    } catch (e) {
-      console.error(`Failed to instantiate ${this.name} model:`, e);
-      // Fallback
-      this.weaponMesh = MeshBuilder.CreateBox(`${this.name}_fallback`, { size: 0.1 }, this.scene);
-      this.weaponMesh.parent = this.camera;
-      this.weaponMesh.position = position;
+      console.log(`[${this.name}] Instantiated via WeaponUtils.`);
     }
   }
 

@@ -13,7 +13,9 @@ import {
   Animation,
   AnimationRange,
   TransformNode,
+  Node,
 } from '@babylonjs/core';
+import { WeaponUtils } from '../../utils/WeaponUtils';
 import { BasePawn } from './BasePawn';
 import { AssetLoader, GameAssets } from '../loaders/AssetLoader';
 import { ParticleSystem, Texture } from '@babylonjs/core';
@@ -243,36 +245,47 @@ export class RemotePlayerPawn extends BasePawn {
         this.weaponMesh = null;
       }
 
-      const entries = AssetLoader.getInstance().instantiateMesh(
-        assetKey,
-        'remoteWeapon_' + this.id
-      );
-      if (!entries) return;
+      // Determine parent (Hand Bone or Root)
+      let parent: Node | undefined = this.mesh;
+      let position = new Vector3(0.3, -0.5, 0.5);
+      let rotation = Vector3.Zero();
 
-      this.weaponMesh = entries.rootNodes[0] as AbstractMesh;
-      this.weaponMesh.parent = this.mesh;
-
-      // Pivot/Attachment logic:
-      // Hand bone search
       const handBone = this.skeleton?.bones.find(
         (b) =>
           b.name.toLowerCase().includes('righthand') || b.name.toLowerCase().includes('right_hand')
       );
 
       if (handBone) {
-        // Attach to bone
         const boneNode = handBone.getTransformNode();
         if (boneNode) {
-          this.weaponMesh.parent = boneNode;
-          this.weaponMesh.position = new Vector3(0, 0, 0);
-          this.weaponMesh.rotation = new Vector3(Math.PI / 2, 0, 0);
+          parent = boneNode;
+          position = new Vector3(0, 0, 0);
+          rotation = new Vector3(Math.PI / 2, 0, 0);
         }
-      } else {
-        // Fallback: position relative to root
-        this.weaponMesh.position = new Vector3(0.3, -0.5, 0.5);
       }
 
-      this.shadowGenerator.addShadowCaster(this.weaponMesh, true);
+      const mesh = await WeaponUtils.createWeaponMesh(this.scene, {
+        assetName: assetKey,
+        targetSize: 0.6, // Default Rifle size for TPS? (Rifle in FPS is 0.6)
+        parent,
+        position,
+        rotation,
+        scalingZMultiplier: 1.6, // Match Rifle.ts scale
+        isPickable: true,
+        receiveShadows: true,
+      });
+
+      if (mesh) {
+        this.weaponMesh = mesh;
+        this.weaponMesh.name = 'remoteWeapon_' + this.id;
+
+        // Ensure metadata for picking
+        this.weaponMesh.getChildMeshes().forEach((m) => {
+          m.metadata = { type: 'remote_player', pawn: this, bodyPart: 'weapon' };
+        });
+
+        this.shadowGenerator.addShadowCaster(this.weaponMesh, true);
+      }
     } catch (e) {
       console.error('Failed to load remote weapon model:', e);
     }
