@@ -128,6 +128,9 @@ export class NetworkMediator {
 
   /**
    * Universal method to send events through the mediator.
+   * NOTE: Photon implementation currently uses ReceiverGroup.Others,
+   * meaning the Master Client will NOT receive their own events.
+   * Systems must handle Master Client logic locally or via direct processing.
    */
   public sendEvent(code: EventCode, data: EventData, reliable: boolean = true): void {
     this.networkManager.sendEvent(code, data, reliable);

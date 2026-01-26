@@ -75,17 +75,20 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
   }
 
   private playGunshot(): void {
-    const sound = this.gunshotSound || AssetLoader.getInstance().getSound('gunshot') || null;
+    const sound = this.gunshotSound || AssetLoader.getInstance().getSound('gunshot');
     if (sound) {
       this.gunshotSound = sound;
       // 피치(재생 속도)를 0.9 ~ 1.1 사이로 랜덤화
       const randomRate = 0.9 + Math.random() * 0.2;
 
-      if (typeof sound.setPlaybackRate === 'function') {
-        sound.setPlaybackRate(randomRate);
-      } else {
-        // Fallback or explicit updateOptions if available on different Sound implementation
-        sound.updateOptions({ playbackRate: randomRate });
+      try {
+        if (typeof (sound as any).setPlaybackRate === 'function') {
+          (sound as any).setPlaybackRate(randomRate);
+        } else if ('playbackRate' in (sound as any)) {
+          (sound as any).playbackRate = randomRate;
+        }
+      } catch (e) {
+        console.warn('[FirearmEffectComponent] Failed to set playback rate:', e);
       }
 
       sound.play();

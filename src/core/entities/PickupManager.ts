@@ -3,7 +3,7 @@ import { PickupActor, PickupType } from '../entities/PickupActor';
 import { PlayerPawn } from '../pawns/PlayerPawn';
 import { IGameSystem } from '../types/IGameSystem';
 import { TickManager } from '../managers/TickManager';
-import { inventoryStore, BagItem } from '../store/GameStore';
+import { InventoryManager } from '../inventory/InventoryManager';
 import { GameObservables } from '../events/GameObservables';
 import { NetworkMediator } from '../network/NetworkMediator';
 import { EventCode } from '../network/NetworkProtocol';
@@ -141,38 +141,43 @@ export class PickupManager implements IGameSystem {
       const dx = playerPos.x - pickupPos.x;
       const dz = playerPos.z - pickupPos.z;
       const distSq = dx * dx + dz * dz;
-      const collectionRange = 3.0; // 더 넓은 범위
+      const collectionRange = 3.0;
 
       if (distSq < collectionRange * collectionRange) {
+        console.log(
+          `[PickupManager] Candidate for collection: ${id}, dist: ${Math.sqrt(distSq).toFixed(2)}m`
+        );
         this.handleCollection(pickup, id);
       }
-    }); // End forEach
+    });
   }
 
   private handleCollection(pickup: PickupActor, id: string): void {
-    if (!this.player) return;
+    if (!this.player || pickup.destroyed) return;
 
-    // Server-Authoritative: Request pickup instead of taking it immediately
-    // Ideally, we could optimistically hide it, but for now we wait for server response.
-    // If not connected (Single player), assume Master authority immediately.
+    console.log(
+      `[PickupManager] Handling collection for ${id}. SocketID: [${this.networkMediator.getSocketId()}]`
+    );
 
+    // Single player mode: Grant immediately
     if (!this.networkMediator.getSocketId()) {
-      // Single player mode: Grant immediately
-      this.grantPickupToInventory(id, pickup.type, this.networkMediator.getSocketId() || 'local');
-      this.pickups.delete(id); // Local cleanup
+      console.log(`[PickupManager] Single Player: Granting ${id} immediately`);
+      this.grantPickupToInventory(id, pickup.type, 'local');
+      this.pickups.delete(id);
       pickup.collect();
       return;
     }
 
-    // Multiplayer: Send Request
-    // Debounce: Avoid spamming requests for same item in same frame
-    // (Simple check: if it's already destroyed locally, ignore)
-    if (pickup.destroyed) return;
+    if (this.networkMediator.isMasterClient()) {
+      console.log(`[PickupManager] Master: Processing ${id} locally`);
+      this.processPickupRequest(id, this.networkMediator.getSocketId()!);
+    } else {
+      console.log(`[PickupManager] Client: Requesting ${id} from Master`);
+      this.networkMediator.sendEvent(EventCode.REQ_PICKUP, { id });
+    }
 
-    this.networkMediator.sendEvent(EventCode.REQ_PICKUP, { id });
-
-    // Optimistic: Hide visual immediately to prevent double usage?
-    // No, wait for confirmation to avoid desync if denied.
+    // Optimistic: Mark as destroyed locally to prevent multiple request spamming
+    pickup.destroyed = true;
   }
 
   // Executed on Master Client
@@ -194,37 +199,34 @@ export class PickupManager implements IGameSystem {
     });
 
     // 3. Notify everyone to destroy the mesh (Visual sync)
-    // Note: PICKUP_GRANTED is also broadcasted, so maybe we rely on that?
-    // But DESTROY_PICKUP is explicit for mesh removal.
     this.networkMediator.sendEvent(EventCode.DESTROY_PICKUP, { id: pickupId });
+
+    // 4. Local handling for Master if they are the requester (Others group doesn't loop back)
+    const myId = this.networkMediator.getSocketId();
+    if (requesterId === myId) {
+      console.log(`[PickupManager] Master loopback: Granting to self`);
+      this.grantPickupToInventory(pickupId, pickup.type, requesterId);
+      this.handleDestroyEvent({ id: pickupId });
+    }
   }
 
   private grantPickupToInventory(_id: string, type: string, ownerId: string): void {
-    // Only process if I am the owner
-    if (ownerId !== this.networkMediator.getSocketId()) return;
-
-    // Logic for inventory addition...
-    const { bagItems } = inventoryStore.get();
-    const existingItemIndex = bagItems.findIndex((item) => item.id === type);
-
-    let newBagItems: BagItem[];
-    if (existingItemIndex !== -1) {
-      newBagItems = bagItems.map((item, idx) =>
-        idx === existingItemIndex ? { ...item, count: item.count + 1 } : item
-      );
-    } else {
-      newBagItems = [
-        ...bagItems,
-        {
-          id: type,
-          name: type === 'health_pack' ? 'First Aid Kit' : 'Ammo Crate',
-          type: 'consumable',
-          count: 1,
-        } as BagItem,
-      ];
+    const myId = this.networkMediator.getSocketId() || 'local';
+    console.log(
+      `[PickupManager] grantPickupToInventory: myId=[${myId}], ownerId=[${ownerId}], type=[${type}]`
+    );
+    if (ownerId !== myId) {
+      console.warn(`[PickupManager] ID Mismatch: ownerId ${ownerId} != myId ${myId}`);
+      return;
     }
 
-    inventoryStore.setKey('bagItems', newBagItems);
+    // Logic for inventory addition using InventoryManager for consistency
+    const success = InventoryManager.addItemToBag(type, 1);
+    if (!success) {
+      this.showPopup(`Inventory Full!`, '#F44336');
+      return;
+    }
+
     this.showPopup(`Picked up ${type}`, '#FF9800');
 
     // Play local sound
