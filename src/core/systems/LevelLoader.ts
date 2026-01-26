@@ -77,7 +77,9 @@ export class LevelLoader {
       const mat = new StandardMaterial('groundMat', this.scene);
       mat.diffuseColor = Color3.FromArray(data.ground.material.diffuse);
       mat.specularColor = Color3.FromArray(data.ground.material.specular);
+      mat.freeze(); // Freeze material
       ground.material = mat;
+      ground.freezeWorldMatrix(); // Freeze matrix
     }
 
     // 2. Walls
@@ -112,7 +114,9 @@ export class LevelLoader {
         mat.bumpTexture = normTex;
       }
 
+      mat.freeze(); // Freeze material
       wall.material = mat;
+      wall.freezeWorldMatrix(); // Freeze matrix
     });
 
     // 3. Props
@@ -150,7 +154,9 @@ export class LevelLoader {
       if (propData.material.emissive) {
         mat.emissiveColor = Color3.FromArray(propData.material.emissive);
       }
+      mat.freeze(); // Freeze material
       mesh.material = mat;
+      mesh.freezeWorldMatrix(); // Freeze matrix
     });
   }
 }

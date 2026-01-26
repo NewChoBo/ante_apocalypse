@@ -33,8 +33,7 @@ export class EnemyManager {
       if (!this.networkManager.isMasterClient()) {
         const enemy = this.enemies.get(data.id);
         if (enemy) {
-          enemy.position.set(data.position.x, data.position.y, data.position.z);
-          enemy.mesh.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+          enemy.updateNetworkState(data.position, data.rotation);
           if (data.isMoving !== undefined) {
             enemy.isMoving = data.isMoving;
           }

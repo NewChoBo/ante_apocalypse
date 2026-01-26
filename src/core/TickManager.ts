@@ -6,6 +6,9 @@ import { ITickable } from './interfaces/ITickable';
 export class TickManager {
   private static instance: TickManager;
   private tickables: ITickable[] = [];
+  private toRegister: ITickable[] = [];
+  private toUnregister: ITickable[] = [];
+  private isTicking: boolean = false;
 
   private constructor() {}
 
@@ -18,15 +21,28 @@ export class TickManager {
 
   /** 업데이트 대상 등록 */
   public register(tickable: ITickable): void {
+    if (this.isTicking) {
+      if (!this.toRegister.includes(tickable)) {
+        this.toRegister.push(tickable);
+      }
+      return;
+    }
+
     if (this.tickables.includes(tickable)) return;
 
     this.tickables.push(tickable);
-    // 우선순위에 따라 정렬 (오름차순)
     this.tickables.sort((a, b) => a.priority - b.priority);
   }
 
   /** 업데이트 대상 해제 */
   public unregister(tickable: ITickable): void {
+    if (this.isTicking) {
+      if (!this.toUnregister.includes(tickable)) {
+        this.toUnregister.push(tickable);
+      }
+      return;
+    }
+
     const index = this.tickables.indexOf(tickable);
     if (index !== -1) {
       this.tickables.splice(index, 1);
@@ -35,10 +51,20 @@ export class TickManager {
 
   /** 등록된 모든 객체 업데이트 실행 */
   public tick(deltaTime: number): void {
-    // 업데이트 중에 리스트가 변경될 수 있으므로 복사본을 순회하거나
-    // 인덱스 관리에 주의해야 합니다. 여기서는 단순 순회를 사용합니다.
+    this.isTicking = true;
     for (const tickable of this.tickables) {
       tickable.tick(deltaTime);
+    }
+    this.isTicking = false;
+
+    // Process deferred queue
+    if (this.toUnregister.length > 0) {
+      this.toUnregister.forEach((t) => this.unregister(t));
+      this.toUnregister = [];
+    }
+    if (this.toRegister.length > 0) {
+      this.toRegister.forEach((t) => this.register(t));
+      this.toRegister = [];
     }
   }
 

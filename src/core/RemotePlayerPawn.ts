@@ -23,6 +23,8 @@ export class RemotePlayerPawn extends BasePawn {
   public mesh: Mesh;
   private targetPosition: Vector3;
   private targetRotation: Vector3;
+  private snapshots: { timestamp: number; position: Vector3; rotation: Vector3 }[] = [];
+  private readonly INTERPOLATION_DELAY = 100; // ms
   private lerpSpeed = 10;
   public id: string;
   public playerName: string;
@@ -277,41 +279,77 @@ export class RemotePlayerPawn extends BasePawn {
     position: { x: number; y: number; z: number },
     rotation: { x: number; y: number; z: number }
   ): void {
+    const now = performance.now();
+    this.snapshots.push({
+      timestamp: now,
+      position: new Vector3(position.x, position.y, position.z),
+      rotation: new Vector3(rotation.x, rotation.y, rotation.z),
+    });
+
+    // Keep buffer small
+    if (this.snapshots.length > 20) {
+      this.snapshots.shift();
+    }
+
     this.targetPosition.set(position.x, position.y, position.z);
     this.targetRotation.set(rotation.x, rotation.y, rotation.z);
   }
 
   public tick(deltaTime: number): void {
     // 1. Calculate movement state
-    const posDiff = Vector3.Distance(this.mesh.position, this.targetPosition);
-    this.isMoving = posDiff > 0.02;
+    const renderTime = performance.now() - this.INTERPOLATION_DELAY;
 
-    // 2. Position Interpolation
-    this.mesh.position = Vector3.Lerp(
-      this.mesh.position,
-      this.targetPosition,
-      Math.min(1.0, deltaTime * this.lerpSpeed)
-    );
+    if (this.snapshots.length >= 2) {
+      // Find two snapshots to interpolate between
+      let i = 0;
+      for (i = 0; i < this.snapshots.length - 1; i++) {
+        if (this.snapshots[i + 1].timestamp > renderTime) break;
+      }
 
-    // 3. Rotation Interpolation
-    // Yaw (Y) for body
-    let targetYaw = this.targetRotation.y;
-    let diffYaw = targetYaw - this.mesh.rotation.y;
-    // Normalize angle difference
-    while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
-    while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
-    this.mesh.rotation.y += diffYaw * deltaTime * this.lerpSpeed;
+      const s0 = this.snapshots[i];
+      const s1 = this.snapshots[i + i < this.snapshots.length - 1 ? 1 : 0];
 
-    // Pitch (X) for head (if bone found)
-    if (this.headBoneNode) {
-      // Simple direct match for now, bones in Babylon might need rotation fix
-      // We can simulate looking up/down by rotating the head bone
-      // Note: Bones use local space, so this might need adjustment depending on bone axis
-      // For Y-Bot GLB, X axis is usually correct for pitch.
-      this.headBoneNode.rotation.x = this.targetRotation.x;
+      if (s1 && s1.timestamp > renderTime) {
+        const t = (renderTime - s0.timestamp) / (s1.timestamp - s0.timestamp);
+        this.mesh.position = Vector3.Lerp(s0.position, s1.position, t);
+
+        // Yaw Interpolation
+        let diffYaw = s1.rotation.y - s0.rotation.y;
+        while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
+        while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
+        this.mesh.rotation.y = s0.rotation.y + diffYaw * t;
+
+        if (this.headBoneNode) {
+          this.headBoneNode.rotation.x = s0.rotation.x + (s1.rotation.x - s0.rotation.x) * t;
+        }
+
+        const posDiff = Vector3.Distance(s0.position, s1.position);
+        this.isMoving = posDiff > 0.01;
+      } else {
+        // Fallback to simple lerp if no future snapshot
+        this.mesh.position = Vector3.Lerp(
+          this.mesh.position,
+          this.targetPosition,
+          Math.min(1.0, deltaTime * this.lerpSpeed)
+        );
+        this.isMoving = Vector3.Distance(this.mesh.position, this.targetPosition) > 0.02;
+      }
+
+      // Cleanup old snapshots
+      if (i > 0) {
+        this.snapshots.splice(0, i);
+      }
+    } else {
+      // Fallback
+      this.mesh.position = Vector3.Lerp(
+        this.mesh.position,
+        this.targetPosition,
+        Math.min(1.0, deltaTime * this.lerpSpeed)
+      );
+      this.isMoving = Vector3.Distance(this.mesh.position, this.targetPosition) > 0.02;
     }
 
-    // 4. Update Animations
+    // 4. Update Animations (keep the existing logic)
     if (this.skeleton) {
       if (this.isMoving) {
         if (this.currentAnim !== 'walk' && this.walkRange) {

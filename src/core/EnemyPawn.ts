@@ -9,16 +9,21 @@ import {
   AnimationPropertiesOverride,
   AbstractMesh,
   ShadowGenerator,
+  DynamicTexture,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
+import { NetworkManager } from './systems/NetworkManager';
 import { AssetLoader } from './AssetLoader';
 import { PickupManager } from './systems/PickupManager';
-import { DynamicTexture } from '@babylonjs/core';
 
 export class EnemyPawn extends BasePawn {
   public mesh: Mesh;
   public isDead = false;
   private _lastPosition: Vector3 = new Vector3();
+  private targetPosition: Vector3 = new Vector3();
+  private targetRotation: Vector3 = new Vector3();
+  private snapshots: { timestamp: number; position: Vector3; rotation: Vector3 }[] = [];
+  private readonly INTERPOLATION_DELAY = 100;
   public type = 'enemy';
 
   // Visuals & Animation
@@ -199,27 +204,79 @@ export class EnemyPawn extends BasePawn {
 
   private _lastMoveTime: number = 0;
 
-  public tick(deltaTime: number): void {
-    // 1. Calculate movement state by displacement with grace period to avoid network stutter
-    const currentPos = this.mesh.position;
-    const distance = Vector3.Distance(currentPos, this._lastPosition);
+  public updateNetworkState(
+    position: { x: number; y: number; z: number },
+    rotation: { x: number; y: number; z: number }
+  ): void {
     const now = performance.now();
+    this.snapshots.push({
+      timestamp: now,
+      position: new Vector3(position.x, position.y, position.z),
+      rotation: new Vector3(rotation.x, rotation.y, rotation.z),
+    });
 
-    if (distance > 0.005) {
-      this.isMoving = true;
-      this._lastMoveTime = now;
-    } else if (now - this._lastMoveTime > 200) {
-      // 200ms grace period bridges the 100ms (10Hz) network sync gap
-      this.isMoving = false;
+    if (this.snapshots.length > 20) {
+      this.snapshots.shift();
+    }
+
+    this.targetPosition.set(position.x, position.y, position.z);
+    this.targetRotation.set(rotation.x, rotation.y, rotation.z);
+  }
+
+  public tick(deltaTime: number): void {
+    const now = performance.now();
+    const isMaster =
+      AssetLoader.getInstance().ready &&
+      (NetworkManager.getInstance().isMasterClient() ||
+        !NetworkManager.getInstance().getSocketId());
+
+    if (!isMaster && this.snapshots.length >= 2) {
+      // 1. Snapshot Interpolation for Non-Master clients
+      const renderTime = now - this.INTERPOLATION_DELAY;
+
+      let i = 0;
+      for (i = 0; i < this.snapshots.length - 1; i++) {
+        if (this.snapshots[i + 1].timestamp > renderTime) break;
+      }
+
+      const s0 = this.snapshots[i];
+      const s1 = this.snapshots[i + i < this.snapshots.length - 1 ? 1 : 0];
+
+      if (s1 && s1.timestamp > renderTime) {
+        const t = (renderTime - s0.timestamp) / (s1.timestamp - s0.timestamp);
+        this.mesh.position = Vector3.Lerp(s0.position, s1.position, t);
+
+        // Yaw Interpolation
+        let diffYaw = s1.rotation.y - s0.rotation.y;
+        while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
+        while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
+        this.mesh.rotation.y = s0.rotation.y + diffYaw * t;
+
+        const posDiff = Vector3.Distance(s0.position, s1.position);
+        this.isMoving = posDiff > 0.01;
+      }
+
+      if (i > 0) {
+        this.snapshots.splice(0, i);
+      }
+    } else {
+      // 2. Master Client movement logic (Original)
+      const distance = Vector3.Distance(this.mesh.position, this._lastPosition);
+
+      if (distance > 0.005) {
+        this.isMoving = true;
+        this._lastMoveTime = now;
+      } else if (now - this._lastMoveTime > 200) {
+        this.isMoving = false;
+      }
+
+      // Apply Gravity
+      if (this.mesh) {
+        this.mesh.moveWithCollisions(new Vector3(0, -9.81 * deltaTime, 0));
+      }
     }
 
     this.updateComponents(deltaTime);
-
-    // Apply Gravity
-    if (this.mesh) {
-      this.mesh.moveWithCollisions(new Vector3(0, -9.81 * deltaTime, 0));
-    }
-
     this._lastPosition.copyFrom(this.mesh.position);
   }
 
