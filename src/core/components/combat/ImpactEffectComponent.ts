@@ -2,7 +2,7 @@ import { Scene, Vector3, ParticleSystem, Texture, Color4, Mesh, Observer } from 
 import { BaseComponent } from '@/core/components/base/BaseComponent';
 import { GameObservables } from '../../events/GameObservables';
 import type { IPawn } from '../../../types/IPawn';
-import flareUrl from '../../assets/textures/Flare.png?url';
+import flareUrl from '@/assets/textures/Flare.png?url';
 
 /**
  * 타격 이펙트(Impact)를 담당하는 컴포넌트.

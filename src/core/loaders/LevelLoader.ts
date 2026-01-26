@@ -8,8 +8,8 @@ import {
   Mesh,
   Texture,
 } from '@babylonjs/core';
-import diffUrl from '../../../assets/textures/ground_crackedMud_baseColor.png?url';
-import normUrl from '../../../assets/textures/ground_crackedMud_normal.png?url';
+import diffUrl from '@/assets/textures/ground_crackedMud_baseColor.png?url';
+import normUrl from '@/assets/textures/ground_crackedMud_normal.png?url';
 
 export interface LevelData {
   ground: {
