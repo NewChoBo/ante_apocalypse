@@ -1,6 +1,7 @@
 import { BaseController } from './BaseController';
 import { EnemyPawn } from '../pawns/EnemyPawn';
 import { PlayerPawn } from '../pawns/PlayerPawn';
+import { IPawn } from '../../types/IPawn';
 
 export class AIController extends BaseController {
   private updateRate = 0.1; // 10 times per sec
@@ -22,13 +23,13 @@ export class AIController extends BaseController {
     this.targetPlayer = target;
   }
 
-  protected onPossess(pawn: any): void {
+  protected onPossess(pawn: IPawn): void {
     if (pawn instanceof EnemyPawn) {
       this.enemyPawn = pawn;
     }
   }
 
-  protected onUnpossess(_pawn: any): void {
+  protected onUnpossess(_pawn: IPawn): void {
     this.enemyPawn = null;
   }
 

@@ -1,25 +1,28 @@
 import * as Photon from 'photon-realtime';
 import { INetworkProvider } from '../INetworkProvider';
-import { RoomInfo, NetworkState, PlayerInfo } from '../NetworkProtocol';
+import { RoomInfo, NetworkState, PlayerInfo, EventData } from '../NetworkProtocol';
+import { IPhotonClient, IPhotonRoom, IPhotonActor, IPhotonNamespace } from './PhotonTypes';
+
+const PhotonTyped = Photon as unknown as IPhotonNamespace;
 
 /**
  * Photon Realtime Cloud를 이용한 네트워크 프로바이더 구현체.
  */
 export class PhotonProvider implements INetworkProvider {
-  private client: any;
+  private client: IPhotonClient;
   private appId: string = import.meta.env.VITE_PHOTON_APP_ID || '';
   private appVersion: string = import.meta.env.VITE_PHOTON_APP_VERSION || '1.0';
 
   public onStateChanged?: (state: NetworkState) => void;
   public onRoomListUpdated?: (rooms: RoomInfo[]) => void;
-  public onEvent?: (code: number, data: any, senderId: string) => void;
+  public onEvent?: (code: number, data: EventData, senderId: string) => void;
   public onPlayerJoined?: (user: PlayerInfo) => void;
   public onPlayerLeft?: (userId: string) => void;
 
   constructor() {
     // browser 환경에서 require('ws') 에러 방지를 위해 WebSocket 구현체 재설정
-    if (typeof window !== 'undefined' && (Photon as any).PhotonPeer) {
-      (Photon as any).PhotonPeer.setWebSocketImpl(WebSocket);
+    if (typeof window !== 'undefined' && PhotonTyped.PhotonPeer) {
+      PhotonTyped.PhotonPeer.setWebSocketImpl(WebSocket);
     }
 
     if (!this.appId || this.appId === 'YOUR_APP_ID_HERE') {
@@ -28,8 +31,8 @@ export class PhotonProvider implements INetworkProvider {
       );
     }
 
-    this.client = new (Photon as any).LoadBalancing.LoadBalancingClient(
-      (Photon as any).ConnectionProtocol.Wss,
+    this.client = new PhotonTyped.LoadBalancing.LoadBalancingClient(
+      PhotonTyped.ConnectionProtocol.Wss,
       this.appId,
       this.appVersion
     );
@@ -38,7 +41,7 @@ export class PhotonProvider implements INetworkProvider {
   }
 
   private setupListeners(): void {
-    this.client.onStateChange = (state: number) => {
+    this.client.onStateChange = (state: number): void => {
       const mappedState = this.mapState(state);
       console.log(`[Photon] State changed: ${mappedState}`);
 
@@ -53,23 +56,24 @@ export class PhotonProvider implements INetworkProvider {
       }
     };
 
-    this.client.onRoomListUpdate = (rooms: any[]) => {
-      const roomInfos: RoomInfo[] = rooms.map((r) => ({
+    this.client.onRoomListUpdate = (rooms: IPhotonRoom[]): void => {
+      const roomInfos: RoomInfo[] = rooms.map((r: IPhotonRoom) => ({
         id: r.name,
         name: r.name,
         playerCount: r.playerCount,
         maxPlayers: r.maxPlayers,
         isOpen: r.isOpen,
+
         customProperties: r.getCustomProperties(),
       }));
       this.onRoomListUpdated?.(roomInfos);
     };
 
-    this.client.onEvent = (code: number, content: any, actorNr: number) => {
-      this.onEvent?.(code, content, actorNr.toString());
+    this.client.onEvent = (code: number, content: unknown, actorNr: number): void => {
+      this.onEvent?.(code, content as EventData, actorNr.toString());
     };
 
-    this.client.onActorJoin = (actor: any) => {
+    this.client.onActorJoin = (actor: IPhotonActor): void => {
       console.log(
         `[Photon] Actor Joined: ${actor.actorNr} (${actor.name}) | My ID: ${this.client.myActor().actorNr}`
       );
@@ -82,36 +86,36 @@ export class PhotonProvider implements INetworkProvider {
       }
     };
 
-    this.client.onActorLeave = (actor: any) => {
+    this.client.onActorLeave = (actor: IPhotonActor): void => {
       console.log(`[Photon] Actor Left: ${actor.actorNr}`);
       this.onPlayerLeft?.(actor.actorNr.toString());
     };
 
-    this.client.onError = (errorCode: number, errorMsg: string) => {
+    this.client.onError = (errorCode: number, errorMsg: string): void => {
       console.error(`[Photon] Error ${errorCode}: ${errorMsg}`);
       this.onStateChanged?.(NetworkState.Error);
     };
   }
 
   private mapState(photonState: number): NetworkState {
-    const States = (Photon as any).LoadBalancing.LoadBalancingClient.State;
+    const States = PhotonTyped.LoadBalancing.LoadBalancingClient.State;
     switch (photonState) {
-      case States.Uninitialized:
+      case States.Joined:
+        return NetworkState.InRoom;
       case States.Disconnected:
+      case States.Uninitialized:
         return NetworkState.Disconnected;
+      case States.Error:
+        return NetworkState.Error;
       case States.ConnectingToNameServer:
       case States.ConnectingToMasterserver:
       case States.ConnectingToGameserver:
-        return NetworkState.Connecting;
       case States.ConnectedToNameServer:
       case States.ConnectedToMaster:
-        return NetworkState.ConnectedToMaster;
+      case States.ConnectedToGameserver:
+        return NetworkState.Connecting;
       case States.JoinedLobby:
         return NetworkState.InLobby;
-      case States.Joined:
-        return NetworkState.InRoom;
-      case States.Error:
-        return NetworkState.Error;
       default:
         return NetworkState.Disconnected;
     }
@@ -120,22 +124,24 @@ export class PhotonProvider implements INetworkProvider {
   public async connect(userId: string): Promise<boolean> {
     this.client.setUserId(userId);
     this.client.myActor().setName(userId);
-
     // NameServer 접속 시도
     return this.client.connectToRegionMaster('kr');
   }
 
   public disconnect(): void {
+    if (this.client.isJoinedToRoom()) {
+      this.client.leaveRoom();
+    }
     this.client.disconnect();
   }
-
   public async createRoom(options: {
     roomName?: string;
     mapId: string;
     maxPlayers: number;
   }): Promise<boolean> {
     const roomName = options.roomName || `${this.client.myActor().name}'s Room`;
-    const roomOptions: any = {
+
+    const roomOptions = {
       isVisible: true,
       isOpen: true,
       maxPlayers: options.maxPlayers || 4,
@@ -155,9 +161,11 @@ export class PhotonProvider implements INetworkProvider {
     // We can return the current scheduled/cached list or wrap a one-time fetch if needed.
     // However, LoadBalancingClient usually syncs rooms via callbacks.
     // We will return a resolved promise with the current known list.
+
     const rooms = this.client.availableRooms() || [];
-    const roomInfos: RoomInfo[] = rooms.map((r: any) => ({
+    const roomInfos: RoomInfo[] = rooms.map((r: IPhotonRoom) => ({
       id: r.name, // Use name as ID
+      name: r.name,
       maxPlayers: r.maxPlayers,
       playerCount: r.playerCount,
       customProperties: r.getCustomProperties(),
@@ -170,9 +178,9 @@ export class PhotonProvider implements INetworkProvider {
     this.client.leaveRoom();
   }
 
-  public sendEvent(code: number, data: any, reliable: boolean = true): void {
+  public sendEvent(code: number, data: EventData, reliable: boolean = true): void {
     this.client.raiseEvent(code, data, {
-      receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.Others,
+      receivers: PhotonTyped.LoadBalancing.Constants.ReceiverGroup.Others,
       cache: reliable ? 1 : 0,
     });
   }
@@ -195,7 +203,7 @@ export class PhotonProvider implements INetworkProvider {
     return Date.now();
   }
 
-  public getCurrentRoomProperty(key: string): any {
+  public getCurrentRoomProperty(key: string): unknown {
     if (this.client.isJoinedToRoom()) {
       return this.client.myRoom().getCustomProperty(key);
     }
@@ -212,7 +220,7 @@ export class PhotonProvider implements INetworkProvider {
     if (this.client.isJoinedToRoom()) {
       const roomActors = this.client.myRoom().actors;
       for (const nr in roomActors) {
-        const a = roomActors[nr];
+        const a: IPhotonActor = roomActors[nr];
         actors.set(nr.toString(), { id: nr.toString(), name: a.name || 'Anonymous' });
       }
     }
@@ -228,7 +236,7 @@ export class PhotonProvider implements INetworkProvider {
 
     const rooms = this.client.availableRooms() || [];
     console.log('[Photon] Manual room list refresh:', rooms);
-    const roomInfos: RoomInfo[] = rooms.map((r: any) => ({
+    const roomInfos: RoomInfo[] = rooms.map((r: IPhotonRoom) => ({
       id: r.name,
       name: r.name,
       playerCount: r.playerCount,

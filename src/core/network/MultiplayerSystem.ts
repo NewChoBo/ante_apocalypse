@@ -53,13 +53,17 @@ export class MultiplayerSystem implements IGameSystem {
     });
   }
 
-  public applyPlayerStates(states: any[]): void {
+  public applyPlayerStates(states: PlayerData[]): void {
+    if (!states) return;
     console.log(`[Multiplayer] Applying ${states.length} player states from sync`);
     states.forEach((p) => {
       if (p.id !== this.networkMediator.getSocketId()) {
         const remote = this.remotePlayers.get(p.id);
         if (remote) {
-          remote.updateNetworkState(p.position, p.rotation);
+          remote.updateNetworkState(
+            p.position || { x: 0, y: 0, z: 0 },
+            p.rotation || { x: 0, y: 0, z: 0 }
+          );
           if (p.weaponId) remote.updateWeapon(p.weaponId);
         } else {
           this.spawnRemotePlayer(p);

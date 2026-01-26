@@ -11,6 +11,7 @@ import {
   TargetDestroyData,
   PickupSpawnData,
   PickupDestroyData,
+  EventData,
 } from '../network/NetworkProtocol';
 
 /**
@@ -54,8 +55,8 @@ export class NetworkMediator {
 
     this.networkManager.onPlayerJoined.add((data) => {
       // Ensure rotation has w component
-      const rot = data.rotation as any;
-      const rotation = data.rotation ? { ...data.rotation, w: rot.w || 1 } : undefined;
+      const rot = data.rotation as { x: number; y: number; z: number; w?: number };
+      const rotation = data.rotation ? { ...data.rotation, w: rot.w ?? 1 } : undefined;
       const playerData: PlayerData = { ...data, rotation };
       this.onPlayerJoined.notifyObservers(playerData);
     });
@@ -65,8 +66,8 @@ export class NetworkMediator {
     });
 
     this.networkManager.onPlayerUpdated.add((data) => {
-      const rot = data.rotation as any;
-      const rotation = data.rotation ? { ...data.rotation, w: rot.w || 1 } : undefined;
+      const rot = data.rotation as { x: number; y: number; z: number; w?: number };
+      const rotation = data.rotation ? { ...data.rotation, w: rot.w ?? 1 } : undefined;
       const playerData: PlayerData = { ...data, rotation };
       this.onPlayerUpdated.notifyObservers(playerData);
     });
@@ -80,19 +81,18 @@ export class NetworkMediator {
     });
 
     this.networkManager.onTargetDestroy.add((data) => {
-      const destroyData: TargetDestroyData = { id: data.targetId };
-      this.onTargetDestroyed.notifyObservers(destroyData);
+      this.onTargetDestroyed.notifyObservers(data);
     });
 
     this.networkManager.onEvent.add((event) => {
       if (event.code === EventCode.SPAWN_ENEMY) {
-        this.onEnemySpawnRequested.notifyObservers(event.data);
+        this.onEnemySpawnRequested.notifyObservers(event.data as EnemySpawnData);
       } else if (event.code === EventCode.DESTROY_ENEMY) {
-        this.onEnemyDestroyRequested.notifyObservers(event.data);
+        this.onEnemyDestroyRequested.notifyObservers(event.data as EnemyDestroyData);
       } else if (event.code === EventCode.SPAWN_PICKUP) {
-        this.onPickupSpawnRequested.notifyObservers(event.data);
+        this.onPickupSpawnRequested.notifyObservers(event.data as PickupSpawnData);
       } else if (event.code === EventCode.DESTROY_PICKUP) {
-        this.onPickupDestroyRequested.notifyObservers(event.data);
+        this.onPickupDestroyRequested.notifyObservers(event.data as PickupDestroyData);
       }
     });
   }
@@ -100,7 +100,7 @@ export class NetworkMediator {
   /**
    * Universal method to send events through the mediator.
    */
-  public sendEvent(code: EventCode, data: any, reliable: boolean = true): void {
+  public sendEvent(code: EventCode, data: EventData, reliable: boolean = true): void {
     this.networkManager.sendEvent(code, data, reliable);
   }
 

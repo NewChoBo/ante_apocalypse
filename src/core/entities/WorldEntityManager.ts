@@ -144,7 +144,10 @@ export class WorldEntityManager implements IGameSystem {
     if (entity.type === 'enemy' && this.networkMediator.isMasterClient()) {
       this.networkMediator.sendEvent(EventCode.DESTROY_ENEMY, { id: entity.id });
     } else if (entity.type.includes('target')) {
-      this.networkMediator.sendEvent(EventCode.TARGET_DESTROY, { targetId: entity.id });
+      this.networkMediator.sendEvent(EventCode.TARGET_DESTROY, {
+        id: entity.id,
+        targetId: entity.id,
+      });
     }
   }
 

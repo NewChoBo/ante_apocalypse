@@ -21,20 +21,30 @@ export enum EventCode {
   PLAYER_DEATH = 20,
 }
 
-export interface RoomInfo {
-  id: string; // Changed from name to id for consistency
-  name: string; // Added for UI compatibility
-  maxPlayers: number;
-  playerCount: number;
-  customProperties?: any;
-  isOpen: boolean;
+export class RoomData {
+  constructor(
+    public readonly id: string,
+    public readonly name: string,
+    public readonly maxPlayers: number,
+    public readonly playerCount: number,
+    public readonly isOpen: boolean,
+    public readonly customProperties: Record<string, unknown> = {}
+  ) {}
 }
 
-export interface PlayerInfo {
-  userId: string;
-  isMaster: boolean;
-  name?: string; // Added optional name
+/** Legacy support interface if needed, but RoomData class is preferred */
+export type RoomInfo = RoomData;
+
+export class PlayerDataModel {
+  constructor(
+    public readonly userId: string,
+    public readonly isMaster: boolean,
+    public readonly name?: string
+  ) {}
 }
+
+/** Legacy support interface */
+export type PlayerInfo = PlayerDataModel;
 
 export enum NetworkState {
   Disconnected = 'Disconnected',
@@ -51,50 +61,170 @@ export interface PlayerData {
   name?: string;
   isMaster?: boolean;
   position?: { x: number; y: number; z: number };
-  rotation?: { x: number; y: number; z: number; w: number };
+  rotation?: { x: number; y: number; z: number; w?: number };
   state?: string;
   weaponId?: string; // Added
   health?: number; // Added
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
-export interface EnemyUpdateData {
-  id: string;
-  position: { x: number; y: number; z: number };
-  rotation?: { x: number; y: number; z: number; w: number };
-  state?: string;
-  isMoving?: boolean; // Added for sync
+export interface Position {
+  x: number;
+  y: number;
+  z: number;
 }
 
-export interface EnemySpawnData {
-  id: string;
-  type: string;
-  position: { x: number; y: number; z: number };
-  targetId?: string;
+export interface Rotation {
+  x: number;
+  y: number;
+  z: number;
+  w?: number;
 }
 
-export interface EnemyDestroyData {
-  id: string;
+export class MovePayload {
+  constructor(
+    public readonly position: Position,
+    public readonly rotation: Rotation,
+    public readonly velocity?: Position
+  ) {}
 }
 
-export interface TargetSpawnData {
-  id: string;
-  type: string;
-  position: { x: number; y: number; z: number };
-  isMoving: boolean;
+export class FirePayload {
+  constructor(
+    public readonly weaponId: string,
+    public readonly muzzleData?: {
+      position: Position;
+      direction: Position;
+    }
+  ) {}
 }
 
-export interface TargetDestroyData {
-  id: string;
-  targetId?: string; // Handle potential inconsistent naming
+export class HitPayload {
+  constructor(
+    public readonly targetId: string,
+    public readonly damage: number,
+    public readonly part?: string,
+    public readonly position?: Position
+  ) {}
 }
 
-export interface PickupSpawnData {
-  id: string;
-  type: string;
-  position: { x: number; y: number; z: number };
+export class AnimStatePayload {
+  constructor(
+    public readonly state: string,
+    public readonly speed?: number
+  ) {}
 }
 
-export interface PickupDestroyData {
-  id: string;
+export class SyncWeaponPayload {
+  constructor(public readonly weaponId: string) {}
 }
+
+export class MapSyncPayload {
+  constructor(public readonly mapId: string) {}
+}
+
+export class EnemyUpdateData {
+  constructor(
+    public readonly id: string,
+    public readonly position: Position,
+    public readonly rotation?: Rotation,
+    public readonly state?: string,
+    public readonly isMoving?: boolean
+  ) {}
+}
+
+export class EnemySpawnData {
+  constructor(
+    public readonly id: string,
+    public readonly type: string,
+    public readonly position: Position,
+    public readonly targetId?: string
+  ) {}
+}
+
+export class EnemyDestroyData {
+  constructor(public readonly id: string) {}
+}
+
+export class TargetSpawnData {
+  constructor(
+    public readonly id: string,
+    public readonly type: string,
+    public readonly position: Position,
+    public readonly isMoving: boolean
+  ) {}
+}
+
+export class TargetDestroyData {
+  constructor(
+    public readonly id: string,
+    public readonly targetId?: string
+  ) {}
+}
+
+export class PickupSpawnData {
+  constructor(
+    public readonly id: string,
+    public readonly type: string,
+    public readonly position: Position
+  ) {}
+}
+
+export class PickupDestroyData {
+  constructor(public readonly id: string) {}
+}
+
+export class EnemyHitPayload {
+  constructor(
+    public readonly id: string,
+    public readonly damage: number
+  ) {}
+}
+
+export class TargetHitPayload {
+  constructor(
+    public readonly targetId: string,
+    public readonly part: string,
+    public readonly damage: number
+  ) {}
+}
+
+export class ReqInitialStatePayload {
+  constructor(public readonly senderId?: string) {}
+}
+
+export class InitialStatePayload {
+  constructor(
+    public readonly players: PlayerData[],
+    public readonly enemies: EnemyUpdateData[],
+    public readonly targets?: TargetSpawnData[]
+  ) {}
+}
+
+export class PlayerDeathPayload {
+  constructor(
+    public readonly playerId: string,
+    public readonly attackerId: string
+  ) {}
+}
+
+export type EventData =
+  | MovePayload
+  | FirePayload
+  | HitPayload
+  | AnimStatePayload
+  | EnemySpawnData
+  | EnemyDestroyData
+  | PickupSpawnData
+  | PickupDestroyData
+  | SyncWeaponPayload
+  | MapSyncPayload
+  | EnemyHitPayload
+  | TargetHitPayload
+  | TargetSpawnData
+  | TargetDestroyData
+  | ReqInitialStatePayload
+  | InitialStatePayload
+  | PlayerDeathPayload
+  | EnemyUpdateData
+  | PlayerData;

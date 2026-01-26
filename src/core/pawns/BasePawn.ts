@@ -55,8 +55,10 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
   }
 
   /** 특정 타입의 컴포넌트 찾기 (Babylon.js behaviors 목록에서 검색) */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public getComponent<T extends BaseComponent>(type: new (...args: any[]) => T): T | undefined {
+  public getComponent<T extends BaseComponent>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    type: abstract new (...args: any[]) => T
+  ): T | undefined {
     if (!this.mesh) return undefined;
     return this.mesh.behaviors.find((b) => b instanceof type) as T;
   }

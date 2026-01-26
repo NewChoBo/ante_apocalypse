@@ -16,14 +16,33 @@ import gunUrl from '../../assets/models/Gun.glb?url';
 // Audio V2 타입을 위해 가져옵니다.
 import type { AudioEngineV2 } from '@babylonjs/core';
 
+export interface GameAssets {
+  enemy: AssetContainer | null;
+  rifle: AssetContainer | null;
+}
+
+export interface GameSounds {
+  gunshot: Sound | null;
+  swipe: Sound | null;
+}
+
 /**
  * 게임 에셋을 중앙에서 관리하고 미리 로드하는 싱글톤 클래스.
  * 오디오 및 3D 모델(Mesh)의 프리로딩과 인스턴싱을 담당합니다.
  */
 export class AssetLoader {
   private static instance: AssetLoader;
-  private sounds: Map<string, any> = new Map(); // Sound type from Babylon is used via createSoundAsync
-  private containers: Map<string, AssetContainer> = new Map();
+
+  public readonly assets: GameAssets = {
+    enemy: null,
+    rifle: null,
+  };
+
+  public readonly sounds: GameSounds = {
+    gunshot: null,
+    swipe: null,
+  };
+
   private isLoaded = false;
   private lastScene: Scene | null = null;
   private loadingPromise: Promise<void> | null = null;
@@ -42,14 +61,26 @@ export class AssetLoader {
    * 캐시된 에셋을 모두 해제하고 상태를 초기화합니다.
    */
   public clear(): void {
-    this.containers.forEach((container: AssetContainer, _key: string): void => {
-      container.dispose();
-    });
-    this.containers.clear();
-    this.sounds.forEach((sound: Sound, _key: string): void => {
-      sound.dispose();
-    });
-    this.sounds.clear();
+    // Dispose Containers
+    if (this.assets.enemy) {
+      this.assets.enemy.dispose();
+      this.assets.enemy = null;
+    }
+    if (this.assets.rifle) {
+      this.assets.rifle.dispose();
+      this.assets.rifle = null;
+    }
+
+    // Dispose Sounds
+    if (this.sounds.gunshot) {
+      this.sounds.gunshot.dispose();
+      this.sounds.gunshot = null;
+    }
+    if (this.sounds.swipe) {
+      this.sounds.swipe.dispose();
+      this.sounds.swipe = null;
+    }
+
     this.isLoaded = false;
     this.lastScene = null;
     // Note: We don't nullify loadingPromise here to avoid breaking active waiters.
@@ -66,10 +97,8 @@ export class AssetLoader {
     }
 
     // 필수 에셋 존재 여부 확인
-    const requiredAssets = ['enemy', 'rifle'];
-    const allContainersPresent = requiredAssets.every((key: string): boolean =>
-      this.containers.has(key)
-    );
+    const allContainersPresent = !!(this.assets.enemy && this.assets.rifle);
+
     // 로딩이 완료되었고 같은 씬이며 모든 데이터가 있다면 바로 리턴
     if (this.isLoaded && this.lastScene === scene && allContainersPresent) {
       console.log(`[AssetLoader] Assets already loaded and valid for Scene#${scene.uniqueId}.`);
@@ -108,20 +137,20 @@ export class AssetLoader {
       if (scene.isDisposed) throw new Error('Scene disposed during audio initialization');
 
       // 2. Load Sounds
-      if (this.sounds.size === 0) {
-        const gunshotSound = await this.audioEngine.createSoundAsync('gunshot', gunshotUrl, {
+      if (!this.sounds.gunshot) {
+        this.sounds.gunshot = (await this.audioEngine.createSoundAsync('gunshot', gunshotUrl, {
           volume: 0.5,
-        });
-        this.sounds.set('gunshot', gunshotSound);
+        })) as unknown as Sound;
+      }
 
-        try {
-          const swipeSound = await this.audioEngine.createSoundAsync('swipe', swipeUrl, {
+      try {
+        if (!this.sounds.swipe) {
+          this.sounds.swipe = (await this.audioEngine.createSoundAsync('swipe', swipeUrl, {
             volume: 0.6,
-          });
-          this.sounds.set('swipe', swipeSound);
-        } catch {
-          console.warn(`[AssetLoader] Non-critical sound "swipe" failed.`);
+          })) as unknown as Sound;
         }
+      } catch {
+        console.warn(`[AssetLoader] Non-critical sound "swipe" failed.`);
       }
 
       if (scene.isDisposed) throw new Error('Scene disposed during sound loading');
@@ -135,8 +164,7 @@ export class AssetLoader {
       if (scene.isDisposed) throw new Error('Scene disposed during mesh loading');
 
       // 최종 확인
-      const requiredAssets = ['enemy', 'rifle'];
-      const success = requiredAssets.every((key: string): boolean => this.containers.has(key));
+      const success = !!(this.assets.enemy && this.assets.rifle);
 
       if (success) {
         this.isLoaded = true;
@@ -160,13 +188,13 @@ export class AssetLoader {
    */
   private async loadMeshToContainer(
     scene: Scene,
-    key: string,
+    key: keyof GameAssets,
     rootUrl: string,
     fileName: string
   ): Promise<void> {
     try {
       const container = await SceneLoader.LoadAssetContainerAsync(rootUrl, fileName, scene);
-      this.containers.set(key, container);
+      this.assets[key] = container;
     } catch (e) {
       console.error(`[AssetLoader] [${key}] Load FAILED:`, e);
       throw e;
@@ -175,14 +203,14 @@ export class AssetLoader {
 
   /**
    * 캐시된 컨테이너에서 메쉬 인스턴스를 생성 (복제)
-   * @param name 에셋 키 이름 (e.g. 'enemy', 'rifle')
+   * @param name 에셋 키 이름 ('enemy' | 'rifle')
    * @param rootName 인스턴스 루트 노드의 이름 (Optional)
    */
-  public instantiateMesh(name: string, rootName?: string): InstantiatedEntries | null {
-    const container = this.containers.get(name);
+  public instantiateMesh(name: keyof GameAssets, rootName?: string): InstantiatedEntries | null {
+    const container = this.assets[name];
     if (!container) {
       console.error(
-        `[AssetLoader] Critical: Cache miss for asset "${name}". isLoaded=${this.isLoaded}, containerCount=${this.containers.size}`
+        `[AssetLoader] Critical: Cache miss for asset "${name}". isLoaded=${this.isLoaded}`
       );
       return null;
     }
@@ -196,20 +224,19 @@ export class AssetLoader {
 
     // Ensure we always return a single root node for the caller to grab (at index 0)
     if (entries.rootNodes.length !== 1) {
-      // Access scene via any mesh or the container's scene property
-      const scene = (container as any).scene;
+      const scene = container.scene;
       const wrapper = new Mesh(rootName || `${name}_wrapper`, scene);
-      entries.rootNodes.forEach((node: any): void => {
+      entries.rootNodes.forEach((node): void => {
         node.parent = wrapper;
       });
-      (entries as any).rootNodes = [wrapper];
+      entries.rootNodes = [wrapper];
     }
 
     return entries;
   }
 
-  public getSound(name: string): any {
-    return this.sounds.get(name);
+  public getSound(name: keyof GameSounds): Sound | null {
+    return this.sounds[name];
   }
 
   public getAudioEngine(): AudioEngineV2 | null {

@@ -1,5 +1,5 @@
 import { Scene, Observable, Mesh } from '@babylonjs/core';
-import { BaseComponent } from '../base/BaseComponent';
+import { BaseComponent } from '@/core/components/base/BaseComponent';
 import { CameraComponent } from '../movement/CameraComponent';
 import { HUDSyncComponent } from '../network/HUDSyncComponent';
 import { IWeapon } from '../../../types/IWeapon';

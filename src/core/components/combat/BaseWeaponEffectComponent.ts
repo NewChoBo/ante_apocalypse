@@ -7,7 +7,7 @@ import {
   Observer,
   Mesh,
 } from '@babylonjs/core';
-import { BaseComponent } from '../base/BaseComponent';
+import { BaseComponent } from '@/core/components/base/BaseComponent';
 import { GameObservables } from '../../events/GameObservables';
 import type { IPawn } from '../../../types/IPawn';
 
@@ -18,7 +18,12 @@ import type { IPawn } from '../../../types/IPawn';
 export abstract class BaseWeaponEffectComponent extends BaseComponent {
   public abstract name: string;
   protected hitSparkMaterial: StandardMaterial;
-  private hitObserver: Observer<any> | null = null;
+  private hitObserver: Observer<{
+    targetId: string;
+    part: string;
+    damage: number;
+    position: Vector3;
+  }> | null = null;
 
   constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);

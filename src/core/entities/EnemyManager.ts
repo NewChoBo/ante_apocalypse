@@ -4,7 +4,7 @@ import { AIController } from '../controllers/AIController';
 import { PlayerPawn } from '../pawns/PlayerPawn';
 import { IGameSystem } from '../types/IGameSystem';
 import { NetworkMediator } from '../network/NetworkMediator';
-import { EventCode } from '../network/NetworkProtocol';
+import { EventCode, EnemySpawnData, EnemyDestroyData } from '../network/NetworkProtocol';
 import { WorldEntityManager } from './WorldEntityManager';
 
 export interface EnemyState {
@@ -59,13 +59,13 @@ export class EnemyManager implements IGameSystem {
     });
   }
 
-  private handleSpawnEnemy(data: any): void {
+  private handleSpawnEnemy(data: EnemySpawnData): void {
     if (this.enemies.has(data.id)) return;
     const position = new Vector3(data.position.x, data.position.y, data.position.z);
     this.createEnemy(data.id, position);
   }
 
-  private handleDestroyEnemy(data: any): void {
+  private handleDestroyEnemy(data: EnemyDestroyData): void {
     const enemy = this.enemies.get(data.id);
     if (enemy) {
       this.worldManager.removeEntity(data.id);
@@ -148,7 +148,7 @@ export class EnemyManager implements IGameSystem {
   public updateEnemy(
     id: string,
     position: { x: number; y: number; z: number },
-    rotation?: { x: number; y: number; z: number; w: number },
+    rotation?: { x: number; y: number; z: number; w?: number },
     _state?: string,
     isMoving?: boolean
   ): void {

@@ -31,7 +31,7 @@ export class InventoryContextMenu {
     const stack = new StackPanel();
     this.container.addControl(stack);
 
-    const createMenuBtn = (id: string, text: string, onClick: () => void) => {
+    const createMenuBtn = (id: string, text: string, onClick: () => void): Button => {
       const btn = Button.CreateSimpleButton(id, text);
       btn.height = '40px';
       btn.color = UI_CONFIG.colors.textMain;

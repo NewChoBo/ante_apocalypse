@@ -214,7 +214,7 @@ export class LobbyUI {
     stack.addControl(name);
 
     // Map Info
-    const mapId = room.customProperties?.mapId || 'UNKNOWN_ZONE';
+    const mapId = (room.customProperties?.mapId as string) || 'UNKNOWN_ZONE';
     const map = new TextBlock();
     map.text = `ZONE: ${mapId.toUpperCase()}`;
     map.color = this.PRIMARY_COLOR;

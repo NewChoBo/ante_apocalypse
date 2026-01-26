@@ -1,5 +1,5 @@
 import { Scene } from '@babylonjs/core';
-import { BaseComponent } from '../base/BaseComponent';
+import { BaseComponent } from '@/core/components/base/BaseComponent';
 import { ammoStore, scoreStore } from '../../store/GameStore';
 import { IWeapon, IFirearm } from '../../../types/IWeapon';
 import type { IPawn } from '../../../types/IPawn';
@@ -17,7 +17,7 @@ export class HUDSyncComponent extends BaseComponent {
 
   /** 탄약 정보 업데이트 */
   public syncAmmo(weapon: IWeapon): void {
-    const isFirearm = (w: any): w is IFirearm => w.currentAmmo !== undefined;
+    const isFirearm = (w: IWeapon): w is IFirearm => (w as IFirearm).currentAmmo !== undefined;
 
     if (isFirearm(weapon)) {
       ammoStore.set({
@@ -36,7 +36,6 @@ export class HUDSyncComponent extends BaseComponent {
     }
   }
 
-  /** 점수 업데이트 */
   public updateScore(points: number): void {
     this.currentScore += points;
     scoreStore.set(this.currentScore);

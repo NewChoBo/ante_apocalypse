@@ -27,7 +27,7 @@ export class PlayerController extends BaseController {
     this.setupInputEvents();
   }
 
-  private onKeyDown = (e: KeyboardEvent) => {
+  private onKeyDown = (e: KeyboardEvent): void => {
     // 포인터가 잠겨있을 때 (게임 플레이 중)
     if (document.pointerLockElement === this.canvas) {
       // 브라우저 단축키 차단 (Ctrl+D, Ctrl+S, Ctrl+W 등)
@@ -41,28 +41,28 @@ export class PlayerController extends BaseController {
     this.updateKeyState(e.code, true);
   };
 
-  private onKeyUp = (e: KeyboardEvent) => {
+  private onKeyUp = (e: KeyboardEvent): void => {
     this.updateKeyState(e.code, false);
   };
 
-  private onMouseMove = (e: MouseEvent) => {
+  private onMouseMove = (e: MouseEvent): void => {
     if (document.pointerLockElement === this.canvas) {
       this.mouseDelta.x += e.movementX;
       this.mouseDelta.y += e.movementY;
     }
   };
 
-  private onMouseDown = (e: MouseEvent) => {
+  private onMouseDown = (e: MouseEvent): void => {
     if (e.button === 0) this.updateKeyState('MouseLeft', true);
     if (e.button === 2) this.updateKeyState('MouseRight', true);
   };
 
-  private onMouseUp = (e: MouseEvent) => {
+  private onMouseUp = (e: MouseEvent): void => {
     if (e.button === 0) this.updateKeyState('MouseLeft', false);
     if (e.button === 2) this.updateKeyState('MouseRight', false);
   };
 
-  private onContextMenu = (e: Event) => {
+  private onContextMenu = (e: Event): void => {
     e.preventDefault();
   };
 

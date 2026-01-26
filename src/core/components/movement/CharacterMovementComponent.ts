@@ -1,5 +1,5 @@
 import { Vector3, Scene, Ray } from '@babylonjs/core';
-import { BaseComponent } from '../base/BaseComponent';
+import { BaseComponent } from '@/core/components/base/BaseComponent';
 import { CombatComponent } from '../combat/CombatComponent';
 import type { IPawn } from '../../../types/IPawn';
 

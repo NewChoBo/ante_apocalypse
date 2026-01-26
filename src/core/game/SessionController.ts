@@ -14,13 +14,20 @@ import { GlobalInputManager } from '../input/GlobalInputManager';
 import { NetworkManager } from '../network/NetworkManager';
 import { MultiplayerSystem } from '../network/MultiplayerSystem';
 import { PickupManager } from '../entities/PickupManager';
+import { PickupType } from '../entities/PickupActor';
 import { TargetSpawnerComponent } from '../components/network/TargetSpawnerComponent';
 import { WorldEntityManager } from '../entities/WorldEntityManager';
 import { EnemyManager } from '../entities/EnemyManager';
 import { AssetLoader } from '../loaders/AssetLoader';
 import { LifetimeManager } from './LifetimeManager';
 import { GameObservables } from '../events/GameObservables';
-import { EventCode } from '../network/NetworkProtocol';
+import {
+  EventCode,
+  InitialStatePayload,
+  PlayerData,
+  TargetSpawnData,
+  EnemyUpdateData,
+} from '../network/NetworkProtocol';
 
 export class SessionController implements IGameSystem {
   private scene: Scene;
@@ -116,7 +123,7 @@ export class SessionController implements IGameSystem {
           if (this.multiplayerSystem) {
             const nm = NetworkManager.getInstance();
             nm.sendEvent(EventCode.PLAYER_DEATH, {
-              playerId: nm.getSocketId(),
+              playerId: nm.getSocketId() || 'unknown',
               attackerId: 'unknown',
             });
           }
@@ -140,8 +147,10 @@ export class SessionController implements IGameSystem {
         slots[slot] = weaponId;
         inventoryStore.setKey('weaponSlots', slots);
 
-        if (weaponId) {
-          const combat = this.playerPawn?.getComponent(CombatComponent);
+        if (weaponId && this.playerPawn) {
+          const combat = this.playerPawn.getComponent(
+            CombatComponent as abstract new (...args: unknown[]) => CombatComponent
+          );
           combat?.equipWeapon(weaponId);
         }
       },
@@ -168,7 +177,7 @@ export class SessionController implements IGameSystem {
 
           const dropPos = this.playerPawn.mesh.position.clone();
           dropPos.y += 0.5;
-          PickupManager.getInstance().spawnPickup(dropPos, item.id as any);
+          PickupManager.getInstance().spawnPickup(dropPos, item.id as PickupType);
         }
       },
     });
@@ -201,25 +210,37 @@ export class SessionController implements IGameSystem {
       network.onInitialStateRequested,
       network.onInitialStateRequested.add(() => {
         if (network.isMasterClient()) {
-          const enemyStates = this.enemyManager?.getEnemyStates() || [];
-          // Extract player states from NetworkManager
-          const playerStates = network.getAllPlayerStates();
+          const enemyStates: EnemyUpdateData[] = this.enemyManager?.getEnemyStates() || [];
 
           // Get non-pawn entities (targets) from WorldEntityManager
-          const targetStates = WorldEntityManager.getInstance()
+          const targetStates: TargetSpawnData[] = WorldEntityManager.getInstance()
             .getEntitiesByType('static_target', 'moving_target', 'humanoid_target')
-            .map((t) => ({
-              id: t.id,
-              type: t.type,
-              position: { x: t.position.x, y: t.position.y, z: t.position.z },
-              isMoving: (t as { isMoving?: boolean }).isMoving || false,
-            }));
+            .map((t) => {
+              const target = t as unknown as { type: string; isMoving?: boolean };
+              return new TargetSpawnData(
+                t.id,
+                target.type || 'static_target',
+                { x: t.position.x, y: t.position.y, z: t.position.z },
+                target.isMoving || false
+              );
+            });
 
-          network.sendEvent(EventCode.INITIAL_STATE, {
-            players: playerStates,
-            enemies: enemyStates,
-            targets: targetStates,
-          });
+          const initialState = new InitialStatePayload(
+            network.getAllPlayerStates().map(
+              (ps) =>
+                ({
+                  id: ps.id,
+                  name: ps.name,
+                  position: ps.position,
+                  rotation: ps.rotation,
+                  weaponId: ps.weaponId,
+                  health: ps.health,
+                }) as PlayerData
+            ),
+            enemyStates,
+            targetStates
+          );
+          network.sendEvent(EventCode.INITIAL_STATE, initialState);
         }
       })
     );
@@ -228,7 +249,14 @@ export class SessionController implements IGameSystem {
       network.onInitialStateReceived,
       network.onInitialStateReceived.add((data) => {
         if (this.enemyManager) {
-          this.enemyManager.applyEnemyStates(data.enemies);
+          const enemyStates = data.enemies.map((e) => ({
+            id: e.id,
+            position: e.position,
+            rotation: e.rotation || { x: 0, y: 0, z: 0 },
+            health: 100, // Default for initial sync
+            isDead: false,
+          }));
+          this.enemyManager.applyEnemyStates(enemyStates);
         }
         if (this.multiplayerSystem) {
           this.multiplayerSystem.applyPlayerStates(data.players);
@@ -243,7 +271,7 @@ export class SessionController implements IGameSystem {
             }) => {
               this.targetSpawner!.spawnTarget(
                 new Vector3(t.position.x, t.position.y, t.position.z),
-                t.isMoving,
+                !!t.isMoving,
                 t.id,
                 t.type
               );
@@ -260,7 +288,9 @@ export class SessionController implements IGameSystem {
 
   private syncInventoryStore(): void {
     if (!this.playerPawn) return;
-    const combat = this.playerPawn.getComponent(CombatComponent);
+    const combat = this.playerPawn.getComponent(
+      CombatComponent as abstract new (...args: unknown[]) => CombatComponent
+    );
     if (!combat) return;
 
     const weapons = combat.getWeapons();

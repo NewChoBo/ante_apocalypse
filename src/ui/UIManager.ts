@@ -223,7 +223,7 @@ export class UIManager {
 
     const mapButtons: TacticalButton[] = [];
 
-    const createMapBtn = (id: string, label: string) => {
+    const createMapBtn = (id: string, label: string): Button => {
       const btn = Button.CreateSimpleButton('map-btn-' + id, label);
       btn.width = '150px';
       btn.height = '40px';
@@ -232,7 +232,7 @@ export class UIManager {
       btn.thickness = 1;
       btn.paddingRight = '10px';
 
-      const updateStyles = () => {
+      const updateStyles = (): void => {
         const isSelected = this.selectedMap === id;
         btn.color = isSelected ? 'black' : 'white';
         btn.background = isSelected ? this.PRIMARY_COLOR : 'rgba(255,255,255,0.05)';

@@ -5,8 +5,7 @@ import { Observable, Observer } from '@babylonjs/core';
  * Observable의 Observer, Nanostores의 구독 해제 함수 등을 등록하여 한꺼번에 처리합니다.
  */
 export class LifetimeManager {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private observers: Array<{ observable: Observable<any>; observer: Observer<any> }> = [];
+  private observers: Array<{ observable: Observable<unknown>; observer: Observer<unknown> }> = [];
   private unsubs: Array<() => void> = [];
 
   /**
@@ -23,10 +22,11 @@ export class LifetimeManager {
   /**
    * Observable의 Observer를 등록합니다.
    */
-  public trackObserver<T>(observable: Observable<T>, observer: Observer<T> | null): void {
-    if (observer) {
-      this.observers.push({ observable, observer });
-    }
+  public trackObserver<T>(observable: Observable<T>, observer: Observer<T>): void {
+    this.observers.push({
+      observable: observable as Observable<unknown>,
+      observer: observer as Observer<unknown>,
+    });
   }
 
   /**

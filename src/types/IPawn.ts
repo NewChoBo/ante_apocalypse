@@ -50,7 +50,7 @@ export interface IPawn {
 
   /** 특정 타입의 컴포넌트 찾기 */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getComponent<T extends BaseComponent>(type: new (...args: any[]) => T): T | undefined;
+  getComponent<T extends BaseComponent>(type: abstract new (...args: any[]) => T): T | undefined;
 
   /** 자원 해제 */
   dispose(): void;

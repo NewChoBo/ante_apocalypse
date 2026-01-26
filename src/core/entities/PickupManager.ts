@@ -180,8 +180,7 @@ export class PickupManager implements IGameSystem {
 
       pickup.collect();
       this.pickups.delete(id);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_e) {
+    } catch {
       // 에러가 나더라도 일단 박스는 제거 (무한 에러 방지)
       pickup.collect();
       this.pickups.delete(id);

@@ -11,9 +11,11 @@ import {
   AnimationPropertiesOverride,
   ShadowGenerator,
   Animation,
+  AnimationRange,
+  TransformNode,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
-import { AssetLoader } from '../loaders/AssetLoader';
+import { AssetLoader, GameAssets } from '../loaders/AssetLoader';
 import { ParticleSystem, Texture } from '@babylonjs/core';
 
 /**
@@ -37,14 +39,14 @@ export class RemotePlayerPawn extends BasePawn {
   // Visuals & Animation
   private visualMesh: AbstractMesh | null = null;
   private skeleton: Skeleton | null = null;
-  private headBoneNode: any = null;
+  private headBoneNode: TransformNode | null = null;
   private shadowGenerator: ShadowGenerator;
   private weaponMesh: AbstractMesh | null = null;
   private currentWeaponId: string | null = null;
 
   // Animation Ranges
-  private idleRange: any;
-  private walkRange: any;
+  private idleRange: AnimationRange | null = null;
+  private walkRange: AnimationRange | null = null;
   private currentAnim = 'idle';
 
   constructor(
@@ -183,9 +185,10 @@ export class RemotePlayerPawn extends BasePawn {
 
       if (this.skeleton) {
         // Try to find head or neck for pitch rotation
-        this.headBoneNode =
+        const headBone =
           this.skeleton.bones.find((b) => b.name.toLowerCase().includes('head')) ||
           this.skeleton.bones.find((b) => b.name.toLowerCase().includes('neck'));
+        this.headBoneNode = headBone ? headBone.getTransformNode() : null;
       }
 
       entries.rootNodes.forEach((node) => {
@@ -233,7 +236,7 @@ export class RemotePlayerPawn extends BasePawn {
     this.loadWeaponModel(assetKey);
   }
 
-  private async loadWeaponModel(assetKey: string): Promise<void> {
+  private async loadWeaponModel(assetKey: keyof GameAssets): Promise<void> {
     try {
       if (this.weaponMesh) {
         this.weaponMesh.dispose();
@@ -258,7 +261,7 @@ export class RemotePlayerPawn extends BasePawn {
 
       if (handBone) {
         // Attach to bone
-        const boneNode = (handBone as any).getTransformNode();
+        const boneNode = handBone.getTransformNode();
         if (boneNode) {
           this.weaponMesh.parent = boneNode;
           this.weaponMesh.position = new Vector3(0, 0, 0);
@@ -430,7 +433,7 @@ export class RemotePlayerPawn extends BasePawn {
     }
   ): void {
     // Play sound from asset loader
-    const sound = AssetLoader.getInstance().getSound('shoot');
+    const sound = AssetLoader.getInstance().getSound('gunshot');
     if (sound) {
       sound.play(); // Play as 2D for now, or use play(0, position) for 3D
     }

@@ -1,5 +1,5 @@
 import { Mesh } from '@babylonjs/core';
-import { BaseComponent } from '../base/BaseComponent';
+import { BaseComponent } from '@/core/components/base/BaseComponent';
 import { WeaponInventoryComponent } from './WeaponInventoryComponent';
 import { Scene } from '@babylonjs/core';
 import type { IPawn } from '../../../types/IPawn';

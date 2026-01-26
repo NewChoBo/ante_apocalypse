@@ -1,4 +1,4 @@
-import { inventoryStore } from '../../core/store/GameStore';
+import { inventoryStore, InventoryState } from '../../core/store/GameStore';
 import { getItemMetadata } from '../../core/items/ItemDatabase';
 import {
   AdvancedDynamicTexture,
@@ -9,8 +9,9 @@ import {
   Control,
   Button,
   StackPanel,
+  Vector2WithInfo,
 } from '@babylonjs/gui';
-import { Observer } from '@babylonjs/core';
+import { Observer, Scene } from '@babylonjs/core';
 import { UIManager } from '../UIManager';
 import { UI_CONFIG, InventoryCallbacks } from './Config';
 import { InventoryTooltip } from './Tooltip';
@@ -30,7 +31,7 @@ export class InventoryUI {
   private selectedSlotIndex = 0;
 
   private unsub: (() => void) | null = null;
-  private pointerObserver: Observer<any> | null = null;
+  private pointerObserver: Observer<Scene> | null = null;
 
   constructor(callbacks: InventoryCallbacks) {
     this.callbacks = callbacks;
@@ -99,7 +100,7 @@ export class InventoryUI {
     header.top = '10px';
     parent.addControl(header);
 
-    const createText = (text: string, color: string, size: number, width: string) => {
+    const createText = (text: string, color: string, size: number, width: string): TextBlock => {
       const tb = new TextBlock('txt', text);
       tb.color = color;
       tb.fontSize = size;
@@ -179,7 +180,7 @@ export class InventoryUI {
     this.renderBagSlots(state);
   }
 
-  private renderEquipmentSlots(state: any): void {
+  private renderEquipmentSlots(state: InventoryState): void {
     state.weaponSlots.forEach((weaponId: string | null, index: number) => {
       const isSelected = this.selectedSlotIndex === index;
       const slotBtn = this.createBaseSlot(`equipSlot_${index}`, UI_CONFIG.colors.bgEquip, true);
@@ -217,7 +218,7 @@ export class InventoryUI {
             this.contextMenu.show(weaponId, info.x, info.y, true);
           }
         },
-        meta,
+        meta || null,
         isSelected
       );
 
@@ -225,7 +226,7 @@ export class InventoryUI {
     });
   }
 
-  private renderBagSlots(state: any): void {
+  private renderBagSlots(state: InventoryState): void {
     const BAG_COLS = 4;
     for (let i = 0; i < state.maxBagSlots; i++) {
       const item = state.bagItems[i];
@@ -258,7 +259,7 @@ export class InventoryUI {
               this.callbacks.onEquipWeapon(this.selectedSlotIndex, item.id);
             }
           },
-          meta
+          meta || null
         );
       }
       this.bagGrid.addControl(slotBtn, Math.floor(i / BAG_COLS), i % BAG_COLS);
@@ -267,8 +268,8 @@ export class InventoryUI {
 
   private attachSlotInteraction(
     btn: Button,
-    onUp: (info: any) => void,
-    meta: any,
+    onUp: (info: Vector2WithInfo) => void, // Button onPointerUpObservable passes Vector2WithInfo
+    meta: { name: string; type: string; description: string } | null,
     isSelected: boolean = false
   ): void {
     btn.onPointerUpObservable.add(onUp);

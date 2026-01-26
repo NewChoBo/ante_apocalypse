@@ -7,11 +7,15 @@ import {
   PointLight,
   Mesh,
   Observer,
+  Sound,
+  TransformNode,
 } from '@babylonjs/core';
 import { BaseWeaponEffectComponent } from './BaseWeaponEffectComponent';
 import { AssetLoader } from '../../loaders/AssetLoader';
 import { GameObservables } from '../../events/GameObservables';
 import type { IPawn } from '../../../types/IPawn';
+import { PlayerPawn } from '../../pawns/PlayerPawn';
+import { MuzzleTransform } from '../../../types/IWeapon';
 
 /**
  * 총기류 전용 시각적 피드백 컴포넌트.
@@ -21,8 +25,13 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
   public name = 'FirearmEffect';
   private flashMaterial: StandardMaterial;
   private muzzleLight: PointLight;
-  private gunshotSound: any;
-  private fireObserver: Observer<any> | null = null;
+  private gunshotSound: Sound | null = null;
+  private fireObserver: Observer<{
+    weaponId: string;
+    ammoRemaining: number;
+    fireType: 'firearm' | 'melee';
+    muzzleTransform?: MuzzleTransform;
+  }> | null = null;
 
   constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
@@ -66,7 +75,7 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
   }
 
   private playGunshot(): void {
-    const sound = this.gunshotSound || AssetLoader.getInstance().getSound('gunshot');
+    const sound = this.gunshotSound || AssetLoader.getInstance().getSound('gunshot') || null;
     if (sound) {
       this.gunshotSound = sound;
       // 피치(재생 속도)를 0.9 ~ 1.1 사이로 랜덤화
@@ -74,8 +83,9 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
 
       if (typeof sound.setPlaybackRate === 'function') {
         sound.setPlaybackRate(randomRate);
-      } else if (typeof sound.setPitch === 'function') {
-        sound.setPitch(randomRate);
+      } else {
+        // Fallback or explicit updateOptions if available on different Sound implementation
+        sound.updateOptions({ playbackRate: randomRate });
       }
 
       sound.play();
@@ -85,7 +95,7 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
   protected emitMuzzleFlash(
     position: Vector3,
     _direction: Vector3,
-    transformNode?: any,
+    transformNode?: TransformNode,
     localPosition?: Vector3
   ): void {
     const flash = MeshBuilder.CreateSphere('muzzleFlash', { diameter: 0.15 }, this.scene);
@@ -101,9 +111,8 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
         flash.position.copyFrom(localPosition);
       }
     } else {
-      const player = this.owner as any;
-      if (player.camera) {
-        flash.parent = player.camera;
+      if (this.owner instanceof PlayerPawn && this.owner.camera) {
+        flash.parent = this.owner.camera;
         flash.position = new Vector3(0, -0.1, 0.8);
       } else {
         flash.position = position;

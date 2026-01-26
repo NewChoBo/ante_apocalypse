@@ -109,7 +109,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     const muzzle = this.getMuzzleTransform();
     NetworkManager.getInstance().fire({
       weaponId: this.name,
-      muzzleTransform: {
+      muzzleData: {
         position: { x: muzzle.position.x, y: muzzle.position.y, z: muzzle.position.z },
         direction: { x: muzzle.direction.x, y: muzzle.direction.y, z: muzzle.direction.z },
       },

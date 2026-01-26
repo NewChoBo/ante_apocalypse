@@ -1,4 +1,4 @@
-import { NetworkState, RoomInfo, PlayerInfo } from './NetworkProtocol';
+import { RoomInfo, NetworkState, PlayerInfo, EventData } from './NetworkProtocol';
 
 export interface INetworkProvider {
   // Methods
@@ -7,19 +7,17 @@ export interface INetworkProvider {
   createRoom(options: { roomName?: string; mapId: string; maxPlayers: number }): Promise<boolean>;
   joinRoom(roomId: string): Promise<boolean>;
   getRoomList(): Promise<RoomInfo[]>;
-  sendEvent(code: number, data: any, reliable: boolean): void;
+  sendEvent(code: number, data: EventData, reliable: boolean): void;
   getLocalPlayerId(): string | null;
   getServerTime(): number;
-
-  // Additional methods used by NetworkManager
-  isMasterClient(): boolean;
+  getCurrentRoomProperty(key: string): unknown;
   getActors(): Map<string, { id: string; name: string }>;
-  getCurrentRoomProperty(key: string): any;
+  isMasterClient(): boolean;
   refreshRoomList?(): void;
 
   // Event Handlers (Setters)
   onStateChanged?: (state: NetworkState) => void;
-  onEvent?: (code: number, data: any, senderId: string) => void;
+  onEvent?: (code: number, data: EventData, senderId: string) => void;
   onPlayerJoined?: (user: PlayerInfo) => void;
   onPlayerLeft?: (userId: string) => void;
   onRoomListUpdated?: (rooms: RoomInfo[]) => void;

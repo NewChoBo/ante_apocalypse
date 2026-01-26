@@ -10,6 +10,7 @@ import {
   AbstractMesh,
   ShadowGenerator,
   DynamicTexture,
+  AnimationRange,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { NetworkManager } from '../network/NetworkManager';
@@ -35,8 +36,8 @@ export class EnemyPawn extends BasePawn {
   private _healthBarTexture: DynamicTexture | null = null;
 
   // Animation Ranges
-  private idleRange: any;
-  private walkRange: any;
+  private idleRange: AnimationRange | null = null;
+  private walkRange: AnimationRange | null = null;
   // private runRange: any;
   // private leftRange: any;
   // private rightRange: any;
@@ -160,16 +161,16 @@ export class EnemyPawn extends BasePawn {
 
           const transformNode = headBone.getTransformNode();
           if (transformNode) {
-            console.log('[EnemyPawn] Attaching headBox to TransformNode'); // eslint-disable-line no-console
+            console.log('[EnemyPawn] Attaching headBox to TransformNode');
             headBox.parent = transformNode;
             headBox.position = Vector3.Zero();
             headBox.rotation = Vector3.Zero();
           } else {
-            console.log('[EnemyPawn] Attaching headBox using attachToBone'); // eslint-disable-line no-console
+            console.log('[EnemyPawn] Attaching headBox using attachToBone');
             try {
               headBox.attachToBone(headBone, this.visualMesh);
             } catch (e) {
-              console.error('[EnemyPawn] Failed to attach to bone', e); // eslint-disable-line no-console
+              console.error('[EnemyPawn] Failed to attach to bone', e);
             }
           }
 

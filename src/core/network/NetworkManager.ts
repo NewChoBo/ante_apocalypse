@@ -1,7 +1,24 @@
-import { Observable, Vector3 } from '@babylonjs/core';
-import { INetworkProvider } from '../network/INetworkProvider';
-import { PhotonProvider } from '../network/providers/PhotonProvider';
-import { RoomInfo, NetworkState, EventCode } from '../network/NetworkProtocol';
+import { Observable } from '@babylonjs/core';
+import { INetworkProvider } from './INetworkProvider';
+import { PhotonProvider } from './providers/PhotonProvider';
+import {
+  RoomInfo,
+  NetworkState,
+  EventCode,
+  EventData,
+  MovePayload,
+  FirePayload,
+  HitPayload,
+  SyncWeaponPayload,
+  EnemyUpdateData,
+  EnemyHitPayload,
+  TargetHitPayload,
+  InitialStatePayload,
+  PlayerDeathPayload,
+  TargetDestroyData,
+  TargetSpawnData,
+  ReqInitialStatePayload,
+} from './NetworkProtocol';
 
 export interface PlayerState {
   id: string;
@@ -46,56 +63,29 @@ export class NetworkManager {
   public onPlayerDied = new Observable<DeathEventData>();
 
   // Enemy Synchronization
-  public onEnemyUpdated = new Observable<{
-    id: string;
-    position: any;
-    rotation: any;
-    isMoving?: boolean;
-  }>();
-  public onEnemyHit = new Observable<{ id: string; damage: number }>();
+  public onEnemyUpdated = new Observable<EnemyUpdateData>();
+  public onEnemyHit = new Observable<EnemyHitPayload>();
 
   // State Synchronization
-  public onInitialStateRequested = new Observable<{ senderId: string }>();
-  public onInitialStateReceived = new Observable<{
-    players: any[];
-    enemies: any[];
-    targets?: any[];
-  }>();
+  public onInitialStateRequested = new Observable<ReqInitialStatePayload & { senderId: string }>();
+  public onInitialStateReceived = new Observable<InitialStatePayload>();
 
   // New Observables for Lobby/State
   public onRoomListUpdated = new Observable<RoomInfo[]>();
   public onStateChanged = new Observable<NetworkState>();
-  public onEvent = new Observable<{ code: number; data: any; senderId: string }>();
+  public onEvent = new Observable<{ code: number; data: EventData; senderId: string }>();
 
   // Target Observables
-  public onTargetHit = new Observable<{ targetId: string; part: string; damage: number }>();
-  public onTargetDestroy = new Observable<{ targetId: string }>();
-  public onTargetSpawn = new Observable<{
-    type: string;
-    position: Vector3;
-    id: string;
-    isMoving: boolean;
-  }>();
+  public onTargetHit = new Observable<TargetHitPayload>();
+  public onTargetDestroy = new Observable<TargetDestroyData>();
+  public onTargetSpawn = new Observable<TargetSpawnData>();
 
   private playerStates: Map<string, PlayerState> = new Map();
-  private currentState: NetworkState = NetworkState.Disconnected;
   private lastRoomList: RoomInfo[] = [];
 
   private constructor() {
     this.provider = new PhotonProvider();
     this.setupProviderListeners();
-  }
-
-  public clearObservers(): void {
-    this.onPlayersList.clear();
-    this.onPlayerJoined.clear();
-    this.onPlayerUpdated.clear();
-    this.onPlayerLeft.clear();
-    this.onPlayerFired.clear();
-    this.onPlayerHit.clear();
-    this.onPlayerDied.clear();
-    this.onRoomListUpdated.clear();
-    this.onStateChanged.clear();
   }
 
   public static getInstance(): NetworkManager {
@@ -106,17 +96,16 @@ export class NetworkManager {
   }
 
   private setupProviderListeners(): void {
-    this.provider.onStateChanged = (state) => {
-      this.currentState = state;
+    this.provider.onStateChanged = (state): void => {
       this.onStateChanged.notifyObservers(state);
     };
 
-    this.provider.onRoomListUpdated = (rooms) => {
+    this.provider.onRoomListUpdated = (rooms): void => {
       this.lastRoomList = rooms;
       this.onRoomListUpdated.notifyObservers(rooms);
     };
 
-    this.provider.onPlayerJoined = (user) => {
+    this.provider.onPlayerJoined = (user): void => {
       const newState: PlayerState = {
         id: user.userId,
         name: user.name || 'Anonymous',
@@ -129,118 +118,87 @@ export class NetworkManager {
       this.onPlayerJoined.notifyObservers(newState);
     };
 
-    this.provider.onPlayerLeft = (id) => {
+    this.provider.onPlayerLeft = (id): void => {
       this.playerStates.delete(id);
       this.onPlayerLeft.notifyObservers(id);
     };
 
-    this.provider.onEvent = (code, data, senderId) => {
+    this.provider.onEvent = (code, data, senderId): void => {
       this.onEvent.notifyObservers({ code, data, senderId });
 
       switch (code) {
-        case EventCode.MOVE:
+        case EventCode.MOVE: {
+          const moveData = data as MovePayload;
           if (this.playerStates.has(senderId)) {
             const state = this.playerStates.get(senderId)!;
-            state.position = data.position;
-            state.rotation = data.rotation;
+            state.position = moveData.position;
+            state.rotation = moveData.rotation;
             this.onPlayerUpdated.notifyObservers(state);
           }
           break;
-        case EventCode.FIRE:
+        }
+        case EventCode.FIRE: {
+          const fireData = data as FirePayload;
           this.onPlayerFired.notifyObservers({
             playerId: senderId,
-            weaponId: data.weaponId,
-            muzzleTransform: data.muzzleTransform,
+            weaponId: fireData.weaponId,
+            muzzleTransform: fireData.muzzleData,
           });
           break;
-        case EventCode.HIT:
+        }
+        case EventCode.HIT: {
+          const hitData = data as HitPayload;
           this.onPlayerHit.notifyObservers({
-            playerId: data.targetId,
-            damage: data.damage,
-            newHealth: data.newHealth || 0,
+            playerId: hitData.targetId,
+            damage: hitData.damage,
+            newHealth: 0, // Should be synced via state if needed
             attackerId: senderId,
           });
           break;
-        case EventCode.SYNC_WEAPON:
+        }
+        case EventCode.SYNC_WEAPON: {
+          const syncData = data as SyncWeaponPayload;
           if (this.playerStates.has(senderId)) {
             const state = this.playerStates.get(senderId)!;
-            state.weaponId = data.weaponId;
+            state.weaponId = syncData.weaponId;
             this.onPlayerUpdated.notifyObservers(state);
           }
           break;
+        }
         case EventCode.ENEMY_MOVE:
-          this.onEnemyUpdated.notifyObservers({
-            id: data.id,
-            position: data.position,
-            rotation: data.rotation,
-            isMoving: data.isMoving,
-          });
+          this.onEnemyUpdated.notifyObservers(data as EnemyUpdateData);
           break;
         case EventCode.ENEMY_HIT:
-          this.onEnemyHit.notifyObservers({
-            id: data.id,
-            damage: data.damage,
-          });
+          this.onEnemyHit.notifyObservers(data as EnemyHitPayload);
           break;
         case EventCode.TARGET_HIT:
-          this.onTargetHit.notifyObservers({
-            targetId: data.targetId,
-            part: data.part,
-            damage: data.damage,
-          });
+          this.onTargetHit.notifyObservers(data as TargetHitPayload);
           break;
         case EventCode.PLAYER_DEATH:
-          this.onPlayerDied.notifyObservers({
-            playerId: data.playerId,
-            attackerId: data.attackerId,
-          });
+          this.onPlayerDied.notifyObservers(data as PlayerDeathPayload);
           break;
         case EventCode.TARGET_DESTROY:
-          this.onTargetDestroy.notifyObservers({
-            targetId: data.targetId,
-          });
+          this.onTargetDestroy.notifyObservers(data as TargetDestroyData);
           break;
         case EventCode.SPAWN_TARGET:
-          this.onTargetSpawn.notifyObservers({
-            type: data.type,
-            position: new Vector3(data.position.x, data.position.y, data.position.z),
-            id: data.id,
-            isMoving: data.isMoving,
-          });
+          this.onTargetSpawn.notifyObservers(data as TargetSpawnData);
           break;
         case EventCode.REQ_INITIAL_STATE:
-          this.onInitialStateRequested.notifyObservers({ senderId });
-          break;
-        case EventCode.INITIAL_STATE:
-          // Update internal state with received players
-          if (data.players && Array.isArray(data.players)) {
-            data.players.forEach((p: PlayerState) => {
-              this.playerStates.set(p.id, p);
-            });
-            console.log(
-              `[NetworkManager] Synced ${data.players.length} players from Initial State`
-            );
-          }
-
-          this.onInitialStateReceived.notifyObservers({
-            players: data.players,
-            enemies: data.enemies,
-            targets: data.targets,
+          this.onInitialStateRequested.notifyObservers({
+            ...(data as ReqInitialStatePayload),
+            senderId,
           });
           break;
+        case EventCode.INITIAL_STATE: {
+          const initialState = data as InitialStatePayload;
+          this.onInitialStateReceived.notifyObservers(initialState);
+          break;
+        }
       }
     };
   }
 
   public connect(userId: string): void {
-    // Prevent redundant connection attempts using internal state
-    if (
-      this.currentState !== NetworkState.Disconnected &&
-      this.currentState !== NetworkState.Error
-    ) {
-      return;
-    }
-
     this.provider.connect(userId).catch((e) => {
       console.error('[NetworkManager] Connect failed:', e);
     });
@@ -271,69 +229,7 @@ export class NetworkManager {
   }
 
   public getMapId(): string | null {
-    return this.provider.getCurrentRoomProperty('mapId');
-  }
-
-  public join(data: {
-    position: Vector3;
-    rotation: Vector3;
-    weaponId: string;
-    name: string;
-  }): void {
-    const myId = this.getSocketId();
-    if (myId) {
-      const myState: PlayerState = {
-        id: myId,
-        name: data.name,
-        position: { x: data.position.x, y: data.position.y, z: data.position.z },
-        rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
-        weaponId: data.weaponId,
-        health: 100,
-      };
-      this.playerStates.set(myId, myState);
-    }
-    this.updateState(data);
-  }
-
-  public updateState(data: { position: Vector3; rotation: Vector3; weaponId: string }): void {
-    const myId = this.getSocketId();
-    if (myId && this.playerStates.has(myId)) {
-      const state = this.playerStates.get(myId)!;
-      state.position = { x: data.position.x, y: data.position.y, z: data.position.z };
-      state.rotation = { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z };
-      state.weaponId = data.weaponId;
-    }
-
-    this.provider.sendEvent(
-      EventCode.MOVE,
-      {
-        position: { x: data.position.x, y: data.position.y, z: data.position.z },
-        rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
-      },
-      false
-    );
-  }
-
-  public fire(fireData: {
-    weaponId: string;
-    muzzleTransform?: {
-      position: { x: number; y: number; z: number };
-      direction: { x: number; y: number; z: number };
-    };
-  }): void {
-    this.provider.sendEvent(EventCode.FIRE, fireData, true);
-  }
-
-  public syncWeapon(weaponId: string): void {
-    this.provider.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
-  }
-
-  public sendEvent(code: number, data: any, reliable: boolean = true): void {
-    this.provider.sendEvent(code, data, reliable);
-  }
-
-  public hit(hitData: { targetId: string; damage: number }): void {
-    this.provider.sendEvent(EventCode.HIT, hitData, true);
+    return (this.provider.getCurrentRoomProperty('mapId') as string) || null;
   }
 
   public getSocketId(): string | undefined {
@@ -345,7 +241,6 @@ export class NetworkManager {
   }
 
   public refreshRoomList(): void {
-    console.log('[NetworkManager] Requesting room list refresh...');
     this.provider.refreshRoomList?.();
   }
 
@@ -355,5 +250,17 @@ export class NetworkManager {
 
   public getAllPlayerStates(): PlayerState[] {
     return Array.from(this.playerStates.values());
+  }
+
+  public sendEvent(code: EventCode, data: EventData, reliable: boolean = true): void {
+    this.provider.sendEvent(code, data, reliable);
+  }
+
+  public fire(payload: FirePayload): void {
+    this.sendEvent(EventCode.FIRE, payload, true);
+  }
+
+  public syncWeapon(weaponId: string): void {
+    this.sendEvent(EventCode.SYNC_WEAPON, new SyncWeaponPayload(weaponId), true);
   }
 }

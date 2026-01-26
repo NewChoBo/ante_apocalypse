@@ -1,8 +1,9 @@
-import { Scene, Mesh, Observer } from '@babylonjs/core';
+import { Scene, Mesh, Observer, Sound } from '@babylonjs/core';
 import { BaseWeaponEffectComponent } from './BaseWeaponEffectComponent';
 import { AssetLoader } from '../../loaders/AssetLoader';
 import { GameObservables } from '../../events/GameObservables';
 import type { IPawn } from '../../../types/IPawn';
+import { MuzzleTransform } from '../../../types/IWeapon';
 
 /**
  * 근접 무기 전용 시각적 피드백 컴포넌트.
@@ -10,8 +11,13 @@ import type { IPawn } from '../../../types/IPawn';
  */
 export class MeleeEffectComponent extends BaseWeaponEffectComponent {
   public name = 'MeleeEffect';
-  private swipeSound: any;
-  private swipeObserver: Observer<any> | null = null;
+  private swipeSound: Sound | null = null;
+  private swipeObserver: Observer<{
+    weaponId: string;
+    ammoRemaining: number;
+    fireType: 'firearm' | 'melee';
+    muzzleTransform?: MuzzleTransform;
+  }> | null = null;
 
   constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
@@ -38,7 +44,7 @@ export class MeleeEffectComponent extends BaseWeaponEffectComponent {
   }
 
   private playSwipe(): void {
-    const sound = this.swipeSound || AssetLoader.getInstance().getSound('swipe');
+    const sound = this.swipeSound || AssetLoader.getInstance().getSound('swipe') || null;
     if (sound) {
       this.swipeSound = sound;
       sound.play();

@@ -5,5 +5,8 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
-  }
+  },
+  esbuild: {
+    pure: ['console.log', 'console.debug'],
+  },
 });

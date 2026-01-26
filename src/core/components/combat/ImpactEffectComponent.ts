@@ -1,5 +1,5 @@
 import { Scene, Vector3, ParticleSystem, Texture, Color4, Mesh, Observer } from '@babylonjs/core';
-import { BaseComponent } from '../base/BaseComponent';
+import { BaseComponent } from '@/core/components/base/BaseComponent';
 import { GameObservables } from '../../events/GameObservables';
 import type { IPawn } from '../../../types/IPawn';
 import flareUrl from '../../assets/textures/Flare.png?url';
@@ -11,7 +11,7 @@ import flareUrl from '../../assets/textures/Flare.png?url';
 export class ImpactEffectComponent extends BaseComponent {
   public name = 'ImpactEffect';
   private particleSystem: ParticleSystem;
-  private hitObserver: Observer<any> | null = null;
+  private hitObserver: Observer<{ position: Vector3; normal: Vector3 }> | null = null;
 
   constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);

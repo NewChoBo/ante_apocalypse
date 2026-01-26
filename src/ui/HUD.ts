@@ -1,5 +1,6 @@
 import { scoreStore, ammoStore, playerHealthStore, AmmoState } from '../core/store/GameStore';
 import { GameObservables } from '../core/events/GameObservables';
+import { MuzzleTransform } from '../types/IWeapon';
 import { Observer } from '@babylonjs/core';
 import { AdvancedDynamicTexture, TextBlock, Rectangle, Control } from '@babylonjs/gui';
 import { UIManager } from './UIManager';
@@ -23,8 +24,13 @@ export class HUD {
   private curAmmoUnsub: (() => void) | null = null;
   private scoreUnsub: (() => void) | null = null;
   private healthUnsub: (() => void) | null = null;
-  private weaponFireObserver: Observer<any> | null = null;
-  private expandTimeout: any;
+  private weaponFireObserver: Observer<{
+    weaponId: string;
+    ammoRemaining: number;
+    fireType: 'firearm' | 'melee';
+    muzzleTransform?: MuzzleTransform;
+  }> | null = null;
+  private expandTimeout: ReturnType<typeof setTimeout> | null = null;
   private previousHealth: number = 100;
 
   constructor() {

@@ -1,10 +1,10 @@
-import { Scene, Vector3, ShadowGenerator, Mesh } from '@babylonjs/core';
-import { BaseComponent } from '../base/BaseComponent';
+import { Scene, Vector3, ShadowGenerator, Mesh, Observer } from '@babylonjs/core';
+import { BaseComponent } from '@/core/components/base/BaseComponent';
 import { StaticTarget } from '../../../targets/StaticTarget';
 import { MovingTarget } from '../../../targets/MovingTarget';
 import { HumanoidTarget } from '../../../targets/HumanoidTarget';
 import { NetworkMediator } from '../../network/NetworkMediator';
-import { EventCode } from '../../network/NetworkProtocol';
+import { EventCode, TargetSpawnData, TargetDestroyData } from '../../network/NetworkProtocol';
 import { WorldEntityManager } from '../../entities/WorldEntityManager';
 import { IWorldEntity } from '../../../types/IWorldEntity';
 import type { IPawn } from '../../../types/IPawn';
@@ -17,11 +17,11 @@ export class TargetSpawnerComponent extends BaseComponent {
   private shadowGenerator: ShadowGenerator;
   private targetIdCounter = 0;
   private worldManager: WorldEntityManager;
-  private respawnTimeout: number | any;
+  private respawnTimeout: ReturnType<typeof setTimeout> | null = null;
   private networkMediator: NetworkMediator;
 
-  private spawnObserver: any | null = null;
-  private destroyObserver: any | null = null;
+  private spawnObserver: Observer<TargetSpawnData> | null = null;
+  private destroyObserver: Observer<TargetDestroyData> | null = null;
 
   constructor(owner: IPawn, scene: Scene, shadowGenerator: ShadowGenerator) {
     super(owner, scene);

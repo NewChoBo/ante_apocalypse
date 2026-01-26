@@ -1,4 +1,4 @@
-import { Vector3 } from '@babylonjs/core';
+import { Vector3, TransformNode } from '@babylonjs/core';
 
 /**
  * 총구의 위치와 방향을 제공하는 인터페이스.
@@ -7,7 +7,7 @@ export interface IMuzzleProvider {
   getMuzzleTransform(): {
     position: Vector3;
     direction: Vector3;
-    transformNode?: any;
+    transformNode?: TransformNode;
   };
 }
 
@@ -73,7 +73,7 @@ export interface IWeapon {
 export interface MuzzleTransform {
   position: Vector3;
   direction: Vector3;
-  transformNode?: any;
+  transformNode?: TransformNode;
   localMuzzlePosition?: Vector3;
 }
 
