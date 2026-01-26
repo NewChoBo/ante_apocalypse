@@ -1,16 +1,17 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { IWorldEntity } from '../../types/IWorldEntity';
-import { NetworkManager } from './NetworkManager';
+import { IGameSystem } from '../types/IGameSystem';
+import { NetworkMediator } from './NetworkMediator';
 import { EventCode } from '../network/NetworkProtocol';
 
 /**
  * 전역 엔티티 관리자.
  * 적, 타겟, 타 플레이어 등 모든 '피격 및 동기화 가능한' 엔티티를 관리합니다.
  */
-export class WorldEntityManager {
+export class WorldEntityManager implements IGameSystem {
   private static instance: WorldEntityManager;
   private entities: Map<string, IWorldEntity> = new Map();
-  private networkManager: NetworkManager;
+  private networkMediator: NetworkMediator;
 
   // 알림용 옵저버
   public onEntityAdded = new Observable<IWorldEntity>();
@@ -18,8 +19,12 @@ export class WorldEntityManager {
   public onEntityHit = new Observable<{ id: string; part: string; damage: number }>();
 
   private constructor() {
-    this.networkManager = NetworkManager.getInstance();
+    this.networkMediator = NetworkMediator.getInstance();
     this.setupNetworkListeners();
+  }
+
+  public initialize(): void {
+    // 추가 초기화 로직이 필요할 경우 여기에 구현
   }
 
   public static getInstance(): WorldEntityManager {
@@ -30,22 +35,14 @@ export class WorldEntityManager {
   }
 
   private setupNetworkListeners(): void {
-    // 1. 타겟 피격 동기화
-    this.networkManager.onTargetHit.add((data) => {
-      this.processHit(data.targetId, data.damage, data.part, false);
+    // 1. 엔티티 상태 동기화 (NetworkMediator 사용)
+    this.networkMediator.onPlayerUpdated.add((_data) => {
+      // 필요 시 처리
     });
 
-    // 2. 적 피격 동기화
-    this.networkManager.onEnemyHit.add((data) => {
-      this.processHit(data.id, data.damage, 'body', false);
-    });
-
-    // 3. 엔티티 파괴 동기화
-    this.networkManager.onEvent.add((event) => {
-      if (event.code === EventCode.TARGET_DESTROY || event.code === EventCode.DESTROY_ENEMY) {
-        const id = event.data.targetId || event.data.id;
-        this.removeEntity(id);
-      }
+    // 2. 타겟 파괴 동기화
+    this.networkMediator.onTargetDestroyed.add((data) => {
+      this.removeEntity(data.id || data.targetId || '');
     });
   }
 
@@ -125,7 +122,7 @@ export class WorldEntityManager {
     // 사망 시 처리
     if (entity.isDead) {
       console.log(`[WorldEntityManager] Entity is dead after hit: ${id}, broadcast: ${broadcast}`);
-      if (broadcast || (entity.type === 'enemy' && this.networkManager.isMasterClient())) {
+      if (broadcast || (entity.type === 'enemy' && this.networkMediator.isMasterClient())) {
         this.broadcastDestroy(entity);
       }
       this.removeEntity(id);
@@ -134,21 +131,25 @@ export class WorldEntityManager {
 
   private broadcastHit(entity: IWorldEntity, damage: number, part: string): void {
     if (entity.type === 'enemy') {
-      this.networkManager.sendEvent(EventCode.ENEMY_HIT, { id: entity.id, damage });
+      this.networkMediator.sendEvent(EventCode.ENEMY_HIT, { id: entity.id, damage });
     } else if (entity.type === 'remote_player') {
-      this.networkManager.hit({ targetId: entity.id, damage });
+      this.networkMediator.sendEvent(EventCode.HIT, { targetId: entity.id, damage });
     } else {
       // General target (StaticTarget, MovingTarget, HumanoidTarget)
-      this.networkManager.sendEvent(EventCode.TARGET_HIT, { targetId: entity.id, part, damage });
+      this.networkMediator.sendEvent(EventCode.TARGET_HIT, { targetId: entity.id, part, damage });
     }
   }
 
   private broadcastDestroy(entity: IWorldEntity): void {
-    if (entity.type === 'enemy' && this.networkManager.isMasterClient()) {
-      this.networkManager.sendEvent(EventCode.DESTROY_ENEMY, { id: entity.id });
+    if (entity.type === 'enemy' && this.networkMediator.isMasterClient()) {
+      this.networkMediator.sendEvent(EventCode.DESTROY_ENEMY, { id: entity.id });
     } else if (entity.type.includes('target')) {
-      this.networkManager.sendEvent(EventCode.TARGET_DESTROY, { targetId: entity.id });
+      this.networkMediator.sendEvent(EventCode.TARGET_DESTROY, { targetId: entity.id });
     }
+  }
+
+  public dispose(): void {
+    this.clear();
   }
 
   public clear(): void {

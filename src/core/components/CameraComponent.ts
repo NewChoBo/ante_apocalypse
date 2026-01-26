@@ -12,6 +12,7 @@ export interface RotationInput {
  * 캐릭터의 카메라와 마우스 회전(Pitch/Yaw)을 담당하는 컴포넌트.
  */
 export class CameraComponent extends BaseComponent {
+  public name = 'Camera';
   public camera: UniversalCamera;
   private mouseSensitivity = 0.002;
   private minPitch = -Math.PI / 2 + 0.1;

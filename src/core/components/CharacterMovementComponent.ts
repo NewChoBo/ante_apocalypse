@@ -18,6 +18,7 @@ export interface MovementInput {
  * 캐릭터의 이동, 중력, 점프 로직을 담당하는 컴포넌트.
  */
 export class CharacterMovementComponent extends BaseComponent {
+  public name = 'CharacterMovement';
   private playerHeight = 1.75;
   private crouchHeight = 1.0;
   private moveSpeed = 8;

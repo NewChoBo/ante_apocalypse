@@ -173,7 +173,7 @@ export class Game {
     }
 
     this.sessionController = new SessionController(scene, this.canvas, shadowGenerator);
-    await this.sessionController.initialize(levelData, mode, this.playerName);
+    await this.sessionController.setup(levelData, mode, this.playerName);
 
     // Ensure the player camera is active
     if (this.sessionController.getPlayerCamera()) {
@@ -264,6 +264,6 @@ export class Game {
 
   private update(deltaTime: number): void {
     TickManager.getInstance().tick(deltaTime);
-    this.sessionController?.update(deltaTime);
+    this.sessionController?.tick(deltaTime);
   }
 }

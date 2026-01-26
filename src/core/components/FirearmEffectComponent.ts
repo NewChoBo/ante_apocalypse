@@ -1,8 +1,16 @@
-import { Scene, Vector3, MeshBuilder, StandardMaterial, Color3, PointLight } from '@babylonjs/core';
+import {
+  Scene,
+  Vector3,
+  MeshBuilder,
+  StandardMaterial,
+  Color3,
+  PointLight,
+  Mesh,
+  Observer,
+} from '@babylonjs/core';
 import { BaseWeaponEffectComponent } from './BaseWeaponEffectComponent';
 import { AssetLoader } from '../AssetLoader';
 import { GameObservables } from '../events/GameObservables';
-import { LifetimeManager } from '../systems/LifetimeManager';
 import type { IPawn } from '../../types/IPawn';
 
 /**
@@ -10,9 +18,11 @@ import type { IPawn } from '../../types/IPawn';
  * 총구 화염(Muzzle Flash)과 총성(Gunshot Sound)을 전담합니다.
  */
 export class FirearmEffectComponent extends BaseWeaponEffectComponent {
+  public name = 'FirearmEffect';
   private flashMaterial: StandardMaterial;
   private muzzleLight: PointLight;
   private gunshotSound: any;
+  private fireObserver: Observer<any> | null = null;
 
   constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
@@ -27,24 +37,32 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
     this.muzzleLight.intensity = 0;
 
     this.gunshotSound = AssetLoader.getInstance().getSound('gunshot');
+  }
 
+  public attach(target: Mesh): void {
+    super.attach(target);
     // 이벤트 구독: 'firearm' 타입인 경우에만 총구 화염 및 소리 발생
-    LifetimeManager.getInstance().trackObserver(
-      GameObservables.weaponFire,
-      GameObservables.weaponFire.add((payload) => {
-        if (payload.fireType === 'firearm') {
-          this.playGunshot();
-          if (payload.muzzleTransform) {
-            this.emitMuzzleFlash(
-              payload.muzzleTransform.position,
-              payload.muzzleTransform.direction,
-              payload.muzzleTransform.transformNode,
-              payload.muzzleTransform.localMuzzlePosition
-            );
-          }
+    this.fireObserver = GameObservables.weaponFire.add((payload) => {
+      if (payload.fireType === 'firearm') {
+        this.playGunshot();
+        if (payload.muzzleTransform) {
+          this.emitMuzzleFlash(
+            payload.muzzleTransform.position,
+            payload.muzzleTransform.direction,
+            payload.muzzleTransform.transformNode,
+            payload.muzzleTransform.localMuzzlePosition
+          );
         }
-      })
-    );
+      }
+    });
+  }
+
+  public detach(): void {
+    if (this.fireObserver) {
+      GameObservables.weaponFire.remove(this.fireObserver);
+      this.fireObserver = null;
+    }
+    super.detach();
   }
 
   private playGunshot(): void {

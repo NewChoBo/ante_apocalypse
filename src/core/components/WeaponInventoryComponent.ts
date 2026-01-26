@@ -1,36 +1,60 @@
-import { Scene, UniversalCamera, Observable } from '@babylonjs/core';
+import { Scene, Observable, Mesh } from '@babylonjs/core';
+import { BaseComponent } from './BaseComponent';
+import { CameraComponent } from './CameraComponent';
+import { HUDSyncComponent } from './HUDSyncComponent';
 import { IWeapon } from '../../types/IWeapon';
 import { inventoryStore } from '../store/GameStore';
 import { Pistol } from '../../weapons/Pistol';
 import { Rifle } from '../../weapons/Rifle';
 import { Knife } from '../../weapons/Knife';
 import { Bat } from '../../weapons/Bat';
+import type { IPawn } from '../../types/IPawn';
 
 /**
  * 캐릭터가 보유한 무기들을 관리하고 교체 로직을 담당하는 컴포넌트.
  */
-export class WeaponInventoryComponent {
+export class WeaponInventoryComponent extends BaseComponent {
+  public name = 'WeaponInventory';
   private weapons: IWeapon[] = [];
   private currentWeaponIndex = 0;
 
   /** 무기가 변경될 때 호출되는 Observable */
   public onWeaponChanged = new Observable<IWeapon>();
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    onScore: (points: number) => void,
-    applyRecoil?: (force: number) => void
-  ) {
+  constructor(owner: IPawn, scene: Scene) {
+    super(owner, scene);
+  }
+
+  public attach(target: Mesh): void {
+    super.attach(target);
+
+    const cameraComp = this.owner.getComponent(CameraComponent);
+    const hudSync = this.owner.getComponent(HUDSyncComponent);
+
+    if (!cameraComp || !hudSync) {
+      // console.warn('[WeaponInventory] Required components (Camera/HUDSync) not found on Pawn yet.');
+      return;
+    }
+
+    const camera = cameraComp.camera;
+    const onScore = (points: number): void => hudSync.updateScore(points);
+    const applyRecoil = (force: number): void => cameraComp.applyRecoil(force);
+
     this.weapons = [
-      new Pistol(scene, camera, onScore, applyRecoil),
-      new Rifle(scene, camera, onScore, applyRecoil),
-      new Knife(scene, camera, onScore),
-      new Bat(scene, camera, onScore),
+      new Pistol(this.scene, camera, onScore, applyRecoil),
+      new Rifle(this.scene, camera, onScore, applyRecoil),
+      new Knife(this.scene, camera, onScore),
+      new Bat(this.scene, camera, onScore),
     ];
 
     // 초기 상태 설정
     this.weapons.forEach((w, i) => (i === 0 ? w.show() : w.hide()));
+  }
+
+  public detach(): void {
+    this.weapons.forEach((w) => w.dispose());
+    this.weapons = [];
+    super.detach();
   }
 
   public get currentWeapon(): IWeapon {

@@ -14,6 +14,7 @@ import type { IPawn } from '../../types/IPawn';
  * 캐릭터의 무기 인벤토리, 입력, UI 동기화를 조율하는 컴포넌트.
  */
 export class CombatComponent extends BaseComponent {
+  public name = 'Combat';
   private inventory: WeaponInventoryComponent;
   private input: WeaponInputComponent;
   private hudSync: HUDSyncComponent;
@@ -26,26 +27,23 @@ export class CombatComponent extends BaseComponent {
       throw new Error('CombatComponent requires a CameraComponent on the Pawn');
     }
 
-    this.hudSync = new HUDSyncComponent();
+    // 1. 컴포넌트들 생성 및 등록
+    this.hudSync = new HUDSyncComponent(owner, scene);
+    this.owner.addComponent(this.hudSync);
 
-    // 1. 인벤토리 초기화 (점수 콜백을 hudSync에 연결)
-    this.inventory = new WeaponInventoryComponent(
-      scene,
-      cameraComp.camera,
-      (points) => this.hudSync.updateScore(points),
-      (force) => cameraComp.applyRecoil(force)
-    );
+    this.inventory = new WeaponInventoryComponent(owner, scene);
+    this.owner.addComponent(this.inventory);
 
+    this.input = new WeaponInputComponent(owner, scene);
+    this.owner.addComponent(this.input);
+
+    // 2. 이벤트 연결 (컴포넌트들이 Mesh에 attach된 후 안전해짐)
     // 무기 변경 시 HUD 동기화 리스너 등록
     this.inventory.onWeaponChanged.add((newWeapon) => this.hudSync.syncAmmo(newWeapon));
-
-    // 2. 입력 처리 초기화
-    this.input = new WeaponInputComponent(this.inventory);
 
     // 초기 HUD 동기화
     this.hudSync.syncAmmo(this.inventory.currentWeapon);
 
-    // 이펙트 컴포넌트 초기화
     // 이펙트 컴포넌트 초기화 및 등록
     this.attachEffect(FirearmEffectComponent);
     this.attachEffect(MeleeEffectComponent);
@@ -68,7 +66,7 @@ export class CombatComponent extends BaseComponent {
     this.inventory.update(deltaTime);
   }
 
-  public getCurrentWeapon() {
+  public getCurrentWeapon(): IWeapon {
     return this.inventory.currentWeapon;
   }
 

@@ -1,15 +1,12 @@
-import { Mesh, Vector3, Scene } from '@babylonjs/core';
+import { Mesh, Vector3, Scene, Observer, Nullable } from '@babylonjs/core';
 import { IPawn } from '../types/IPawn';
 import { BaseComponent } from './components/BaseComponent';
-import { ITickable } from './interfaces/ITickable';
-import { TickManager } from './TickManager';
-import { IDestructible } from './interfaces/IDestructible';
 import { IWorldEntity, DamageProfile } from '../types/IWorldEntity';
 
 /**
  * 모든 Pawn의 공통 기능을 담은 추상 클래스.
  */
-export abstract class BasePawn implements IPawn, ITickable, IDestructible, IWorldEntity {
+export abstract class BasePawn implements IPawn, IWorldEntity {
   public abstract mesh: Mesh;
   public abstract type: string;
   public controllerId: string | null = null;
@@ -18,17 +15,22 @@ export abstract class BasePawn implements IPawn, ITickable, IDestructible, IWorl
   public maxHealth: number = 100;
   public isActive: boolean = true;
   public isDead: boolean = false;
-  public readonly priority = 20;
+  public readonly priority: number = 20;
 
   public damageProfile?: DamageProfile;
 
   protected scene: Scene;
-  protected components: BaseComponent[] = [];
+  private _tickObserver: Nullable<Observer<Scene>> = null;
 
   constructor(scene: Scene) {
     this.scene = scene;
-    // TickManager에 자동 등록
-    TickManager.getInstance().register(this);
+    // 씬의 렌더 루프에 업데이트 등록 (Babylon.js 표준 방식)
+    this._tickObserver = this.scene.onBeforeRenderObservable.add(() => {
+      const deltaTime = this.scene.getEngine().getDeltaTime() / 1000;
+      if (this.isActive) {
+        this.tick(deltaTime);
+      }
+    });
   }
 
   /** ITickable 인터페이스 구현 (하위 클래스에서 상속받아 구현) */
@@ -45,22 +47,23 @@ export abstract class BasePawn implements IPawn, ITickable, IDestructible, IWorl
   /** 사망 처리 */
   public abstract die(): void;
 
-  /** 컴포넌트 추가 */
+  /** 컴포넌트(Behavior) 추가 */
   public addComponent(component: BaseComponent): void {
-    this.components.push(component);
+    if (this.mesh) {
+      this.mesh.addBehavior(component);
+    }
   }
 
-  /** 특정 타입의 컴포넌트 찾기 */
+  /** 특정 타입의 컴포넌트 찾기 (Babylon.js behaviors 목록에서 검색) */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public getComponent<T extends BaseComponent>(type: new (...args: any[]) => T): T | undefined {
-    return this.components.find((c) => c instanceof type) as T;
+    if (!this.mesh) return undefined;
+    return this.mesh.behaviors.find((b) => b instanceof type) as T;
   }
 
-  /** 모든 컴포넌트 업데이트 */
-  protected updateComponents(deltaTime: number): void {
-    for (const component of this.components) {
-      component.update(deltaTime);
-    }
+  /** 모든 컴포넌트 업데이트 (Behavior가 각자 처리하므로 메서드는 공백으로 유지 가능하거나 제거) */
+  protected updateComponents(_deltaTime: number): void {
+    // Babylon.js Behavior가 attach 시점에 등록한 observer에 의해 자동 업데이트됩니다.
   }
 
   public get position(): Vector3 {
@@ -76,17 +79,15 @@ export abstract class BasePawn implements IPawn, ITickable, IDestructible, IWorl
 
   /** 기본 리소스 해제 */
   public dispose(): void {
-    // TickManager에서 등록 해제
-    TickManager.getInstance().unregister(this);
-
-    for (const component of this.components) {
-      component.dispose();
+    if (this._tickObserver) {
+      this.scene.onBeforeRenderObservable.remove(this._tickObserver);
+      this._tickObserver = null;
     }
-    this.components = [];
 
+    // Babylon.js mesh dispose 시 behaviors도 함께 해제되지만 명시적 호출
     if (this.mesh) {
       this.mesh.dispose();
-      (this as any).mesh = null;
+      (this as unknown as { mesh: Nullable<Mesh> }).mesh = null;
     }
   }
 }

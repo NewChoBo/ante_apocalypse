@@ -1,11 +1,19 @@
+import { Scene } from '@babylonjs/core';
+import { BaseComponent } from './BaseComponent';
 import { ammoStore, scoreStore } from '../store/GameStore';
 import { IWeapon, IFirearm } from '../../types/IWeapon';
+import type { IPawn } from '../../types/IPawn';
 
 /**
  * 게임 상태(탄약, 점수 등)를 HUD UI(NanoStores)와 동기화하는 전용 컴포넌트.
  */
-export class HUDSyncComponent {
+export class HUDSyncComponent extends BaseComponent {
+  public name = 'HUDSync';
   private currentScore = 0;
+
+  constructor(owner: IPawn, scene: Scene) {
+    super(owner, scene);
+  }
 
   /** 탄약 정보 업데이트 */
   public syncAmmo(weapon: IWeapon): void {
@@ -39,4 +47,6 @@ export class HUDSyncComponent {
     this.currentScore = score;
     scoreStore.set(this.currentScore);
   }
+
+  public update(_deltaTime: number): void {}
 }

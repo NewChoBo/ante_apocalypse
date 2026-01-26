@@ -44,3 +44,57 @@ export enum NetworkState {
   InRoom = 'InRoom',
   Error = 'Error',
 }
+
+export interface PlayerData {
+  id: string;
+  userId?: string;
+  name?: string;
+  isMaster?: boolean;
+  position?: { x: number; y: number; z: number };
+  rotation?: { x: number; y: number; z: number; w: number };
+  state?: string;
+  weaponId?: string; // Added
+  health?: number; // Added
+  [key: string]: any;
+}
+
+export interface EnemyUpdateData {
+  id: string;
+  position: { x: number; y: number; z: number };
+  rotation?: { x: number; y: number; z: number; w: number };
+  state?: string;
+  isMoving?: boolean; // Added for sync
+}
+
+export interface EnemySpawnData {
+  id: string;
+  type: string;
+  position: { x: number; y: number; z: number };
+  targetId?: string;
+}
+
+export interface EnemyDestroyData {
+  id: string;
+}
+
+export interface TargetSpawnData {
+  id: string;
+  type: string;
+  position: { x: number; y: number; z: number };
+  isMoving: boolean;
+}
+
+export interface TargetDestroyData {
+  id: string;
+  targetId?: string; // Handle potential inconsistent naming
+}
+
+export interface PickupSpawnData {
+  id: string;
+  type: string;
+  position: { x: number; y: number; z: number };
+}
+
+export interface PickupDestroyData {
+  id: string;
+}

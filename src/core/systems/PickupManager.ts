@@ -1,23 +1,23 @@
 import { Scene, Vector3 } from '@babylonjs/core';
 import { PickupActor, PickupType } from '../entities/PickupActor';
 import { PlayerPawn } from '../PlayerPawn';
-import { ITickable } from '../interfaces/ITickable';
+import { IGameSystem } from '../types/IGameSystem';
 import { TickManager } from '../TickManager';
 import { inventoryStore, BagItem } from '../store/GameStore';
 import { GameObservables } from '../events/GameObservables';
-import { NetworkManager } from './NetworkManager';
+import { NetworkMediator } from './NetworkMediator';
 import { EventCode } from '../network/NetworkProtocol';
 
-export class PickupManager implements ITickable {
+export class PickupManager implements IGameSystem {
   private static instance: PickupManager;
   private scene: Scene | null = null;
   private player: PlayerPawn | null = null;
   private pickups: Map<string, PickupActor> = new Map();
   public readonly priority = 30;
-  private networkManager: NetworkManager;
+  private networkMediator: NetworkMediator;
 
   private constructor() {
-    this.networkManager = NetworkManager.getInstance();
+    this.networkMediator = NetworkMediator.getInstance();
   }
 
   public static getInstance(): PickupManager {
@@ -27,33 +27,41 @@ export class PickupManager implements ITickable {
     return PickupManager.instance;
   }
 
-  public initialize(scene: Scene, player: PlayerPawn): void {
+  public initialize(): void {
+    // SessionController에서 주입받아 초기화
+  }
+
+  public setup(scene: Scene, player: PlayerPawn): void {
     this.scene = scene;
     this.player = player;
 
-    this.player = player;
-    this.networkManager = NetworkManager.getInstance();
-
     // Networking
-    this.networkManager.onEvent.add((event) => {
-      if (event.code === EventCode.SPAWN_PICKUP) {
-        this.handleSpawnEvent(event.data);
-      } else if (event.code === EventCode.DESTROY_PICKUP) {
-        this.handleDestroyEvent(event.data);
-      }
+    this.networkMediator.onPickupSpawnRequested.add((data) => {
+      this.handleSpawnEvent(data);
+    });
+
+    this.networkMediator.onPickupDestroyRequested.add((data) => {
+      this.handleDestroyEvent(data);
     });
 
     // 게임 재시작 시 TickManager가 초기화되므로 다시 등록해야 함
-    TickManager.getInstance().register(this);
+    TickManager.getInstance().register({
+      priority: this.priority,
+      tick: (dt) => this.tick(dt),
+    });
   }
 
-  private handleSpawnEvent(data: any): void {
+  private handleSpawnEvent(data: {
+    id: string;
+    position: { x: number; y: number; z: number };
+    type: string;
+  }): void {
     if (this.pickups.has(data.id)) return;
     const pos = new Vector3(data.position.x, data.position.y, data.position.z);
-    this.spawnPickup(pos, data.type, data.id, false); // False = don't broadcast
+    this.spawnPickup(pos, data.type as PickupType, data.id, false); // False = don't broadcast
   }
 
-  private handleDestroyEvent(data: any): void {
+  private handleDestroyEvent(data: { id: string }): void {
     const pickup = this.pickups.get(data.id);
     if (pickup) {
       pickup.collect();
@@ -73,17 +81,17 @@ export class PickupManager implements ITickable {
     const pickupId = id || `pickup_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
     const pickup = new PickupActor(this.scene, position, type);
-    // Attach ID to pickup for Lookup? Or just use Map.
-    // We need to know ID when collecting.
-    (pickup as any).networkId = pickupId;
+    // Attach ID to pickup for Lookup
+    (pickup as { networkId?: string }).networkId = pickupId;
 
     this.pickups.set(pickupId, pickup);
 
-    if (broadcast && (this.networkManager.isMasterClient() || !this.networkManager.getSocketId())) {
-      // Only Master broadcasts spawns ideally, but if we allow local spawn...
-      // Plan: Only Master logic calls this without ID.
-      if (this.networkManager.isMasterClient()) {
-        this.networkManager.sendEvent(EventCode.SPAWN_PICKUP, {
+    if (
+      broadcast &&
+      (this.networkMediator.isMasterClient() || !this.networkMediator.getSocketId())
+    ) {
+      if (this.networkMediator.isMasterClient()) {
+        this.networkMediator.sendEvent(EventCode.SPAWN_PICKUP, {
           id: pickupId,
           type,
           position: { x: position.x, y: position.y, z: position.z },
@@ -94,7 +102,7 @@ export class PickupManager implements ITickable {
 
   public spawnRandomPickup(position: Vector3): void {
     // Only Master decides spawning drops
-    if (!this.networkManager.isMasterClient() && this.networkManager.getSocketId()) return;
+    if (!this.networkMediator.isMasterClient() && this.networkMediator.getSocketId()) return;
 
     // 40% chance to spawn an item
     if (Math.random() > 0.4) return;
@@ -124,7 +132,6 @@ export class PickupManager implements ITickable {
       const collectionRange = 3.0; // 더 넓은 범위
 
       if (distSq < collectionRange * collectionRange) {
-        console.log(`[PickupManager] Inside collection range. distSq: ${distSq.toFixed(2)}`);
         this.handleCollection(pickup, id);
       }
     }); // End forEach
@@ -166,14 +173,15 @@ export class PickupManager implements ITickable {
       });
 
       // Notify others
-      this.networkManager.sendEvent(EventCode.DESTROY_PICKUP, { id });
+      this.networkMediator.sendEvent(EventCode.DESTROY_PICKUP, { id });
 
       pickup.collect();
       this.pickups.delete(id);
 
-      console.log(`[PickupManager] Stored ${pickup.type} in bag`);
-    } catch (e) {
-      console.error(`[PickupManager] Error storing ${pickup.type}:`, e);
+      pickup.collect();
+      this.pickups.delete(id);
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_e) {
       // 에러가 나더라도 일단 박스는 제거 (무한 에러 방지)
       pickup.collect();
       this.pickups.delete(id);
@@ -198,6 +206,10 @@ export class PickupManager implements ITickable {
 
     document.body.appendChild(popup);
     setTimeout(() => popup.remove(), 1500);
+  }
+
+  public dispose(): void {
+    this.clear();
   }
 
   public clear(): void {

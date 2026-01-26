@@ -2,20 +2,29 @@ import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
 import { EnemyPawn } from '../EnemyPawn';
 import { AIController } from '../controllers/AIController';
 import { PlayerPawn } from '../PlayerPawn';
-import { NetworkManager } from './NetworkManager';
+import { IGameSystem } from '../types/IGameSystem';
+import { NetworkMediator } from './NetworkMediator';
 import { EventCode } from '../network/NetworkProtocol';
 import { WorldEntityManager } from './WorldEntityManager';
+
+export interface EnemyState {
+  id: string;
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  health: number;
+  isDead: boolean;
+}
 
 /**
  * 적(Enemy) 실체의 생성 및 AI 업데이트를 담당합니다.
  * 실제 피격 처리는 WorldEntityManager에서 수행됩니다.
  */
-export class EnemyManager {
+export class EnemyManager implements IGameSystem {
   private scene: Scene;
   private shadowGenerator: ShadowGenerator;
   private enemies: Map<string, EnemyPawn> = new Map();
   private controllers: Map<string, AIController> = new Map();
-  private networkManager: NetworkManager;
+  private networkMediator: NetworkMediator;
   private worldManager: WorldEntityManager;
   private lastSyncTime = 0;
   private syncInterval = 100; // 10Hz sync
@@ -23,34 +32,30 @@ export class EnemyManager {
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
-    this.networkManager = NetworkManager.getInstance();
+    this.networkMediator = NetworkMediator.getInstance();
     this.worldManager = WorldEntityManager.getInstance();
     this.setupNetworkListeners();
   }
 
+  public initialize(): void {
+    // 추가 초기화 로직
+    this.networkMediator.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
+  }
+
   private setupNetworkListeners(): void {
-    this.networkManager.onEnemyUpdated.add((data) => {
-      if (!this.networkManager.isMasterClient()) {
-        const enemy = this.enemies.get(data.id);
-        if (enemy) {
-          enemy.updateNetworkState(data.position, data.rotation);
-          if (data.isMoving !== undefined) {
-            enemy.isMoving = data.isMoving;
-          }
-        }
+    this.networkMediator.onEnemyUpdated.add((data) => {
+      if (!this.networkMediator.isMasterClient()) {
+        const { id, position, rotation, state, isMoving } = data;
+        this.updateEnemy(id, position, rotation, state, isMoving);
       }
     });
 
-    // onEnemyHit is now handled by WorldEntityManager
+    this.networkMediator.onEnemySpawnRequested.add((data) => {
+      this.handleSpawnEnemy(data);
+    });
 
-    this.networkManager.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
-
-    this.networkManager.onEvent.add((event) => {
-      if (event.code === EventCode.SPAWN_ENEMY) {
-        this.handleSpawnEnemy(event.data);
-      } else if (event.code === EventCode.DESTROY_ENEMY) {
-        this.handleDestroyEnemy(event.data);
-      }
+    this.networkMediator.onEnemyDestroyRequested.add((data) => {
+      this.handleDestroyEnemy(data);
     });
   }
 
@@ -68,7 +73,7 @@ export class EnemyManager {
   }
 
   public spawnEnemies(spawnPoints: number[][], targetPlayer: PlayerPawn): void {
-    if (this.networkManager.isMasterClient() || !this.networkManager.getSocketId()) {
+    if (this.networkMediator.isMasterClient() || !this.networkMediator.getSocketId()) {
       spawnPoints.forEach((point, index) => {
         const id = `enemy_${index}`;
         const position = Vector3.FromArray(point);
@@ -85,7 +90,7 @@ export class EnemyManager {
     // WorldManager에 등록하여 전역 피격 및 관리가 가능하게 함
     this.worldManager.registerEntity(enemy);
 
-    if (this.networkManager.isMasterClient() || !this.networkManager.getSocketId()) {
+    if (this.networkMediator.isMasterClient() || !this.networkMediator.getSocketId()) {
       if (target) {
         const controller = new AIController(`ai_${id}`, enemy, target);
         this.controllers.set(id, controller);
@@ -101,9 +106,9 @@ export class EnemyManager {
     this.enemies.forEach((enemy, id) => {
       // 사망 혹은 제거 체크
       if (enemy.isDead || enemy.mesh.isDisposed()) {
-        // Master인 경우 파괴 이벤트 전송 (WorldManager에서 처리할 수도 있지만 여기서 보장)
-        if (this.networkManager.isMasterClient()) {
-          this.networkManager.sendEvent(EventCode.DESTROY_ENEMY, { id });
+        // Master인 경우 파괴 이벤트 전송
+        if (this.networkMediator.isMasterClient()) {
+          this.networkMediator.sendEvent(EventCode.DESTROY_ENEMY, { id });
         }
 
         // 제거 처리
@@ -114,12 +119,12 @@ export class EnemyManager {
       }
     });
 
-    if (this.networkManager.isMasterClient()) {
+    if (this.networkMediator.isMasterClient()) {
       const now = performance.now();
       if (now - this.lastSyncTime > this.syncInterval) {
         this.enemies.forEach((enemy, id) => {
           if (!enemy.isDead && !enemy.mesh.isDisposed()) {
-            this.networkManager.sendEvent(
+            this.networkMediator.sendEvent(
               EventCode.ENEMY_MOVE,
               {
                 id,
@@ -140,8 +145,24 @@ export class EnemyManager {
     }
   }
 
-  public getEnemyStates(): any[] {
-    const states: any[] = [];
+  public updateEnemy(
+    id: string,
+    position: { x: number; y: number; z: number },
+    rotation?: { x: number; y: number; z: number; w: number },
+    _state?: string,
+    isMoving?: boolean
+  ): void {
+    const enemy = this.enemies.get(id);
+    if (enemy) {
+      enemy.updateNetworkState(position, rotation || { x: 0, y: 0, z: 0, w: 1 });
+      if (isMoving !== undefined) {
+        enemy.isMoving = isMoving;
+      }
+    }
+  }
+
+  public getEnemyStates(): EnemyState[] {
+    const states: EnemyState[] = [];
     this.enemies.forEach((enemy, id) => {
       states.push({
         id,
@@ -158,7 +179,7 @@ export class EnemyManager {
     return states;
   }
 
-  public applyEnemyStates(states: any[]): void {
+  public applyEnemyStates(states: EnemyState[]): void {
     states.forEach((state) => {
       const enemy = this.enemies.get(state.id);
       if (enemy) {

@@ -1,5 +1,9 @@
-import { Scene, Vector3, ShadowGenerator, UniversalCamera } from '@babylonjs/core';
+import { Scene, Vector3, ShadowGenerator, UniversalCamera, AssetContainer } from '@babylonjs/core';
+import { IGameSystem } from '../types/IGameSystem';
+import { NetworkMediator } from './NetworkMediator';
 import { PlayerPawn } from '../PlayerPawn';
+import { playerHealthStore, inventoryStore } from '../store/GameStore';
+import { GameMode } from '../../types/GameMode';
 import { PlayerController } from '../controllers/PlayerController';
 import { LevelData } from './LevelLoader';
 import { CombatComponent } from '../components/CombatComponent';
@@ -13,17 +17,16 @@ import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
 import { WorldEntityManager } from './WorldEntityManager';
 import { EnemyManager } from './EnemyManager';
-import { EventCode } from '../network/NetworkProtocol';
-import { GameObservables } from '../events/GameObservables';
 import { AssetLoader } from '../AssetLoader';
-import { playerHealthStore, inventoryStore } from '../store/GameStore';
-import { GameMode } from '../../types/GameMode';
 import { LifetimeManager } from './LifetimeManager';
+import { GameObservables } from '../events/GameObservables';
+import { EventCode } from '../network/NetworkProtocol';
 
-export class SessionController {
+export class SessionController implements IGameSystem {
   private scene: Scene;
   private canvas: HTMLCanvasElement;
   private shadowGenerator: ShadowGenerator;
+  private assetContainer: AssetContainer;
 
   private playerPawn: PlayerPawn | null = null;
   private playerController: PlayerController | null = null;
@@ -38,14 +41,21 @@ export class SessionController {
     this.scene = scene;
     this.canvas = canvas;
     this.shadowGenerator = shadowGenerator;
+    this.assetContainer = new AssetContainer(this.scene);
+    NetworkMediator.getInstance();
   }
 
-  public async initialize(
+  public async initialize(): Promise<void> {
+    // 기본 초기화 ( Game.ts 에서 levelData 주입하여 호출되게 변경 예정 )
+  }
+
+  public async setup(
     levelData: LevelData,
     mode: GameMode = 'single',
     playerName: string = 'Anonymous'
   ): Promise<void> {
     this.playerPawn = new PlayerPawn(this.scene);
+    this.assetContainer.meshes.push(this.playerPawn.mesh);
     WorldEntityManager.getInstance().registerEntity(this.playerPawn);
 
     if (levelData.playerSpawn) {
@@ -69,15 +79,20 @@ export class SessionController {
   }
 
   private setupSystems(levelData: LevelData): void {
-    this.targetSpawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
+    this.targetSpawner = new TargetSpawnerComponent(
+      this.playerPawn!,
+      this.scene,
+      this.shadowGenerator
+    );
     this.targetSpawner.spawnInitialTargets();
 
     if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
       this.enemyManager = new EnemyManager(this.scene, this.shadowGenerator);
+      this.enemyManager.initialize();
       this.enemyManager.spawnEnemies(levelData.enemySpawns, this.playerPawn!);
     }
 
-    PickupManager.getInstance().initialize(this.scene, this.playerPawn!);
+    PickupManager.getInstance().setup(this.scene, this.playerPawn!);
 
     const lm = LifetimeManager.getInstance();
     lm.trackObserver(
@@ -109,7 +124,7 @@ export class SessionController {
       })
     );
 
-    combatComp.onWeaponChanged((newWeapon: any) => {
+    combatComp.onWeaponChanged((newWeapon: { name: string }) => {
       this.syncInventoryStore();
       if (this.multiplayerSystem) {
         NetworkManager.getInstance().syncWeapon(newWeapon.name);
@@ -178,6 +193,7 @@ export class SessionController {
       this.shadowGenerator,
       playerName
     );
+    this.multiplayerSystem.initialize();
 
     const lm = LifetimeManager.getInstance();
     // Initial State Sync Logic
@@ -218,14 +234,21 @@ export class SessionController {
           this.multiplayerSystem.applyPlayerStates(data.players);
         }
         if (data.targets && this.targetSpawner) {
-          data.targets.forEach((t: any) => {
-            this.targetSpawner!.spawnTarget(
-              new Vector3(t.position.x, t.position.y, t.position.z),
-              t.isMoving,
-              t.id,
-              t.type
-            );
-          });
+          data.targets.forEach(
+            (t: {
+              position: { x: number; y: number; z: number };
+              isMoving: boolean;
+              id: string;
+              type: string;
+            }) => {
+              this.targetSpawner!.spawnTarget(
+                new Vector3(t.position.x, t.position.y, t.position.z),
+                t.isMoving,
+                t.id,
+                t.type
+              );
+            }
+          );
         }
       })
     );
@@ -271,7 +294,7 @@ export class SessionController {
     this.playerController?.setInputBlocked(blocked);
   }
 
-  public update(deltaTime: number): void {
+  public tick(deltaTime: number): void {
     if (this.multiplayerSystem) {
       this.multiplayerSystem.update();
     }
@@ -283,11 +306,13 @@ export class SessionController {
   public dispose(): void {
     this.healthUnsub?.();
     this.playerController?.dispose();
-    this.playerPawn?.dispose();
     this.hud?.dispose();
     this.inventoryUI?.dispose();
     this.multiplayerSystem?.dispose();
     this.enemyManager?.dispose();
-    // Managers are singletons, cleared in Game.ts for now or we could add clear here
+    this.targetSpawner?.dispose();
+
+    // Clean up all session-specific Babylon.js objects
+    this.assetContainer.dispose();
   }
 }

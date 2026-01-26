@@ -1,15 +1,17 @@
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
-import { NetworkManager, PlayerState } from './NetworkManager';
+import { IGameSystem } from '../types/IGameSystem';
+import { NetworkMediator } from './NetworkMediator';
 import { RemotePlayerPawn } from '../RemotePlayerPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { CombatComponent } from '../components/CombatComponent';
 import { WorldEntityManager } from './WorldEntityManager';
+import { EventCode, PlayerData } from '../network/NetworkProtocol';
 
-export class MultiplayerSystem {
+export class MultiplayerSystem implements IGameSystem {
   private scene: Scene;
   private localPlayer: PlayerPawn;
   private remotePlayers: Map<string, RemotePlayerPawn> = new Map();
-  private networkManager: NetworkManager;
+  private networkMediator: NetworkMediator;
   private shadowGenerator: ShadowGenerator;
   private lastUpdateTime = 0;
   private updateInterval = 50; // 20Hz update rate
@@ -23,18 +25,29 @@ export class MultiplayerSystem {
     this.scene = scene;
     this.localPlayer = localPlayer;
     this.shadowGenerator = shadowGenerator;
-    this.networkManager = NetworkManager.getInstance();
+    this.networkMediator = NetworkMediator.getInstance();
 
     this.setupListeners();
     localStorage.setItem('playerName', playerName);
+  }
 
+  public initialize(): void {
+    const playerName = localStorage.getItem('playerName') || 'Anonymous';
     // Join with initial state
     const combat = this.localPlayer.getComponent(CombatComponent);
     const weaponId = combat?.getCurrentWeapon()?.name || 'Pistol';
 
-    this.networkManager.join({
-      position: this.localPlayer.mesh.position,
-      rotation: this.localPlayer.camera.rotation,
+    this.networkMediator.sendEvent(EventCode.JOIN, {
+      position: {
+        x: this.localPlayer.mesh.position.x,
+        y: this.localPlayer.mesh.position.y,
+        z: this.localPlayer.mesh.position.z,
+      },
+      rotation: {
+        x: this.localPlayer.camera.rotation.x,
+        y: this.localPlayer.camera.rotation.y,
+        z: this.localPlayer.camera.rotation.z,
+      },
       weaponId: weaponId,
       name: playerName,
     });
@@ -43,7 +56,7 @@ export class MultiplayerSystem {
   public applyPlayerStates(states: any[]): void {
     console.log(`[Multiplayer] Applying ${states.length} player states from sync`);
     states.forEach((p) => {
-      if (p.id !== this.networkManager.getSocketId()) {
+      if (p.id !== this.networkMediator.getSocketId()) {
         const remote = this.remotePlayers.get(p.id);
         if (remote) {
           remote.updateNetworkState(p.position, p.rotation);
@@ -56,31 +69,28 @@ export class MultiplayerSystem {
   }
 
   private setupListeners(): void {
-    this.networkManager.onPlayersList.add((players) => {
-      players.forEach((p) => {
-        if (p.id !== this.networkManager.getSocketId()) {
-          this.spawnRemotePlayer(p);
-        }
-      });
-    });
-
-    this.networkManager.onPlayerJoined.add((player) => {
-      if (player.id !== this.networkManager.getSocketId()) {
+    this.networkMediator.onPlayerJoined.add((player) => {
+      if (player.id !== this.networkMediator.getSocketId()) {
         this.spawnRemotePlayer(player);
       }
     });
 
-    this.networkManager.onPlayerUpdated.add((player) => {
-      const remote = this.remotePlayers.get(player.id);
-      if (remote) {
-        remote.updateNetworkState(player.position, player.rotation);
-        if (player.weaponId) {
-          remote.updateWeapon(player.weaponId);
+    this.networkMediator.onPlayerUpdated.add((data) => {
+      if (data.id !== this.networkMediator.getSocketId()) {
+        const remote = this.remotePlayers.get(data.id);
+        if (remote) {
+          // Apply default values if position or rotation are missing
+          const position = data.position || { x: 0, y: 0, z: 0 };
+          const rotation = data.rotation || { x: 0, y: 0, z: 0, w: 1 };
+          remote.updateNetworkState(position, rotation);
+          if (data.weaponId) {
+            remote.updateWeapon(data.weaponId);
+          }
         }
       }
     });
 
-    this.networkManager.onPlayerLeft.add((id) => {
+    this.networkMediator.onPlayerLeft.add((id) => {
       const remote = this.remotePlayers.get(id);
       if (remote) {
         WorldEntityManager.getInstance().removeEntity(id);
@@ -89,38 +99,24 @@ export class MultiplayerSystem {
       }
     });
 
-    this.networkManager.onPlayerHit.add((data) => {
-      if (data.playerId === this.networkManager.getSocketId()) {
-        // Local player hit
-        this.localPlayer.takeDamage(data.damage);
-      } else {
-        const remote = this.remotePlayers.get(data.playerId);
-        if (remote) {
-          remote.takeDamage(data.damage);
-        }
-      }
-    });
-
-    this.networkManager.onPlayerDied.add((data) => {
-      // If it's me, localPlayer.die() is already called by SessionController logic (health <= 0)
-      // If it's remote:
-      const remote = this.remotePlayers.get(data.playerId);
-      if (remote) {
-        remote.die();
-      }
+    // onPlayerHit handles damage sync for both local and remote
+    this.networkMediator.onEnemyUpdated.add((_data) => {
+      // Enemy specific sync can go here if needed
     });
   }
 
-  private spawnRemotePlayer(player: PlayerState): void {
+  private spawnRemotePlayer(player: PlayerData): void {
     if (this.remotePlayers.has(player.id)) return;
 
     const name = player.name || 'Anonymous';
+    const position = player.position || { x: 0, y: 10, z: 0 }; // Default spawn pos
+
     console.log(
-      `[Multiplayer] Spawning remote player: ${player.id} (${name}) at ${player.position.x}, ${player.position.y}, ${player.position.z}`
+      `[Multiplayer] Spawning remote player: ${player.id} (${name}) at ${position.x}, ${position.y}, ${position.z}`
     );
 
     const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, name);
-    remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
+    remote.position = new Vector3(position.x, position.y, position.z);
     this.remotePlayers.set(player.id, remote);
     WorldEntityManager.getInstance().registerEntity(remote);
   }
@@ -131,21 +127,29 @@ export class MultiplayerSystem {
       const combat = this.localPlayer.getComponent(CombatComponent);
       const weaponId = combat?.getCurrentWeapon()?.name || 'Pistol';
 
-      this.networkManager.updateState({
-        position: this.localPlayer.mesh.position,
-        rotation: new Vector3(
-          this.localPlayer.camera.rotation.x,
-          this.localPlayer.mesh.rotation.y, // Use mesh yaw for synchronization
-          0
-        ),
-        weaponId: weaponId,
-      });
+      this.networkMediator.sendEvent(
+        EventCode.MOVE,
+        {
+          position: {
+            x: this.localPlayer.mesh.position.x,
+            y: this.localPlayer.mesh.position.y,
+            z: this.localPlayer.mesh.position.z,
+          },
+          rotation: {
+            x: this.localPlayer.camera.rotation.x,
+            y: this.localPlayer.mesh.rotation.y, // Use mesh yaw for synchronization
+            z: 0,
+          },
+          weaponId: weaponId,
+        },
+        false
+      );
       this.lastUpdateTime = now;
     }
   }
 
   public dispose(): void {
-    this.networkManager.clearObservers();
+    // Mediator observers are cleared centrally or we could clear specific ones here
     this.remotePlayers.forEach((p) => p.dispose());
     this.remotePlayers.clear();
   }

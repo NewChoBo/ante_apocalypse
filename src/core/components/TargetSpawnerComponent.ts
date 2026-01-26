@@ -1,41 +1,67 @@
-import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
+import { Scene, Vector3, ShadowGenerator, Mesh } from '@babylonjs/core';
+import { BaseComponent } from './BaseComponent';
 import { StaticTarget } from '../../targets/StaticTarget';
 import { MovingTarget } from '../../targets/MovingTarget';
 import { HumanoidTarget } from '../../targets/HumanoidTarget';
-import { NetworkManager } from '../systems/NetworkManager';
+import { NetworkMediator } from '../systems/NetworkMediator';
 import { EventCode } from '../network/NetworkProtocol';
 import { WorldEntityManager } from '../systems/WorldEntityManager';
 import { IWorldEntity } from '../../types/IWorldEntity';
+import type { IPawn } from '../../types/IPawn';
 
 /**
  * 타겟의 스폰 및 리스폰 로직을 담당하는 컴포넌트.
  */
-export class TargetSpawnerComponent {
-  private scene: Scene;
+export class TargetSpawnerComponent extends BaseComponent {
+  public name = 'TargetSpawner';
   private shadowGenerator: ShadowGenerator;
   private targetIdCounter = 0;
   private worldManager: WorldEntityManager;
-  private respawnTimeout: any;
-  private networkManager: NetworkManager;
+  private respawnTimeout: number | any;
+  private networkMediator: NetworkMediator;
 
-  constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
-    this.scene = scene;
+  private spawnObserver: any | null = null;
+  private destroyObserver: any | null = null;
+
+  constructor(owner: IPawn, scene: Scene, shadowGenerator: ShadowGenerator) {
+    super(owner, scene);
     this.shadowGenerator = shadowGenerator;
     this.worldManager = WorldEntityManager.getInstance();
-    this.networkManager = NetworkManager.getInstance();
+    this.networkMediator = NetworkMediator.getInstance();
+  }
 
-    this.networkManager.onTargetSpawn.add((data) => {
-      this.spawnTarget(data.position, data.isMoving, data.id, data.type);
+  public attach(target: Mesh): void {
+    super.attach(target);
+
+    this.spawnObserver = this.networkMediator.onTargetSpawnRequested.add((data) => {
+      const pos = new Vector3(data.position.x, data.position.y, data.position.z);
+      this.spawnTarget(pos, data.isMoving, data.id, data.type);
     });
 
-    this.networkManager.onTargetDestroy.add(() => {
+    this.destroyObserver = this.networkMediator.onTargetDestroyed.add(() => {
       this.scheduleRespawn();
     });
   }
 
+  public detach(): void {
+    if (this.spawnObserver) {
+      this.networkMediator.onTargetSpawnRequested.remove(this.spawnObserver);
+      this.spawnObserver = null;
+    }
+    if (this.destroyObserver) {
+      this.networkMediator.onTargetDestroyed.remove(this.destroyObserver);
+      this.destroyObserver = null;
+    }
+    super.detach();
+  }
+
+  public update(_deltaTime: number): void {
+    // 스폰 로직은 이벤트 및 타이머 기반으로 처리
+  }
+
   /** 초기 타겟 자동 스폰 */
   public spawnInitialTargets(): void {
-    if (!this.networkManager.isMasterClient() && this.networkManager.getSocketId()) return;
+    if (!this.networkMediator.isMasterClient() && this.networkMediator.getSocketId()) return;
 
     const distances = [10, 15, 20];
 
@@ -53,7 +79,7 @@ export class TargetSpawnerComponent {
     if (this.scene.isDisposed) return '';
 
     if (!id) {
-      if (!this.networkManager.isMasterClient() && this.networkManager.getSocketId()) return '';
+      if (!this.networkMediator.isMasterClient() && this.networkMediator.getSocketId()) return '';
       id = `target_${++this.targetIdCounter}_${Math.random().toString(36).substr(2, 4)}`;
 
       if (!type) {
@@ -62,7 +88,7 @@ export class TargetSpawnerComponent {
         else type = isMoving ? 'moving_target' : 'static_target';
       }
 
-      this.networkManager.sendEvent(EventCode.SPAWN_TARGET, {
+      this.networkMediator.sendEvent(EventCode.SPAWN_TARGET, {
         type,
         position: { x: position.x, y: position.y, z: position.z },
         id,
@@ -94,7 +120,7 @@ export class TargetSpawnerComponent {
 
   /** 일정 시간 후 리스폰 예약 */
   public scheduleRespawn(delayMs: number = 1500): void {
-    if (!this.networkManager.isMasterClient() && this.networkManager.getSocketId()) return;
+    if (!this.networkMediator.isMasterClient() && this.networkMediator.getSocketId()) return;
 
     this.respawnTimeout = setTimeout(() => {
       if (this.scene.isDisposed) return;

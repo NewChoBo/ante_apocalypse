@@ -1,4 +1,4 @@
-import { Scene, Vector3, ParticleSystem, Texture, Color4 } from '@babylonjs/core';
+import { Scene, Vector3, ParticleSystem, Texture, Color4, Mesh, Observer } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { GameObservables } from '../events/GameObservables';
 import type { IPawn } from '../../types/IPawn';
@@ -9,18 +9,31 @@ import flareUrl from '../../assets/textures/Flare.png?url';
  * 타겟 피격 시 파티클 시스템을 생성합니다.
  */
 export class ImpactEffectComponent extends BaseComponent {
+  public name = 'ImpactEffect';
   private particleSystem: ParticleSystem;
+  private hitObserver: Observer<any> | null = null;
 
   constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
 
     // 파티클 시스템 미리 생성 (풀링 방식이 이상적이나 간소화)
     this.particleSystem = this.createParticleSystem();
+  }
 
+  public attach(target: Mesh): void {
+    super.attach(target);
     // 모든 표면 타격 이벤트 구독 (타겟 포함)
-    GameObservables.hitEffect.add((info) => {
+    this.hitObserver = GameObservables.hitEffect.add((info) => {
       this.playHitEffect(info.position);
     });
+  }
+
+  public detach(): void {
+    if (this.hitObserver) {
+      GameObservables.hitEffect.remove(this.hitObserver);
+      this.hitObserver = null;
+    }
+    super.detach();
   }
 
   public update(_deltaTime: number): void {
