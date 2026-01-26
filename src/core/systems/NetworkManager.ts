@@ -46,12 +46,21 @@ export class NetworkManager {
   public onPlayerDied = new Observable<DeathEventData>();
 
   // Enemy Synchronization
-  public onEnemyUpdated = new Observable<{ id: string; position: any; rotation: any }>();
+  public onEnemyUpdated = new Observable<{
+    id: string;
+    position: any;
+    rotation: any;
+    isMoving?: boolean;
+  }>();
   public onEnemyHit = new Observable<{ id: string; damage: number }>();
 
   // State Synchronization
   public onInitialStateRequested = new Observable<{ senderId: string }>();
-  public onInitialStateReceived = new Observable<{ players: any[]; enemies: any[] }>();
+  public onInitialStateReceived = new Observable<{
+    players: any[];
+    enemies: any[];
+    targets?: any[];
+  }>();
 
   // New Observables for Lobby/State
   public onRoomListUpdated = new Observable<RoomInfo[]>();
@@ -107,16 +116,16 @@ export class NetworkManager {
       this.onRoomListUpdated.notifyObservers(rooms);
     };
 
-    this.provider.onPlayerJoined = (id, name) => {
+    this.provider.onPlayerJoined = (user) => {
       const newState: PlayerState = {
-        id,
-        name,
+        id: user.userId,
+        name: user.name || 'Anonymous',
         position: { x: 0, y: 0, z: 0 },
         rotation: { x: 0, y: 0, z: 0 },
         weaponId: 'Pistol',
         health: 100,
       };
-      this.playerStates.set(id, newState);
+      this.playerStates.set(user.userId, newState);
       this.onPlayerJoined.notifyObservers(newState);
     };
 
@@ -164,8 +173,10 @@ export class NetworkManager {
             id: data.id,
             position: data.position,
             rotation: data.rotation,
+            isMoving: data.isMoving,
           });
           break;
+        case EventCode.ENEMY_HIT:
           this.onEnemyHit.notifyObservers({
             id: data.id,
             damage: data.damage,
@@ -176,6 +187,12 @@ export class NetworkManager {
             targetId: data.targetId,
             part: data.part,
             damage: data.damage,
+          });
+          break;
+        case EventCode.PLAYER_DEATH:
+          this.onPlayerDied.notifyObservers({
+            playerId: data.playerId,
+            attackerId: data.attackerId,
           });
           break;
         case EventCode.TARGET_DESTROY:
@@ -208,6 +225,7 @@ export class NetworkManager {
           this.onInitialStateReceived.notifyObservers({
             players: data.players,
             enemies: data.enemies,
+            targets: data.targets,
           });
           break;
       }
@@ -229,7 +247,11 @@ export class NetworkManager {
   }
 
   public async createRoom(name: string, options?: { mapId: string }): Promise<boolean> {
-    return this.provider.createRoom(name, options);
+    return this.provider.createRoom({
+      roomName: name,
+      mapId: options?.mapId || 'training_ground',
+      maxPlayers: 4,
+    });
   }
 
   public async joinRoom(name: string): Promise<boolean> {
@@ -237,7 +259,7 @@ export class NetworkManager {
   }
 
   public leaveRoom(): void {
-    this.provider.leaveRoom();
+    this.provider.disconnect();
   }
 
   public isMasterClient(): boolean {
@@ -269,7 +291,6 @@ export class NetworkManager {
         health: 100,
       };
       this.playerStates.set(myId, myState);
-      // We don't notify onPlayerJoined for self here, as UI handles local join flow
     }
     this.updateState(data);
   }
@@ -316,7 +337,11 @@ export class NetworkManager {
   }
 
   public getSocketId(): string | undefined {
-    return (this.provider as any).client?.myActor()?.actorNr?.toString();
+    return this.provider.getLocalPlayerId() || undefined;
+  }
+
+  public getServerTime(): number {
+    return this.provider.getServerTime();
   }
 
   public refreshRoomList(): void {

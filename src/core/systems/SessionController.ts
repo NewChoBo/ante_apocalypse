@@ -11,6 +11,7 @@ import { NetworkManager } from './NetworkManager';
 import { MultiplayerSystem } from './MultiplayerSystem';
 import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
+import { WorldEntityManager } from './WorldEntityManager';
 import { EnemyManager } from './EnemyManager';
 import { EventCode } from '../network/NetworkProtocol';
 import { GameObservables } from '../events/GameObservables';
@@ -29,6 +30,7 @@ export class SessionController {
   private hud: HUD | null = null;
   private inventoryUI: InventoryUI | null = null;
   private enemyManager: EnemyManager | null = null;
+  private targetSpawner: TargetSpawnerComponent | null = null;
   private healthUnsub: (() => void) | null = null;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, shadowGenerator: ShadowGenerator) {
@@ -43,6 +45,7 @@ export class SessionController {
     playerName: string = 'Anonymous'
   ): Promise<void> {
     this.playerPawn = new PlayerPawn(this.scene);
+    WorldEntityManager.getInstance().registerEntity(this.playerPawn);
 
     if (levelData.playerSpawn) {
       this.playerPawn.position = Vector3.FromArray(levelData.playerSpawn);
@@ -66,8 +69,8 @@ export class SessionController {
   }
 
   private setupSystems(levelData: LevelData): void {
-    const spawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
-    spawner.spawnInitialTargets();
+    this.targetSpawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
+    this.targetSpawner.spawnInitialTargets();
 
     if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
       this.enemyManager = new EnemyManager(this.scene, this.shadowGenerator);
@@ -89,6 +92,13 @@ export class SessionController {
     this.healthUnsub = playerHealthStore.subscribe((health) => {
       if (health <= 0) {
         GameObservables.playerDied.notifyObservers(null);
+        if (this.multiplayerSystem) {
+          const nm = NetworkManager.getInstance();
+          nm.sendEvent(EventCode.PLAYER_DEATH, {
+            playerId: nm.getSocketId(),
+            attackerId: 'unknown',
+          });
+        }
       }
     });
 
@@ -170,9 +180,20 @@ export class SessionController {
         // Extract player states from NetworkManager
         const playerStates = network.getAllPlayerStates();
 
+        // Get non-pawn entities (targets) from WorldEntityManager
+        const targetStates = WorldEntityManager.getInstance()
+          .getEntitiesByType('static_target', 'moving_target', 'humanoid_target')
+          .map((t) => ({
+            id: t.id,
+            type: t.type,
+            position: { x: t.position.x, y: t.position.y, z: t.position.z },
+            isMoving: (t as any).isMoving || false,
+          }));
+
         network.sendEvent(EventCode.INITIAL_STATE, {
           players: playerStates,
           enemies: enemyStates,
+          targets: targetStates,
         });
       }
     });
@@ -184,6 +205,16 @@ export class SessionController {
       }
       if (this.multiplayerSystem) {
         this.multiplayerSystem.applyPlayerStates(data.players);
+      }
+      if (data.targets && this.targetSpawner) {
+        data.targets.forEach((t: any) => {
+          this.targetSpawner!.spawnTarget(
+            new Vector3(t.position.x, t.position.y, t.position.z),
+            t.isMoving,
+            t.id,
+            t.type
+          );
+        });
       }
     });
 

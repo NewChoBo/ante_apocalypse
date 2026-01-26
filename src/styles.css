@@ -44,9 +44,6 @@ body {
   height: 100%;
 }
 
-/* HUD REMOVED - Managed by Babylon GUI */
-/* Inventory UI REMOVED - Managed by Babylon GUI */
-
 /* 바빌론 인스펙터 레이어 최상단 고정 */
 #scene-explorer-host,
 #inspector-host {

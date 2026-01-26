@@ -4,7 +4,7 @@ import { GameObservables } from './events/GameObservables';
 import { LevelLoader, LevelData } from './systems/LevelLoader';
 import { TickManager } from './TickManager';
 import { AssetLoader } from './AssetLoader';
-import { TargetRegistry } from './systems/TargetRegistry';
+import { WorldEntityManager } from './systems/WorldEntityManager';
 import { PickupManager } from './systems/PickupManager';
 import { UIManager, UIScreen } from '../ui/UIManager';
 import { SceneManager } from './systems/SceneManager';
@@ -232,7 +232,7 @@ export class Game {
 
     // Reset Managers
     TickManager.getInstance().clear();
-    TargetRegistry.getInstance().clear();
+    WorldEntityManager.getInstance().clear();
     PickupManager.getInstance().clear();
     AssetLoader.getInstance().clear();
 

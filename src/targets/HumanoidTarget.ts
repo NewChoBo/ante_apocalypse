@@ -17,6 +17,8 @@ import { BaseTarget } from './BaseTarget';
 export class HumanoidTarget extends BaseTarget {
   public id: string;
   public mesh: Mesh;
+  public type: string = 'humanoid_target';
+  public isMoving: boolean = false;
   private shadowGenerator: ShadowGenerator;
 
   constructor(scene: Scene, id: string, position: Vector3, shadowGenerator: ShadowGenerator) {
@@ -25,6 +27,10 @@ export class HumanoidTarget extends BaseTarget {
     this.id = id;
     this.shadowGenerator = shadowGenerator;
     this.mesh = this.createHumanoidMesh(position);
+    this.damageProfile = {
+      multipliers: { head: 4.0, body: 1.0 }, // Humanoid target gets higher head multiplier
+      defaultMultiplier: 1.0,
+    };
   }
 
   private createHumanoidMesh(position: Vector3): Mesh {
@@ -54,6 +60,9 @@ export class HumanoidTarget extends BaseTarget {
     // 그림자 추가
     this.shadowGenerator.addShadowCaster(body);
     this.shadowGenerator.addShadowCaster(head);
+
+    body.metadata = { targetId: this.id, part: 'body' };
+    head.metadata = { targetId: this.id, part: 'head' };
 
     return body;
   }
@@ -85,10 +94,15 @@ export class HumanoidTarget extends BaseTarget {
   }
 
   public onDestroy(): void {
+    console.log(`[HumanoidTarget] onDestroy called for ${this.id}`);
     this.playDestroyAnimation();
   }
 
   private playDestroyAnimation(): void {
+    if (!this.mesh || this.mesh.isDisposed()) return;
+
+    this.scene.stopAnimation(this.mesh);
+
     const scaleAnim = new Animation(
       'destroyScale',
       'scaling',
@@ -104,6 +118,7 @@ export class HumanoidTarget extends BaseTarget {
 
     this.mesh.animations = [scaleAnim];
     this.scene.beginAnimation(this.mesh, 0, 20, false, 1, () => {
+      console.log(`[HumanoidTarget] Animation ended, disposing mesh for ${this.id}`);
       this.mesh.dispose();
     });
   }

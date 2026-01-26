@@ -1,14 +1,10 @@
 import { Scene, AbstractMesh, UniversalCamera, Vector3, Mesh } from '@babylonjs/core';
 import { IWeapon } from '../types/IWeapon.ts';
-import { TargetRegistry } from '../core/systems/TargetRegistry';
+import { WorldEntityManager } from '../core/systems/WorldEntityManager';
 import { GameObservables } from '../core/events/GameObservables';
-import { NetworkManager } from '../core/systems/NetworkManager';
-import { RemotePlayerPawn } from '../core/RemotePlayerPawn';
-import { EventCode } from '../core/network/NetworkProtocol';
 
 /**
  * 모든 무기의 최상위 추상 클래스.
- * 총기, 근접 무기 등에 공통적으로 필요한 기본 필드와 메서드만 포함합니다.
  */
 export abstract class BaseWeapon implements IWeapon {
   public abstract name: string;
@@ -143,78 +139,33 @@ export abstract class BaseWeapon implements IWeapon {
 
   /** 공통 히트 처리 로직 (적, 타겟 모두 포함) */
   protected processHit(pickedMesh: Mesh, pickedPoint: Vector3, damageAmount: number): boolean {
-    // 1. Pawn (Enemy or Remote Player) 피격 처리
     const metadata = pickedMesh.metadata;
-    if (metadata && metadata.pawn) {
-      const pawn = metadata.pawn;
-      let finalDamage = damageAmount;
-      let part = 'body';
+    if (!metadata) return false;
 
-      if (metadata.bodyPart === 'head') {
-        finalDamage *= 2; // Headshot Multiplier
-        part = 'head';
-      }
+    // Pawn(Enemy/Player) or Target ID detection
+    const entityId = metadata.pawn?.id || metadata.targetId;
+    if (!entityId) return false;
 
-      if (typeof pawn.takeDamage === 'function') {
-        pawn.takeDamage(finalDamage);
-      }
+    const part = metadata.bodyPart || metadata.part || 'body';
 
-      GameObservables.targetHit.notifyObservers({
-        targetId: pawn.id || 'unknown',
-        part: part,
-        damage: finalDamage,
-        position: pickedPoint,
-      });
+    // 1. Process via WorldEntityManager (Handles Multipliers, Score Dispatching (via observers), and Network Sync)
+    WorldEntityManager.getInstance().processHit(entityId, damageAmount, part, true, pickedPoint);
 
-      // 점수 처리
-      if (this.onScoreCallback) {
-        this.onScoreCallback(part === 'head' ? 100 : 50);
-      }
-
-      // 네트워크 동기화
-      const type = metadata.type;
-      if (type === 'remote_player' || pawn instanceof RemotePlayerPawn) {
-        NetworkManager.getInstance().hit({
-          targetId: pawn.id,
-          damage: finalDamage,
-        });
-      } else if (type === 'enemy') {
-        const enemyId = Array.from(pickedMesh.name.matchAll(/enemy_(\d+)/g))[0]?.[0] || pawn.id;
-        NetworkManager.getInstance().sendEvent(
-          EventCode.ENEMY_HIT,
-          { id: enemyId || pawn.id, damage: finalDamage },
-          true
-        );
-      }
-
-      return true;
+    // 2. Score processing (using hardcoded fallback for now, or we could use onEntityHit observer)
+    if (this.onScoreCallback) {
+      const score = part === 'head' ? 100 : 50;
+      this.onScoreCallback(score);
     }
 
-    // 2. 타겟(Target) 피격 처리
-    if (pickedMesh.name.startsWith('target')) {
-      const nameParts = pickedMesh.name.split('_');
-      const targetId = `${nameParts[0]}_${nameParts[1]}`;
-      const part = nameParts[2] || 'body';
+    // 3. GameObservable for VFX/HUD
+    GameObservables.targetHit.notifyObservers({
+      targetId: entityId,
+      part: part,
+      damage: damageAmount,
+      position: pickedPoint,
+    });
 
-      const isHeadshot = part === 'head';
-      const destroyed = TargetRegistry.getInstance().hitTarget(targetId, part, damageAmount);
-
-      if (this.onScoreCallback) {
-        const score = destroyed ? (isHeadshot ? 200 : 100) : isHeadshot ? 30 : 10;
-        this.onScoreCallback(score);
-      }
-
-      GameObservables.targetHit.notifyObservers({
-        targetId,
-        part,
-        damage: damageAmount,
-        position: pickedPoint,
-      });
-
-      return true;
-    }
-
-    return false;
+    return true;
   }
 
   public dispose(): void {

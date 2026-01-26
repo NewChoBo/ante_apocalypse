@@ -17,6 +17,8 @@ import { BaseTarget } from './BaseTarget';
 export class StaticTarget extends BaseTarget {
   public id: string;
   public mesh: Mesh;
+  public type: string = 'static_target';
+  public isMoving: boolean = false;
   private shadowGenerator: ShadowGenerator;
 
   constructor(scene: Scene, id: string, position: Vector3, shadowGenerator: ShadowGenerator) {
@@ -24,6 +26,10 @@ export class StaticTarget extends BaseTarget {
     this.id = id;
     this.shadowGenerator = shadowGenerator;
     this.mesh = this.createMesh(position);
+    this.damageProfile = {
+      multipliers: { head: 3.0, body: 1.0 },
+      defaultMultiplier: 1.0,
+    };
   }
 
   private createMesh(position: Vector3): Mesh {
@@ -38,6 +44,7 @@ export class StaticTarget extends BaseTarget {
     target.material = material;
 
     this.shadowGenerator.addShadowCaster(target);
+    target.metadata = { targetId: this.id };
 
     // 중앙 원 (노란색)
     const center = MeshBuilder.CreateCylinder(
@@ -71,10 +78,16 @@ export class StaticTarget extends BaseTarget {
   }
 
   public onDestroy(): void {
+    console.log(`[StaticTarget] onDestroy called for ${this.id}`);
     this.playDestroyAnimation();
   }
 
   private playDestroyAnimation(): void {
+    if (!this.mesh || this.mesh.isDisposed()) return;
+
+    // 기존 애니메이션 중지
+    this.scene.stopAnimation(this.mesh);
+
     const scaleAnim = new Animation(
       'destroyScale',
       'scaling',
@@ -91,6 +104,7 @@ export class StaticTarget extends BaseTarget {
 
     this.mesh.animations = [scaleAnim];
     this.scene.beginAnimation(this.mesh, 0, 20, false, 1, () => {
+      console.log(`[StaticTarget] Animation ended, disposing mesh for ${this.id}`);
       this.mesh.dispose();
     });
   }

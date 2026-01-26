@@ -3,6 +3,7 @@ import { NetworkManager, PlayerState } from './NetworkManager';
 import { RemotePlayerPawn } from '../RemotePlayerPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { CombatComponent } from '../components/CombatComponent';
+import { WorldEntityManager } from './WorldEntityManager';
 
 export class MultiplayerSystem {
   private scene: Scene;
@@ -37,8 +38,6 @@ export class MultiplayerSystem {
       weaponId: weaponId,
       name: playerName,
     });
-
-    // this.syncExistingPlayers(); // [DEPRECATED] Handled by INITIAL_STATE sync
   }
 
   public applyPlayerStates(states: any[]): void {
@@ -55,22 +54,6 @@ export class MultiplayerSystem {
       }
     });
   }
-
-  // private syncExistingPlayers(): void {
-  //   const actors = this.networkManager.getActors();
-  //   actors.forEach((actor, id) => {
-  //     if (id !== this.networkManager.getSocketId()) {
-  //       this.spawnRemotePlayer({
-  //         id,
-  //         name: actor.name,
-  //         position: { x: 0, y: 0, z: 0 },
-  //         rotation: { x: 0, y: 0, z: 0 },
-  //         weaponId: 'Pistol',
-  //         health: 100,
-  //       });
-  //     }
-  //   });
-  // }
 
   private setupListeners(): void {
     this.networkManager.onPlayersList.add((players) => {
@@ -100,6 +83,7 @@ export class MultiplayerSystem {
     this.networkManager.onPlayerLeft.add((id) => {
       const remote = this.remotePlayers.get(id);
       if (remote) {
+        WorldEntityManager.getInstance().removeEntity(id);
         remote.dispose();
         this.remotePlayers.delete(id);
       }
@@ -116,6 +100,15 @@ export class MultiplayerSystem {
         }
       }
     });
+
+    this.networkManager.onPlayerDied.add((data) => {
+      // If it's me, localPlayer.die() is already called by SessionController logic (health <= 0)
+      // If it's remote:
+      const remote = this.remotePlayers.get(data.playerId);
+      if (remote) {
+        remote.die();
+      }
+    });
   }
 
   private spawnRemotePlayer(player: PlayerState): void {
@@ -129,6 +122,7 @@ export class MultiplayerSystem {
     const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, name);
     remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
     this.remotePlayers.set(player.id, remote);
+    WorldEntityManager.getInstance().registerEntity(remote);
   }
 
   public update(): void {

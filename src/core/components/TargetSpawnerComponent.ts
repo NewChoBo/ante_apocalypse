@@ -1,11 +1,11 @@
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
-import { ITarget } from '../../types/ITarget';
 import { StaticTarget } from '../../targets/StaticTarget';
 import { MovingTarget } from '../../targets/MovingTarget';
 import { HumanoidTarget } from '../../targets/HumanoidTarget';
-import { TargetRegistry } from '../systems/TargetRegistry';
 import { NetworkManager } from '../systems/NetworkManager';
 import { EventCode } from '../network/NetworkProtocol';
+import { WorldEntityManager } from '../systems/WorldEntityManager';
+import { IWorldEntity } from '../../types/IWorldEntity';
 
 /**
  * 타겟의 스폰 및 리스폰 로직을 담당하는 컴포넌트.
@@ -14,18 +14,22 @@ export class TargetSpawnerComponent {
   private scene: Scene;
   private shadowGenerator: ShadowGenerator;
   private targetIdCounter = 0;
-  private registry: TargetRegistry;
+  private worldManager: WorldEntityManager;
   private respawnTimeout: any;
   private networkManager: NetworkManager;
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
-    this.registry = TargetRegistry.getInstance();
+    this.worldManager = WorldEntityManager.getInstance();
     this.networkManager = NetworkManager.getInstance();
 
     this.networkManager.onTargetSpawn.add((data) => {
       this.spawnTarget(data.position, data.isMoving, data.id, data.type);
+    });
+
+    this.networkManager.onTargetDestroy.add(() => {
+      this.scheduleRespawn();
     });
   }
 
@@ -46,24 +50,18 @@ export class TargetSpawnerComponent {
 
   /** 개별 타겟 스폰 */
   public spawnTarget(position: Vector3, isMoving: boolean, id?: string, type?: string): string {
-    // 씬이 제거되었으면 스폰 중단
     if (this.scene.isDisposed) return '';
 
-    // If ID is missing, we are originating this spawn request (Logic driven)
     if (!id) {
-      // Only Master can originate logic spawns
       if (!this.networkManager.isMasterClient() && this.networkManager.getSocketId()) return '';
-
       id = `target_${++this.targetIdCounter}_${Math.random().toString(36).substr(2, 4)}`;
 
-      // Determine type
       if (!type) {
         const randomType = Math.random();
-        if (randomType > 0.6) type = 'humanoid';
-        else type = isMoving ? 'moving' : 'static';
+        if (randomType > 0.6) type = 'humanoid_target';
+        else type = isMoving ? 'moving_target' : 'static_target';
       }
 
-      // Broadcast
       this.networkManager.sendEvent(EventCode.SPAWN_TARGET, {
         type,
         position: { x: position.x, y: position.y, z: position.z },
@@ -72,26 +70,25 @@ export class TargetSpawnerComponent {
       });
     }
 
-    // fallback type if logic didn't set it (should not happen for valid calls)
-    if (!type) type = isMoving ? 'moving' : 'static';
+    if (!type) type = isMoving ? 'moving_target' : 'static_target';
 
-    let target: ITarget;
+    let target: IWorldEntity;
 
-    if (type === 'humanoid') {
+    if (type === 'humanoid_target' || type === 'humanoid') {
       target = new HumanoidTarget(
         this.scene,
         id!,
         position.add(new Vector3(0, 0.5, 0)),
         this.shadowGenerator
       );
-    } else if (type === 'moving' || isMoving) {
+    } else if (type === 'moving_target' || type === 'moving' || isMoving) {
       target = new MovingTarget(this.scene, id!, position, this.shadowGenerator);
     } else {
       target = new StaticTarget(this.scene, id!, position, this.shadowGenerator);
     }
 
-    // 레지스트리에 등록
-    this.registry.register(target);
+    // WorldManager에 등록
+    this.worldManager.registerEntity(target);
     return id!;
   }
 
@@ -100,6 +97,7 @@ export class TargetSpawnerComponent {
     if (!this.networkManager.isMasterClient() && this.networkManager.getSocketId()) return;
 
     this.respawnTimeout = setTimeout(() => {
+      if (this.scene.isDisposed) return;
       const lane = Math.floor(Math.random() * 5);
       const x = (lane - 2) * 7;
       const z = 10 + Math.random() * 12;

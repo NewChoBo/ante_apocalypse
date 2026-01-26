@@ -8,7 +8,6 @@ import {
   Mesh,
 } from '@babylonjs/core';
 import { MeleeWeapon } from './MeleeWeapon';
-import { TargetRegistry } from '../core/systems/TargetRegistry';
 import { GameObservables } from '../core/events/GameObservables';
 
 /**
@@ -102,25 +101,8 @@ export class Bat extends MeleeWeapon {
     });
 
     // 공격 판정 (보정된 다중 레이캐스트 적용)
-    const hitResult = this.checkMeleeHit();
-
-    if (hitResult) {
-      const { targetId, part, pickedPoint } = hitResult;
-      const destroyed = TargetRegistry.getInstance().hitTarget(targetId, part, this.damage);
-
-      // 히트 이벤트 발행 (이펙트 연출용)
-      GameObservables.targetHit.notifyObservers({
-        targetId,
-        part,
-        damage: this.damage,
-        position: pickedPoint,
-      });
-
-      if (this.onScoreCallback) {
-        const score = destroyed ? 200 : 50;
-        this.onScoreCallback(score);
-      }
-    }
+    // MeleeWeapon.checkMeleeHit internaly calls processHit which handles damage/points.
+    this.checkMeleeHit();
 
     // 방망이는 휘두르는 데 시간이 더 걸림 (0.8초)
     setTimeout(() => {

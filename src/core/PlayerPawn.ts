@@ -27,11 +27,17 @@ import { playerHealthStore } from './store/GameStore';
  */
 export class PlayerPawn extends BasePawn {
   public mesh: Mesh;
+  public type = 'player';
   private movementComponent: CharacterMovementComponent;
   private cameraComponent: CameraComponent;
 
   constructor(scene: Scene) {
     super(scene);
+    this.id = 'player_local'; // Local player ID
+    this.damageProfile = {
+      multipliers: { head: 2.0, body: 1.0 },
+      defaultMultiplier: 1.0,
+    };
 
     // 초기 체력 동기화
     playerHealthStore.set(this.health);
@@ -83,7 +89,12 @@ export class PlayerPawn extends BasePawn {
     this.updateComponents(deltaTime);
   }
 
-  public takeDamage(amount: number): void {
+  public takeDamage(
+    amount: number,
+    _attackerId?: string,
+    _part?: string,
+    _hitPoint?: Vector3
+  ): void {
     if (this.isDead || this.health <= 0) return;
 
     this.health = Math.max(0, this.health - amount);
@@ -110,10 +121,9 @@ export class PlayerPawn extends BasePawn {
     }
   }
 
-  private die(): void {
+  public die(): void {
     this.isDead = true;
     console.log('Player Died');
-    // 게임 오버 처리는 나중에 Game 클래스나 전역 상태 관리에서 수행할 수도 있음
-    // 일단 로그만 출력
+    // TODO: Handle Game Over logic (UI, Respawn, etc.)
   }
 }
