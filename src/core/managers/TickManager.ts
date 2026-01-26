@@ -1,4 +1,4 @@
-import { ITickable } from './interfaces/ITickable';
+import { ITickable } from '../interfaces/ITickable';
 
 /**
  * 게임 내 모든 ITickable 객체를 관리하고 매 프레임 업데이트를 수행하는 매니저.

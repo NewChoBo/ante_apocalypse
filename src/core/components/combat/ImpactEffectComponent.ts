@@ -1,7 +1,7 @@
 import { Scene, Vector3, ParticleSystem, Texture, Color4, Mesh, Observer } from '@babylonjs/core';
-import { BaseComponent } from './BaseComponent';
-import { GameObservables } from '../events/GameObservables';
-import type { IPawn } from '../../types/IPawn';
+import { BaseComponent } from '../base/BaseComponent';
+import { GameObservables } from '../../events/GameObservables';
+import type { IPawn } from '../../../types/IPawn';
 import flareUrl from '../../assets/textures/Flare.png?url';
 
 /**

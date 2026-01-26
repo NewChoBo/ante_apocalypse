@@ -7,9 +7,9 @@ import {
   Observer,
   Mesh,
 } from '@babylonjs/core';
-import { BaseComponent } from './BaseComponent';
-import { GameObservables } from '../events/GameObservables';
-import type { IPawn } from '../../types/IPawn';
+import { BaseComponent } from '../base/BaseComponent';
+import { GameObservables } from '../../events/GameObservables';
+import type { IPawn } from '../../../types/IPawn';
 
 /**
  * 모든 무기 이펙트 컴포넌트의 추상 베이스 클래스.

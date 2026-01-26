@@ -12,7 +12,7 @@ import { BaseWeapon } from './BaseWeapon';
 import { GameObservables } from '../core/events/GameObservables';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon';
-import { NetworkManager } from '../core/systems/NetworkManager';
+import { NetworkManager } from '../core/network/NetworkManager';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.

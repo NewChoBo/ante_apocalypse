@@ -1,13 +1,13 @@
 import { Scene, Vector3, ShadowGenerator, Mesh } from '@babylonjs/core';
-import { BaseComponent } from './BaseComponent';
-import { StaticTarget } from '../../targets/StaticTarget';
-import { MovingTarget } from '../../targets/MovingTarget';
-import { HumanoidTarget } from '../../targets/HumanoidTarget';
-import { NetworkMediator } from '../systems/NetworkMediator';
-import { EventCode } from '../network/NetworkProtocol';
-import { WorldEntityManager } from '../systems/WorldEntityManager';
-import { IWorldEntity } from '../../types/IWorldEntity';
-import type { IPawn } from '../../types/IPawn';
+import { BaseComponent } from '../base/BaseComponent';
+import { StaticTarget } from '../../../targets/StaticTarget';
+import { MovingTarget } from '../../../targets/MovingTarget';
+import { HumanoidTarget } from '../../../targets/HumanoidTarget';
+import { NetworkMediator } from '../../network/NetworkMediator';
+import { EventCode } from '../../network/NetworkProtocol';
+import { WorldEntityManager } from '../../entities/WorldEntityManager';
+import { IWorldEntity } from '../../../types/IWorldEntity';
+import type { IPawn } from '../../../types/IPawn';
 
 /**
  * 타겟의 스폰 및 리스폰 로직을 담당하는 컴포넌트.

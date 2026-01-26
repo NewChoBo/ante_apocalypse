@@ -12,9 +12,9 @@ import {
   DynamicTexture,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
-import { NetworkManager } from './systems/NetworkManager';
-import { AssetLoader } from './AssetLoader';
-import { PickupManager } from './systems/PickupManager';
+import { NetworkManager } from '../network/NetworkManager';
+import { AssetLoader } from '../loaders/AssetLoader';
+import { PickupManager } from '../entities/PickupManager';
 
 export class EnemyPawn extends BasePawn {
   public mesh: Mesh;

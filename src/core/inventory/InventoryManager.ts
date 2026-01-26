@@ -1,6 +1,6 @@
 import { inventoryStore, BagItem } from '../store/GameStore';
 import { getItemMetadata } from '../items/ItemDatabase';
-import type { PlayerPawn } from '../PlayerPawn';
+import type { PlayerPawn } from '../pawns/PlayerPawn';
 
 export class InventoryManager {
   /**

@@ -1,9 +1,9 @@
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
-import { EnemyPawn } from '../EnemyPawn';
+import { EnemyPawn } from '../pawns/EnemyPawn';
 import { AIController } from '../controllers/AIController';
-import { PlayerPawn } from '../PlayerPawn';
+import { PlayerPawn } from '../pawns/PlayerPawn';
 import { IGameSystem } from '../types/IGameSystem';
-import { NetworkMediator } from './NetworkMediator';
+import { NetworkMediator } from '../network/NetworkMediator';
 import { EventCode } from '../network/NetworkProtocol';
 import { WorldEntityManager } from './WorldEntityManager';
 

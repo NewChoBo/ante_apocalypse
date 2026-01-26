@@ -1,8 +1,8 @@
 import { Scene, Mesh, Observer } from '@babylonjs/core';
 import { BaseWeaponEffectComponent } from './BaseWeaponEffectComponent';
-import { AssetLoader } from '../AssetLoader';
-import { GameObservables } from '../events/GameObservables';
-import type { IPawn } from '../../types/IPawn';
+import { AssetLoader } from '../../loaders/AssetLoader';
+import { GameObservables } from '../../events/GameObservables';
+import type { IPawn } from '../../../types/IPawn';
 
 /**
  * 근접 무기 전용 시각적 피드백 컴포넌트.

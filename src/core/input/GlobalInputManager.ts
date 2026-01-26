@@ -1,6 +1,6 @@
 import { Scene } from '@babylonjs/core';
-import { PickupManager } from './PickupManager';
-import { PlayerPawn } from '../PlayerPawn';
+import { PickupManager } from '../entities/PickupManager';
+import { PlayerPawn } from '../pawns/PlayerPawn';
 import { PlayerController } from '../controllers/PlayerController';
 import { InventoryUI } from '../../ui/inventory/InventoryUI';
 import { gameStateStore } from '../store/GameStore';

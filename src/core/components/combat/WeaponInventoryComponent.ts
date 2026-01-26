@@ -1,14 +1,14 @@
 import { Scene, Observable, Mesh } from '@babylonjs/core';
-import { BaseComponent } from './BaseComponent';
-import { CameraComponent } from './CameraComponent';
-import { HUDSyncComponent } from './HUDSyncComponent';
-import { IWeapon } from '../../types/IWeapon';
-import { inventoryStore } from '../store/GameStore';
-import { Pistol } from '../../weapons/Pistol';
-import { Rifle } from '../../weapons/Rifle';
-import { Knife } from '../../weapons/Knife';
-import { Bat } from '../../weapons/Bat';
-import type { IPawn } from '../../types/IPawn';
+import { BaseComponent } from '../base/BaseComponent';
+import { CameraComponent } from '../movement/CameraComponent';
+import { HUDSyncComponent } from '../network/HUDSyncComponent';
+import { IWeapon } from '../../../types/IWeapon';
+import { inventoryStore } from '../../store/GameStore';
+import { Pistol } from '../../../weapons/Pistol';
+import { Rifle } from '../../../weapons/Rifle';
+import { Knife } from '../../../weapons/Knife';
+import { Bat } from '../../../weapons/Bat';
+import type { IPawn } from '../../../types/IPawn';
 
 /**
  * 캐릭터가 보유한 무기들을 관리하고 교체 로직을 담당하는 컴포넌트.

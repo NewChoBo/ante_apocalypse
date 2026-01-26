@@ -1,5 +1,5 @@
 import { Scene, ShadowGenerator } from '@babylonjs/core';
-import { LevelLoader, LevelData } from '../core/systems/LevelLoader';
+import { LevelLoader, LevelData } from '../core/loaders/LevelLoader';
 
 export class ShootingRange {
   private levelLoader: LevelLoader;

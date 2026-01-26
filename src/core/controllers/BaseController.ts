@@ -1,6 +1,6 @@
 import { IPawn } from '../../types/IPawn';
 import { ITickable } from '../interfaces/ITickable';
-import { TickManager } from '../TickManager';
+import { TickManager } from '../managers/TickManager';
 
 /**
  * Unreal의 Controller 개념을 도입한 추상 클래스.

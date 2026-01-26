@@ -10,7 +10,7 @@ import {
   AbstractMesh,
 } from '@babylonjs/core';
 import { Firearm } from './Firearm';
-import { AssetLoader } from '../core/AssetLoader';
+import { AssetLoader } from '../core/loaders/AssetLoader';
 
 /**
  * 소총 (Rifle) - 연발 가능

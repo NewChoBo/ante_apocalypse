@@ -1,11 +1,11 @@
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
 import { IGameSystem } from '../types/IGameSystem';
 import { NetworkMediator } from './NetworkMediator';
-import { RemotePlayerPawn } from '../RemotePlayerPawn';
-import { PlayerPawn } from '../PlayerPawn';
-import { CombatComponent } from '../components/CombatComponent';
-import { WorldEntityManager } from './WorldEntityManager';
-import { EventCode, PlayerData } from '../network/NetworkProtocol';
+import { RemotePlayerPawn } from '../pawns/RemotePlayerPawn';
+import { PlayerPawn } from '../pawns/PlayerPawn';
+import { CombatComponent } from '../components/combat/CombatComponent';
+import { WorldEntityManager } from '../entities/WorldEntityManager';
+import { EventCode, PlayerData } from './NetworkProtocol';
 
 export class MultiplayerSystem implements IGameSystem {
   private scene: Scene;

@@ -1,21 +1,21 @@
 import { Engine, Vector3, UniversalCamera } from '@babylonjs/core';
-import { gameStateStore } from './store/GameStore';
-import { GameObservables } from './events/GameObservables';
-import { LevelLoader, LevelData } from './systems/LevelLoader';
-import { TickManager } from './TickManager';
-import { AssetLoader } from './AssetLoader';
-import { WorldEntityManager } from './systems/WorldEntityManager';
-import { PickupManager } from './systems/PickupManager';
-import { UIManager, UIScreen } from '../ui/UIManager';
-import { SceneManager } from './systems/SceneManager';
-import { SessionController } from './systems/SessionController';
-import { GameMode } from '../types/GameMode';
-import { NetworkManager } from './systems/NetworkManager';
-import { NetworkState } from './network/NetworkProtocol';
-import { LifetimeManager } from './systems/LifetimeManager';
+import { gameStateStore } from '../store/GameStore';
+import { GameObservables } from '../events/GameObservables';
+import { LevelLoader, LevelData } from '../loaders/LevelLoader';
+import { TickManager } from '../managers/TickManager';
+import { AssetLoader } from '../loaders/AssetLoader';
+import { WorldEntityManager } from '../entities/WorldEntityManager';
+import { PickupManager } from '../entities/PickupManager';
+import { UIManager, UIScreen } from '../../ui/UIManager';
+import { SceneManager } from './SceneManager';
+import { SessionController } from './SessionController';
+import { GameMode } from '../../types/GameMode';
+import { NetworkManager } from '../network/NetworkManager';
+import { NetworkState } from '../network/NetworkProtocol';
+import { LifetimeManager } from './LifetimeManager';
 
-import trainingGroundData from '../assets/levels/training_ground.json';
-import combatZoneData from '../assets/levels/combat_zone.json';
+import trainingGroundData from '../../assets/levels/training_ground.json';
+import combatZoneData from '../../assets/levels/combat_zone.json';
 
 const LEVELS: Record<string, LevelData> = {
   training_ground: trainingGroundData as LevelData,

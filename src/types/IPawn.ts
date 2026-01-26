@@ -1,5 +1,5 @@
 import { Mesh, Vector3, Scene } from '@babylonjs/core';
-import type { BaseComponent } from '../core/components/BaseComponent';
+import type { BaseComponent } from '../core/components/base/BaseComponent';
 
 /**
  * Unreal의 Pawn 개념을 도입한 인터페이스.

@@ -1,11 +1,11 @@
 import { Scene, Vector3 } from '@babylonjs/core';
 import { PickupActor, PickupType } from '../entities/PickupActor';
-import { PlayerPawn } from '../PlayerPawn';
+import { PlayerPawn } from '../pawns/PlayerPawn';
 import { IGameSystem } from '../types/IGameSystem';
-import { TickManager } from '../TickManager';
+import { TickManager } from '../managers/TickManager';
 import { inventoryStore, BagItem } from '../store/GameStore';
 import { GameObservables } from '../events/GameObservables';
-import { NetworkMediator } from './NetworkMediator';
+import { NetworkMediator } from '../network/NetworkMediator';
 import { EventCode } from '../network/NetworkProtocol';
 
 export class PickupManager implements IGameSystem {

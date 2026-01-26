@@ -1,5 +1,5 @@
 import { Scene, Mesh, Behavior, Observer, Nullable } from '@babylonjs/core';
-import type { IPawn } from '../../types/IPawn';
+import type { IPawn } from '../../../types/IPawn';
 
 /**
  * 모든 컴포넌트의 가상 기본 클래스.

@@ -1,7 +1,7 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { IWorldEntity } from '../../types/IWorldEntity';
 import { IGameSystem } from '../types/IGameSystem';
-import { NetworkMediator } from './NetworkMediator';
+import { NetworkMediator } from '../network/NetworkMediator';
 import { EventCode } from '../network/NetworkProtocol';
 
 /**

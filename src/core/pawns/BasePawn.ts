@@ -1,7 +1,7 @@
 import { Mesh, Vector3, Scene, Observer, Nullable } from '@babylonjs/core';
-import { IPawn } from '../types/IPawn';
-import { BaseComponent } from './components/BaseComponent';
-import { IWorldEntity, DamageProfile } from '../types/IWorldEntity';
+import { IPawn } from '../../types/IPawn';
+import { BaseComponent } from '../components/base/BaseComponent';
+import { IWorldEntity, DamageProfile } from '../../types/IWorldEntity';
 
 /**
  * 모든 Pawn의 공통 기능을 담은 추상 클래스.

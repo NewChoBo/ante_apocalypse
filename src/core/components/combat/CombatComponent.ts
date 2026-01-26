@@ -1,14 +1,14 @@
 import { Scene } from '@babylonjs/core';
-import { BaseComponent } from './BaseComponent';
+import { BaseComponent } from '../base/BaseComponent';
 import { WeaponInventoryComponent } from './WeaponInventoryComponent';
-import { IWeapon } from '../../types/IWeapon';
+import { IWeapon } from '../../../types/IWeapon';
 import { WeaponInputComponent } from './WeaponInputComponent';
-import { HUDSyncComponent } from './HUDSyncComponent';
+import { HUDSyncComponent } from '../network/HUDSyncComponent';
 import { FirearmEffectComponent } from './FirearmEffectComponent';
 import { MeleeEffectComponent } from './MeleeEffectComponent';
 import { ImpactEffectComponent } from './ImpactEffectComponent';
-import { CameraComponent } from './CameraComponent';
-import type { IPawn } from '../../types/IPawn';
+import { CameraComponent } from '../movement/CameraComponent';
+import type { IPawn } from '../../../types/IPawn';
 
 /**
  * 캐릭터의 무기 인벤토리, 입력, UI 동기화를 조율하는 컴포넌트.

@@ -1,7 +1,7 @@
 import { Vector3, Scene, Ray } from '@babylonjs/core';
-import { BaseComponent } from './BaseComponent';
-import { CombatComponent } from './CombatComponent';
-import type { IPawn } from '../../types/IPawn';
+import { BaseComponent } from '../base/BaseComponent';
+import { CombatComponent } from '../combat/CombatComponent';
+import type { IPawn } from '../../../types/IPawn';
 
 export interface MovementInput {
   forward: boolean;

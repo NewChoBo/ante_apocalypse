@@ -1,6 +1,6 @@
 import { Scene, AbstractMesh, UniversalCamera, Vector3, Mesh } from '@babylonjs/core';
-import { IWeapon } from '../types/IWeapon.ts';
-import { WorldEntityManager } from '../core/systems/WorldEntityManager';
+import { IWeapon } from '../types/IWeapon';
+import { WorldEntityManager } from '../core/entities/WorldEntityManager';
 import { GameObservables } from '../core/events/GameObservables';
 
 /**

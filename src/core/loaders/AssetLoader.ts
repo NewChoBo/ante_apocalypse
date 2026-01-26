@@ -8,10 +8,10 @@ import {
   Sound,
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
-import gunshotUrl from '../assets/sounds/gunshot.wav';
-import swipeUrl from '../assets/sounds/swipe.wav';
-import dummy3Url from '../assets/models/dummy3.babylon?url';
-import gunUrl from '../assets/models/Gun.glb?url';
+import gunshotUrl from '../../assets/sounds/gunshot.wav';
+import swipeUrl from '../../assets/sounds/swipe.wav';
+import dummy3Url from '../../assets/models/dummy3.babylon?url';
+import gunUrl from '../../assets/models/Gun.glb?url';
 
 // Audio V2 타입을 위해 가져옵니다.
 import type { AudioEngineV2 } from '@babylonjs/core';

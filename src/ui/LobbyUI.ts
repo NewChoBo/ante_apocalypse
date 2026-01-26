@@ -8,7 +8,7 @@ import {
   Button,
   InputText,
 } from '@babylonjs/gui';
-import { NetworkManager } from '../core/systems/NetworkManager';
+import { NetworkManager } from '../core/network/NetworkManager';
 import { UIManager, UIScreen } from './UIManager';
 import { RoomInfo } from '../core/network/NetworkProtocol';
 

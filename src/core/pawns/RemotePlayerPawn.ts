@@ -13,7 +13,7 @@ import {
   Animation,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
-import { AssetLoader } from './AssetLoader';
+import { AssetLoader } from '../loaders/AssetLoader';
 import { ParticleSystem, Texture } from '@babylonjs/core';
 
 /**

@@ -1,6 +1,6 @@
 import { BaseController } from './BaseController';
-import { EnemyPawn } from '../EnemyPawn';
-import { PlayerPawn } from '../PlayerPawn';
+import { EnemyPawn } from '../pawns/EnemyPawn';
+import { PlayerPawn } from '../pawns/PlayerPawn';
 
 export class AIController extends BaseController {
   private updateRate = 0.1; // 10 times per sec

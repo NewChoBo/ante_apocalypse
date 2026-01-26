@@ -9,7 +9,7 @@ import {
   Animation,
 } from '@babylonjs/core';
 import { BaseTarget } from './BaseTarget';
-import { NetworkManager } from '../core/systems/NetworkManager';
+import { NetworkManager } from '../core/network/NetworkManager';
 
 /**
  * 이동 타겟 구현체.

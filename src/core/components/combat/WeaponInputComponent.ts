@@ -1,8 +1,8 @@
 import { Mesh } from '@babylonjs/core';
-import { BaseComponent } from './BaseComponent';
+import { BaseComponent } from '../base/BaseComponent';
 import { WeaponInventoryComponent } from './WeaponInventoryComponent';
 import { Scene } from '@babylonjs/core';
-import type { IPawn } from '../../types/IPawn';
+import type { IPawn } from '../../../types/IPawn';
 
 /**
  * 사용자 입력을 캡처하여 무기 인벤토리 및 현재 무기 행동으로 변환하는 컴포넌트.

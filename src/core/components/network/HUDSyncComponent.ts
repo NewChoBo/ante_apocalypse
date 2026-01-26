@@ -1,8 +1,8 @@
 import { Scene } from '@babylonjs/core';
-import { BaseComponent } from './BaseComponent';
-import { ammoStore, scoreStore } from '../store/GameStore';
-import { IWeapon, IFirearm } from '../../types/IWeapon';
-import type { IPawn } from '../../types/IPawn';
+import { BaseComponent } from '../base/BaseComponent';
+import { ammoStore, scoreStore } from '../../store/GameStore';
+import { IWeapon, IFirearm } from '../../../types/IWeapon';
+import type { IPawn } from '../../../types/IPawn';
 
 /**
  * 게임 상태(탄약, 점수 등)를 HUD UI(NanoStores)와 동기화하는 전용 컴포넌트.

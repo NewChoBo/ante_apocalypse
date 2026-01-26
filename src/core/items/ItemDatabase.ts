@@ -1,4 +1,4 @@
-import type { PlayerPawn } from '../PlayerPawn';
+import type { PlayerPawn } from '../pawns/PlayerPawn';
 
 export interface ItemMetadata {
   id: string;
