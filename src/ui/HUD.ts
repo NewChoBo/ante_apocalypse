@@ -1,4 +1,10 @@
-import { scoreStore, ammoStore, playerHealthStore, AmmoState } from '../core/store/GameStore';
+import {
+  scoreStore,
+  ammoStore,
+  playerHealthStore,
+  gameTimerStore,
+  AmmoState,
+} from '../core/store/GameStore';
 import { GameObservables } from '../core/events/GameObservables';
 import { MuzzleTransform } from '../types/IWeapon';
 import { Observer } from '@babylonjs/core';
@@ -12,6 +18,7 @@ export class HUD {
   private scoreText!: TextBlock;
   private currentAmmoText!: TextBlock;
   private totalAmmoText!: TextBlock;
+  private timerText!: TextBlock;
   private healthBar!: Rectangle;
   private healthValueText!: TextBlock;
   private damageOverlay!: Rectangle;
@@ -23,6 +30,7 @@ export class HUD {
 
   private curAmmoUnsub: (() => void) | null = null;
   private scoreUnsub: (() => void) | null = null;
+  private timerUnsub: (() => void) | null = null;
   private healthUnsub: (() => void) | null = null;
   private weaponFireObserver: Observer<{
     weaponId: string;
@@ -139,6 +147,19 @@ export class HUD {
     this.crosshair.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.crosshair.isHitTestVisible = false;
     this.ui.addControl(this.crosshair);
+
+    // 6. Timer (Top Center)
+    // 6. Timer (Top Center)
+    this.timerText = new TextBlock('timerValue', '00:00');
+    this.timerText.color = 'white';
+    this.timerText.fontSize = 30;
+    this.timerText.fontWeight = 'bold';
+    this.timerText.height = '50px'; // Explicit height to prevent blocking clicks
+    this.timerText.width = '200px';
+    this.timerText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    this.timerText.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    this.timerText.top = '10px'; // Closer to top
+    this.ui.addControl(this.timerText);
   }
 
   private showDamageFlash(): void {
@@ -207,6 +228,12 @@ export class HUD {
         this.crosshair.height = '8px';
       }, 150);
     });
+
+    // Timer
+    this.timerUnsub = gameTimerStore.subscribe((time) => {
+      this.timerText.text = time;
+      this.timerText.isVisible = time !== '00:00';
+    });
   }
 
   public dispose(): void {
@@ -228,6 +255,10 @@ export class HUD {
     }
     if (this.expandTimeout) {
       clearTimeout(this.expandTimeout);
+    }
+    if (this.timerUnsub) {
+      this.timerUnsub();
+      this.timerUnsub = null;
     }
 
     // Dispose GUI controls

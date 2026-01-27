@@ -4,7 +4,12 @@ export interface INetworkProvider {
   // Methods
   connect(userId: string): Promise<boolean>;
   disconnect(): void;
-  createRoom(options: { roomName?: string; mapId: string; maxPlayers: number }): Promise<boolean>;
+  createRoom(options: {
+    roomName?: string;
+    mapId: string;
+    maxPlayers: number;
+    gameMode: string;
+  }): Promise<boolean>;
   joinRoom(roomId: string): Promise<boolean>;
   getRoomList(): Promise<RoomData[]>;
   sendEvent(code: number, data: EventData, reliable: boolean): void;

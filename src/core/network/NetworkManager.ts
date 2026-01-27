@@ -43,6 +43,7 @@ export interface DeathEventData {
 export class NetworkManager {
   private static instance: NetworkManager;
   private provider: INetworkProvider;
+  private state: NetworkState = NetworkState.Disconnected;
 
   public onPlayersList = new Observable<PlayerState[]>();
   public onPlayerJoined = new Observable<PlayerState>();
@@ -84,6 +85,7 @@ export class NetworkManager {
 
   private setupProviderListeners(): void {
     this.provider.onStateChanged = (state): void => {
+      this.state = state;
       this.onStateChanged.notifyObservers(state);
     };
 
@@ -175,10 +177,14 @@ export class NetworkManager {
     });
   }
 
-  public async createRoom(name: string, options?: { mapId: string }): Promise<boolean> {
+  public async createRoom(
+    name: string,
+    options?: { mapId: string; gameMode: string }
+  ): Promise<boolean> {
     return this.provider.createRoom({
       roomName: name,
       mapId: options?.mapId || 'training_ground',
+      gameMode: options?.gameMode || 'survival',
       maxPlayers: 4,
     });
   }
@@ -191,6 +197,10 @@ export class NetworkManager {
     this.provider.disconnect();
   }
 
+  public getState(): NetworkState {
+    return this.state;
+  }
+
   public isMasterClient(): boolean {
     return this.provider.isMasterClient();
   }
@@ -201,6 +211,10 @@ export class NetworkManager {
 
   public getMapId(): string | null {
     return (this.provider.getCurrentRoomProperty('mapId') as string) || null;
+  }
+
+  public getRoomProperty(key: string): unknown {
+    return this.provider.getCurrentRoomProperty(key);
   }
 
   public getSocketId(): string | undefined {

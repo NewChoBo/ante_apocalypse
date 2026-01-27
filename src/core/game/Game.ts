@@ -111,16 +111,7 @@ export class Game {
       this.uiManager.onLogin.add((name: string): void => {
         this.playerName = name;
         console.log(`Player logging in as: ${this.playerName}`);
-        this.uiManager.showScreen(UIScreen.MAIN_MENU);
-      })
-    );
-
-    lm.trackObserver(
-      this.uiManager.onStartMultiplayer,
-      this.uiManager.onStartMultiplayer.add(() => {
-        // Start connection to Network (Photon)
-        NetworkManager.getInstance().connect(this.playerName);
-        this.uiManager.showScreen(UIScreen.LOBBY);
+        this.enterLobby();
       })
     );
 
@@ -141,9 +132,29 @@ export class Game {
     );
   }
 
+  private enterLobby(): void {
+    const netMgr = NetworkManager.getInstance();
+    console.log(`[Game] Entering Lobby... State: ${netMgr.getState()}`);
+
+    if (netMgr.getState() === NetworkState.InLobby) {
+      this.uiManager.showScreen(UIScreen.LOBBY);
+    } else {
+      if (
+        netMgr.getState() === NetworkState.Disconnected ||
+        netMgr.getState() === NetworkState.Connecting
+      ) {
+        netMgr.connect(this.playerName);
+      }
+      this.uiManager.showScreen(UIScreen.LOBBY);
+    }
+  }
+
   private handleNetworkStateChange(state: NetworkState): void {
+    console.log(`[Game] Network State Changed: ${state}`);
     if (state === NetworkState.InRoom && !this.isRunning) {
-      this.start('survival');
+      const gameMode = NetworkManager.getInstance().getRoomProperty('gameMode') as string;
+      console.log(`[Game] Joining room with GameMode: ${gameMode}`);
+      this.start(gameMode || 'survival');
     }
   }
 

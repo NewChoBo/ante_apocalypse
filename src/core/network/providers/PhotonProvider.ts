@@ -138,6 +138,7 @@ export class PhotonProvider implements INetworkProvider {
     roomName?: string;
     mapId: string;
     maxPlayers: number;
+    gameMode: string;
   }): Promise<boolean> {
     const roomName = options.roomName || `${this.client.myActor().name}'s Room`;
 
@@ -145,10 +146,17 @@ export class PhotonProvider implements INetworkProvider {
       isVisible: true,
       isOpen: true,
       maxPlayers: options.maxPlayers || 4,
-      customGameProperties: { mapId: options.mapId || 'training_ground' },
-      propsListedInLobby: ['mapId'],
+      customGameProperties: {
+        mapId: options.mapId || 'training_ground',
+        gameMode: options.gameMode || 'survival',
+      },
+      propsListedInLobby: ['mapId', 'gameMode'],
     };
 
+    console.log(`[Photon] Attempting to create room: ${roomName}`, roomOptions);
+    if (!this.client.isInLobby()) {
+      console.warn('[Photon] createRoom called while NOT in lobby. State:', this.client.state);
+    }
     return this.client.createRoom(roomName, roomOptions);
   }
 

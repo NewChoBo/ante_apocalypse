@@ -31,6 +31,8 @@ export interface IPhotonClient {
   availableRooms(): IPhotonRoom[];
   raiseEvent(eventCode: number, data: unknown, options: unknown): void;
   setUserId(userId: string): void;
+  isInLobby(): boolean;
+  state: number;
 
   onStateChange?: (state: number) => void;
   onRoomListUpdate?: (rooms: IPhotonRoom[]) => void;

@@ -9,15 +9,24 @@ import {
   InputText,
 } from '@babylonjs/gui';
 import { NetworkManager } from '../core/network/NetworkManager';
-import { UIManager, UIScreen } from './UIManager';
+
 import { RoomData } from '../core/network/NetworkProtocol';
+import { GameModeType } from '../types/GameMode';
 
 export class LobbyUI {
   private container: Container;
   private roomListPanel: StackPanel;
   private networkManager: NetworkManager;
-  private uiManager: UIManager;
-  private roomNameInput: InputText | null = null;
+
+  // Filter Input
+
+  private filterText: string = '';
+
+  // Modal
+  private modalContainer: Container | null = null;
+  private modalRoomNameInput: InputText | null = null;
+  private modalSelectedMode: GameModeType = 'survival';
+  private modalSelectedMap: string = 'training_ground';
 
   // Visual Constants from UIManager (for consistency)
   private readonly PRIMARY_COLOR = '#ffc400';
@@ -25,15 +34,17 @@ export class LobbyUI {
   private readonly FONT_TACTICAL = 'Rajdhani, sans-serif';
   private readonly FONT_MONO = 'Roboto Mono, monospace';
 
-  constructor(uiManager: UIManager) {
-    this.uiManager = uiManager;
+  constructor() {
     this.networkManager = NetworkManager.getInstance();
     this.container = this.createContainer();
+
+    // Find controls
     this.roomListPanel = this.container
       .getDescendants()
       .find((d) => d.name === 'room-list') as StackPanel;
 
     this.setupListeners();
+    this.createRoomCreationModal(); // Create hidden modal
   }
 
   public getContainer(): Container {
@@ -100,65 +111,244 @@ export class LobbyUI {
     bottomControls.top = '-40px';
     content.addControl(bottomControls);
 
-    const createBtn = this.createButton('CREATE_SESSION', '200px');
-    createBtn.onPointerUpObservable.add(() => this.onCreateRoom());
-    bottomControls.addControl(createBtn);
+    // 1. Refresh Button (Left)
+    const refreshBtn = this.createButton('REFRESH_UI', '150px');
+    refreshBtn.width = '150px';
+    refreshBtn.fontSize = 14;
+    refreshBtn.onPointerUpObservable.add(() => {
+      console.log('[Lobby] Refreshing UI...');
+      this.networkManager.refreshRoomList();
+    });
+    bottomControls.addControl(refreshBtn);
 
-    // Room Name Input (Left of Create Button)
+    const spacer1 = new Rectangle();
+    spacer1.width = '20px';
+    spacer1.thickness = 0;
+    bottomControls.addControl(spacer1);
+
+    // 2. Filter Input (Center-Left)
     const input = new InputText();
-    input.width = '200px';
+    input.width = '250px';
     input.height = '40px';
-    input.text = 'OPER_ZONE_' + Math.floor(Math.random() * 1000);
+    input.text = '';
     input.color = 'white';
     input.background = 'rgba(0, 0, 0, 0.5)';
     input.focusedBackground = 'rgba(0, 0, 0, 0.8)';
     input.thickness = 1;
     input.fontFamily = this.FONT_MONO;
-    input.fontSize = 16;
-    input.placeholderText = 'ENTER ROOM NAME';
+    input.fontSize = 14;
+    input.placeholderText = 'SEARCH CHANNEL...';
     input.placeholderColor = 'gray';
     input.onTextChangedObservable.add((input) => {
-      input.text = input.text.toUpperCase().replace(/[^A-Z0-9_]/g, '');
-    });
-    // Add before buttons? No, StackPanel order matters.
-    // Let's allow creating it first or move controls around.
-    // Ideally put it in bottomControls before buttons.
-
-    // Create Refresh Button
-    const refreshBtn = this.createButton('REFRESH_UI', '150px');
-    refreshBtn.paddingLeft = '20px';
-    refreshBtn.onPointerUpObservable.add(() => {
-      console.log('[Lobby] Refreshing UI...');
-      this.networkManager.refreshRoomList();
-      // Also update from cache immediately if available (in case refresh doesn't trigger event)
+      this.filterText = input.text.trim().toUpperCase();
       this.updateRoomList(this.networkManager.getRoomList());
     });
 
-    // Re-ordering for layout: Input -> Create -> Refresh
-    bottomControls.clearControls();
     bottomControls.addControl(input);
 
-    // Add Margin
-    const spacer = new Rectangle();
-    spacer.width = '10px';
-    spacer.thickness = 0;
-    bottomControls.addControl(spacer);
+    const spacer2 = new Rectangle();
+    spacer2.width = '20px';
+    spacer2.thickness = 0;
+    bottomControls.addControl(spacer2);
 
+    // 3. Create Button (Right)
+    const createBtn = this.createButton('CREATE_SESSION', '200px');
+    createBtn.onPointerUpObservable.add(() => this.showCreateModal());
     bottomControls.addControl(createBtn);
-    bottomControls.addControl(refreshBtn);
-
-    this.roomNameInput = input;
-
-    // Return button
-    const backBtn = this.createButton('RETURN_TO_BASE', '200px');
-    backBtn.color = '#ff4d4d';
-    backBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
-    backBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    backBtn.top = '-40px';
-    backBtn.onPointerUpObservable.add(() => this.uiManager.showScreen(UIScreen.MAIN_MENU));
-    content.addControl(backBtn);
 
     return container;
+  }
+
+  private createRoomCreationModal(): void {
+    const modal = new Rectangle('modal-overlay');
+    modal.width = '100%';
+    modal.height = '100%';
+    modal.background = 'rgba(0, 0, 0, 0.8)';
+    modal.thickness = 0;
+    modal.isVisible = false;
+    modal.zIndex = 100; // Lay on top
+    this.container.addControl(modal); // Add to lobby container
+    this.modalContainer = modal;
+
+    const panel = new Rectangle('modal-panel');
+    panel.width = '600px';
+    panel.height = '500px';
+    panel.background = 'rgba(10, 10, 15, 0.95)';
+    panel.thickness = 1;
+    panel.color = this.PRIMARY_COLOR;
+    modal.addControl(panel);
+
+    const stack = new StackPanel();
+    stack.width = '550px';
+    panel.addControl(stack);
+
+    // Title
+    const title = new TextBlock();
+    title.text = 'INITIALIZE OPERATION';
+    title.color = this.PRIMARY_COLOR;
+    title.fontSize = 24;
+    title.fontFamily = this.FONT_TACTICAL;
+    title.fontWeight = '700';
+    title.height = '60px';
+    stack.addControl(title);
+
+    // 1. Room Name
+    const nameLabel = this.createLabel('OPERATION NAME:');
+    stack.addControl(nameLabel);
+
+    const nameInput = new InputText();
+    nameInput.width = '100%';
+    nameInput.height = '40px';
+    nameInput.text = 'OPER_ZONE_' + Math.floor(Math.random() * 1000);
+    nameInput.color = 'white';
+    nameInput.background = 'rgba(255, 255, 255, 0.05)';
+    nameInput.focusedBackground = 'rgba(255, 255, 255, 0.1)';
+    nameInput.thickness = 1;
+    nameInput.color = this.PRIMARY_COLOR;
+    nameInput.fontFamily = this.FONT_MONO;
+    nameInput.onTextChangedObservable.add((i) => {
+      i.text = i.text.toUpperCase().replace(/[^A-Z0-9_]/g, '');
+    });
+    this.modalRoomNameInput = nameInput;
+    stack.addControl(nameInput);
+
+    // 2. Game Mode
+    const modeLabel = this.createLabel('ENGAGEMENT RULES:');
+    modeLabel.paddingTop = '20px';
+    stack.addControl(modeLabel);
+
+    const modePanel = new StackPanel();
+    modePanel.isVertical = false;
+    modePanel.height = '40px';
+    stack.addControl(modePanel);
+
+    const createModeBtn = (id: GameModeType, label: string): Button => {
+      const btn = Button.CreateSimpleButton('modal-mode-' + id, label);
+      btn.width = '150px';
+      btn.height = '35px';
+      btn.color = 'white';
+      btn.background = 'transparent';
+      btn.thickness = 1;
+      btn.fontFamily = this.FONT_MONO;
+      btn.fontSize = 12;
+      btn.paddingRight = '10px';
+
+      btn.onPointerUpObservable.add(() => {
+        this.modalSelectedMode = id;
+        this.updateModalStyles();
+      });
+      return btn;
+    };
+
+    const survivalBtn = createModeBtn('survival', 'SURVIVAL');
+    const timeAttackBtn = createModeBtn('time_attack', 'TIME ATTACK');
+    modePanel.addControl(survivalBtn);
+    modePanel.addControl(timeAttackBtn);
+
+    // 3. Map
+    const mapLabel = this.createLabel('DEPLOYMENT ZONE:');
+    mapLabel.paddingTop = '20px';
+    stack.addControl(mapLabel);
+
+    const mapPanel = new StackPanel();
+    mapPanel.isVertical = false;
+    mapPanel.height = '40px';
+    stack.addControl(mapPanel);
+
+    const createMapBtn = (id: string, label: string): Button => {
+      const btn = Button.CreateSimpleButton('modal-map-' + id, label);
+      btn.width = '150px';
+      btn.height = '35px';
+      btn.color = 'white';
+      btn.background = 'transparent';
+      btn.thickness = 1;
+      btn.fontFamily = this.FONT_MONO;
+      btn.fontSize = 12;
+      btn.paddingRight = '10px';
+
+      btn.onPointerUpObservable.add(() => {
+        this.modalSelectedMap = id;
+        this.updateModalStyles();
+      });
+      return btn;
+    };
+
+    const tgBtn = createMapBtn('training_ground', 'TRAINING_GD');
+    const czBtn = createMapBtn('combat_zone', 'COMBAT_ZONE');
+    mapPanel.addControl(tgBtn);
+    mapPanel.addControl(czBtn);
+
+    // Spacer
+    const spacer = new Rectangle();
+    spacer.height = '40px';
+    spacer.thickness = 0;
+    stack.addControl(spacer);
+
+    // Actions
+    const actionPanel = new StackPanel();
+    actionPanel.isVertical = false;
+    actionPanel.height = '50px';
+    actionPanel.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    stack.addControl(actionPanel);
+
+    const confirmBtn = this.createButton('CONFIRM', '180px');
+    confirmBtn.onPointerUpObservable.add(() => this.onCreateRoomConfirm());
+    actionPanel.addControl(confirmBtn);
+
+    const cancelBtn = this.createButton('CANCEL', '180px');
+    cancelBtn.color = '#ff4d4d'; // Red
+    cancelBtn.paddingLeft = '20px';
+    cancelBtn.onPointerUpObservable.add(() => this.hideCreateModal());
+    actionPanel.addControl(cancelBtn);
+
+    // Store references for style updating (hacky but works for now)
+    this.modalContainer.metadata = { survivalBtn, timeAttackBtn, tgBtn, czBtn };
+  }
+
+  private updateModalStyles(): void {
+    if (!this.modalContainer || !this.modalContainer.metadata) return;
+    const { survivalBtn, timeAttackBtn, tgBtn, czBtn } = this.modalContainer.metadata;
+
+    const updateBtn = (btn: Button, selected: boolean): void => {
+      btn.background = selected ? this.PRIMARY_COLOR : 'transparent';
+      btn.color = selected ? 'black' : 'white';
+    };
+
+    updateBtn(survivalBtn, this.modalSelectedMode === 'survival');
+    updateBtn(timeAttackBtn, this.modalSelectedMode === 'time_attack');
+    updateBtn(tgBtn, this.modalSelectedMap === 'training_ground');
+    updateBtn(czBtn, this.modalSelectedMap === 'combat_zone');
+  }
+
+  private showCreateModal(): void {
+    if (this.modalContainer) {
+      this.modalContainer.isVisible = true;
+      this.modalSelectedMode = 'survival'; // Reset defaults or keep last? Resetting seems safer.
+      // this.modalSelectedMap = 'training_ground'; // Keep map
+      this.updateModalStyles();
+    }
+  }
+
+  private hideCreateModal(): void {
+    if (this.modalContainer) {
+      this.modalContainer.isVisible = false;
+    }
+  }
+
+  private onCreateRoomConfirm(): void {
+    let roomName =
+      this.modalRoomNameInput?.text || `OPER_ZONE_${Math.floor(Math.random() * 10000)}`;
+    if (roomName.length === 0) roomName = `OPER_ZONE_${Math.floor(Math.random() * 10000)}`;
+
+    console.log(
+      `[Lobby] Creating Room: ${roomName}, Mode: ${this.modalSelectedMode}, Map: ${this.modalSelectedMap}`
+    );
+    this.networkManager.createRoom(roomName, {
+      mapId: this.modalSelectedMap,
+      gameMode: this.modalSelectedMode,
+    });
+
+    this.hideCreateModal();
   }
 
   private setupListeners(): void {
@@ -174,7 +364,14 @@ export class LobbyUI {
     if (!this.roomListPanel) return;
     this.roomListPanel.clearControls();
 
-    if (rooms.length === 0) {
+    // Filter
+    const filtered = rooms.filter(
+      (r) =>
+        r.name.toUpperCase().includes(this.filterText) ||
+        (r.customProperties?.mapId as string)?.toUpperCase().includes(this.filterText)
+    );
+
+    if (filtered.length === 0) {
       const emptyMsg = new TextBlock();
       emptyMsg.text = 'NO_ACTIVE_SESSIONS_FOUND';
       emptyMsg.color = 'rgba(255, 255, 255, 0.2)';
@@ -185,7 +382,7 @@ export class LobbyUI {
       return;
     }
 
-    rooms.forEach((room) => {
+    filtered.forEach((room) => {
       const row = this.createRoomRow(room);
       this.roomListPanel.addControl(row);
     });
@@ -221,16 +418,26 @@ export class LobbyUI {
     map.color = this.PRIMARY_COLOR;
     map.fontSize = 12;
     map.fontFamily = this.FONT_MONO;
-    map.width = '200px';
+    map.width = '150px';
     stack.addControl(map);
+
+    // Mode Info
+    const modeId = (room.customProperties?.gameMode as string) || 'SURVIVAL';
+    const mode = new TextBlock();
+    mode.text = `${modeId.toUpperCase().replace('_', ' ')}`;
+    mode.color = 'rgba(255, 255, 255, 0.8)';
+    mode.fontSize = 12;
+    mode.fontFamily = this.FONT_MONO;
+    mode.width = '120px';
+    stack.addControl(mode);
 
     // Player Count
     const count = new TextBlock();
-    count.text = `${room.playerCount}/${room.maxPlayers} UNITS`;
+    count.text = `${room.playerCount}/${room.maxPlayers}`;
     count.color = 'rgba(255, 255, 255, 0.6)';
     count.fontSize = 12;
     count.fontFamily = this.FONT_MONO;
-    count.width = '150px';
+    count.width = '80px';
     stack.addControl(count);
 
     // Join Button
@@ -247,14 +454,6 @@ export class LobbyUI {
     stack.addControl(joinBtn);
 
     return rect;
-  }
-
-  private onCreateRoom(): void {
-    const selectedMap = this.uiManager.getSelectedMap();
-    let roomName = this.roomNameInput?.text || `OPER_ZONE_${Math.floor(Math.random() * 10000)}`;
-    if (roomName.length === 0) roomName = `OPER_ZONE_${Math.floor(Math.random() * 10000)}`;
-
-    this.networkManager.createRoom(roomName, { mapId: selectedMap });
   }
 
   private createButton(text: string, width: string): Button {
@@ -278,5 +477,16 @@ export class LobbyUI {
     });
 
     return btn;
+  }
+
+  private createLabel(text: string): TextBlock {
+    const label = new TextBlock();
+    label.text = text;
+    label.color = 'white';
+    label.fontSize = 14;
+    label.fontFamily = this.FONT_MONO;
+    label.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    label.height = '30px';
+    return label;
   }
 }

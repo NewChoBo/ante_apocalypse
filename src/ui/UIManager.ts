@@ -11,11 +11,9 @@ import {
 import { Scene, Observable } from '@babylonjs/core';
 import { LobbyUI } from './LobbyUI';
 
-type TacticalButton = Button & { _updateStyles?: () => void };
-
 export enum UIScreen {
   LOGIN = 'LOGIN',
-  MAIN_MENU = 'MAIN_MENU',
+  // MAIN_MENU removed
   LOBBY = 'LOBBY',
   PAUSE = 'PAUSE',
   NONE = 'NONE',
@@ -38,8 +36,8 @@ export class UIManager {
 
   // Observables for Menu Actions
   public onLogin = new Observable<string>();
-  public onStartMultiplayer = new Observable<void>();
-  public onLogout = new Observable<void>();
+  // onStartMultiplayer removed
+  // onLogout removed
   public onResume = new Observable<void>();
   public onAbort = new Observable<void>();
 
@@ -74,7 +72,7 @@ export class UIManager {
 
   private createScreens(): void {
     this.screens.set(UIScreen.LOGIN, this.createLoginScreen());
-    this.screens.set(UIScreen.MAIN_MENU, this.createMainMenuScreen());
+    // MAIN_MENU removed
     this.screens.set(UIScreen.LOBBY, this.createLobbyScreen());
     this.screens.set(UIScreen.PAUSE, this.createPauseScreen());
 
@@ -165,105 +163,8 @@ export class UIManager {
     return container;
   }
 
-  private createMainMenuScreen(): Container {
-    const container = new Rectangle('main-menu-container');
-    container.width = '100%';
-    container.height = '100%';
-    container.background = this.BG_COLOR;
-    container.thickness = 0;
-    this.ui.addControl(container);
-
-    const content = new Rectangle();
-    content.width = '600px';
-    content.height = '100%';
-    content.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    content.left = '10%';
-    content.thickness = 0;
-    container.addControl(content);
-
-    const stack = new StackPanel();
-    stack.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-    stack.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    content.addControl(stack);
-
-    const logoSmall = new TextBlock();
-    logoSmall.text = 'ANTE APOCALYPSE';
-    logoSmall.color = 'rgba(255, 255, 255, 0.5)';
-    logoSmall.fontSize = 32;
-    logoSmall.fontFamily = this.FONT_TACTICAL;
-    logoSmall.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    logoSmall.height = '100px';
-    logoSmall.paddingBottom = '40px';
-    stack.addControl(logoSmall);
-
-    const multiBtn = this.createMenuButton('JOINT_OP.EXE', 'NETWORK_COORDINATED');
-    multiBtn.onPointerUpObservable.add(() => this.onStartMultiplayer.notifyObservers());
-    stack.addControl(multiBtn);
-
-    const mapLabel = new TextBlock();
-    mapLabel.text = 'SELECT_DEPLOYMENT_ZONE:';
-    mapLabel.color = this.PRIMARY_COLOR;
-    mapLabel.fontSize = 12;
-    mapLabel.fontFamily = this.FONT_MONO;
-    mapLabel.height = '40px';
-    mapLabel.paddingTop = '20px';
-    mapLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    stack.addControl(mapLabel);
-
-    const mapGrid = new StackPanel('map-selector');
-    mapGrid.isVertical = false;
-    mapGrid.height = '60px';
-    mapGrid.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    stack.addControl(mapGrid);
-
-    const mapButtons: TacticalButton[] = [];
-
-    const createMapBtn = (id: string, label: string): Button => {
-      const btn = Button.CreateSimpleButton('map-btn-' + id, label);
-      btn.width = '150px';
-      btn.height = '40px';
-      btn.fontFamily = this.FONT_MONO;
-      btn.fontSize = 12;
-      btn.thickness = 1;
-      btn.paddingRight = '10px';
-
-      const updateStyles = (): void => {
-        const isSelected = this.selectedMap === id;
-        btn.color = isSelected ? 'black' : 'white';
-        btn.background = isSelected ? this.PRIMARY_COLOR : 'rgba(255,255,255,0.05)';
-        btn.alpha = isSelected ? 1 : 0.6;
-      };
-
-      updateStyles();
-
-      btn.onPointerUpObservable.add(() => {
-        this.selectedMap = id;
-        mapButtons.forEach((b) => b._updateStyles?.());
-      });
-
-      (btn as TacticalButton)._updateStyles = updateStyles;
-      mapButtons.push(btn as TacticalButton);
-      return btn;
-    };
-
-    mapGrid.addControl(createMapBtn('training_ground', 'TRAINING_GD'));
-    mapGrid.addControl(createMapBtn('combat_zone', 'COMBAT_ZONE'));
-
-    const spacer = new Rectangle();
-    spacer.height = '40px';
-    spacer.thickness = 0;
-    stack.addControl(spacer);
-
-    const logoutBtn = this.createTacticalButton('TERMINATE_SESSION', '250px', '40px');
-    logoutBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    logoutBtn.onPointerUpObservable.add(() => this.onLogout.notifyObservers());
-    stack.addControl(logoutBtn);
-
-    return container;
-  }
-
   private createLobbyScreen(): Container {
-    this.lobbyUI = new LobbyUI(this);
+    this.lobbyUI = new LobbyUI();
     const container = this.lobbyUI.getContainer();
     this.ui.addControl(container);
     return container;
@@ -327,56 +228,7 @@ export class UIManager {
     return btn;
   }
 
-  private createMenuButton(title: string, sub: string): Button {
-    const btn = Button.CreateSimpleButton('menu-btn-' + title, '');
-    btn.width = '450px';
-    btn.height = '100px';
-    btn.background = 'rgba(255, 255, 255, 0.03)';
-    btn.thickness = 1;
-    btn.color = 'rgba(255, 255, 255, 0.1)';
-    btn.paddingBottom = '15px';
-    btn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-
-    const stack = new StackPanel();
-    stack.isHitTestVisible = false;
-    btn.addControl(stack);
-
-    const titleText = new TextBlock();
-    titleText.text = title;
-    titleText.color = 'white';
-    titleText.fontSize = 24;
-    titleText.fontFamily = this.FONT_TACTICAL;
-    titleText.fontWeight = '700';
-    titleText.height = '40px';
-    titleText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    titleText.paddingLeft = '30px';
-    stack.addControl(titleText);
-
-    const subText = new TextBlock();
-    subText.text = sub;
-    subText.color = 'rgba(255, 255, 255, 0.4)';
-    subText.fontSize = 11;
-    subText.fontFamily = this.FONT_MONO;
-    subText.height = '20px';
-    subText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    subText.paddingLeft = '30px';
-    stack.addControl(subText);
-
-    btn.onPointerEnterObservable.add(() => {
-      btn.background = 'rgba(255, 255, 255, 0.08)';
-      btn.color = this.PRIMARY_COLOR;
-      btn.left = '10px';
-    });
-    btn.onPointerOutObservable.add(() => {
-      btn.background = 'rgba(255, 255, 255, 0.03)';
-      btn.color = 'rgba(255, 255, 255, 0.1)';
-      btn.left = '0px';
-    });
-
-    return btn;
-  }
-
-  public setGameOverUI(isGameOver: boolean): void {
+  public setGameOverUI(isGameOver: boolean, message: string = 'MISSION_FAILED'): void {
     const pauseContainer = this.screens.get(UIScreen.PAUSE);
     if (!pauseContainer) return;
 
@@ -384,7 +236,13 @@ export class UIManager {
       .getDescendants()
       .find((d) => d.name === 'pause-title') as TextBlock;
     if (title) {
-      title.text = isGameOver ? 'MISSION_FAILED' : 'PAUSED';
+      if (isGameOver) {
+        title.text = message;
+        title.color = message === 'MISSION ACCOMPLISHED!' ? '#4caf50' : '#ff4d4d'; // Green or Red
+      } else {
+        title.text = 'PAUSED';
+        title.color = 'white';
+      }
     }
 
     const resumeBtn = pauseContainer

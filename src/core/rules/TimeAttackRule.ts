@@ -2,7 +2,7 @@ import { IGameRule } from './IGameRule';
 import { Game } from '../game/Game';
 import { PlayerPawn } from '../pawns/PlayerPawn';
 import { UIScreen } from '../../ui/UIManager';
-import { gameStateStore, scoreStore } from '../store/GameStore';
+import { gameStateStore, scoreStore, gameTimerStore } from '../store/GameStore';
 
 export class TimeAttackRule implements IGameRule {
   private game: Game;
@@ -31,13 +31,11 @@ export class TimeAttackRule implements IGameRule {
 
     this.currentTime -= deltaTime;
 
-    if (Math.floor(this.currentTime) % 10 === 0) {
-      // Debug log every ~10s or per frame if needed, but let's keep it clean
-      // Actually 10s log might be tricky with float, so just per second:
-    }
-
-    // 임시 디버깅용: 남은 시간 정수 출력 (매 초마다 바뀔 때만 찍어도 좋지만 간단히)
-    // console.log(`Time Left: ${this.currentTime.toFixed(1)}`);
+    // Format time MM:SS
+    const minutes = Math.floor(this.currentTime / 60);
+    const seconds = Math.floor(this.currentTime % 60);
+    const formatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    gameTimerStore.set(formatted);
 
     if (this.currentTime <= 0) {
       this.handleGameOver(false); // Time Over -> Fail
@@ -69,7 +67,7 @@ export class TimeAttackRule implements IGameRule {
       // 메시지 설정 (임시로 콘솔만, UI Manager에 메서드 추가 필요할 수 있음)
       console.log(isWin ? 'MISSION ACCOMPLISHED!' : 'MISSION FAILED!');
 
-      this.game.uiManager.setGameOverUI(true); // GameOver UI 재활용
+      this.game.uiManager.setGameOverUI(true, isWin ? 'MISSION ACCOMPLISHED!' : 'MISSION FAILED');
       this.game.uiManager.showScreen(UIScreen.PAUSE);
       this.game.uiManager.exitPointerLock();
     }
@@ -77,5 +75,6 @@ export class TimeAttackRule implements IGameRule {
 
   public dispose(): void {
     this.gameEnded = true;
+    gameTimerStore.set('00:00');
   }
 }
