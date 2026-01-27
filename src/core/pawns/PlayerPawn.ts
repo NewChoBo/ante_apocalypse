@@ -124,7 +124,20 @@ export class PlayerPawn extends BasePawn {
 
   public die(): void {
     this.isDead = true;
-    // Notify observers with this instance
     GameObservables.playerDied.notifyObservers(this);
+  }
+
+  public respawn(position: Vector3): void {
+    this.isDead = false;
+    this.health = this.maxHealth;
+    playerHealthStore.set(this.health);
+
+    this.mesh.position.copyFrom(position);
+    this.mesh.checkCollisions = true; // Re-enable physics
+
+    // Reset camera if needed
+    // this.camera.position... (handled by parent mesh usually, but cameraComponent follows mesh)
+
+    console.log('[PlayerPawn] Respawned at', position);
   }
 }

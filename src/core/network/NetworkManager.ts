@@ -1,7 +1,9 @@
-import { Observable } from '@babylonjs/core';
+import { SimpleObservable } from '../../shared/utils/SimpleObservable';
 import { INetworkProvider } from './INetworkProvider';
 import { PhotonProvider } from './providers/PhotonProvider';
-import { ServerGameController } from '../server/ServerGameController';
+// ServerController is now decoupled via IServerNetwork.
+import { ServerGameController } from '../../server/core/ServerGameController';
+import { LocalNetworkAdapter } from '../../client/adapters/LocalNetworkAdapter';
 import { GameObservables } from '../events/GameObservables';
 import {
   RoomData,
@@ -22,7 +24,7 @@ import {
   OnHitPayload,
   OnAmmoSyncPayload,
   OnDiedPayload,
-} from './NetworkProtocol';
+} from '../../shared/protocol/NetworkProtocol';
 
 export interface FireEventData {
   playerId: string;
@@ -44,32 +46,34 @@ export class NetworkManager {
   private state: NetworkState = NetworkState.Disconnected;
   private serverController: ServerGameController | null = null;
 
-  public onPlayersList = new Observable<PlayerData[]>();
-  public onPlayerJoined = new Observable<PlayerData>();
-  public onPlayerUpdated = new Observable<PlayerData>();
-  public onPlayerLeft = new Observable<string>();
+  public onPlayersList = new SimpleObservable<PlayerData[]>();
+  public onPlayerJoined = new SimpleObservable<PlayerData>();
+  public onPlayerUpdated = new SimpleObservable<PlayerData>();
+  public onPlayerLeft = new SimpleObservable<string>();
 
   // Game Logic Observables (Driven by ON_ events)
-  public onPlayerFired = new Observable<FireEventData>();
-  public onPlayerDied = new Observable<DeathEventData>();
-  public onPlayerHit = new Observable<OnHitPayload>();
-  public onAmmoSynced = new Observable<OnAmmoSyncPayload>();
+  public onPlayerFired = new SimpleObservable<FireEventData>();
+  public onPlayerDied = new SimpleObservable<DeathEventData>();
+  public onPlayerHit = new SimpleObservable<OnHitPayload>();
+  public onAmmoSynced = new SimpleObservable<OnAmmoSyncPayload>();
 
   // Enemy Synchronization
-  public onEnemyUpdated = new Observable<EnemyUpdateData>();
+  public onEnemyUpdated = new SimpleObservable<EnemyUpdateData>();
 
   // State Synchronization
-  public onInitialStateRequested = new Observable<ReqInitialStatePayload & { senderId: string }>();
-  public onInitialStateReceived = new Observable<InitialStatePayload>();
+  public onInitialStateRequested = new SimpleObservable<
+    ReqInitialStatePayload & { senderId: string }
+  >();
+  public onInitialStateReceived = new SimpleObservable<InitialStatePayload>();
 
   // New Observables for Lobby/State
-  public onRoomListUpdated = new Observable<RoomData[]>();
-  public onStateChanged = new Observable<NetworkState>();
-  public onEvent = new Observable<{ code: number; data: EventData; senderId: string }>();
+  public onRoomListUpdated = new SimpleObservable<RoomData[]>();
+  public onStateChanged = new SimpleObservable<NetworkState>();
+  public onEvent = new SimpleObservable<{ code: number; data: EventData; senderId: string }>();
 
   // Target Observables
-  public onTargetDestroy = new Observable<TargetDestroyData>();
-  public onTargetSpawn = new Observable<TargetSpawnData>();
+  public onTargetDestroy = new SimpleObservable<TargetDestroyData>();
+  public onTargetSpawn = new SimpleObservable<TargetSpawnData>();
 
   private lastRoomList: RoomData[] = [];
 
@@ -219,7 +223,7 @@ export class NetworkManager {
     );
 
     if (isMaster && !this.serverController) {
-      this.serverController = new ServerGameController();
+      this.serverController = new ServerGameController(new LocalNetworkAdapter(this));
     } else if (!isMaster && this.serverController) {
       this.serverController.dispose();
       this.serverController = null;
@@ -306,6 +310,8 @@ export class NetworkManager {
   }
 
   public syncWeapon(weaponId: string): void {
-    this.sendEvent(EventCode.SYNC_WEAPON, new SyncWeaponPayload(weaponId), true);
+    // OLD: this.sendEvent(EventCode.SYNC_WEAPON, new SyncWeaponPayload(weaponId), true);
+    // NEW: Request server to switch
+    this.sendEvent(EventCode.REQ_SWITCH_WEAPON, { weaponId }, true, 'master');
   }
 }

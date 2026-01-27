@@ -1,4 +1,9 @@
-import { RoomData, NetworkState, PlayerDataModel, EventData } from './NetworkProtocol';
+import {
+  RoomData,
+  NetworkState,
+  PlayerDataModel,
+  EventData,
+} from '../../shared/protocol/NetworkProtocol';
 
 export interface INetworkProvider {
   // Methods

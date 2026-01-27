@@ -1,4 +1,4 @@
-import { NetworkManager } from '../network/NetworkManager';
+import { IServerNetwork } from '../interfaces/IServerNetwork';
 import { ServerEnemyController } from './ServerEnemyController';
 import {
   EventCode,
@@ -19,7 +19,10 @@ import {
   OnPosCorrectionPayload,
   ReqUseItemPayload,
   OnStateDeltaPayload,
-} from '../network/NetworkProtocol';
+  OnPlayerRespawnPayload,
+  ReqSwitchWeaponPayload,
+  SyncWeaponPayload,
+} from '../../shared/protocol/NetworkProtocol';
 
 interface ServerPlayerState extends PlayerData {
   type: string;
@@ -39,17 +42,21 @@ interface ServerEntityState {
 }
 
 export class ServerGameController {
-  private network: NetworkManager;
+  private network: IServerNetwork;
   private enemyController: ServerEnemyController;
   private playerStates: Map<string, ServerPlayerState> = new Map();
   // entityStates now only holds static targets or other non-enemy AI entities
   private entityStates: Map<string, ServerEntityState> = new Map();
   private activePickups: Map<string, PickupSpawnData> = new Map();
+  // Drop Tables: 30% chance. Item types: 'ammo', 'health_pack'.
+  private readonly DROP_CHANCE = 0.3;
+  private readonly DROP_ITEMS = ['ammo_rifle', 'ammo_pistol', 'health_pack'];
 
   // Match State
-  private matchState: 'READY' | 'PLAYING' | 'GAME_OVER' = 'READY';
+  private matchState: 'READY' | 'COUNTDOWN' | 'PLAYING' | 'GAME_OVER' = 'READY';
   private remainingSeconds: number = 60; // 1 minute default
   private matchTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly RESPAWN_TIME_MS = 5000; // 5 seconds respawn
 
   // Scoring
   private playerScores: Map<string, number> = new Map();
@@ -81,23 +88,30 @@ export class ServerGameController {
     Knife: { magazineSize: 9999, reserve: 0, fireRate: 300 },
   };
 
-  constructor() {
-    this.network = NetworkManager.getInstance();
-    this.enemyController = new ServerEnemyController();
+  constructor(network: IServerNetwork) {
+    this.network = network;
+    this.enemyController = new ServerEnemyController(network); // Pass network to sub-controller
     this.setupListeners();
     this.startMatchTimer();
     console.log('%c[Server] Logical Server Started 🟢', 'color: lightgreen; font-weight: bold;');
   }
 
+  private lastTickTime: number = Date.now();
+
   private startMatchTimer() {
     if (this.matchTimer) clearInterval(this.matchTimer);
 
+    this.lastTickTime = Date.now();
     this.matchTimer = setInterval(() => {
       this.tick();
-    }, 100); // 10Hz tick rate
+    }, 33); // ~30Hz tick rate
   }
 
   private tick() {
+    const now = Date.now();
+    const dt = (now - this.lastTickTime) / 1000;
+    this.lastTickTime = now;
+
     // 0. Update AI
     if (this.matchState === 'PLAYING') {
       const playerPositions = new Map<string, { x: number; y: number; z: number }>();
@@ -106,7 +120,7 @@ export class ServerGameController {
           playerPositions.set(p.id, p.position);
         }
       });
-      this.enemyController.tick(0.1, playerPositions);
+      this.enemyController.tick(dt, playerPositions);
     }
 
     // High-frequency tasks
@@ -139,7 +153,11 @@ export class ServerGameController {
     const seconds = Math.floor(this.remainingSeconds % 60);
     const formatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-    const payload = new OnMatchStateSyncPayload(this.matchState, formatted, this.remainingSeconds);
+    const payload = new OnMatchStateSyncPayload(
+      this.matchState as any,
+      formatted,
+      this.remainingSeconds
+    );
     this.network.sendEvent(EventCode.ON_MATCH_STATE_SYNC, payload, true, 'all');
 
     // Also sync scores
@@ -163,12 +181,56 @@ export class ServerGameController {
   }
 
   public startMatch() {
-    this.matchState = 'PLAYING';
-    this.remainingSeconds = 60;
+    this.matchState = 'COUNTDOWN';
+    this.remainingSeconds = 5; // 5 seconds countdown
+
+    // Reset Scores
     this.totalTeamScore = 0;
     this.playerScores.clear();
-    this.startMatchTimer(); // Ensure timer is running
-    console.log('[Server] Match Started!');
+
+    // Reset Players (Respawn all)
+    this.playerStates.forEach((p) => {
+      this.respawnPlayer(p.id, true); // silent respawn
+    });
+
+    this.startMatchTimer();
+    console.log('[Server] Match Countdown Started!');
+
+    // After 5 seconds, switch to PLAYING
+    setTimeout(() => {
+      if (this.matchState === 'COUNTDOWN') {
+        this.matchState = 'PLAYING';
+        this.remainingSeconds = 180; // 3 minutes match
+        console.log('[Server] Match Started (PLAYING)!');
+      }
+    }, 5000);
+  }
+
+  private respawnPlayer(playerId: string, silent: boolean = false) {
+    const state = this.playerStates.get(playerId);
+    if (!state) return;
+
+    state.isDead = false;
+    state.health = this.DEFAULT_HP;
+    state.position = { x: 0, y: 10, z: 0 }; // Default spawn height
+
+    // Full Ammo Refill
+    for (const [wId, config] of Object.entries(this.DEFAULT_WEAPON_DATA)) {
+      state.ammo[wId] = {
+        current: config.magazineSize,
+        reserve: config.reserve,
+        magazineSize: config.magazineSize,
+      };
+    }
+
+    if (!silent) {
+      this.network.sendEvent(
+        EventCode.ON_PLAYER_RESPAWN,
+        new OnPlayerRespawnPayload(playerId, state.position),
+        true,
+        'all'
+      );
+    }
   }
 
   private broadcastDeltaSync() {
@@ -367,6 +429,25 @@ export class ServerGameController {
       case EventCode.REQ_USE_ITEM:
         this.processUseItem(senderId, state, data as ReqUseItemPayload);
         break;
+      case EventCode.REQ_SWITCH_WEAPON:
+        this.processSwitchWeapon(senderId, state, data as ReqSwitchWeaponPayload);
+        break;
+    }
+  }
+
+  private processSwitchWeapon(
+    _senderId: string,
+    state: ServerPlayerState,
+    data: ReqSwitchWeaponPayload
+  ) {
+    const weaponId = data.weaponId;
+    // Validation: Check if player has this weapon in inventory/ammo
+    if (this.DEFAULT_WEAPON_DATA[weaponId]) {
+      state.weaponId = weaponId;
+      const payload = new SyncWeaponPayload(weaponId);
+      // Broadcast to others (Sender already knows, but for consistency we can send to all or others)
+      // Since client predicts, we send to others. Or all if we want confirmation.
+      this.network.sendEvent(EventCode.SYNC_WEAPON, payload, true, 'all');
     }
   }
 
@@ -471,8 +552,8 @@ export class ServerGameController {
     const now = Date.now();
     const playerFires = this.lastFireTimes.get(shooterId) || {};
     const lastFire = playerFires[weaponId] || 0;
-    if (now - lastFire < config.fireRate * 0.9) {
-      // 10% tolerance for jitter
+    if (now - lastFire < config.fireRate * 0.7) {
+      // 30% tolerance for jitter
       console.warn(`[Server] Fire rate violation: ${shooterId} with ${weaponId}`);
       return;
     }
@@ -516,7 +597,15 @@ export class ServerGameController {
   private processHit(attackerId: string, data: ReqHitPayload) {
     // 1. Check if target is a player
     const playerTarget = this.playerStates.get(data.targetId);
-    let target: { health: number; isDead: boolean; id: string; type: string } | undefined;
+    let target:
+      | {
+          health: number;
+          isDead: boolean;
+          id: string;
+          type: string;
+          position?: { x: number; y: number; z: number };
+        }
+      | undefined;
 
     if (playerTarget) {
       target = {
@@ -524,6 +613,7 @@ export class ServerGameController {
         type: playerTarget.type,
         health: playerTarget.health || 0,
         isDead: playerTarget.isDead,
+        position: playerTarget.position,
       };
     } else {
       // Check Entity States (Targets)
@@ -538,7 +628,8 @@ export class ServerGameController {
             id: enemy.id,
             type: 'enemy',
             health: enemy.health,
-            isDead: false, // Enemy controller handles death state removal separately, keeping simple here
+            isDead: false,
+            position: enemy.position,
           };
         }
       }
@@ -593,6 +684,16 @@ export class ServerGameController {
         reason: 'Shot',
       });
 
+      // Respawn Logic for Players
+      if (target.type === 'player' && this.matchState === 'PLAYING') {
+        setTimeout(() => {
+          // Only respawn if match is still playing
+          if (this.matchState === 'PLAYING') {
+            this.respawnPlayer(data.targetId);
+          }
+        }, this.RESPAWN_TIME_MS);
+      }
+
       // Special handling for non-players
       if (target.type !== 'player') {
         if (target.type === 'enemy') {
@@ -600,6 +701,19 @@ export class ServerGameController {
           // For now, simple destroy
           this.network.sendEvent(EventCode.ON_ENEMY_DESTROY, { id: data.targetId });
           this.enemyController.removeEnemy(data.targetId);
+
+          // Drop Table Logic
+          if (Math.random() < this.DROP_CHANCE) {
+            const itemType = this.DROP_ITEMS[Math.floor(Math.random() * this.DROP_ITEMS.length)];
+            const pickupId = `pickup_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+            const spawnPos = { ...target.position! }; // Clone position
+            spawnPos.y += 0.5;
+
+            const pickup = new PickupSpawnData(pickupId, itemType, spawnPos);
+            this.activePickups.set(pickupId, pickup);
+
+            this.network.sendEvent(EventCode.SPAWN_PICKUP, pickup, true, 'all');
+          }
         } else if (target.type && target.type.includes('target')) {
           this.network.sendEvent(EventCode.TARGET_DESTROY, { id: data.targetId });
           // Note: entityStates removal happens in setupListeners when listening to TARGET_DESTROY

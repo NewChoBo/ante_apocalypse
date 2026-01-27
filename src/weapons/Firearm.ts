@@ -15,7 +15,7 @@ import { BaseWeapon } from './BaseWeapon';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm, IWeapon } from '../types/IWeapon';
 import { NetworkManager } from '../core/network/NetworkManager';
-import { ReqHitPayload, ReqFirePayload, EventCode } from '../core/network/NetworkProtocol';
+import { ReqHitPayload, ReqFirePayload, EventCode } from '../shared/protocol/NetworkProtocol';
 import { GameAssets } from '../core/loaders/AssetLoader';
 import { WeaponUtils } from '../utils/WeaponUtils';
 

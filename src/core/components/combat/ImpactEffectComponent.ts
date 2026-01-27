@@ -5,7 +5,7 @@ import { NetworkManager } from '../../network/NetworkManager';
 import { CombatComponent } from './CombatComponent';
 import type { IPawn } from '../../../types/IPawn';
 import { IFirearm } from '../../../types/IWeapon';
-import { OnHitPayload } from '../../network/NetworkProtocol';
+import { OnHitPayload } from '../../../shared/protocol/NetworkProtocol';
 import flareUrl from '@/assets/textures/Flare.png?url';
 
 /**

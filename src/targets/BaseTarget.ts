@@ -1,5 +1,5 @@
 import { Mesh, Vector3, Scene } from '@babylonjs/core';
-import { ITarget } from '../types/ITarget.ts';
+import { ITarget } from '../types/ITarget';
 import { IWorldEntity, DamageProfile } from '../types/IWorldEntity';
 
 /**

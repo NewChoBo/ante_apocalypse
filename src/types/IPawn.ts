@@ -1,59 +1,17 @@
-import { Mesh, Vector3, Scene } from '@babylonjs/core';
-import { BaseComponent, ComponentConstructor } from '../core/components/base/BaseComponent';
-import { ITickable } from '../core/interfaces/ITickable';
+import { AbstractMesh, Vector3, Mesh } from '@babylonjs/core';
+import { IWorldEntity } from './IWorldEntity';
 
-/**
- * Unreal의 Pawn 개념을 도입한 인터페이스.
- * 월드 내에서 존재하고, Controller에 의해 제어될 수 있는 물리적 실체를 정의합니다.
- */
-export interface IPawn extends ITickable {
-  /** Pawn의 타입 (StaticTarget, HumanoidEnemy 등) */
-  type: string;
+export interface IPawn extends IWorldEntity {
+  mesh: AbstractMesh | Mesh;
+  get position(): Vector3;
+  get rotation(): Vector3;
 
-  /** Pawn이 가진 메인 메쉬 */
-  mesh: Mesh;
+  // Component System
+  addComponent(component: any): void;
+  getComponent<T>(componentClass: new (...args: any[]) => T): T | null | undefined;
 
-  /** 현재 위치 */
-  position: Vector3;
+  // Controller
+  controllerId?: string | null;
 
-  /** 체력 */
-  health: number;
-
-  /** 최대 체력 */
-  maxHealth: number;
-
-  /** 활성화 여부 */
-  isActive: boolean;
-
-  /** 소유하고 있는 컨트롤러 ID (없으면 null) */
-  controllerId: string | null;
-
-  /** 고유 ID */
-  id: string;
-
-  /** 사망 상태 */
-  isDead: boolean;
-
-  /** 업데이트 우선순위 */
-  readonly priority: number;
-
-  /** 데미지 처리 */
-  takeDamage(amount: number): void;
-
-  /** Pawn 초기화 */
-  initialize(scene: Scene): void;
-
-  /** 매 프레임 업데이트 */
-  tick(deltaTime: number): void;
-
-  /** 컴포넌트 추가 */
-  addComponent(component: BaseComponent): void;
-
-  getComponent<T extends BaseComponent>(type: ComponentConstructor<T>): T | undefined;
-
-  /** 입력 시스템 설정 (활성화/비활성화) */
-  setupInput(enabled: boolean): void;
-
-  /** 자원 해제 */
   dispose(): void;
 }

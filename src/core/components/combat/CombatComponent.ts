@@ -11,7 +11,7 @@ import { CameraComponent } from '../movement/CameraComponent';
 import type { IPawn } from '../../../types/IPawn';
 import { crosshairKickStore } from '../../store/GameStore';
 import { NetworkManager } from '../../network/NetworkManager';
-import { ReqFirePayload } from '../../network/NetworkProtocol';
+import { ReqFirePayload } from '../../../shared/protocol/NetworkProtocol';
 
 /**
  * 캐릭터의 무기 인벤토리, 입력, UI 동기화를 조율하는 컴포넌트.

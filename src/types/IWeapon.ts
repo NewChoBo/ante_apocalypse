@@ -1,4 +1,5 @@
 import { Vector3, TransformNode, Observable } from '@babylonjs/core';
+import { IWeaponStats } from './IWeaponStats';
 
 /**
  * 총구의 위치와 방향을 제공하는 인터페이스.
@@ -14,57 +15,21 @@ export interface IMuzzleProvider {
 /**
  * 모든 무기(총기, 근접 무기 등)의 핵심 인터페이스.
  */
-export interface IWeapon {
-  /** 무기 이름 */
-  name: string;
-
-  /** 기본 데미지 */
-  damage: number;
-
-  /** 사거리 */
-  range: number;
-
-  /** 발사/공격 시도 */
+export interface IWeapon extends IWeaponStats {
+  // Methods not in Shared Stats
   fire(): boolean;
-
-  /** 공격 시작 (연사 혹은 휘두르기 시작) */
   startFire(): void;
-
-  /** 공격 중지 */
   stopFire(): void;
-
-  /** 매 프레임 업데이트 */
   update(deltaTime: number): void;
-
-  /** 무기 스태츠 가져오기 */
   getStats(): Record<string, unknown>;
-
-  /** 무기 모델 표시 */
   show(): void;
-
-  /** 무기 모델 숨기기 */
   hide(): void;
-
-  /** 무기 내리기 애니메이션 (교체 시) */
   lower(): Promise<void>;
-
-  /** 무기 올리기 애니메이션 (교체 시) */
   raise(): void;
-
-  /** 현재 상태에 따른 이동 속도 배수 반환 */
   getMovementSpeedMultiplier(): number;
-
-  /** 현재 상태에 따른 원하는 FOV 반환 */
   getDesiredFOV(defaultFOV: number): number;
-
-  /** 정조준 상태 설정 */
   setAiming(isAiming: boolean): void;
-
-  /** 탄약 추가 */
   addAmmo(amount: number): void;
-
-  /** 리소스 해제 */
-  /** 리소스 해제 */
   dispose(): void;
 
   // Prediction Events
@@ -84,16 +49,15 @@ export interface MuzzleTransform {
 
 export interface IFirearm extends IWeapon {
   currentAmmo: number;
+  // magazineSize, etc are inherited from IWeaponStats (Generic) but we might want to enforce them as non-optional?
+  // Since IFirearm needs them.
   magazineSize: number;
   reserveAmmo: number;
-
   fireRate: number;
   reloadTime: number;
   firingMode: 'semi' | 'auto';
   recoilForce: number;
 
-  startFire(): void;
-  stopFire(): void;
   reload(): void;
 
   getMuzzleTransform(): MuzzleTransform;

@@ -1,9 +1,9 @@
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
 import { EnemyPawn } from '../pawns/EnemyPawn';
 import { PlayerPawn } from '../pawns/PlayerPawn';
-import { IGameSystem } from '../types/IGameSystem';
+import { IGameSystem } from '../../types/IGameSystem';
 import { NetworkMediator } from '../network/NetworkMediator';
-import { EventCode, EnemySpawnData, EnemyDestroyData } from '../network/NetworkProtocol';
+import { EventCode, EnemySpawnData, EnemyDestroyData } from '../../shared/protocol/NetworkProtocol';
 import { WorldEntityManager } from './WorldEntityManager';
 
 export interface EnemyState {
@@ -67,12 +67,6 @@ export class EnemyManager implements IGameSystem {
       enemy.dispose();
       this.enemies.delete(data.id);
     }
-  }
-
-  public spawnEnemies(_spawnPoints: number[][], _targetPlayer: PlayerPawn): void {
-    // Deprecated: Server handles spawning.
-    // This function kept for compatibility if needed, but logic removed.
-    console.warn('[EnemyManager] spawnEnemies called, but Server is authoritative.');
   }
 
   public createEnemy(id: string, position: Vector3, _target?: PlayerPawn): EnemyPawn {

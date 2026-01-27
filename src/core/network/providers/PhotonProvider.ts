@@ -1,6 +1,11 @@
 import * as Photon from 'photon-realtime';
 import { INetworkProvider } from '../INetworkProvider';
-import { RoomData, NetworkState, PlayerDataModel, EventData } from '../NetworkProtocol';
+import {
+  RoomData,
+  NetworkState,
+  PlayerDataModel,
+  EventData,
+} from '../../../shared/protocol/NetworkProtocol';
 import { IPhotonClient, IPhotonRoom, IPhotonActor, IPhotonNamespace } from './PhotonTypes';
 
 const PhotonTyped = Photon as unknown as IPhotonNamespace;

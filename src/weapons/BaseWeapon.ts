@@ -1,7 +1,7 @@
 import { Scene, AbstractMesh, UniversalCamera, Vector3, Mesh, Observable } from '@babylonjs/core';
 import { IWeapon } from '../types/IWeapon';
 import { NetworkManager } from '../core/network/NetworkManager';
-import { ReqHitPayload } from '../core/network/NetworkProtocol';
+import { ReqHitPayload } from '../shared/protocol/NetworkProtocol';
 
 /**
  * 모든 무기의 최상위 추상 클래스.

@@ -10,7 +10,7 @@ import { UIManager, UIScreen } from '../../ui/UIManager';
 import { SceneManager } from './SceneManager';
 import { SessionController } from './SessionController';
 import { NetworkManager } from '../network/NetworkManager';
-import { NetworkState } from '../network/NetworkProtocol';
+import { NetworkState } from '../../shared/protocol/NetworkProtocol';
 import { LifetimeManager } from './LifetimeManager';
 import { IGameRule } from '../rules/IGameRule';
 import { TimeAttackRule } from '../rules/TimeAttackRule';

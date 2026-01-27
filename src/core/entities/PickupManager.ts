@@ -1,12 +1,12 @@
 import { Scene, Vector3 } from '@babylonjs/core';
 import { PickupActor, PickupType } from '../entities/PickupActor';
 import { PlayerPawn } from '../pawns/PlayerPawn';
-import { IGameSystem } from '../types/IGameSystem';
+import { IGameSystem } from '../../types/IGameSystem';
 import { TickManager } from '../managers/TickManager';
 import { InventoryManager } from '../inventory/InventoryManager';
 import { GameObservables } from '../events/GameObservables';
 import { NetworkMediator } from '../network/NetworkMediator';
-import { EventCode } from '../network/NetworkProtocol';
+import { EventCode } from '../../shared/protocol/NetworkProtocol';
 
 export class PickupManager implements IGameSystem {
   private static instance: PickupManager;
@@ -44,12 +44,12 @@ export class PickupManager implements IGameSystem {
       this.handleDestroyEvent(data);
     });
 
-    // Master: Handle pickup requests
-    this.networkMediator.onPickupTryRequested.add((data) => {
-      if (this.networkMediator.isMasterClient()) {
-        this.processPickupRequest(data.id, data.senderId);
-      }
-    });
+    // Master: Handle pickup requests - DEPRECATED (Moved to ServerGameController)
+    // this.networkMediator.onPickupTryRequested.add((data) => {
+    //   if (this.networkMediator.isMasterClient()) {
+    //     this.processPickupRequest(data.id, data.senderId);
+    //   }
+    // });
 
     // Client: Handle granted pickup
     this.networkMediator.onItemPicked.add((data) => {
@@ -112,17 +112,6 @@ export class PickupManager implements IGameSystem {
     }
   }
 
-  public spawnRandomPickup(position: Vector3): void {
-    // Only Master decides spawning drops
-    if (!this.networkMediator.isMasterClient() && this.networkMediator.getSocketId()) return;
-
-    // 40% chance to spawn an item
-    if (Math.random() > 0.4) return;
-
-    const type: PickupType = Math.random() > 0.5 ? 'health_pack' : 'ammo_box';
-    this.spawnPickup(position, type);
-  }
-
   public tick(deltaTime: number): void {
     const player = this.player;
     if (!player) return;
@@ -160,8 +149,23 @@ export class PickupManager implements IGameSystem {
       return;
     }
 
-    if (this.networkMediator.isMasterClient()) {
-      this.processPickupRequest(id, this.networkMediator.getSocketId()!);
+    if (this.networkMediator.isMasterClient() && !this.networkMediator.getSocketId()) {
+      // Single player / no server case? Or just send request anyway if server is running local.
+      // If we are master AND server is running, we should send Event.
+      // If ServerGameController is active, send Event.
+      // For now, always send Event if socket exists.
+      const pos = pickup.mesh.getAbsolutePosition();
+      this.networkMediator.sendEvent(EventCode.REQ_TRY_PICKUP, {
+        id,
+        position: { x: pos.x, y: pos.y, z: pos.z },
+      });
+    } else if (this.networkMediator.isMasterClient()) {
+      // Master but connected? logic above covers.
+      const pos = pickup.mesh.getAbsolutePosition();
+      this.networkMediator.sendEvent(EventCode.REQ_TRY_PICKUP, {
+        id,
+        position: { x: pos.x, y: pos.y, z: pos.z },
+      });
     } else {
       const pos = pickup.mesh.getAbsolutePosition();
       this.networkMediator.sendEvent(EventCode.REQ_TRY_PICKUP, {
@@ -174,34 +178,10 @@ export class PickupManager implements IGameSystem {
     pickup.destroyed = true;
   }
 
-  // Executed on Master Client
-  private processPickupRequest(pickupId: string, requesterId: string): void {
-    const pickup = this.pickups.get(pickupId);
-    if (!pickup || pickup.destroyed) {
-      return;
-    }
-
-    // Valid Request.
-    // 1. Mark as destroyed locally/Master side to prevent double grant
-    pickup.destroyed = true;
-
-    // 2. Grant to everyone (via NetworkManager will handle broadcast)
-    this.networkMediator.sendEvent(EventCode.ON_ITEM_PICKED, {
-      id: pickupId,
-      type: pickup.type,
-      ownerId: requesterId,
-    });
-
-    // 3. Notify everyone to destroy the mesh (Visual sync)
-    this.networkMediator.sendEvent(EventCode.DESTROY_PICKUP, { id: pickupId });
-
-    // 4. Local handling for Master if they are the requester (Others group doesn't loop back)
-    const myId = this.networkMediator.getSocketId();
-    if (requesterId === myId) {
-      this.grantPickupToInventory(pickupId, pickup.type, requesterId);
-      this.handleDestroyEvent({ id: pickupId });
-    }
-  }
+  // Executed on Master Client - DEPRECATED
+  // private processPickupRequest(pickupId: string, requesterId: string): void {
+  //   ...
+  // }
 
   private grantPickupToInventory(_id: string, type: string, ownerId: string): void {
     const myId = this.networkMediator.getSocketId() || 'local';

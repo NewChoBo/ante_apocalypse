@@ -1,8 +1,8 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { IWorldEntity } from '../../types/IWorldEntity';
-import { IGameSystem } from '../types/IGameSystem';
+import { IGameSystem } from '../../types/IGameSystem';
 import { NetworkMediator } from '../network/NetworkMediator';
-import { EventCode, OnDiedPayload } from '../network/NetworkProtocol';
+import { EventCode, OnDiedPayload } from '../../shared/protocol/NetworkProtocol';
 
 /**
  * 전역 엔티티 관리자.

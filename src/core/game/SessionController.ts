@@ -1,5 +1,5 @@
 import { Scene, Vector3, ShadowGenerator, UniversalCamera, AssetContainer } from '@babylonjs/core';
-import { IGameSystem } from '../types/IGameSystem';
+import { IGameSystem } from '../../types/IGameSystem';
 import { NetworkMediator } from '../network/NetworkMediator';
 import { PlayerPawn } from '../pawns/PlayerPawn';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
@@ -27,7 +27,7 @@ import {
   PlayerData,
   TargetSpawnData,
   EnemyUpdateData,
-} from '../network/NetworkProtocol';
+} from '../../shared/protocol/NetworkProtocol';
 
 export class SessionController implements IGameSystem {
   private scene: Scene;
@@ -89,7 +89,8 @@ export class SessionController implements IGameSystem {
     if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
       this.enemyManager = new EnemyManager(this.scene, this.shadowGenerator);
       this.enemyManager.initialize();
-      this.enemyManager.spawnEnemies(levelData.enemySpawns, this.playerPawn!);
+      // Server handles spawning implicitly via ServerGameController -> ServerEnemyController
+      // We do NOT manual spawn here anymore.
     }
 
     PickupManager.getInstance().setup(this.scene, this.playerPawn!);
@@ -137,9 +138,7 @@ export class SessionController implements IGameSystem {
         inventoryStore.setKey('weaponSlots', slots);
 
         if (weaponId && this.playerPawn) {
-          const combat = this.playerPawn.getComponent(
-            CombatComponent as abstract new (...args: unknown[]) => CombatComponent
-          );
+          const combat = this.playerPawn.getComponent(CombatComponent) as CombatComponent;
           combat?.equipWeapon(weaponId);
         }
       },
@@ -223,9 +222,7 @@ export class SessionController implements IGameSystem {
 
           // IMPORTANT: Add self (Host) to the state!
           if (this.playerPawn) {
-            const combat = this.playerPawn.getComponent(
-              CombatComponent as abstract new (...args: unknown[]) => CombatComponent
-            );
+            const combat = this.playerPawn.getComponent(CombatComponent) as CombatComponent;
             const myWeapon = combat?.getCurrentWeapon()?.name || 'Pistol';
 
             playerStates.push({
@@ -296,9 +293,7 @@ export class SessionController implements IGameSystem {
 
   private syncInventoryStore(): void {
     if (!this.playerPawn) return;
-    const combat = this.playerPawn.getComponent(
-      CombatComponent as abstract new (...args: unknown[]) => CombatComponent
-    );
+    const combat = this.playerPawn.getComponent(CombatComponent) as CombatComponent;
     if (!combat) return;
 
     const weapons = combat.getWeapons();

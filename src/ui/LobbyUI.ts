@@ -10,7 +10,7 @@ import {
 } from '@babylonjs/gui';
 import { NetworkManager } from '../core/network/NetworkManager';
 
-import { RoomData } from '../core/network/NetworkProtocol';
+import { RoomData } from '../shared/protocol/NetworkProtocol';
 import { GameModeType } from '../types/GameMode';
 
 export class LobbyUI {

@@ -1,5 +1,5 @@
 import { Mesh, Vector3 } from '@babylonjs/core';
-import { IDestructible } from '../core/interfaces/IDestructible';
+import { IDestructible } from './IDestructible';
 
 /**
  * 피격 가능한 대상에 대한 인터페이스.

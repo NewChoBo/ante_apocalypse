@@ -96,7 +96,9 @@ export class Knife extends MeleeWeapon {
     const sound = AssetLoader.getInstance().getSound('swipe');
     if (sound) {
       // 칼은 조금 더 높은 피치
-      sound.setPlaybackRate(1.1 + Math.random() * 0.2);
+      if (sound.setPlaybackRate) {
+        sound.setPlaybackRate(1.1 + Math.random() * 0.2);
+      }
       sound.play();
     }
 

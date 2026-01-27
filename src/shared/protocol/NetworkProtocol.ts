@@ -23,6 +23,7 @@ export enum EventCode {
   REQ_TRY_PICKUP = 103,
   REQ_RELOAD = 104,
   REQ_USE_ITEM = 105,
+  REQ_SWITCH_WEAPON = 106,
 
   // [S -> C] Notifications
   ON_STATE_SYNC = 200,
@@ -36,6 +37,7 @@ export enum EventCode {
   ON_SCORE_SYNC = 208,
   ON_POS_CORRECTION = 209,
   ON_STATE_DELTA = 210,
+  ON_PLAYER_RESPAWN = 211,
 }
 
 export class RoomData {
@@ -303,6 +305,13 @@ export class PlayerDeathPayload {
   ) {}
 }
 
+export class OnPlayerRespawnPayload {
+  constructor(
+    public readonly playerId: string,
+    public readonly position: Position
+  ) {}
+}
+
 export class ReqTryPickupPayload {
   constructor(
     public readonly id: string,
@@ -315,6 +324,10 @@ export class ReqUseItemPayload {
     public readonly itemId: string,
     public readonly itemType: string
   ) {}
+}
+
+export class ReqSwitchWeaponPayload {
+  constructor(public readonly weaponId: string) {}
 }
 
 export class OnItemPickedPayload {
@@ -354,4 +367,6 @@ export type EventData =
   | OnScoreSyncPayload
   | OnPosCorrectionPayload
   | ReqUseItemPayload
-  | OnStateDeltaPayload;
+  | ReqSwitchWeaponPayload
+  | OnStateDeltaPayload
+  | OnPlayerRespawnPayload;

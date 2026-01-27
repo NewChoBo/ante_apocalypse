@@ -1,11 +1,16 @@
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
-import { IGameSystem } from '../types/IGameSystem';
+import { IGameSystem } from '../../types/IGameSystem';
 import { NetworkMediator } from './NetworkMediator';
 import { RemotePlayerPawn } from '../pawns/RemotePlayerPawn';
 import { PlayerPawn } from '../pawns/PlayerPawn';
 import { CombatComponent } from '../components/combat/CombatComponent';
 import { WorldEntityManager } from '../entities/WorldEntityManager';
-import { EventCode, PlayerData, OnStateDeltaPayload } from './NetworkProtocol';
+import {
+  EventCode,
+  PlayerData,
+  OnStateDeltaPayload,
+  OnPlayerRespawnPayload,
+} from '../../shared/protocol/NetworkProtocol';
 import { gameStateStore, scoreStore, gameTimerStore } from '../store/GameStore';
 
 export class MultiplayerSystem implements IGameSystem {
@@ -41,7 +46,7 @@ export class MultiplayerSystem implements IGameSystem {
 
     const playerName = localStorage.getItem('playerName') || 'Anonymous';
     // Join with initial state
-    const combat = this.localPlayer.getComponent(CombatComponent);
+    const combat = this.localPlayer.getComponent(CombatComponent) as CombatComponent;
     const weaponId = combat?.getCurrentWeapon()?.name || 'Pistol';
 
     this.networkMediator.sendEvent(EventCode.JOIN, {
@@ -185,10 +190,17 @@ export class MultiplayerSystem implements IGameSystem {
       }
     });
 
-    // Update health authoritative
-    this.networkMediator.onHit.add((data) => {
-      if (data.targetId === this.localPlayer.id) {
-        this.localPlayer.updateHealth(data.remainingHealth);
+    // Handle Respawn
+    this.networkMediator.onPlayerRespawn.add((data: OnPlayerRespawnPayload) => {
+      const position = new Vector3(data.position.x, data.position.y, data.position.z);
+
+      if (data.playerId === this.localPlayer.id) {
+        this.localPlayer.respawn(position);
+      } else {
+        const remote = this.remotePlayers.get(data.playerId);
+        if (remote) {
+          remote.respawn(position);
+        }
       }
     });
   }
@@ -239,7 +251,7 @@ export class MultiplayerSystem implements IGameSystem {
   public update(): void {
     const now = performance.now();
     if (now - this.lastUpdateTime > this.updateInterval) {
-      const combat = this.localPlayer.getComponent(CombatComponent);
+      const combat = this.localPlayer.getComponent(CombatComponent) as CombatComponent;
       const weaponId = combat?.getCurrentWeapon()?.name || 'Pistol';
 
       this.networkMediator.sendEvent(
@@ -275,7 +287,9 @@ export class MultiplayerSystem implements IGameSystem {
       name: remote.playerName,
       position: { x: remote.mesh.position.x, y: remote.mesh.position.y, z: remote.mesh.position.z },
       rotation: { x: 0, y: remote.mesh.rotation.y, z: 0 },
-      weaponId: remote.getComponent(CombatComponent)?.getCurrentWeapon()?.name || 'Pistol',
+      weaponId:
+        (remote.getComponent(CombatComponent) as CombatComponent)?.getCurrentWeapon()?.name ||
+        'Pistol',
       health: remote.health, // RemotePlayerPawn health is updated via NetworkMediator.onHit
     }));
   }

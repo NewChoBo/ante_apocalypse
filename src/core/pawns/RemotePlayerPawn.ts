@@ -415,16 +415,11 @@ export class RemotePlayerPawn extends BasePawn {
     this.mesh.isPickable = false;
 
     // Simple visual death: Fall backward
-    // Since mesh is a Box, unauthorized change might be weird if physics enabled?
-    // We just animate rotation.
-    // If skeleton exists, we might want to stop standard anims.
     if (this.skeleton) {
       this.scene.stopAnimation(this.skeleton);
     }
 
-    // Rotate root mesh backward
-    // Animation to rotate X -90 deg
-    // Actually mesh.rotation is Euler.
+    // Play death animation (rotation)
     const deathAnim = new Animation(
       'deathAnim',
       'rotation.x',
@@ -436,10 +431,31 @@ export class RemotePlayerPawn extends BasePawn {
       { frame: 0, value: this.mesh.rotation.x },
       { frame: 30, value: this.mesh.rotation.x - Math.PI / 2 },
     ]);
+    this.mesh.animations = []; // Clear previous
     this.mesh.animations.push(deathAnim);
-    this.scene.beginAnimation(this.mesh, 0, 30, false, 1, () => {
-      // Optional: Fade out or leave corpse
-    });
+    this.scene.beginAnimation(this.mesh, 0, 30, false, 1);
+  }
+
+  public respawn(position: Vector3): void {
+    this.isDead = false;
+    this.health = 100; // Reset visual health
+    this.updateHealthBar(100);
+
+    this.mesh.position.copyFrom(position);
+    this.mesh.rotation.x = 0; // Reset death rotation
+    this.mesh.checkCollisions = true;
+    this.mesh.isPickable = true;
+
+    // Reset animations
+    this.mesh.animations = [];
+    if (this.skeleton) {
+      this.scene.stopAnimation(this.skeleton);
+      if (this.idleRange) {
+        this.scene.beginAnimation(this.skeleton, this.idleRange.from, this.idleRange.to, true);
+      }
+    }
+
+    console.log(`[RemotePlayer] ${this.id} respawned.`);
   }
 
   public fire(

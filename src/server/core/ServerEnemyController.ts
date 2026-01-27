@@ -1,11 +1,6 @@
-import { NetworkManager } from '../network/NetworkManager';
-import { EventCode, EnemySpawnData, EnemyUpdateData } from '../network/NetworkProtocol';
-
-interface SimpleVector3 {
-  x: number;
-  y: number;
-  z: number;
-}
+import { IServerNetwork } from '../interfaces/IServerNetwork';
+import { EventCode, EnemySpawnData } from '../../shared/protocol/NetworkProtocol';
+import { SimpleVector3 } from '../../shared/math/Vector';
 
 interface ServerEnemy {
   id: string;
@@ -19,7 +14,7 @@ interface ServerEnemy {
 }
 
 export class ServerEnemyController {
-  private network: NetworkManager;
+  private network: IServerNetwork;
   private enemies: Map<string, ServerEnemy> = new Map();
 
   // Config
@@ -29,7 +24,7 @@ export class ServerEnemyController {
   private readonly AGGRO_RANGE = 20;
   private readonly ATTACK_RANGE = 1.5;
 
-  // Spawn Points (Simple fixed points for now)
+  // Spawn Points (Simple fixed points for now - TODO: Injected from LevelData)
   private readonly SPAWN_POINTS: SimpleVector3[] = [
     { x: 10, y: 0, z: 10 },
     { x: -10, y: 0, z: 10 },
@@ -37,8 +32,8 @@ export class ServerEnemyController {
     { x: -10, y: 0, z: -10 },
   ];
 
-  constructor() {
-    this.network = NetworkManager.getInstance();
+  constructor(network: IServerNetwork) {
+    this.network = network;
   }
 
   public tick(deltaTime: number, playerPositions: Map<string, SimpleVector3>) {

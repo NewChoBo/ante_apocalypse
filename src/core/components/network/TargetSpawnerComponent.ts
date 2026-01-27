@@ -4,7 +4,11 @@ import { StaticTarget } from '../../../targets/StaticTarget';
 import { MovingTarget } from '../../../targets/MovingTarget';
 import { HumanoidTarget } from '../../../targets/HumanoidTarget';
 import { NetworkMediator } from '../../network/NetworkMediator';
-import { EventCode, TargetSpawnData, TargetDestroyData } from '../../network/NetworkProtocol';
+import {
+  EventCode,
+  TargetSpawnData,
+  TargetDestroyData,
+} from '../../../shared/protocol/NetworkProtocol';
 import { WorldEntityManager } from '../../entities/WorldEntityManager';
 import { IWorldEntity } from '../../../types/IWorldEntity';
 import type { IPawn } from '../../../types/IPawn';

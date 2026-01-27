@@ -15,7 +15,7 @@ import {
 import { BasePawn } from './BasePawn';
 import { NetworkManager } from '../network/NetworkManager';
 import { AssetLoader } from '../loaders/AssetLoader';
-import { PickupManager } from '../entities/PickupManager';
+// import { PickupManager } from '../entities/PickupManager';
 
 export class EnemyPawn extends BasePawn {
   public mesh: Mesh;
@@ -331,7 +331,8 @@ export class EnemyPawn extends BasePawn {
     console.log('Enemy Died');
 
     // 아이템 드롭
-    PickupManager.getInstance().spawnRandomPickup(this.position);
+    // Pickup spawning is handled by Server (ServerGameController -> IDestructible.onDied -> DropTable)
+    // PickupManager.getInstance().spawnRandomPickup(this.position);
 
     // 죽었음을 시각적으로 표시 (일단 비활성화)
     // 실제로는 사망 애니메이션을 재생하거나 래그돌을 적용할 수 있음

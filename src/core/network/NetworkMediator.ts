@@ -23,7 +23,8 @@ import {
   OnScoreSyncPayload,
   OnPosCorrectionPayload,
   EventData,
-} from '../network/NetworkProtocol';
+  OnPlayerRespawnPayload,
+} from '../../shared/protocol/NetworkProtocol';
 
 /**
  * Game logic systems and the low-level NetworkManager.
@@ -44,6 +45,7 @@ export class NetworkMediator {
   public onPickupDestroyRequested = new Observable<PickupDestroyData>();
   public onEnemySpawnRequested = new Observable<EnemySpawnData>();
   public onEnemyDestroyRequested = new Observable<EnemyDestroyData>();
+  public onPlayerRespawn = new Observable<OnPlayerRespawnPayload>();
 
   // Authoritative Network Events
   public onStateSync = new Observable<OnStateSyncPayload>();
@@ -159,6 +161,8 @@ export class NetworkMediator {
         this.onScoreSync.notifyObservers(data as OnScoreSyncPayload);
       } else if (code === EventCode.ON_POS_CORRECTION) {
         this.onPosCorrection.notifyObservers(data as OnPosCorrectionPayload);
+      } else if (code === EventCode.ON_PLAYER_RESPAWN) {
+        this.onPlayerRespawn.notifyObservers(data as OnPlayerRespawnPayload);
       }
     });
 

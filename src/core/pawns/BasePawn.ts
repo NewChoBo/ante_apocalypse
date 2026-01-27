@@ -1,6 +1,6 @@
 import { Mesh, Vector3, Scene, Nullable } from '@babylonjs/core';
 import { IPawn } from '../../types/IPawn';
-import { BaseComponent, ComponentConstructor } from '../components/base/BaseComponent';
+import { BaseComponent } from '../components/base/BaseComponent';
 import { IWorldEntity, DamageProfile } from '../../types/IWorldEntity';
 import { TickManager } from '../managers/TickManager';
 
@@ -29,6 +29,22 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
     TickManager.getInstance().register(this);
   }
 
+  public get position(): Vector3 {
+    return this.mesh.position;
+  }
+
+  public set position(value: Vector3) {
+    this.mesh.position.copyFrom(value);
+  }
+
+  public get rotation(): Vector3 {
+    return this.mesh.rotation;
+  }
+
+  public set rotation(value: Vector3) {
+    this.mesh.rotation.copyFrom(value);
+  }
+
   /** ITickable 인터페이스 구현 (하위 클래스에서 상속받아 구현) */
   public abstract tick(deltaTime: number): void;
 
@@ -50,10 +66,12 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
   public abstract setupInput(enabled: boolean): void;
 
   /** 컴포넌트(Behavior) 추가 */
-  public addComponent(component: BaseComponent): void {
-    this.components.push(component);
-    if (this.mesh) {
-      this.mesh.addBehavior(component);
+  public addComponent(component: any): void {
+    if (component instanceof BaseComponent) {
+      this.components.push(component);
+      if (this.mesh) {
+        this.mesh.addBehavior(component);
+      }
     }
   }
 
@@ -72,21 +90,17 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
     component.dispose();
   }
 
-  public getComponent<T extends BaseComponent>(type: ComponentConstructor<T>): T | undefined {
+  public getComponent<T>(type: any): T | undefined {
     return this.components.find((b) => b instanceof type) as T;
   }
 
-  /** 모든 컴포넌트 업데이트 (Behavior가 각자 처리하므로 메서드는 공백으로 유지 가능하거나 제거) */
-  protected updateComponents(_deltaTime: number): void {
-    // Babylon.js Behavior가 attach 시점에 등록한 observer에 의해 자동 업데이트됩니다.
-  }
-
-  public get position(): Vector3 {
-    return this.mesh.position;
-  }
-
-  public set position(value: Vector3) {
-    this.mesh.position.copyFrom(value);
+  protected updateComponents(deltaTime: number): void {
+    this.components.forEach((comp) => {
+      // Assuming BaseComponent has update(dt)
+      if ((comp as any).update) {
+        (comp as any).update(deltaTime);
+      }
+    });
   }
 
   /** 하위 클래스에서 구체적인 초기화 로직 구현 */

@@ -17,7 +17,7 @@ import { CombatComponent } from './CombatComponent';
 import { NetworkManager } from '../../network/NetworkManager';
 import type { IPawn } from '../../../types/IPawn';
 import { IFirearm, IWeapon } from '../../../types/IWeapon';
-import { OnFiredPayload } from '../../network/NetworkProtocol';
+import { OnFiredPayload } from '../../../shared/protocol/NetworkProtocol';
 
 /**
  * 총기류 전용 시각적 피드백 컴포넌트.
