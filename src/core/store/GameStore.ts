@@ -12,20 +12,18 @@ declare global {
   }
 }
 
-function initStores(): {
+type GameStores = {
   scoreStore: WritableAtom<number>;
   gameStateStore: WritableAtom<'READY' | 'PLAYING' | 'PAUSED' | 'GAME_OVER'>;
   ammoStore: MapStore<AmmoState>;
   playerHealthStore: WritableAtom<number>;
   inventoryStore: MapStore<InventoryState>;
-} {
-  if (window.__GAME_STORES__) {
-    console.log('[GameStore] Reusing existing global stores (Singleton)');
-    return window.__GAME_STORES__;
-  }
+};
 
-  console.log('[GameStore] Initializing new global stores');
-  const stores = {
+let localStores: GameStores | null = null;
+
+function createStores(): GameStores {
+  return {
     scoreStore: atom<number>(0),
     gameStateStore: atom<'READY' | 'PLAYING' | 'PAUSED' | 'GAME_OVER'>('READY'),
     ammoStore: map<AmmoState>({
@@ -45,9 +43,31 @@ function initStores(): {
       maxBagSlots: 24,
     }),
   };
+}
 
-  window.__GAME_STORES__ = stores;
-  return stores;
+function initStores(): GameStores {
+  // 1. If we already have local stores, return them (Singleton)
+  if (localStores) {
+    return localStores;
+  }
+
+  // 2. In DEV, try to pick up from window for HMR
+  if (import.meta.env.DEV && window.__GAME_STORES__) {
+    console.log('[GameStore] Reusing existing global stores from window (HMR)');
+    localStores = window.__GAME_STORES__ as GameStores;
+    return localStores;
+  }
+
+  // 3. Initialize new stores
+  console.log('[GameStore] Initializing new stores');
+  localStores = createStores();
+
+  // 4. In DEV, expose to window for HMR
+  if (import.meta.env.DEV) {
+    window.__GAME_STORES__ = localStores;
+  }
+
+  return localStores;
 }
 
 /**
