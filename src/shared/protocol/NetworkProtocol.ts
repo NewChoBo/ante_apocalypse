@@ -24,6 +24,7 @@ export enum EventCode {
   REQ_RELOAD = 104,
   REQ_USE_ITEM = 105,
   REQ_SWITCH_WEAPON = 106,
+  REQ_READY = 107,
 
   // [S -> C] Notifications
   ON_STATE_SYNC = 200,

@@ -123,6 +123,15 @@ export class CombatComponent extends BaseComponent {
       const fired = weapon.fire();
 
       if (fired) {
+        // [Optimistic] Deduct ammo locally immediately for responsiveness
+        // The server will send ON_AMMO_SYNC to correct us if we drift.
+        const firearm = weapon as any;
+        if (firearm.ammo && firearm.ammo.current > 0) {
+          firearm.ammo.current--;
+          // Sync HUD immediately
+          this.hudSync.syncAmmo(weapon);
+        }
+
         // 2. Authority: Send request to server
         const network = NetworkManager.getInstance();
         const req = new ReqFirePayload(

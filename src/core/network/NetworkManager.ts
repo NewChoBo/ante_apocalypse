@@ -301,6 +301,10 @@ export class NetworkManager {
     this.provider.sendEvent(code, data, reliable, target);
   }
 
+  public sendReady(): void {
+    this.sendEvent(EventCode.REQ_READY, {}, true, 'master'); // Send to Server (Master)
+  }
+
   public requestFire(payload: ReqFirePayload): void {
     this.sendEvent(EventCode.REQ_FIRE, payload, true, 'master');
   }

@@ -186,6 +186,9 @@ export class Game {
     this.sessionController = new SessionController(scene, this.canvas, shadowGenerator);
     await this.sessionController.setup(levelData, this.playerName);
 
+    // Notify Server we are ready to receive World Snapshot
+    NetworkManager.getInstance().sendReady();
+
     // Ensure the player camera is active
     if (this.sessionController.getPlayerCamera()) {
       scene.activeCamera = this.sessionController.getPlayerCamera();

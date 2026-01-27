@@ -16,7 +16,6 @@ import {
   OnMatchStateSyncPayload,
   OnMatchEndPayload,
   OnScoreSyncPayload,
-  OnPosCorrectionPayload,
   ReqUseItemPayload,
   OnStateDeltaPayload,
   OnPlayerRespawnPayload,
@@ -104,7 +103,7 @@ export class ServerGameController {
     this.lastTickTime = Date.now();
     this.matchTimer = setInterval(() => {
       this.tick();
-    }, 33); // ~30Hz tick rate
+    }, 33); // 30Hz tick rate
   }
 
   private tick() {
@@ -317,11 +316,8 @@ export class ServerGameController {
 
     this.network.onPlayerJoined.add((player) => {
       this.initializePlayer(player.id, player.name || 'Anonymous');
-      this.sendWorldSnapshot(player.id);
-
-      if (this.matchState === 'READY' && this.playerStates.size >= 1) {
-        this.startMatch();
-      }
+      // WAIT for REQ_READY before sending snapshot
+      // this.sendWorldSnapshot(player.id);
     });
 
     this.network.onPlayerLeft.add((playerId) => {
@@ -375,36 +371,16 @@ export class ServerGameController {
     switch (code) {
       case EventCode.MOVE: {
         const move = data as MovePayload;
-        const lastTime = this.lastInputTimes.get(senderId) || 0;
-        const dt = (now - lastTime) / 1000;
+        // const lastTime = this.lastInputTimes.get(senderId) || 0;
+        // const dt = (now - lastTime) / 1000;
 
-        // basic speed hack check (skip first packet)
+        // DISABLE SPEED CHECK for Alpha
+        /*
         if (lastTime > 0 && dt > 0.01) {
-          const prevPos = state.position || { x: 0, y: 0, z: 0 };
-          const dist = Math.sqrt(
-            Math.pow(move.position.x - prevPos.x, 2) +
-              Math.pow(move.position.y - prevPos.y, 2) +
-              Math.pow(move.position.z - prevPos.z, 2)
-          );
-          const speed = dist / dt;
-
-          if (speed > 25) {
-            // Increased limit slightly for burst movement, then correct
-            console.warn(
-              `[Server] Speed hack detected! Player=${senderId}, Speed=${speed.toFixed(2)}m/s. Correcting position.`
-            );
-
-            // Correct position to previous known good position
-            this.network.sendEvent(
-              EventCode.ON_POS_CORRECTION,
-              new OnPosCorrectionPayload(prevPos, state.rotation),
-              true,
-              senderId
-            );
-            this.lastInputTimes.set(senderId, now);
-            return; // Skip state update this frame
-          }
+             // ... speed check logic ...
+             return;
         }
+        */
 
         state.position = move.position;
         state.rotation = move.rotation;
@@ -414,6 +390,13 @@ export class ServerGameController {
         this.recordHistory(senderId, move.position, now);
         break;
       }
+      case EventCode.REQ_READY:
+        // Client is fully loaded. Send Snapshot & Check Match Start
+        this.sendWorldSnapshot(senderId);
+        if (this.matchState === 'READY' && this.playerStates.size >= 1) {
+          this.startMatch();
+        }
+        break;
       case EventCode.REQ_FIRE:
         if (!state.isDead) this.processFire(senderId, state, data as ReqFirePayload);
         break;
@@ -640,6 +623,7 @@ export class ServerGameController {
     // 2. Lag Compensation: Basic validation
     if (!this.validateHitWithLagComp(target.id, data.hitPosition)) {
       console.warn(`[Server] Potential hit validation failure for ${attackerId} -> ${target.id}`);
+      // ALLOW HIT ANYWAY for Alpha (Favor the Shooter)
     }
 
     target.health -= data.damage;
