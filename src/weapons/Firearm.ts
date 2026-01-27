@@ -14,6 +14,7 @@ import { GameObservables } from '../core/events/GameObservables';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon';
 import { NetworkManager } from '../core/network/NetworkManager';
+import { ReqHitPayload } from '../core/network/NetworkProtocol';
 import { GameAssets } from '../core/loaders/AssetLoader';
 import { WeaponUtils } from '../utils/WeaponUtils';
 
@@ -100,7 +101,8 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     this.lastFireTime = now;
     this.onFire();
 
-    // 발사 이벤트 발행
+    // [Prediction] Client-side visual/audio effect
+    // We notify observers to play sounds/muzzle flash locally immediately
     GameObservables.weaponFire.notifyObservers({
       weaponId: this.name,
       ammoRemaining: this.currentAmmo,
@@ -108,9 +110,9 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
       muzzleTransform: this.getMuzzleTransform(),
     });
 
-    // 네트워크 발사 이벤트 전송
+    // [Authority] Send Fire Request to Master Client
     const muzzle = this.getMuzzleTransform();
-    NetworkManager.getInstance().fire({
+    NetworkManager.getInstance().requestFire({
       weaponId: this.name,
       muzzleData: {
         position: { x: muzzle.position.x, y: muzzle.position.y, z: muzzle.position.z },
@@ -218,14 +220,30 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     });
 
     if (pickInfo?.hit && pickInfo.pickedMesh) {
-      // 1. 공통 타격 이펙트 (벽, 바닥, 타겟 모두 포함)
+      // 1. [Prediction] 공통 타격 이펙트 (벽, 바닥, 타겟 모두 포함)
+      // Play hit effect immediately for responsiveness
       GameObservables.hitEffect.notifyObservers({
         position: pickInfo.pickedPoint!,
         normal: pickInfo.getNormal(true) || Vector3.Up(),
       });
 
-      // 2. 통합 히트 프로세싱 (적, 타겟 등)
-      this.processHit(pickInfo.pickedMesh as Mesh, pickInfo.pickedPoint!, this.damage);
+      // 2. [Authority] Send Hit Request to Master Client
+      // Do NOT apply damage locally. Wait for CONFIRM_HIT or Entity Update.
+      if (pickInfo.pickedMesh) {
+        // Identify target ID (assuming mesh.name or parent/metadata holds ID)
+        // For now using mesh.name as ID, but in real game this should be a robust entity ID
+        const targetId = pickInfo.pickedMesh.name;
+
+        const hitReq = new ReqHitPayload(targetId, this.damage, {
+          x: pickInfo.pickedPoint!.x,
+          y: pickInfo.pickedPoint!.y,
+          z: pickInfo.pickedPoint!.z,
+        });
+        NetworkManager.getInstance().requestHit(hitReq);
+      }
+
+      // Removed direct processHit call
+      // this.processHit(pickInfo.pickedMesh as Mesh, pickInfo.pickedPoint!, this.damage);
     }
   }
 

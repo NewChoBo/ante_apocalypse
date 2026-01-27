@@ -18,6 +18,7 @@ export enum EventCode {
   PICKUP_GRANTED = 22,
   REQ_HIT = 23,
   CONFIRM_HIT = 24,
+  REQ_FIRE = 25,
 }
 
 export class RoomData {

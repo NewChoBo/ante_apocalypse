@@ -16,6 +16,8 @@ import {
   TargetSpawnData,
   ReqInitialStatePayload,
   PlayerData,
+  ReqHitPayload,
+  ConfirmHitPayload,
 } from './NetworkProtocol';
 
 export interface FireEventData {
@@ -43,6 +45,9 @@ export class NetworkManager {
   public onPlayerLeft = new Observable<string>();
   public onPlayerFired = new Observable<FireEventData>();
   public onPlayerDied = new Observable<DeathEventData>();
+
+  // Hit/Damage Events
+  public onPlayerHit = new Observable<ConfirmHitPayload>();
 
   // Enemy Synchronization
   public onEnemyUpdated = new Observable<EnemyUpdateData>();
@@ -161,6 +166,34 @@ export class NetworkManager {
           this.onInitialStateReceived.notifyObservers(initialState);
           break;
         }
+        case EventCode.REQ_FIRE: {
+          if (this.isMasterClient()) {
+            // Master Logic: Validate fire request (cooldown, ammo, etc.)
+            // For now, simpler: just broadcast FIRE event
+            const fireData = data as FirePayload;
+            this.sendEvent(EventCode.FIRE, fireData, true);
+          }
+          break;
+        }
+        case EventCode.REQ_HIT: {
+          if (this.isMasterClient()) {
+            // Master Logic: Validate hit (raycast check, distance, etc.)
+            // For now: Accept all hits and broadcast ConfirmHit
+            const hitData = data as ReqHitPayload;
+            const confirmData = new ConfirmHitPayload(
+              hitData.targetId,
+              hitData.damage,
+              100 - hitData.damage // Placeholder: Real HP logic should be in a centralized state manager
+            );
+            this.sendEvent(EventCode.CONFIRM_HIT, confirmData, true);
+          }
+          break;
+        }
+        case EventCode.CONFIRM_HIT: {
+          const confirmData = data as ConfirmHitPayload;
+          this.onPlayerHit.notifyObservers(confirmData);
+          break;
+        }
       }
     };
   }
@@ -231,8 +264,20 @@ export class NetworkManager {
     this.provider.sendEvent(code, data, reliable);
   }
 
+  public requestFire(payload: FirePayload): void {
+    // Send Request to Master
+    this.sendEvent(EventCode.REQ_FIRE, payload, true);
+  }
+
+  /**
+   * @deprecated Use requestFire instead for Server Authority
+   */
   public fire(payload: FirePayload): void {
     this.sendEvent(EventCode.FIRE, payload, true);
+  }
+
+  public requestHit(payload: ReqHitPayload): void {
+    this.sendEvent(EventCode.REQ_HIT, payload, true);
   }
 
   public syncWeapon(weaponId: string): void {

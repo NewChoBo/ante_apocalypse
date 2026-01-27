@@ -14,6 +14,11 @@ export interface TargetDestroyedInfo {
 /**
  * 전역 게임 Observable 모음.
  * NanoStores(상태)와 달리, 순간적인 '사건'을 전달하는 데 사용합니다.
+ *
+ * [Unidirectional Data Flow Rule]
+ * 이 이벤트들은 원칙적으로 'NetworkManager'의 수신부(onEvent)나
+ * 'Prediction' 로직에서만 발생시켜야 합니다.
+ * 로컬 로직에서 직접 notify() 쏘는 것을 지양하세요.
  */
 export const GameObservables = {
   /** 타겟이 파괴됨 */
