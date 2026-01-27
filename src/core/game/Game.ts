@@ -9,7 +9,6 @@ import { PickupManager } from '../entities/PickupManager';
 import { UIManager, UIScreen } from '../../ui/UIManager';
 import { SceneManager } from './SceneManager';
 import { SessionController } from './SessionController';
-import { GameMode } from '../../types/GameMode';
 import { NetworkManager } from '../network/NetworkManager';
 import { NetworkState } from '../network/NetworkProtocol';
 import { LifetimeManager } from './LifetimeManager';
@@ -45,7 +44,6 @@ export class Game {
 
   private isRunning = false;
   private isPaused = false;
-  private currentMode: GameMode = 'multi';
   private playerName: string = 'Anonymous';
   private renderFunction: () => void;
 
@@ -145,22 +143,19 @@ export class Game {
 
   private handleNetworkStateChange(state: NetworkState): void {
     if (state === NetworkState.InRoom && !this.isRunning) {
-      this.start('multi');
+      this.start('survival');
     }
   }
 
-  public async start(mode: GameMode = 'multi', ruleType: string = 'survival'): Promise<void> {
+  public async start(ruleType: string = 'survival'): Promise<void> {
     if (this.isRunning) return;
-    this.currentMode = mode;
 
-    // Use map selected from UI (or synchronized from room if multi)
-    let mapKey = this.uiManager.getSelectedMap();
-    if (mode === 'multi') {
-      const syncedMap = NetworkManager.getInstance().getMapId();
-      if (syncedMap) {
-        mapKey = syncedMap;
-        console.log(`[Game] Using synchronized map: ${mapKey}`);
-      }
+    // Use synchronized map or default
+    let mapKey = 'training_ground';
+    const syncedMap = NetworkManager.getInstance().getMapId();
+    if (syncedMap) {
+      mapKey = syncedMap;
+      console.log(`[Game] Using synchronized map: ${mapKey}`);
     }
     const levelData = LEVELS[mapKey] || LEVELS['training_ground'];
 
@@ -181,7 +176,7 @@ export class Game {
     }
 
     this.sessionController = new SessionController(scene, this.canvas, shadowGenerator);
-    await this.sessionController.setup(levelData, mode, this.playerName);
+    await this.sessionController.setup(levelData, this.playerName);
 
     // Ensure the player camera is active
     if (this.sessionController.getPlayerCamera()) {
@@ -276,9 +271,7 @@ export class Game {
     PickupManager.getInstance().clear();
     AssetLoader.getInstance().clear();
 
-    if (this.currentMode === 'multi') {
-      NetworkManager.getInstance().leaveRoom();
-    }
+    NetworkManager.getInstance().leaveRoom();
 
     this.initMenu();
   }

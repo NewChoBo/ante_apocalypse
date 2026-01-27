@@ -3,7 +3,6 @@ import { IGameSystem } from '../types/IGameSystem';
 import { NetworkMediator } from '../network/NetworkMediator';
 import { PlayerPawn } from '../pawns/PlayerPawn';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
-import { GameMode } from '../../types/GameMode';
 import { PlayerController } from '../controllers/PlayerController';
 import { LevelData } from '../loaders/LevelLoader';
 import { CombatComponent } from '../components/combat/CombatComponent';
@@ -56,11 +55,7 @@ export class SessionController implements IGameSystem {
     // 기본 초기화 ( Game.ts 에서 levelData 주입하여 호출되게 변경 예정 )
   }
 
-  public async setup(
-    levelData: LevelData,
-    mode: GameMode = 'multi',
-    playerName: string = 'Anonymous'
-  ): Promise<void> {
+  public async setup(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
     this.playerPawn = new PlayerPawn(this.scene);
     this.assetContainer.meshes.push(this.playerPawn.mesh);
     WorldEntityManager.getInstance().registerEntity(this.playerPawn);
@@ -79,10 +74,7 @@ export class SessionController implements IGameSystem {
     this.setupCombat();
     this.setupInventory();
     this.setupInput();
-
-    if (mode === 'multi') {
-      this.setupMultiplayer(playerName);
-    }
+    this.setupMultiplayer(playerName);
   }
 
   private setupSystems(levelData: LevelData): void {

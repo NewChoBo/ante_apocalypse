@@ -61,7 +61,11 @@ export class TargetSpawnerComponent extends BaseComponent {
 
   /** 초기 타겟 자동 스폰 */
   public spawnInitialTargets(): void {
-    if (!this.networkMediator.isMasterClient() && this.networkMediator.getSocketId()) return;
+    if (!this.networkMediator.isMasterClient()) {
+      return;
+    }
+
+    console.log('[TargetSpawner] Master client spawning initial targets.');
 
     const distances = [10, 15, 20];
 
@@ -79,7 +83,7 @@ export class TargetSpawnerComponent extends BaseComponent {
     if (this.scene.isDisposed) return '';
 
     if (!id) {
-      if (!this.networkMediator.isMasterClient() && this.networkMediator.getSocketId()) return '';
+      if (!this.networkMediator.isMasterClient()) return '';
       id = `target_${++this.targetIdCounter}_${Math.random().toString(36).substr(2, 4)}`;
 
       if (!type) {
@@ -120,7 +124,7 @@ export class TargetSpawnerComponent extends BaseComponent {
 
   /** 일정 시간 후 리스폰 예약 */
   public scheduleRespawn(delayMs: number = 1500): void {
-    if (!this.networkMediator.isMasterClient() && this.networkMediator.getSocketId()) return;
+    if (!this.networkMediator.isMasterClient()) return;
 
     this.respawnTimeout = setTimeout(() => {
       if (this.scene.isDisposed) return;

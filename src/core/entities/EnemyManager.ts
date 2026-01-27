@@ -73,7 +73,8 @@ export class EnemyManager implements IGameSystem {
   }
 
   public spawnEnemies(spawnPoints: number[][], targetPlayer: PlayerPawn): void {
-    if (this.networkMediator.isMasterClient() || !this.networkMediator.getSocketId()) {
+    if (this.networkMediator.isMasterClient()) {
+      console.log(`[EnemyManager] Spawning ${spawnPoints.length} enemies (Master).`);
       spawnPoints.forEach((point, index) => {
         const id = `enemy_${index}`;
         const position = Vector3.FromArray(point);
@@ -90,7 +91,7 @@ export class EnemyManager implements IGameSystem {
     // WorldManager에 등록하여 전역 피격 및 관리가 가능하게 함
     this.worldManager.registerEntity(enemy);
 
-    if (this.networkMediator.isMasterClient() || !this.networkMediator.getSocketId()) {
+    if (this.networkMediator.isMasterClient()) {
       if (target) {
         const controller = new AIController(`ai_${id}`, enemy, target);
         this.controllers.set(id, controller);
