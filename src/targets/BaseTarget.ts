@@ -42,6 +42,13 @@ export abstract class BaseTarget implements ITarget, IWorldEntity {
     this.onDestroy();
   }
 
+  public updateHealth(amount: number): void {
+    this.health = amount;
+    if (this.health <= 0 && !this.isDead) {
+      this.die();
+    }
+  }
+
   public takeDamage(
     amount: number,
     _attackerId?: string,

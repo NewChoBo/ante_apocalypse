@@ -1,7 +1,7 @@
-import { Scene, AbstractMesh, UniversalCamera, Vector3, Mesh } from '@babylonjs/core';
+import { Scene, AbstractMesh, UniversalCamera, Vector3, Mesh, Observable } from '@babylonjs/core';
 import { IWeapon } from '../types/IWeapon';
-import { WorldEntityManager } from '../core/entities/WorldEntityManager';
-import { GameObservables } from '../core/events/GameObservables';
+import { NetworkManager } from '../core/network/NetworkManager';
+import { ReqHitPayload } from '../core/network/NetworkProtocol';
 
 /**
  * 모든 무기의 최상위 추상 클래스.
@@ -18,6 +18,10 @@ export abstract class BaseWeapon implements IWeapon {
 
   public isActive = false;
   public isAiming = false;
+
+  // Prediction Observable
+  public onHitPredicted = new Observable<{ position: Vector3; normal: Vector3 }>();
+  public onFirePredicted = new Observable<IWeapon>();
 
   // 절차적 애니메이션 상태
   protected visualOffset = new Vector3(0, 0, 0);
@@ -92,8 +96,6 @@ export abstract class BaseWeapon implements IWeapon {
   public async lower(): Promise<void> {
     if (this.animState === 'lowering') return;
     this.animState = 'lowering';
-    // 애니메이션이 끝날 때까지 대기하는 프로미스를 반환할 수도 있지만,
-    // 여기서는 간단히 상태만 변경하고 update에서 처리합니다.
     return new Promise((resolve) => {
       const check = (): void => {
         if (this.animProgress <= 0) {
@@ -126,12 +128,9 @@ export abstract class BaseWeapon implements IWeapon {
     }
 
     if (this.weaponMesh) {
-      // Y축 오프셋 적용 (무기가 아래로 내려가는 효과)
-      // animProgress가 1이면 0, 0이면 -0.5만큼 내려감
       const yOffset = (this.animProgress - 1) * 0.5;
       this.weaponMesh.position.y = this.idlePosition.y + yOffset;
 
-      // X축 회전 적용 (내려갈 때 살짝 눕는 효과)
       const xRot = (1 - this.animProgress) * 0.5;
       this.weaponMesh.rotation.x = this.idleRotation.x + xRot;
     }
@@ -148,22 +147,26 @@ export abstract class BaseWeapon implements IWeapon {
 
     const part = metadata.bodyPart || metadata.part || 'body';
 
-    // 1. Process via WorldEntityManager (Handles Multipliers, Score Dispatching (via observers), and Network Sync)
-    WorldEntityManager.getInstance().processHit(entityId, damageAmount, part, true, pickedPoint);
+    // 1. Prediction Event (VFX, Sound)
+    this.onHitPredicted.notifyObservers({
+      position: pickedPoint,
+      normal: Vector3.Up(), // Fallback normal as processHit doesn't have it
+    });
 
-    // 2. Score processing (using hardcoded fallback for now, or we could use onEntityHit observer)
+    // 2. Score processing (Optimistic / Local)
     if (this.onScoreCallback) {
       const score = part === 'head' ? 100 : 50;
       this.onScoreCallback(score);
     }
 
-    // 3. GameObservable for VFX/HUD
-    GameObservables.targetHit.notifyObservers({
-      targetId: entityId,
-      part: part,
-      damage: damageAmount,
-      position: pickedPoint,
-    });
+    // 3. Authority Request
+    const req = new ReqHitPayload(
+      entityId,
+      damageAmount,
+      { x: pickedPoint.x, y: pickedPoint.y, z: pickedPoint.z },
+      { x: 0, y: 1, z: 0 } // Default normal
+    );
+    NetworkManager.getInstance().requestHit(req);
 
     return true;
   }
@@ -172,5 +175,6 @@ export abstract class BaseWeapon implements IWeapon {
     if (this.weaponMesh) {
       this.weaponMesh.dispose();
     }
+    this.onHitPredicted.clear();
   }
 }

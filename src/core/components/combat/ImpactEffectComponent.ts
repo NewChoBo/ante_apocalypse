@@ -1,38 +1,98 @@
 import { Scene, Vector3, ParticleSystem, Texture, Color4, Mesh, Observer } from '@babylonjs/core';
 import { BaseComponent } from '@/core/components/base/BaseComponent';
-import { GameObservables } from '../../events/GameObservables';
+import { NetworkMediator } from '../../network/NetworkMediator';
+import { NetworkManager } from '../../network/NetworkManager';
+import { CombatComponent } from './CombatComponent';
 import type { IPawn } from '../../../types/IPawn';
+import { IFirearm } from '../../../types/IWeapon';
+import { OnHitPayload } from '../../network/NetworkProtocol';
 import flareUrl from '@/assets/textures/Flare.png?url';
 
 /**
  * 타격 이펙트(Impact)를 담당하는 컴포넌트.
  * 타겟 피격 시 파티클 시스템을 생성합니다.
+ * Local Prediction과 Network Event를 모두 처리합니다.
  */
 export class ImpactEffectComponent extends BaseComponent {
   public name = 'ImpactEffect';
   private particleSystem: ParticleSystem;
-  private hitObserver: Observer<{ position: Vector3; normal: Vector3 }> | null = null;
+
+  // Observers
+  private networkObserver: Observer<OnHitPayload> | null = null;
+  private weaponChangeObserver: Observer<any> | null = null;
+  private weaponObserver: Observer<any> | null = null;
 
   constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
 
-    // 파티클 시스템 미리 생성 (풀링 방식이 이상적이나 간소화)
     this.particleSystem = this.createParticleSystem();
   }
 
   public attach(target: Mesh): void {
     super.attach(target);
-    // 모든 표면 타격 이벤트 구독 (타겟 포함)
-    this.hitObserver = GameObservables.hitEffect.add((info) => {
-      this.playHitEffect(info.position);
+
+    // 1. Remote Events (via NetworkMediator)
+    this.networkObserver = NetworkMediator.getInstance().onHit.add((payload) => {
+      // Local Player Check (Ignore self-echo if predicted)
+      if (payload.shooterId === this.owner.id) {
+        if (this.isLocalPlayer()) {
+          return;
+        }
+      }
+
+      if (payload.hitPosition) {
+        const pos = new Vector3(
+          payload.hitPosition.x,
+          payload.hitPosition.y,
+          payload.hitPosition.z
+        );
+        this.playHitEffect(pos);
+      }
     });
+
+    // 2. Local Prediction (via CombatComponent)
+    if (this.isLocalPlayer()) {
+      const combat = this.owner.getComponent(CombatComponent);
+      if (combat) {
+        this.bindWeapon(combat.getCurrentWeapon() as IFirearm);
+
+        this.weaponChangeObserver = combat.onWeaponChanged.add((newWeapon) => {
+          this.bindWeapon(newWeapon as IFirearm);
+        });
+      }
+    }
+  }
+
+  private isLocalPlayer(): boolean {
+    const myId = NetworkManager.getInstance().getSocketId();
+    return this.owner.id === myId;
+  }
+
+  private bindWeapon(weapon: IFirearm): void {
+    // 기존 구독 해제
+    if (this.weaponObserver && weapon && weapon.onHitPredicted) {
+      weapon.onHitPredicted.remove(this.weaponObserver);
+    }
+
+    if (weapon && weapon.onHitPredicted) {
+      this.weaponObserver = weapon.onHitPredicted.add((info) => {
+        this.playHitEffect(info.position);
+      });
+    }
   }
 
   public detach(): void {
-    if (this.hitObserver) {
-      GameObservables.hitEffect.remove(this.hitObserver);
-      this.hitObserver = null;
+    if (this.networkObserver) {
+      NetworkMediator.getInstance().onHit.remove(this.networkObserver);
+      this.networkObserver = null;
     }
+
+    if (this.weaponChangeObserver) {
+      const combat = this.owner.getComponent(CombatComponent);
+      combat?.onWeaponChanged.remove(this.weaponChangeObserver);
+      this.weaponChangeObserver = null;
+    }
+
     super.detach();
   }
 

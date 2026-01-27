@@ -12,26 +12,28 @@ import {
 } from '@babylonjs/core';
 import { BaseWeaponEffectComponent } from './BaseWeaponEffectComponent';
 import { AssetLoader } from '../../loaders/AssetLoader';
-import { GameObservables } from '../../events/GameObservables';
+import { NetworkMediator } from '../../network/NetworkMediator';
+import { CombatComponent } from './CombatComponent';
+import { NetworkManager } from '../../network/NetworkManager';
 import type { IPawn } from '../../../types/IPawn';
-import { PlayerPawn } from '../../pawns/PlayerPawn';
-import { MuzzleTransform } from '../../../types/IWeapon';
+import { IFirearm, IWeapon } from '../../../types/IWeapon';
+import { OnFiredPayload } from '../../network/NetworkProtocol';
 
 /**
  * 총기류 전용 시각적 피드백 컴포넌트.
  * 총구 화염(Muzzle Flash)과 총성(Gunshot Sound)을 전담합니다.
+ * Local Prediction과 Network Event를 모두 처리합니다.
  */
 export class FirearmEffectComponent extends BaseWeaponEffectComponent {
   public name = 'FirearmEffect';
   private flashMaterial: StandardMaterial;
   private muzzleLight: PointLight;
   private gunshotSound: Sound | null = null;
-  private fireObserver: Observer<{
-    weaponId: string;
-    ammoRemaining: number;
-    fireType: 'firearm' | 'melee';
-    muzzleTransform?: MuzzleTransform;
-  }> | null = null;
+
+  // Observers
+  private networkObserver: Observer<OnFiredPayload> | null = null;
+  private weaponObserver: Observer<IWeapon> | null = null;
+  private weaponChangeObserver: Observer<IWeapon> | null = null;
 
   constructor(owner: IPawn, scene: Scene) {
     super(owner, scene);
@@ -50,28 +52,120 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
 
   public attach(target: Mesh): void {
     super.attach(target);
-    // 이벤트 구독: 'firearm' 타입인 경우에만 총구 화염 및 소리 발생
-    this.fireObserver = GameObservables.weaponFire.add((payload) => {
-      if (payload.fireType === 'firearm') {
-        this.playGunshot();
-        if (payload.muzzleTransform) {
-          this.emitMuzzleFlash(
-            payload.muzzleTransform.position,
-            payload.muzzleTransform.direction,
-            payload.muzzleTransform.transformNode,
-            payload.muzzleTransform.localMuzzlePosition
-          );
+
+    // 1. Remote Events (via NetworkMediator)
+    this.networkObserver = NetworkMediator.getInstance().onFired.add((payload) => {
+      // 내 캐릭터의 이벤트를 수신했을 때:
+      // - Local Player라면 Prediction으로 이미 재생했으므로 무시.
+      // - Remote Player라면 재생.
+      if (payload.shooterId === this.owner.id) {
+        if (this.isLocalPlayer()) {
+          return; // Ignore self-echo
         }
       }
+
+      // Remote Player firing (or me if checks passed)
+      // Convert payload Position/Direction to Vector3
+      if (payload.muzzleData) {
+        const pos = new Vector3(
+          payload.muzzleData.position.x,
+          payload.muzzleData.position.y,
+          payload.muzzleData.position.z
+        );
+        const dir = new Vector3(
+          payload.muzzleData.direction.x,
+          payload.muzzleData.direction.y,
+          payload.muzzleData.direction.z
+        );
+
+        this.playEffect(payload.weaponId, {
+          position: pos,
+          direction: dir,
+        });
+      } else {
+        this.playEffect(payload.weaponId);
+      }
     });
+
+    // 2. Local Prediction (via CombatComponent)
+    if (this.isLocalPlayer()) {
+      const combat = this.owner.getComponent(CombatComponent);
+      if (combat) {
+        // 초기 무기 바인딩
+        this.bindWeapon(combat.getCurrentWeapon() as IFirearm);
+
+        // 무기 교체 시 바인딩 갱신
+        this.weaponChangeObserver = combat.onWeaponChanged.add((newWeapon: IWeapon) => {
+          this.bindWeapon(newWeapon as IFirearm);
+        });
+      }
+    }
+  }
+
+  private isLocalPlayer(): boolean {
+    const myId = NetworkManager.getInstance().getSocketId();
+    return this.owner.id === myId;
+  }
+
+  private bindWeapon(weapon: IFirearm): void {
+    // Safety check: Ensure it's actually a Firearm (has muzzle transform)
+    if (!weapon || !('getMuzzleTransform' in weapon)) {
+      return;
+    }
+
+    if (weapon.onFirePredicted) {
+      this.weaponObserver = weapon.onFirePredicted.add((w) => {
+        // Double check in callback (though w should be the weapon itself)
+        if ('getMuzzleTransform' in w) {
+          const f = w as unknown as IFirearm;
+          this.playEffect(f.name, f.getMuzzleTransform());
+        }
+      });
+    }
   }
 
   public detach(): void {
-    if (this.fireObserver) {
-      GameObservables.weaponFire.remove(this.fireObserver);
-      this.fireObserver = null;
+    if (this.networkObserver) {
+      NetworkMediator.getInstance().onFired.remove(this.networkObserver);
+      this.networkObserver = null;
     }
+
+    if (this.weaponObserver && (this.owner as any).getComponent(CombatComponent)) {
+      const combat = this.owner.getComponent(CombatComponent);
+      const currentWeapon = combat?.getCurrentWeapon();
+      if (currentWeapon?.onFirePredicted) {
+        currentWeapon.onFirePredicted.remove(this.weaponObserver);
+      }
+      this.weaponObserver = null;
+    }
+
+    if (this.weaponChangeObserver) {
+      const combat = this.owner.getComponent(CombatComponent);
+      combat?.onWeaponChanged.remove(this.weaponChangeObserver);
+      this.weaponChangeObserver = null;
+    }
+
     super.detach();
+  }
+
+  private playEffect(
+    _weaponId: string,
+    muzzleData?: {
+      position: Vector3;
+      direction: Vector3;
+      transformNode?: TransformNode;
+      localMuzzlePosition?: Vector3;
+    }
+  ): void {
+    this.playGunshot();
+    if (muzzleData) {
+      this.emitMuzzleFlash(
+        muzzleData.position,
+        muzzleData.direction,
+        muzzleData.transformNode,
+        muzzleData.localMuzzlePosition
+      );
+    }
   }
 
   private playGunshot(): void {
@@ -114,12 +208,10 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
         flash.position.copyFrom(localPosition);
       }
     } else {
-      if (this.owner instanceof PlayerPawn && this.owner.camera) {
-        flash.parent = this.owner.camera;
-        flash.position = new Vector3(0, -0.1, 0.8);
-      } else {
-        flash.position = position;
-      }
+      // Fallback: If local player, assume camera relative?
+      // But we handled this in Firearm.getMuzzleTransform().
+      // Here we just use what is passed.
+      flash.position.copyFrom(position);
     }
 
     flash.rotation.z = Math.random() * Math.PI;

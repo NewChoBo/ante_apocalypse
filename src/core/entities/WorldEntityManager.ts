@@ -2,7 +2,7 @@ import { Observable, Vector3 } from '@babylonjs/core';
 import { IWorldEntity } from '../../types/IWorldEntity';
 import { IGameSystem } from '../types/IGameSystem';
 import { NetworkMediator } from '../network/NetworkMediator';
-import { EventCode } from '../network/NetworkProtocol';
+import { EventCode, OnDiedPayload } from '../network/NetworkProtocol';
 
 /**
  * 전역 엔티티 관리자.
@@ -40,45 +40,30 @@ export class WorldEntityManager implements IGameSystem {
       // 필요 시 처리
     });
 
-    // 2. 타겟 파괴 동기화
+    // 2. 타켓 파괴 동기화
     this.networkMediator.onTargetDestroyed.add((data) => {
       this.removeEntity(data.id || data.targetId || '');
     });
 
     // 3. Hit Detection (Server-Authoritative)
-    // Master: Handle Incoming Hit Requests
-    this.networkMediator.onHitRequested.add((data) => {
-      if (this.networkMediator.isMasterClient()) {
-        this.handleHitRequest(data);
+    // Client: Handle Confirmed Hits (Sync HP/Death)
+    this.networkMediator.onHit.add((data) => {
+      this.applyConfirmedHit(data.targetId, data.damage, data.remainingHealth);
+    });
+
+    // 4. Death Detection (Sync Death)
+    this.networkMediator.onPlayerDied.add((data) => {
+      // Player death is handled in MultiplayerSystem/SessionController
+      // But if an enemy died, it might be broadcasted as ON_DIED too
+      const entity = this.entities.get(data.playerId);
+      if (entity && entity.type === 'enemy') {
+        this.removeEntity(data.playerId);
       }
     });
 
-    // Client: Handle Confirmed Hits (Sync HP/Death)
-    this.networkMediator.onHitConfirmed.add((data) => {
-      this.applyConfirmedHit(data.targetId, data.damage, data.remainingHealth);
-    });
-  }
-
-  // Master Logic
-  private handleHitRequest(data: {
-    targetId: string;
-    damage: number;
-    shooterId: string;
-    hitPosition: { x: number; y: number; z: number };
-  }): void {
-    const entity = this.entities.get(data.targetId);
-    if (!entity || entity.isDead) return;
-
-    // Validation logic here (e.g. check distance, line of sight)
-    // For now, accept valid entity hit.
-
-    this.processHit(
-      data.targetId,
-      data.damage,
-      'body',
-      true,
-      new Vector3(data.hitPosition.x, data.hitPosition.y, data.hitPosition.z)
-    );
+    // Note: REQ_HIT is handled primarily by ServerGameController.
+    // ServerGameController broadcasts ON_HIT.
+    // WorldEntityManager responds to ON_HIT on all clients (including Master).
   }
 
   // Client/Local Logic
@@ -86,20 +71,17 @@ export class WorldEntityManager implements IGameSystem {
     const entity = this.entities.get(targetId);
     if (!entity) return;
 
-    // 1. Apply damage locally for feedback (FX, Sound, standard logic)
-    // false = do not broadcast again
-    this.processHit(targetId, damage, 'body', false);
-
-    // 2. Force update health/state to match server (Authoritative Correction)
+    // 1. Apply visual/sound feedback
+    // We call takeDamage but with a flag or just update HP
+    // IWorldEntity.updateHealth is preferred for authority correction
     if (remainingHealth >= 0) {
-      // Ideally we cast to a type that supports health setting or use IWorldEntity if we add setHealth
-      // For now, check if it has updateHealth method (RemotePlayerPawn)
-      if ('updateHealth' in entity && typeof (entity as any).updateHealth === 'function') {
-        (entity as any).updateHealth(remainingHealth);
-      } else {
-        entity.health = remainingHealth;
-      }
+      entity.updateHealth(remainingHealth);
+    } else {
+      // Blind sync: just subtract damage if HP not known
+      entity.takeDamage(damage, 'remote', 'body');
     }
+
+    this.onEntityHit.notifyObservers({ id: targetId, part: 'body', damage: damage });
   }
 
   /** 엔티티 등록 */
@@ -151,28 +133,23 @@ export class WorldEntityManager implements IGameSystem {
     const entity = this.entities.get(id);
     if (!entity || entity.isDead) return;
 
-    // 1. If Broadcast is requested (Origin: Local Player)
-    //    Perform Server-Auth Check
+    // [REQ/ON Pattern]
+    // If broadcast is true, it means this call originated from some local interaction (e.g. Raycast)
     if (broadcast) {
-      if (this.networkMediator.getSocketId() && !this.networkMediator.isMasterClient()) {
-        // I am a Client. Send Request.
-        this.networkMediator.sendEvent(EventCode.REQ_HIT, {
-          targetId: id,
-          damage: damage,
-          hitPosition: hitPoint
-            ? { x: hitPoint.x, y: hitPoint.y, z: hitPoint.z }
-            : { x: 0, y: 0, z: 0 },
-        });
-        // Do NOT apply damage locally yet (wait for confirmation)
-        // Or apply Cosmetic Only?
-        // Existing BaseWeapon already does visual Hit Effect via GameObservables.hitEffect
-        // So here we strictly control Logic (HP reduction).
-        return;
-      }
+      // Send REQ_HIT to Server.
+      this.networkMediator.sendEvent(EventCode.REQ_HIT, {
+        targetId: id,
+        damage: damage,
+        hitPosition: hitPoint
+          ? { x: hitPoint.x, y: hitPoint.y, z: hitPoint.z }
+          : { x: 0, y: 0, z: 0 },
+      });
+      // Do not apply logic locally. Wait for ON_HIT.
+      return;
     }
 
-    // 2. Execution (Master or Single Player or Confirmed Local Apply)
-    // 데미지 계산 (엔티티의 프로필 활용)
+    // This part is called when broadcast=false (from applyConfirmedHit)
+    // or when in Single Player (where mediator is null/stubbed?)
     let finalDamage = damage;
     if (entity.damageProfile) {
       const multiplier =
@@ -183,36 +160,17 @@ export class WorldEntityManager implements IGameSystem {
     entity.takeDamage(finalDamage, 'source', part, hitPoint);
     this.onEntityHit.notifyObservers({ id, part, damage: finalDamage });
 
-    // 3. If Master, Broadcast Confirmation (Sync)
-    if (
-      broadcast &&
-      (this.networkMediator.isMasterClient() || !this.networkMediator.getSocketId())
-    ) {
-      // Single Player or Master
-      if (this.networkMediator.isMasterClient()) {
-        // Broadcast 'CONFIRM_HIT' to sync everyone
-        // Note: We currently don't track HP in EntityManager centrally, so we just send damage.
-        this.networkMediator.sendEvent(EventCode.CONFIRM_HIT, {
-          targetId: id,
-          damage: finalDamage,
-          remainingHealth: -1, // Todo: Get actual health if available
-        });
-      }
-    }
-
-    // 사망 시 처리
-    if (entity.isDead) {
-      // Local state check
-      if (this.networkMediator.isMasterClient() || !this.networkMediator.getSocketId()) {
-        this.broadcastDestroy(entity);
-      }
+    // Master Client specific cleanup
+    if (this.networkMediator.isMasterClient() && entity.isDead) {
+      this.broadcastDestroy(entity);
       this.removeEntity(id);
     }
   }
 
   private broadcastDestroy(entity: IWorldEntity): void {
-    if (entity.type === 'enemy' && this.networkMediator.isMasterClient()) {
-      this.networkMediator.sendEvent(EventCode.DESTROY_ENEMY, { id: entity.id });
+    if (entity.type === 'enemy') {
+      const onDied = new OnDiedPayload(entity.id, undefined, 'Shot');
+      this.networkMediator.sendEvent(EventCode.ON_DIED, onDied, true);
     } else if (entity.type.includes('target')) {
       this.networkMediator.sendEvent(EventCode.TARGET_DESTROY, {
         id: entity.id,

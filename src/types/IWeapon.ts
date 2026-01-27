@@ -1,4 +1,4 @@
-import { Vector3, TransformNode } from '@babylonjs/core';
+import { Vector3, TransformNode, Observable } from '@babylonjs/core';
 
 /**
  * 총구의 위치와 방향을 제공하는 인터페이스.
@@ -64,7 +64,12 @@ export interface IWeapon {
   addAmmo(amount: number): void;
 
   /** 리소스 해제 */
+  /** 리소스 해제 */
   dispose(): void;
+
+  // Prediction Events
+  onFirePredicted: Observable<IWeapon>;
+  onHitPredicted: Observable<{ position: Vector3; normal: Vector3 }>;
 }
 
 /**

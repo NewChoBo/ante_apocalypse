@@ -4,11 +4,9 @@ import {
   playerHealthStore,
   gameTimerStore,
   gameStateStore,
+  crosshairKickStore,
   AmmoState,
 } from '../core/store/GameStore';
-import { GameObservables } from '../core/events/GameObservables';
-import { MuzzleTransform } from '../types/IWeapon';
-import { Observer } from '@babylonjs/core';
 import { AdvancedDynamicTexture, TextBlock, Rectangle, Control } from '@babylonjs/gui';
 import { UIManager } from './UIManager';
 
@@ -34,14 +32,11 @@ export class HUD {
   private timerUnsub: (() => void) | null = null;
   private healthUnsub: (() => void) | null = null;
   private gameStateUnsub: (() => void) | null = null;
-  private weaponFireObserver: Observer<{
-    weaponId: string;
-    ammoRemaining: number;
-    fireType: 'firearm' | 'melee';
-    muzzleTransform?: MuzzleTransform;
-  }> | null = null;
+  private recoilUnsub: (() => void) | null = null;
+
   private expandTimeout: ReturnType<typeof setTimeout> | null = null;
   private previousHealth: number = 100;
+  private previousRecoilVal: number = 0;
 
   constructor() {
     this.ui = UIManager.getInstance().getTexture();
@@ -151,7 +146,6 @@ export class HUD {
     this.ui.addControl(this.crosshair);
 
     // 6. Timer (Top Center)
-    // 6. Timer (Top Center)
     this.timerText = new TextBlock('timerValue', '00:00');
     this.timerText.color = 'white';
     this.timerText.fontSize = 30;
@@ -220,7 +214,14 @@ export class HUD {
     });
 
     // Crosshair Recoil
-    this.weaponFireObserver = GameObservables.weaponFire.add(() => {
+    this.recoilUnsub = crosshairKickStore.subscribe((val) => {
+      if (val === 0 || val === this.previousRecoilVal) {
+        this.previousRecoilVal = val;
+        return;
+      }
+
+      this.previousRecoilVal = val;
+
       this.crosshair.width = '20px';
       this.crosshair.height = '20px';
 
@@ -263,9 +264,9 @@ export class HUD {
       this.gameStateUnsub();
       this.gameStateUnsub = null;
     }
-    if (this.weaponFireObserver) {
-      GameObservables.weaponFire.remove(this.weaponFireObserver);
-      this.weaponFireObserver = null;
+    if (this.recoilUnsub) {
+      this.recoilUnsub();
+      this.recoilUnsub = null;
     }
     if (this.expandTimeout) {
       clearTimeout(this.expandTimeout);

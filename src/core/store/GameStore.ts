@@ -9,6 +9,7 @@ declare global {
       playerHealthStore: WritableAtom<number>;
       inventoryStore: MapStore<InventoryState>;
       gameTimerStore: WritableAtom<string>;
+      crosshairKickStore: WritableAtom<number>;
     };
   }
 }
@@ -20,6 +21,7 @@ type GameStores = {
   playerHealthStore: WritableAtom<number>;
   inventoryStore: MapStore<InventoryState>;
   gameTimerStore: WritableAtom<string>;
+  crosshairKickStore: WritableAtom<number>;
 };
 
 let localStores: GameStores | null = null;
@@ -45,6 +47,7 @@ function createStores(): GameStores {
       maxBagSlots: 24,
     }),
     gameTimerStore: atom<string>('00:00'),
+    crosshairKickStore: atom<number>(0),
   };
 }
 
@@ -100,7 +103,22 @@ export interface AmmoState {
   showAmmo: boolean;
 }
 
-const { scoreStore, gameStateStore, ammoStore, playerHealthStore, inventoryStore, gameTimerStore } =
-  initStores();
+const {
+  scoreStore,
+  gameStateStore,
+  ammoStore,
+  playerHealthStore,
+  inventoryStore,
+  gameTimerStore,
+  crosshairKickStore,
+} = initStores();
 
-export { scoreStore, gameStateStore, ammoStore, playerHealthStore, inventoryStore, gameTimerStore };
+export {
+  scoreStore,
+  gameStateStore,
+  ammoStore,
+  playerHealthStore,
+  inventoryStore,
+  gameTimerStore,
+  crosshairKickStore,
+};

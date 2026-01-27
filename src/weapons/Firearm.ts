@@ -8,13 +8,14 @@ import {
   StandardMaterial,
   Color3,
   Animation,
+  Observable,
 } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon';
-import { GameObservables } from '../core/events/GameObservables';
+
 import { ammoStore } from '../core/store/GameStore';
-import { MuzzleTransform, IFirearm } from '../types/IWeapon';
+import { MuzzleTransform, IFirearm, IWeapon } from '../types/IWeapon';
 import { NetworkManager } from '../core/network/NetworkManager';
-import { ReqHitPayload } from '../core/network/NetworkProtocol';
+import { ReqHitPayload, ReqFirePayload, EventCode } from '../core/network/NetworkProtocol';
 import { GameAssets } from '../core/loaders/AssetLoader';
 import { WeaponUtils } from '../utils/WeaponUtils';
 
@@ -59,6 +60,17 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     this.currentAmmo = initialAmmo;
     this.reserveAmmo = reserveAmmo;
     this.applyRecoilCallback = applyRecoil;
+
+    // Listen for server-authoritative ammo updates
+    NetworkManager.getInstance().onAmmoSynced.add((data) => {
+      if (data.weaponId === this.name) {
+        this.currentAmmo = data.currentAmmo;
+        this.reserveAmmo = data.reserveAmmo;
+        if (this.isActive) {
+          this.updateAmmoStore();
+        }
+      }
+    });
   }
 
   /** 총구 트랜스폼 정보 제공 (IMuzzleProvider 구현) */
@@ -86,39 +98,34 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     return { position: pos, direction: forward };
   }
 
+  public onFirePredicted = new Observable<IWeapon>();
+  public onHitPredicted = new Observable<{ position: Vector3; normal: Vector3 }>();
+
   public fire(): boolean {
     if (this.isReloading) return false;
 
     const now = performance.now() / 1000;
     if (now - this.lastFireTime < this.fireRate) return false;
 
+    // [Server Authority] Do not decrement ammo locally. Wait for ON_AMMO_SYNC.
     if (this.currentAmmo <= 0) {
       this.reload();
       return false;
     }
 
-    this.currentAmmo--;
     this.lastFireTime = now;
     this.onFire();
 
     // [Prediction] Client-side visual/audio effect
-    // We notify observers to play sounds/muzzle flash locally immediately
-    GameObservables.weaponFire.notifyObservers({
-      weaponId: this.name,
-      ammoRemaining: this.currentAmmo,
-      fireType: 'firearm',
-      muzzleTransform: this.getMuzzleTransform(),
-    });
+    this.onFirePredicted.notifyObservers(this);
 
     // [Authority] Send Fire Request to Master Client
     const muzzle = this.getMuzzleTransform();
-    NetworkManager.getInstance().requestFire({
-      weaponId: this.name,
-      muzzleData: {
-        position: { x: muzzle.position.x, y: muzzle.position.y, z: muzzle.position.z },
-        direction: { x: muzzle.direction.x, y: muzzle.direction.y, z: muzzle.direction.z },
-      },
+    const req = new ReqFirePayload(this.name, {
+      position: { x: muzzle.position.x, y: muzzle.position.y, z: muzzle.position.z },
+      direction: { x: muzzle.direction.x, y: muzzle.direction.y, z: muzzle.direction.z },
     });
+    NetworkManager.getInstance().requestFire(req);
 
     // 자체 반동 처리
     if (this.applyRecoilCallback) {
@@ -127,10 +134,6 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
 
     if (this.isActive) {
       this.updateAmmoStore();
-    }
-
-    if (this.currentAmmo <= 0 && this.reserveAmmo > 0) {
-      this.reload();
     }
 
     return true;
@@ -153,19 +156,20 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
       return;
     }
 
+    // 1. Prediction/Visual feedback (Optional: start reload animation)
     this.isReloading = true;
     this.isFiring = false;
     this.onReloadStart();
     this.ejectMagazine();
 
+    // 2. [Authority] Send Reload Request to Master Client
+    const req = { weaponId: this.name }; // ReqReloadPayload matches this record/class
+    NetworkManager.getInstance().sendEvent(EventCode.REQ_RELOAD, req, true);
+
+    // 3. Local Timer to end "Reloading" state (Estimated time)
+    // Server will eventually send ON_AMMO_SYNC which tells us exact new state.
     setTimeout(() => {
-      const needed = this.magazineSize - this.currentAmmo;
-      const amount = Math.min(needed, this.reserveAmmo);
-
-      this.currentAmmo += amount;
-      this.reserveAmmo -= amount;
       this.isReloading = false;
-
       this.onReloadEnd();
 
       if (this.isActive) {
@@ -221,8 +225,8 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
 
     if (pickInfo?.hit && pickInfo.pickedMesh) {
       // 1. [Prediction] 공통 타격 이펙트 (벽, 바닥, 타겟 모두 포함)
-      // Play hit effect immediately for responsiveness
-      GameObservables.hitEffect.notifyObservers({
+      // Play hit effect immediately for responsiveness via Local Prediction
+      this.onHitPredicted.notifyObservers({
         position: pickInfo.pickedPoint!,
         normal: pickInfo.getNormal(true) || Vector3.Up(),
       });
@@ -230,9 +234,17 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
       // 2. [Authority] Send Hit Request to Master Client
       // Do NOT apply damage locally. Wait for CONFIRM_HIT or Entity Update.
       if (pickInfo.pickedMesh) {
-        // Identify target ID (assuming mesh.name or parent/metadata holds ID)
-        // For now using mesh.name as ID, but in real game this should be a robust entity ID
-        const targetId = pickInfo.pickedMesh.name;
+        // Identify target ID using metadata (pawn or direct id)
+        const metadata = pickInfo.pickedMesh.metadata;
+        let targetId = pickInfo.pickedMesh.name;
+
+        if (metadata) {
+          if (metadata.pawn && metadata.pawn.id) {
+            targetId = metadata.pawn.id;
+          } else if (metadata.id) {
+            targetId = metadata.id;
+          }
+        }
 
         const hitReq = new ReqHitPayload(targetId, this.damage, {
           x: pickInfo.pickedPoint!.x,

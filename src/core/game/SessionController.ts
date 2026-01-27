@@ -16,6 +16,7 @@ import { PickupManager } from '../entities/PickupManager';
 import { PickupType } from '../entities/PickupActor';
 import { TargetSpawnerComponent } from '../components/network/TargetSpawnerComponent';
 import { WorldEntityManager } from '../entities/WorldEntityManager';
+import { IWeapon } from '../../types/IWeapon';
 import { EnemyManager } from '../entities/EnemyManager';
 import { AssetLoader } from '../loaders/AssetLoader';
 import { LifetimeManager } from './LifetimeManager';
@@ -111,19 +112,15 @@ export class SessionController implements IGameSystem {
     lm.trackUnsub(
       playerHealthStore.subscribe((health: number) => {
         if (health <= 0) {
-          // GameObservables.playerDied is handled by PlayerPawn.die()
-          if (this.multiplayerSystem) {
-            const nm = NetworkManager.getInstance();
-            nm.sendEvent(EventCode.PLAYER_DEATH, {
-              playerId: nm.getSocketId() || 'unknown',
-              attackerId: 'unknown',
-            });
-          }
+          // Local death logic (VFX, Game Over UI) is triggered by PlayerPawn.die()
+          // which is called by updateHealth() or takeDamage()
+          // We no longer broadcast PLAYER_DEATH from client.
+          // Server sends ON_DIED (202).
         }
       })
     );
 
-    combatComp.onWeaponChanged((newWeapon: { name: string }) => {
+    combatComp.onWeaponChanged.add((newWeapon: IWeapon) => {
       this.syncInventoryStore();
       if (this.multiplayerSystem) {
         NetworkManager.getInstance().syncWeapon(newWeapon.name);

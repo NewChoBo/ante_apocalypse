@@ -117,6 +117,35 @@ export class MultiplayerSystem implements IGameSystem {
     });
 
     // onPlayerHit handles damage sync for both local and remote
+    this.networkMediator.onHit.add((data) => {
+      // Find the entity that was hit
+      const targetId = data.targetId;
+      const isLocal = targetId === this.networkMediator.getSocketId();
+
+      if (isLocal) {
+        this.localPlayer.updateHealth(data.remainingHealth);
+      } else {
+        const remote = this.remotePlayers.get(targetId);
+        if (remote) {
+          remote.updateHealth(data.remainingHealth);
+        }
+      }
+    });
+
+    this.networkMediator.onPlayerDied.add((data) => {
+      const targetId = data.playerId;
+      const isLocal = targetId === this.networkMediator.getSocketId();
+
+      if (isLocal) {
+        if (!this.localPlayer.isDead) this.localPlayer.die();
+      } else {
+        const remote = this.remotePlayers.get(targetId);
+        if (remote && !remote.isDead) {
+          remote.die();
+        }
+      }
+    });
+
     this.networkMediator.onEnemyUpdated.add((_data) => {
       // Enemy specific sync can go here if needed
     });
@@ -178,7 +207,7 @@ export class MultiplayerSystem implements IGameSystem {
       position: { x: remote.mesh.position.x, y: remote.mesh.position.y, z: remote.mesh.position.z },
       rotation: { x: 0, y: remote.mesh.rotation.y, z: 0 },
       weaponId: remote.getComponent(CombatComponent)?.getCurrentWeapon()?.name || 'Pistol',
-      health: 100, // RemotePlayerPawn should eventually assume health tracking if needed
+      health: remote.health, // RemotePlayerPawn health is updated via NetworkMediator.onHit
     }));
   }
 }

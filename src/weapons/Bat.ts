@@ -8,7 +8,7 @@ import {
   Mesh,
 } from '@babylonjs/core';
 import { MeleeWeapon } from './MeleeWeapon';
-import { GameObservables } from '../core/events/GameObservables';
+import { AssetLoader } from '../core/loaders/AssetLoader';
 
 /**
  * 야구 방망이 (Bat) - 근접 무기
@@ -93,12 +93,16 @@ export class Bat extends MeleeWeapon {
     this.isAnimating = true;
     this.swingAnimationTimer = 0;
 
-    // 공격 사운드 및 이벤트 발행 (swipe 사운드 재사용 혹은 전용 사운드)
-    GameObservables.weaponFire.notifyObservers({
-      weaponId: this.name,
-      ammoRemaining: 0,
-      fireType: 'melee',
-    });
+    // 공격 사운드
+    const sound = AssetLoader.getInstance().getSound('swipe');
+    if (sound) {
+      // 랜덤 피치
+      sound.setPlaybackRate(0.9 + Math.random() * 0.2);
+      sound.play();
+    }
+
+    // UI Event
+    this.onFirePredicted.notifyObservers(this);
 
     // 공격 판정 (보정된 다중 레이캐스트 적용)
     // MeleeWeapon.checkMeleeHit internaly calls processHit which handles damage/points.

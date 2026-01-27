@@ -1,23 +1,26 @@
 import { Observable } from '@babylonjs/core';
 import { INetworkProvider } from './INetworkProvider';
 import { PhotonProvider } from './providers/PhotonProvider';
+import { ServerGameController } from '../server/ServerGameController';
 import {
   RoomData,
   NetworkState,
   EventCode,
   EventData,
   MovePayload,
-  FirePayload,
+  ReqFirePayload,
+  OnFiredPayload,
   SyncWeaponPayload,
   EnemyUpdateData,
   InitialStatePayload,
-  PlayerDeathPayload,
   TargetDestroyData,
   TargetSpawnData,
   ReqInitialStatePayload,
   PlayerData,
   ReqHitPayload,
-  ConfirmHitPayload,
+  OnHitPayload,
+  OnAmmoSyncPayload,
+  OnDiedPayload,
 } from './NetworkProtocol';
 
 export interface FireEventData {
@@ -38,16 +41,18 @@ export class NetworkManager {
   private static instance: NetworkManager;
   private provider: INetworkProvider;
   private state: NetworkState = NetworkState.Disconnected;
+  private serverController: ServerGameController | null = null;
 
   public onPlayersList = new Observable<PlayerData[]>();
   public onPlayerJoined = new Observable<PlayerData>();
   public onPlayerUpdated = new Observable<PlayerData>();
   public onPlayerLeft = new Observable<string>();
+
+  // Game Logic Observables (Driven by ON_ events)
   public onPlayerFired = new Observable<FireEventData>();
   public onPlayerDied = new Observable<DeathEventData>();
-
-  // Hit/Damage Events
-  public onPlayerHit = new Observable<ConfirmHitPayload>();
+  public onPlayerHit = new Observable<OnHitPayload>();
+  public onAmmoSynced = new Observable<OnAmmoSyncPayload>();
 
   // Enemy Synchronization
   public onEnemyUpdated = new Observable<EnemyUpdateData>();
@@ -83,6 +88,7 @@ export class NetworkManager {
     this.provider.onStateChanged = (state): void => {
       this.state = state;
       this.onStateChanged.notifyObservers(state);
+      this.checkServerAuthority();
     };
 
     this.provider.onRoomListUpdated = (rooms): void => {
@@ -91,6 +97,7 @@ export class NetworkManager {
     };
 
     this.provider.onPlayerJoined = (user): void => {
+      this.checkServerAuthority(); // Re-check, maybe user joined triggers something or I need to state-check
       const newState: PlayerData = {
         id: user.userId,
         name: user.name || 'Anonymous',
@@ -103,16 +110,21 @@ export class NetworkManager {
     };
 
     this.provider.onPlayerLeft = (id): void => {
+      // If master left, I might become master.
+      // PhotonProvider usually updates isMasterClient internal flag before calling generic callbacks?
+      // We rely on polling checkServerAuthority or provider specific hook.
+      setTimeout(() => this.checkServerAuthority(), 100); // Slight delay to ensure Photon updated state
       this.onPlayerLeft.notifyObservers(id);
     };
 
     this.provider.onEvent = (code, data, senderId): void => {
+      // 1. Notify Raw Observers (e.g. ServerGameController, NetworkMediator)
       this.onEvent.notifyObservers({ code, data, senderId });
 
+      // 2. Process Notifications (ON_*) to update View/GameState
       switch (code) {
         case EventCode.MOVE: {
           const moveData = data as MovePayload;
-          // Stateless Relay: Pass data directly to observers
           this.onPlayerUpdated.notifyObservers({
             id: senderId,
             name: 'Unknown',
@@ -122,18 +134,27 @@ export class NetworkManager {
           });
           break;
         }
-        case EventCode.FIRE: {
-          const fireData = data as FirePayload;
+        case EventCode.ON_FIRED: {
+          const fireData = data as OnFiredPayload;
           this.onPlayerFired.notifyObservers({
-            playerId: senderId,
+            playerId: fireData.shooterId,
             weaponId: fireData.weaponId,
             muzzleTransform: fireData.muzzleData,
           });
           break;
         }
+        case EventCode.ON_HIT: {
+          const hitData = data as OnHitPayload;
+          this.onPlayerHit.notifyObservers(hitData);
+          break;
+        }
+        case EventCode.ON_AMMO_SYNC: {
+          const ammoData = data as OnAmmoSyncPayload;
+          this.onAmmoSynced.notifyObservers(ammoData);
+          break;
+        }
         case EventCode.SYNC_WEAPON: {
           const syncData = data as SyncWeaponPayload;
-          // Stateless Relay
           this.onPlayerUpdated.notifyObservers({
             id: senderId,
             name: 'Unknown',
@@ -146,9 +167,14 @@ export class NetworkManager {
         case EventCode.ENEMY_MOVE:
           this.onEnemyUpdated.notifyObservers(data as EnemyUpdateData);
           break;
-        case EventCode.PLAYER_DEATH:
-          this.onPlayerDied.notifyObservers(data as PlayerDeathPayload);
+        case EventCode.ON_DIED: {
+          const deathData = data as OnDiedPayload;
+          this.onPlayerDied.notifyObservers({
+            playerId: deathData.victimId,
+            attackerId: deathData.killerId || '',
+          });
           break;
+        }
         case EventCode.TARGET_DESTROY:
           this.onTargetDestroy.notifyObservers(data as TargetDestroyData);
           break;
@@ -166,26 +192,24 @@ export class NetworkManager {
           this.onInitialStateReceived.notifyObservers(initialState);
           break;
         }
-        case EventCode.REQ_FIRE: {
-          if (this.isMasterClient()) {
-            // Master Logic: Validate fire request (cooldown, ammo, etc.)
-            // For now, simpler: just broadcast FIRE event
-            const fireData = data as FirePayload;
-            this.sendEvent(EventCode.FIRE, fireData, true);
-          }
-          break;
-        }
-        case EventCode.REQ_HIT: {
-          // Master Logic: Handled by WorldEntityManager via onHitRequested
-          break;
-        }
-        case EventCode.CONFIRM_HIT: {
-          const confirmData = data as ConfirmHitPayload;
-          this.onPlayerHit.notifyObservers(confirmData);
-          break;
-        }
+        // REQ_ events are ignored here (Handled by ServerGameController via onEvent)
       }
     };
+  }
+
+  /**
+   * Gatekeeper Logic: Manages the Logical Server instance based on Authority.
+   */
+  private checkServerAuthority(): void {
+    const isMaster = this.isMasterClient();
+    if (isMaster && !this.serverController) {
+      console.log('[NetworkManager] Becoming Master Client. Starting Logical Server...');
+      this.serverController = new ServerGameController();
+    } else if (!isMaster && this.serverController) {
+      console.log('[NetworkManager] No longer Master Client. Disposing Logical Server...');
+      this.serverController.dispose();
+      this.serverController = null;
+    }
   }
 
   public connect(userId: string): void {
@@ -254,16 +278,8 @@ export class NetworkManager {
     this.provider.sendEvent(code, data, reliable);
   }
 
-  public requestFire(payload: FirePayload): void {
-    // Send Request to Master
+  public requestFire(payload: ReqFirePayload): void {
     this.sendEvent(EventCode.REQ_FIRE, payload, true);
-  }
-
-  /**
-   * @deprecated Use requestFire instead for Server Authority
-   */
-  public fire(payload: FirePayload): void {
-    this.sendEvent(EventCode.FIRE, payload, true);
   }
 
   public requestHit(payload: ReqHitPayload): void {

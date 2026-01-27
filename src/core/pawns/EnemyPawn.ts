@@ -317,6 +317,14 @@ export class EnemyPawn extends BasePawn {
     }
   }
 
+  public updateHealth(amount: number): void {
+    this.health = amount;
+    this.updateHealthBar(amount);
+    if (this.health <= 0 && !this.isDead) {
+      this.die();
+    }
+  }
+
   public die(): void {
     if (this.isDead) return;
     this.isDead = true;

@@ -1,5 +1,4 @@
 import { Observable, Vector3 } from '@babylonjs/core';
-import { MuzzleTransform } from '../../types/IWeapon';
 import { IPawn } from '../../types/IPawn';
 
 /**
@@ -23,16 +22,6 @@ export interface TargetDestroyedInfo {
 export const GameObservables = {
   /** 타겟이 파괴됨 */
   targetDestroyed: new Observable<TargetDestroyedInfo>(),
-
-  weaponFire: new Observable<{
-    weaponId: string;
-    ammoRemaining: number;
-    fireType: 'firearm' | 'melee';
-    muzzleTransform?: MuzzleTransform;
-  }>(),
-
-  /** 타격 발생 (VFX 연출용) */
-  hitEffect: new Observable<{ position: Vector3; normal: Vector3 }>(),
 
   /** 타겟 피격 (상세 정보 포함) */
   targetHit: new Observable<{

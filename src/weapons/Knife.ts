@@ -8,7 +8,7 @@ import {
   Mesh,
 } from '@babylonjs/core';
 import { MeleeWeapon } from './MeleeWeapon';
-import { GameObservables } from '../core/events/GameObservables';
+import { AssetLoader } from '../core/loaders/AssetLoader';
 
 /**
  * 근접 공격용 칼(Knife) 클래스.
@@ -92,12 +92,16 @@ export class Knife extends MeleeWeapon {
     this.isAnimating = true;
     this.swingAnimationTimer = 0;
 
-    // 발사 이벤트 발행 (사운드 및 HUD 연동용)
-    GameObservables.weaponFire.notifyObservers({
-      weaponId: this.name,
-      ammoRemaining: 0,
-      fireType: 'melee',
-    });
+    // 발사 이벤트 발행 (사운드)
+    const sound = AssetLoader.getInstance().getSound('swipe');
+    if (sound) {
+      // 칼은 조금 더 높은 피치
+      sound.setPlaybackRate(1.1 + Math.random() * 0.2);
+      sound.play();
+    }
+
+    // UI Event
+    this.onFirePredicted.notifyObservers(this);
 
     // 공격 판정 (보정된 다중 레이캐스트 적용)
     // MeleeWeapon.checkMeleeHit internaly calls processHit which handles damage/points.

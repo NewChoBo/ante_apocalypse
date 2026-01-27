@@ -1,8 +1,9 @@
 export enum EventCode {
+  // System Events
   JOIN = 1,
   LEAVE = 2,
   MOVE = 3,
-  FIRE = 5,
+  // FIRE = 5, // Deprecated in favor of REQ/ON pattern
   SYNC_WEAPON = 7,
   ENEMY_MOVE = 9,
   TARGET_DESTROY = 11,
@@ -13,12 +14,21 @@ export enum EventCode {
   DESTROY_ENEMY = 17,
   SPAWN_PICKUP = 18,
   DESTROY_PICKUP = 19,
-  PLAYER_DEATH = 20,
+  // PLAYER_DEATH = 20, // Deprecated, use ON_DIED
   REQ_PICKUP = 21,
   PICKUP_GRANTED = 22,
-  REQ_HIT = 23,
-  CONFIRM_HIT = 24,
-  REQ_FIRE = 25,
+
+  // [C -> S] Requests
+  REQ_FIRE = 100,
+  REQ_RELOAD = 101,
+  REQ_HIT = 102,
+
+  // [S -> C] Notifications
+  ON_FIRED = 200,
+  ON_HIT = 201,
+  ON_DIED = 202, // Broadcasts death
+  ON_STATE_SYNC = 203, // Full state sync for late joiners
+  ON_AMMO_SYNC = 204,
 }
 
 export class RoomData {
@@ -57,8 +67,8 @@ export interface PlayerData {
   position?: { x: number; y: number; z: number };
   rotation?: { x: number; y: number; z: number; w?: number };
   state?: string;
-  weaponId?: string; // Added
-  health?: number; // Added
+  weaponId?: string;
+  health?: number;
   [key: string]: unknown;
 }
 
@@ -80,17 +90,86 @@ export class MovePayload {
     public readonly position: Position,
     public readonly rotation: Rotation,
     public readonly velocity?: Position,
-    public readonly weaponId?: string // Added to support syncing weapon with movement
+    public readonly weaponId?: string
   ) {}
 }
 
-export class FirePayload {
+// --- Protocol for Logical Server ---
+
+// [REQ] Fire
+export class ReqFirePayload {
   constructor(
     public readonly weaponId: string,
     public readonly muzzleData?: {
       position: Position;
       direction: Position;
     }
+  ) {}
+}
+
+// [ON] Fired (Broadcast to all)
+export class OnFiredPayload {
+  constructor(
+    public readonly shooterId: string,
+    public readonly weaponId: string,
+    public readonly muzzleData?: {
+      position: Position;
+      direction: Position;
+    }
+  ) {}
+}
+
+// [REQ] Reload
+export class ReqReloadPayload {
+  constructor(public readonly weaponId: string) {}
+}
+
+// [REQ] Hit
+export class ReqHitPayload {
+  constructor(
+    public readonly targetId: string,
+    public readonly damage: number,
+    public readonly hitPosition: Position,
+    public readonly hitNormal?: Position
+  ) {}
+}
+
+// [ON] Hit (Confirmed) - Previously used, ensuring it matches new needs
+export class OnHitPayload {
+  constructor(
+    public readonly targetId: string,
+    public readonly damage: number,
+    public readonly remainingHealth: number,
+    public readonly shooterId?: string, // Optional info
+    public readonly hitPosition?: Position,
+    public readonly hitNormal?: Position
+  ) {}
+}
+
+// [ON] Died
+export class OnDiedPayload {
+  constructor(
+    public readonly victimId: string,
+    public readonly killerId?: string,
+    public readonly reason?: string
+  ) {}
+}
+
+// [ON] State Sync (Full World State)
+export class OnStateSyncPayload {
+  constructor(
+    public readonly timestamp: number,
+    public readonly players: PlayerData[]
+    // Add enemies/pickups here if needed
+  ) {}
+}
+
+// [ON] Ammo Sync (Private or Public)
+export class OnAmmoSyncPayload {
+  constructor(
+    public readonly weaponId: string,
+    public readonly currentAmmo: number,
+    public readonly reserveAmmo: number
   ) {}
 }
 
@@ -180,26 +259,16 @@ export class PickupGrantedPayload {
   ) {}
 }
 
-export class ReqHitPayload {
-  constructor(
-    public readonly targetId: string,
-    public readonly damage: number,
-    public readonly hitPosition: Position,
-    public readonly hitNormal?: Position
-  ) {}
-}
-
-export class ConfirmHitPayload {
-  constructor(
-    public readonly targetId: string,
-    public readonly damage: number,
-    public readonly remainingHealth: number
-  ) {}
-}
-
 export type EventData =
   | MovePayload
-  | FirePayload
+  | ReqFirePayload
+  | OnFiredPayload
+  | OnAmmoSyncPayload
+  | ReqReloadPayload
+  | ReqHitPayload
+  | OnHitPayload
+  | OnDiedPayload
+  | OnStateSyncPayload
   | SyncWeaponPayload
   | EnemySpawnData
   | EnemyDestroyData
@@ -213,6 +282,4 @@ export type EventData =
   | EnemyUpdateData
   | PlayerData
   | ReqPickupPayload
-  | PickupGrantedPayload
-  | ReqHitPayload
-  | ConfirmHitPayload;
+  | PickupGrantedPayload;

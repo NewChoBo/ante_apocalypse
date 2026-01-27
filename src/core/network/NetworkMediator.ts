@@ -14,7 +14,9 @@ import {
   ReqPickupPayload,
   PickupGrantedPayload,
   ReqHitPayload,
-  ConfirmHitPayload,
+  OnHitPayload,
+  OnFiredPayload,
+  OnAmmoSyncPayload,
   EventData,
 } from '../network/NetworkProtocol';
 
@@ -39,8 +41,13 @@ export class NetworkMediator {
   public onPickupDestroyRequested = new Observable<PickupDestroyData>();
   public onPickupRequested = new Observable<{ id: string; requesterId: string }>();
   public onPickupGranted = new Observable<PickupGrantedPayload>();
+
   public onHitRequested = new Observable<ReqHitPayload & { shooterId: string }>();
-  public onHitConfirmed = new Observable<ConfirmHitPayload>();
+  public onHit = new Observable<OnHitPayload>();
+  public onFired = new Observable<OnFiredPayload>();
+  public onPlayerDied = new Observable<{ playerId: string; attackerId: string }>();
+  public onAmmoSynced = new Observable<OnAmmoSyncPayload>();
+
   public onStateChanged = new Observable<NetworkState>();
 
   private constructor() {
@@ -102,11 +109,6 @@ export class NetworkMediator {
       } else if (event.code === EventCode.DESTROY_PICKUP) {
         this.onPickupDestroyRequested.notifyObservers(event.data as PickupDestroyData);
       } else if (event.code === EventCode.REQ_PICKUP) {
-        // Need to pass sender ID if available. NetworkManager currently doesn't pass sender ID in simplified EventData.
-        // Assuming NetworkManager.onEvent provides { code: ..., data: ..., senderId: ... }
-        // Verify NetworkManager.ts implementation.
-        // If not, we rely on the payload having it or NetworkManager structure being compatible.
-        // Assuming `event` object has `senderId`.
         const payload = event.data as ReqPickupPayload;
         this.onPickupRequested.notifyObservers({
           id: payload.id,
@@ -120,9 +122,17 @@ export class NetworkMediator {
           ...payload,
           shooterId: event.senderId || '',
         });
-      } else if (event.code === EventCode.CONFIRM_HIT) {
-        this.onHitConfirmed.notifyObservers(event.data as ConfirmHitPayload);
+      } else if (event.code === EventCode.ON_HIT) {
+        this.onHit.notifyObservers(event.data as OnHitPayload);
+      } else if (event.code === EventCode.ON_FIRED) {
+        this.onFired.notifyObservers(event.data as OnFiredPayload);
+      } else if (event.code === EventCode.ON_AMMO_SYNC) {
+        this.onAmmoSynced.notifyObservers(event.data as OnAmmoSyncPayload);
       }
+    });
+
+    this.networkManager.onPlayerDied.add((data) => {
+      this.onPlayerDied.notifyObservers(data);
     });
   }
 

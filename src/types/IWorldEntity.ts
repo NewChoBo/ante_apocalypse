@@ -36,6 +36,9 @@ export interface IWorldEntity {
   /** 데미지 처리 */
   takeDamage(amount: number, attackerId?: string, part?: string, hitPoint?: Vector3): void;
 
+  /** 체력 강제 동기화 (네트워크용) */
+  updateHealth(amount: number): void;
+
   /** 소멸 처리 */
   die(): void;
 

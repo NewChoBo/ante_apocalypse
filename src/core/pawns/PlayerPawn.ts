@@ -1,5 +1,6 @@
 import { Mesh, Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
+import { DamageProfile } from '../../types/IWorldEntity';
 import { CharacterMovementComponent } from '../components/movement/CharacterMovementComponent';
 import { CameraComponent } from '../components/movement/CameraComponent';
 import { CombatComponent } from '../components/combat/CombatComponent';
@@ -25,7 +26,7 @@ export class PlayerPawn extends BasePawn {
     // Load stats from JSON
     this.health = playerData.health;
     this.maxHealth = playerData.maxHealth;
-    this.damageProfile = playerData.damageProfile as any;
+    this.damageProfile = playerData.damageProfile as DamageProfile;
 
     // 초기 체력 동기화
     playerHealthStore.set(this.health);
@@ -104,6 +105,14 @@ export class PlayerPawn extends BasePawn {
     if (this.health <= 0) return;
     this.health = Math.min(this.maxHealth, this.health + amount);
     playerHealthStore.set(this.health);
+  }
+
+  public updateHealth(amount: number): void {
+    this.health = amount;
+    playerHealthStore.set(this.health);
+    if (this.health <= 0 && !this.isDead) {
+      this.die();
+    }
   }
 
   public addAmmo(amount: number): void {

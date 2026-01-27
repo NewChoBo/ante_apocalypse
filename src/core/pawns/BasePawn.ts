@@ -43,6 +43,9 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
   /** 사망 처리 */
   public abstract die(): void;
 
+  /** 체력 강제 동기화 */
+  public abstract updateHealth(amount: number): void;
+
   /** 입력 시스템 설정 (하위 클래스에서 구현) */
   public abstract setupInput(enabled: boolean): void;
 
