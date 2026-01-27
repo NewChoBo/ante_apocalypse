@@ -176,17 +176,7 @@ export class NetworkManager {
           break;
         }
         case EventCode.REQ_HIT: {
-          if (this.isMasterClient()) {
-            // Master Logic: Validate hit (raycast check, distance, etc.)
-            // For now: Accept all hits and broadcast ConfirmHit
-            const hitData = data as ReqHitPayload;
-            const confirmData = new ConfirmHitPayload(
-              hitData.targetId,
-              hitData.damage,
-              100 - hitData.damage // Placeholder: Real HP logic should be in a centralized state manager
-            );
-            this.sendEvent(EventCode.CONFIRM_HIT, confirmData, true);
-          }
+          // Master Logic: Handled by WorldEntityManager via onHitRequested
           break;
         }
         case EventCode.CONFIRM_HIT: {

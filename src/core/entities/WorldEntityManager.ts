@@ -82,20 +82,24 @@ export class WorldEntityManager implements IGameSystem {
   }
 
   // Client/Local Logic
-  private applyConfirmedHit(targetId: string, damage: number, _remainingHealth: number): void {
+  private applyConfirmedHit(targetId: string, damage: number, remainingHealth: number): void {
     const entity = this.entities.get(targetId);
     if (!entity) return;
 
-    // Force update health/state to match server
-    if (entity.type === 'remote_player') {
-      // (entity as any).health = remainingHealth; // If we had public health setter
-    }
-
-    // Apply damage locally for feedback (vignette, sound, animation)
+    // 1. Apply damage locally for feedback (FX, Sound, standard logic)
     // false = do not broadcast again
-    // We pass 0 damage if we set health directly, or passes damage.
-    // Since we don't sync exact health var yet on all entities, we just apply damage.
     this.processHit(targetId, damage, 'body', false);
+
+    // 2. Force update health/state to match server (Authoritative Correction)
+    if (remainingHealth >= 0) {
+      // Ideally we cast to a type that supports health setting or use IWorldEntity if we add setHealth
+      // For now, check if it has updateHealth method (RemotePlayerPawn)
+      if ('updateHealth' in entity && typeof (entity as any).updateHealth === 'function') {
+        (entity as any).updateHealth(remainingHealth);
+      } else {
+        entity.health = remainingHealth;
+      }
+    }
   }
 
   /** 엔티티 등록 */
