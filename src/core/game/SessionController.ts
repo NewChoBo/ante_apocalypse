@@ -119,7 +119,7 @@ export class SessionController implements IGameSystem {
     lm.trackUnsub(
       playerHealthStore.subscribe((health: number) => {
         if (health <= 0) {
-          GameObservables.playerDied.notifyObservers(null);
+          // GameObservables.playerDied is handled by PlayerPawn.die()
           if (this.multiplayerSystem) {
             const nm = NetworkManager.getInstance();
             nm.sendEvent(EventCode.PLAYER_DEATH, {

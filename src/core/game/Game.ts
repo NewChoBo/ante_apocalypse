@@ -13,6 +13,9 @@ import { GameMode } from '../../types/GameMode';
 import { NetworkManager } from '../network/NetworkManager';
 import { NetworkState } from '../network/NetworkProtocol';
 import { LifetimeManager } from './LifetimeManager';
+import { IGameRule } from '../rules/IGameRule';
+import { SurvivalRule } from '../rules/SurvivalRule';
+import { PlayerPawn } from '../pawns/PlayerPawn';
 
 import levelsConfig from '@/assets/data/levels.json';
 import trainingGroundData from '@/assets/levels/training_ground.json';
@@ -36,7 +39,8 @@ export class Game {
   private engine!: Engine;
   private sceneManager!: SceneManager;
   private sessionController: SessionController | null = null;
-  private uiManager!: UIManager;
+  public uiManager!: UIManager;
+  private currentRule!: IGameRule;
 
   private isRunning = false;
   private isPaused = false;
@@ -190,13 +194,19 @@ export class Game {
       scene.activeCamera = this.sessionController.getPlayerCamera();
     }
 
-    // Listen for player death to trigger Game Over
+    // Listen for player death to trigger Game Over logic via Rule
     LifetimeManager.getInstance().trackObserver(
       GameObservables.playerDied,
-      GameObservables.playerDied.add(() => {
-        if (this.isRunning && !this.isPaused) this.gameOver();
+      GameObservables.playerDied.add((player) => {
+        if (this.isRunning && !this.isPaused && this.currentRule) {
+          this.currentRule.onPlayerDied(player as PlayerPawn);
+        }
       })
     );
+
+    // Initialize Game Rule
+    this.currentRule = new SurvivalRule(this);
+    this.currentRule.onStart();
 
     this.engine.hideLoadingUI();
     this.isRunning = true;
@@ -212,12 +222,11 @@ export class Game {
     this.engine.runRenderLoop(this.renderFunction);
   }
 
-  private gameOver(): void {
-    this.isPaused = true;
-    gameStateStore.set('GAME_OVER');
-    this.uiManager.setGameOverUI(true);
-    this.uiManager.showScreen(UIScreen.PAUSE);
-    this.uiManager.exitPointerLock();
+  // Deprecated/Removed: gameOver logic is now in SurvivalRule
+  // private gameOver(): void { ... }
+
+  public setPaused(paused: boolean): void {
+    this.isPaused = paused;
   }
 
   public pause(): void {
@@ -275,5 +284,8 @@ export class Game {
   private update(deltaTime: number): void {
     TickManager.getInstance().tick(deltaTime);
     this.sessionController?.tick(deltaTime);
+    if (this.currentRule) {
+      this.currentRule.onUpdate(deltaTime);
+    }
   }
 }

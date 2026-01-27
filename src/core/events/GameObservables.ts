@@ -1,5 +1,6 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { MuzzleTransform } from '../../types/IWeapon';
+import { IPawn } from '../../types/IPawn';
 
 /**
  * 타겟이 파괴되었을 때의 데이터 규격
@@ -43,5 +44,5 @@ export const GameObservables = {
   }>(),
 
   /** 플레이어 사망 */
-  playerDied: new Observable<null>(),
+  playerDied: new Observable<IPawn>(),
 };

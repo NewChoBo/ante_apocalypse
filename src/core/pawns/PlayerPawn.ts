@@ -5,6 +5,7 @@ import { CameraComponent } from '../components/movement/CameraComponent';
 import { CombatComponent } from '../components/combat/CombatComponent';
 import { InputComponent } from '../components/input/InputComponent';
 import { playerHealthStore } from '../store/GameStore';
+import { GameObservables } from '../events/GameObservables';
 import playerData from '@/assets/data/characters/player_default.json';
 
 /**
@@ -114,5 +115,7 @@ export class PlayerPawn extends BasePawn {
 
   public die(): void {
     this.isDead = true;
+    // Notify observers with this instance
+    GameObservables.playerDied.notifyObservers(this);
   }
 }
