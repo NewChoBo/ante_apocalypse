@@ -50,6 +50,9 @@ export interface IPawn {
 
   getComponent<T extends BaseComponent>(type: ComponentConstructor<T>): T | undefined;
 
+  /** 입력 시스템 설정 (활성화/비활성화) */
+  setupInput(enabled: boolean): void;
+
   /** 자원 해제 */
   dispose(): void;
 }

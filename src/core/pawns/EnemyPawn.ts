@@ -203,6 +203,10 @@ export class EnemyPawn extends BasePawn {
     // 필요한 경우 초기화 로직
   }
 
+  public setupInput(_enabled: boolean): void {
+    // AI enemies do not have local player input components
+  }
+
   private _lastMoveTime: number = 0;
 
   public updateNetworkState(

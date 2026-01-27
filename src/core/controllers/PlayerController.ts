@@ -58,12 +58,14 @@ export class PlayerController extends BaseController {
     };
   }
 
-  protected onPossess(_pawn: IPawn): void {
-    // 빙의 시 추가 로직
+  protected onPossess(pawn: IPawn): void {
+    console.log(`[PlayerController] Possessing pawn: ${pawn.id}`);
+    pawn.setupInput(true);
   }
 
-  protected onUnpossess(_pawn: IPawn): void {
-    // 빙의 해제 시 추가 로직
+  protected onUnpossess(pawn: IPawn): void {
+    console.log(`[PlayerController] Unpossessing pawn: ${pawn.id}`);
+    pawn.setupInput(false);
   }
 
   public setInputBlocked(blocked: boolean): void {

@@ -167,6 +167,10 @@ export class RemotePlayerPawn extends BasePawn {
 
   public initialize(): void {}
 
+  public setupInput(_enabled: boolean): void {
+    // Remote players do not have local input components
+  }
+
   private async loadModel(): Promise<void> {
     try {
       const entries = AssetLoader.getInstance().instantiateMesh('enemy', 'remoteVisual_' + this.id);

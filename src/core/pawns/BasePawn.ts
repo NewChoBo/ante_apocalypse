@@ -47,6 +47,9 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
   /** 사망 처리 */
   public abstract die(): void;
 
+  /** 입력 시스템 설정 (하위 클래스에서 구현) */
+  public abstract setupInput(enabled: boolean): void;
+
   /** 컴포넌트(Behavior) 추가 */
   public addComponent(component: BaseComponent): void {
     if (this.mesh) {

@@ -15,7 +15,7 @@ export class PlayerPawn extends BasePawn {
   public type = 'player';
   private movementComponent: CharacterMovementComponent;
   private cameraComponent: CameraComponent;
-  private inputComponent: InputComponent;
+  private inputComponent: InputComponent | null = null;
 
   constructor(scene: Scene) {
     super(scene);
@@ -45,10 +45,6 @@ export class PlayerPawn extends BasePawn {
     this.mesh.ellipsoid = new Vector3(0.4, 0.875, 0.4); // 캐릭터의 충돌 볼륨 (높이 1.75m)
     this.mesh.ellipsoidOffset = new Vector3(0, -0.875, 0); // 메쉬(눈높이)가 상단에 위치하도록 오프셋 설정
 
-    // 입력 컴포넌트 추가
-    this.inputComponent = new InputComponent(this, scene);
-    this.addComponent(this.inputComponent);
-
     // 카메라 컴포넌트 추가
     this.cameraComponent = new CameraComponent(this, scene, 0);
     this.addComponent(this.cameraComponent);
@@ -64,6 +60,23 @@ export class PlayerPawn extends BasePawn {
 
   public initialize(): void {
     // 추가 초기화 로직
+  }
+
+  public setupInput(enabled: boolean): void {
+    if (enabled) {
+      if (!this.inputComponent) {
+        this.inputComponent = new InputComponent(this, this.scene);
+        this.addComponent(this.inputComponent);
+        console.log(`[PlayerPawn] InputComponent attached.`);
+      }
+    } else {
+      if (this.inputComponent) {
+        // Babylon.js behavior disposal is handled via removeBehavior or mesh dispose
+        this.mesh.removeBehavior(this.inputComponent);
+        this.inputComponent = null;
+        console.log(`[PlayerPawn] InputComponent detached.`);
+      }
+    }
   }
 
   public tick(deltaTime: number): void {
