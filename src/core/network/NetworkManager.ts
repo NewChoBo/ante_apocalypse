@@ -200,13 +200,15 @@ export class NetworkManager {
   /**
    * Gatekeeper Logic: Manages the Logical Server instance based on Authority.
    */
-  private checkServerAuthority(): void {
-    const isMaster = this.isMasterClient();
+  public checkServerAuthority(): void {
+    const isMaster = this.provider.isMasterClient();
+    console.log(
+      `[Network] Check Authority: Master=${isMaster}, ServerExists=${!!this.serverController}`
+    );
+
     if (isMaster && !this.serverController) {
-      console.log('[NetworkManager] Becoming Master Client. Starting Logical Server...');
       this.serverController = new ServerGameController();
     } else if (!isMaster && this.serverController) {
-      console.log('[NetworkManager] No longer Master Client. Disposing Logical Server...');
       this.serverController.dispose();
       this.serverController = null;
     }

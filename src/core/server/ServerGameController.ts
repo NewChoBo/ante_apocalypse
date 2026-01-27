@@ -4,114 +4,118 @@ import {
   ReqFirePayload,
   ReqHitPayload,
   ReqReloadPayload,
-  OnFiredPayload,
-  OnHitPayload,
   OnAmmoSyncPayload,
-  OnDiedPayload,
 } from '../network/NetworkProtocol';
 
-interface UserState {
+interface ServerPlayerState {
+  id: string;
+  hp: number;
   ammo: Record<string, { current: number; reserve: number; magazineSize: number }>;
-  health: number;
+  isDead: boolean;
 }
 
-/**
- * Master Client에서만 실행되는 논리 서버 컨트롤러.
- * 뷰(Mesh, Sound)와 무관하게 데이터 검증 및 상태 관리만 담당합니다.
- */
 export class ServerGameController {
-  private networkManager: NetworkManager;
-  private userStates: Map<string, UserState> = new Map();
+  private network: NetworkManager;
+  private playerStates: Map<string, ServerPlayerState> = new Map();
 
-  // 설정값 (추후 데이터 파일로 분리 가능)
-  private readonly DEFAULT_HEALTH = 100;
+  // Config
+  private readonly DEFAULT_HP = 100;
+  private readonly DEFAULT_WEAPON_DATA: Record<string, { magazineSize: number; reserve: number }> =
+    {
+      Rifle: { magazineSize: 30, reserve: 90 },
+      Pistol: { magazineSize: 12, reserve: 60 },
+      Bat: { magazineSize: 9999, reserve: 0 },
+      Knife: { magazineSize: 9999, reserve: 0 },
+    };
 
   constructor() {
-    this.networkManager = NetworkManager.getInstance();
+    this.network = NetworkManager.getInstance();
     this.setupListeners();
-    console.log('[ServerGameController] Initialized (Master Authority)');
+    console.log('%c[Server] Logical Server Started 🟢', 'color: lightgreen; font-weight: bold;');
   }
 
-  public dispose(): void {
-    // 리스너 해제 등 정리 로직이 필요하다면 구현
-    console.log('[ServerGameController] Disposed');
-  }
-
-  private setupListeners(): void {
-    // NetworkManager로부터 Raw Event 수신
-    // 주의: NetworkManager.onEvent는 모~든 이벤트를 수신하므로 필터링 필요
-    this.networkManager.onEvent.add((event) => {
-      // 오직 Request만 처리
-      switch (event.code) {
-        case EventCode.REQ_FIRE:
-          this.handleReqFire(event.data as ReqFirePayload, event.senderId || '');
-          break;
-        case EventCode.REQ_HIT:
-          this.handleReqHit(event.data as ReqHitPayload, event.senderId || '');
-          break;
-        case EventCode.REQ_RELOAD:
-          this.handleReqReload(event.data as ReqReloadPayload, event.senderId || '');
-          break;
-      }
-    });
-
-    // 플레이어 입장 시 초기 상태 생성
-    this.networkManager.onPlayerJoined.add((player) => {
-      if (!this.userStates.has(player.id)) {
-        this.initializeUserState(player.id);
-      }
+  private setupListeners() {
+    // Listen to Raw Events (Requests from Clients)
+    this.network.onEvent.add((payload) => {
+      const { code, data, senderId } = payload;
+      this.handlePacket(code, data, senderId || '');
     });
   }
 
-  private initializeUserState(userId: string): void {
-    this.userStates.set(userId, {
-      ammo: {
-        Rifle: { current: 30, reserve: 90, magazineSize: 30 },
-        Pistol: { current: 12, reserve: 60, magazineSize: 12 },
-      },
-      health: this.DEFAULT_HEALTH,
-    });
-    console.log(`[Server] Initialized state for user ${userId}`);
+  private handlePacket(code: number, data: any, senderId: string) {
+    if (!senderId) return;
+
+    // Ensure player state exists
+    if (!this.playerStates.has(senderId)) this.initializePlayer(senderId);
+
+    const state = this.playerStates.get(senderId)!;
+    if (state.isDead) return;
+
+    switch (code) {
+      case EventCode.REQ_FIRE:
+        console.log(`[Server] Received REQ_FIRE from ${senderId}`);
+        this.processFire(senderId, state, data as ReqFirePayload);
+        break;
+      case EventCode.REQ_HIT:
+        console.log(`[Server] Received REQ_HIT from ${senderId}`);
+        this.processHit(senderId, data as ReqHitPayload);
+        break;
+      case EventCode.REQ_RELOAD:
+        console.log(`[Server] Received REQ_RELOAD from ${senderId}`);
+        this.processReload(senderId, state, data as ReqReloadPayload);
+        break;
+    }
   }
 
-  private handleReqFire(payload: ReqFirePayload, senderId: string): void {
-    // 1. 상태 가져오기
-    let state = this.userStates.get(senderId);
-    if (!state) {
-      this.initializeUserState(senderId);
-      state = this.userStates.get(senderId)!;
+  private initializePlayer(id: string) {
+    const ammo: Record<string, { current: number; reserve: number; magazineSize: number }> = {};
+    for (const [wId, config] of Object.entries(this.DEFAULT_WEAPON_DATA)) {
+      ammo[wId] = {
+        current: config.magazineSize,
+        reserve: config.reserve,
+        magazineSize: config.magazineSize,
+      };
     }
 
-    const weaponId = payload.weaponId || 'Rifle'; // Default fallback
-    const ammoData = state.ammo[weaponId] || { current: 30, reserve: 90, magazineSize: 30 };
+    this.playerStates.set(id, {
+      id,
+      hp: this.DEFAULT_HP,
+      ammo,
+      isDead: false,
+    });
+    console.log(`[Server] Initialized Player: ${id}`);
+  }
 
-    // 2. 검증 (탄약 확인)
-    if (ammoData.current > 0) {
-      // 3. 로직 수행 (탄약 차감)
+  private processFire(shooterId: string, state: ServerPlayerState, data: ReqFirePayload) {
+    const weaponId = data.weaponId || 'Rifle';
+    const ammoData = state.ammo[weaponId];
+
+    // 1. Validation
+    if (!ammoData || ammoData.current <= 0) {
+      console.warn(`[Server] ${shooterId} Out of Ammo with ${weaponId}!`);
+      return;
+    }
+
+    // 2. Logic (Deduct Ammo)
+    if (weaponId !== 'Bat' && weaponId !== 'Knife') {
       ammoData.current--;
-      state.ammo[weaponId] = ammoData;
-
-      // 4. 통보 (Notification)
-      // A. 발사 성공 (VFX 재생용 - Unreliable 권장이나 중요도에 따라 Reliable)
-      const onFired = new OnFiredPayload(senderId, weaponId, payload.muzzleData);
-      this.networkManager.sendEvent(EventCode.ON_FIRED, onFired, false);
-
-      // B. 탄약 동기화 (UI용 - Reliable, 해당 유저에게만 보내면 좋지만 현재 구조상 Broadcast)
-      const onAmmo = new OnAmmoSyncPayload(weaponId, ammoData.current, ammoData.reserve);
-      this.networkManager.sendEvent(EventCode.ON_AMMO_SYNC, onAmmo, true);
-    } else {
-      console.warn(`[Server] User ${senderId} tried to fire ${weaponId} but has no ammo.`);
     }
+
+    // 3. Broadcast Result (ON_FIRED)
+    this.network.sendEvent(EventCode.ON_FIRED, {
+      shooterId,
+      weaponId,
+      muzzleData: (data as any).muzzleData, // Maintain existing structure for effects
+      ammoRemaining: ammoData.current,
+    });
+
+    // 4. Sync Ammo to shooter (Reliable)
+    const onAmmo = new OnAmmoSyncPayload(weaponId, ammoData.current, ammoData.reserve);
+    this.network.sendEvent(EventCode.ON_AMMO_SYNC, onAmmo, true);
   }
 
-  private handleReqReload(payload: ReqReloadPayload, senderId: string): void {
-    let state = this.userStates.get(senderId);
-    if (!state) {
-      this.initializeUserState(senderId);
-      state = this.userStates.get(senderId)!;
-    }
-
-    const weaponId = payload.weaponId;
+  private processReload(senderId: string, state: ServerPlayerState, data: ReqReloadPayload) {
+    const weaponId = data.weaponId;
     const ammoData = state.ammo[weaponId];
 
     if (ammoData && ammoData.reserve > 0 && ammoData.current < ammoData.magazineSize) {
@@ -120,7 +124,6 @@ export class ServerGameController {
 
       ammoData.current += amount;
       ammoData.reserve -= amount;
-      state.ammo[weaponId] = ammoData;
 
       console.log(
         `[Server] User ${senderId} reloaded ${weaponId}. New Ammo: ${ammoData.current}/${ammoData.reserve}`
@@ -128,48 +131,53 @@ export class ServerGameController {
 
       // Sync back to client
       const onAmmo = new OnAmmoSyncPayload(weaponId, ammoData.current, ammoData.reserve);
-      this.networkManager.sendEvent(EventCode.ON_AMMO_SYNC, onAmmo, true);
+      this.network.sendEvent(EventCode.ON_AMMO_SYNC, onAmmo, true);
     }
   }
 
-  private handleReqHit(payload: ReqHitPayload, senderId: string): void {
-    // 1. 타겟 상태 확인
-    const targetId = payload.targetId;
-    const targetState = this.userStates.get(targetId);
+  private processHit(attackerId: string, data: ReqHitPayload) {
+    const targetState = this.playerStates.get(data.targetId);
 
-    if (targetState) {
-      // 2. 데미지 적용
-      if (targetState.health > 0) {
-        targetState.health -= payload.damage;
-        if (targetState.health < 0) targetState.health = 0;
-
-        // 3. 결과 전송 (HP 갱신)
-        const onHit = new OnHitPayload(
-          targetId,
-          payload.damage,
-          targetState.health,
-          senderId,
-          payload.hitPosition,
-          payload.hitNormal
-        );
-        this.networkManager.sendEvent(EventCode.ON_HIT, onHit, true);
-
-        // 4. 사망 처리
-        if (targetState.health <= 0) {
-          const onDied = new OnDiedPayload(targetId, senderId, 'Shot');
-          this.networkManager.sendEvent(EventCode.ON_DIED, onDied, true);
-        }
-      }
-    } else {
-      const onHit = new OnHitPayload(
-        targetId,
-        payload.damage,
-        -1, // Unknown health
-        senderId,
-        payload.hitPosition,
-        payload.hitNormal
-      );
-      this.networkManager.sendEvent(EventCode.ON_HIT, onHit, true);
+    // For unregistered targets (like dummy targets), create a temp state
+    let effectiveTarget = targetState;
+    if (!effectiveTarget) {
+      effectiveTarget = {
+        id: data.targetId,
+        hp: 100,
+        ammo: {},
+        isDead: false,
+      };
+      this.playerStates.set(data.targetId, effectiveTarget);
     }
+
+    if (effectiveTarget.isDead) return;
+
+    // Apply Damage
+    effectiveTarget.hp -= data.damage;
+    console.log(`[Server] Target ${data.targetId} HP: ${effectiveTarget.hp}`);
+
+    // Broadcast ON_HIT
+    this.network.sendEvent(EventCode.ON_HIT, {
+      targetId: data.targetId,
+      damage: data.damage,
+      remainingHealth: effectiveTarget.hp,
+      shooterId: attackerId,
+      hitPosition: data.hitPosition,
+    });
+
+    if (effectiveTarget.hp <= 0) {
+      effectiveTarget.isDead = true;
+      effectiveTarget.hp = 0;
+      this.network.sendEvent(EventCode.ON_DIED, {
+        victimId: data.targetId,
+        killerId: attackerId,
+        reason: 'Shot',
+      });
+    }
+  }
+
+  public dispose() {
+    this.playerStates.clear();
+    console.log('[Server] Logical Server Stopped 🔴');
   }
 }

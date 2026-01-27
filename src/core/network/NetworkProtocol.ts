@@ -19,16 +19,16 @@ export enum EventCode {
   PICKUP_GRANTED = 22,
 
   // [C -> S] Requests
-  REQ_FIRE = 100,
-  REQ_RELOAD = 101,
-  REQ_HIT = 102,
+  REQ_FIRE = 101,
+  REQ_RELOAD = 102,
+  REQ_HIT = 103,
 
   // [S -> C] Notifications
-  ON_FIRED = 200,
-  ON_HIT = 201,
-  ON_DIED = 202, // Broadcasts death
-  ON_STATE_SYNC = 203, // Full state sync for late joiners
-  ON_AMMO_SYNC = 204,
+  ON_FIRED = 203,
+  ON_HIT = 204,
+  ON_DIED = 205,
+  ON_STATE_SYNC = 206,
+  ON_AMMO_SYNC = 207,
 }
 
 export class RoomData {
