@@ -171,6 +171,7 @@ export class LobbyUI {
   }
 
   private updateRoomList(rooms: RoomData[]): void {
+    if (!this.roomListPanel) return;
     this.roomListPanel.clearControls();
 
     if (rooms.length === 0) {
