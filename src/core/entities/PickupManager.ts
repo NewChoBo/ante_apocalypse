@@ -44,13 +44,6 @@ export class PickupManager implements IGameSystem {
       this.handleDestroyEvent(data);
     });
 
-    // Master: Handle pickup requests - DEPRECATED (Moved to ServerGameController)
-    // this.networkMediator.onPickupTryRequested.add((data) => {
-    //   if (this.networkMediator.isMasterClient()) {
-    //     this.processPickupRequest(data.id, data.senderId);
-    //   }
-    // });
-
     // Client: Handle granted pickup
     this.networkMediator.onItemPicked.add((data) => {
       this.grantPickupToInventory(data.id, data.type, data.ownerId);
@@ -98,17 +91,14 @@ export class PickupManager implements IGameSystem {
 
     this.pickups.set(pickupId, pickup);
 
-    if (
-      broadcast &&
-      (this.networkMediator.isMasterClient() || !this.networkMediator.getSocketId())
-    ) {
-      if (this.networkMediator.isMasterClient()) {
-        this.networkMediator.sendEvent(EventCode.SPAWN_PICKUP, {
-          id: pickupId,
-          type,
-          position: { x: position.x, y: position.y, z: position.z },
-        });
-      }
+    // Client-side spawning for effect ONLY if triggered by event.
+    // If called manually on Master, it should instead request server to spawn?
+    // Actually, createPickup is usually called by handleSpawnEvent.
+    // If we want to safeguard against manual calls:
+    if (broadcast) {
+      console.warn(
+        '[PickupManager] Manual spawnPickup call with broadcast=true is deprecated. Use ServerGameController.'
+      );
     }
   }
 
@@ -149,30 +139,12 @@ export class PickupManager implements IGameSystem {
       return;
     }
 
-    if (this.networkMediator.isMasterClient() && !this.networkMediator.getSocketId()) {
-      // Single player / no server case? Or just send request anyway if server is running local.
-      // If we are master AND server is running, we should send Event.
-      // If ServerGameController is active, send Event.
-      // For now, always send Event if socket exists.
-      const pos = pickup.mesh.getAbsolutePosition();
-      this.networkMediator.sendEvent(EventCode.REQ_TRY_PICKUP, {
-        id,
-        position: { x: pos.x, y: pos.y, z: pos.z },
-      });
-    } else if (this.networkMediator.isMasterClient()) {
-      // Master but connected? logic above covers.
-      const pos = pickup.mesh.getAbsolutePosition();
-      this.networkMediator.sendEvent(EventCode.REQ_TRY_PICKUP, {
-        id,
-        position: { x: pos.x, y: pos.y, z: pos.z },
-      });
-    } else {
-      const pos = pickup.mesh.getAbsolutePosition();
-      this.networkMediator.sendEvent(EventCode.REQ_TRY_PICKUP, {
-        id,
-        position: { x: pos.x, y: pos.y, z: pos.z },
-      });
-    }
+    // Standard Server-Authoritative Logic: Always Request
+    const pos = pickup.mesh.getAbsolutePosition();
+    this.networkMediator.sendEvent(EventCode.REQ_TRY_PICKUP, {
+      id,
+      position: { x: pos.x, y: pos.y, z: pos.z },
+    });
 
     // Optimistic: Mark as destroyed locally to prevent multiple request spamming
     pickup.destroyed = true;

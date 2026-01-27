@@ -102,6 +102,14 @@ export class TargetSpawnerComponent extends BaseComponent {
         id,
         isMoving,
       });
+
+      // Server/Master Logic: Send event and wait for echo to create visual.
+      return id;
+    }
+
+    // Client Logic: Check duplication
+    if (this.worldManager.getEntity(id)) {
+      return id;
     }
 
     if (!type) type = isMoving ? 'moving_target' : 'static_target';
