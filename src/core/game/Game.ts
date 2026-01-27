@@ -14,6 +14,7 @@ import { NetworkManager } from '../network/NetworkManager';
 import { NetworkState } from '../network/NetworkProtocol';
 import { LifetimeManager } from './LifetimeManager';
 import { IGameRule } from '../rules/IGameRule';
+import { TimeAttackRule } from '../rules/TimeAttackRule';
 import { SurvivalRule } from '../rules/SurvivalRule';
 import { PlayerPawn } from '../pawns/PlayerPawn';
 
@@ -119,7 +120,8 @@ export class Game {
     lm.trackObserver(
       this.uiManager.onStartSingleplayer,
       this.uiManager.onStartSingleplayer.add(() => {
-        this.start('single');
+        // Test: Start with Time Attack mode temporarily
+        this.start('single', 'time_attack');
       })
     );
 
@@ -155,7 +157,7 @@ export class Game {
     }
   }
 
-  public async start(mode: GameMode = 'single'): Promise<void> {
+  public async start(mode: GameMode = 'single', ruleType: string = 'survival'): Promise<void> {
     if (this.isRunning) return;
     this.currentMode = mode;
 
@@ -205,7 +207,15 @@ export class Game {
     );
 
     // Initialize Game Rule
-    this.currentRule = new SurvivalRule(this);
+    switch (ruleType) {
+      case 'time_attack':
+        this.currentRule = new TimeAttackRule(this);
+        break;
+      case 'survival':
+      default:
+        this.currentRule = new SurvivalRule(this);
+        break;
+    }
     this.currentRule.onStart();
 
     this.engine.hideLoadingUI();
