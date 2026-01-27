@@ -48,6 +48,8 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
   protected isFiring = false;
   protected muzzleOffset = new Vector3(0, 0.1, 0.5);
 
+  private ammoObserver: any = null;
+
   constructor(
     scene: Scene,
     camera: UniversalCamera,
@@ -62,7 +64,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     this.applyRecoilCallback = applyRecoil;
 
     // Listen for server-authoritative ammo updates
-    NetworkManager.getInstance().onAmmoSynced.add((data) => {
+    this.ammoObserver = NetworkManager.getInstance().onAmmoSynced.add((data) => {
       if (data.weaponId === this.name) {
         this.currentAmmo = data.currentAmmo;
         this.reserveAmmo = data.reserveAmmo;
@@ -243,6 +245,8 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
             targetId = metadata.pawn.id;
           } else if (metadata.id) {
             targetId = metadata.id;
+          } else if (metadata.targetId) {
+            targetId = metadata.targetId;
           }
         }
 
@@ -366,6 +370,10 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
   }
 
   public dispose(): void {
+    if (this.ammoObserver) {
+      NetworkManager.getInstance().onAmmoSynced.remove(this.ammoObserver);
+      this.ammoObserver = null;
+    }
     super.dispose();
   }
 }

@@ -4,6 +4,7 @@ export interface INetworkProvider {
   // Methods
   connect(userId: string): Promise<boolean>;
   disconnect(): void;
+  leaveRoom(): void;
   createRoom(options: {
     roomName?: string;
     mapId: string;
@@ -12,7 +13,12 @@ export interface INetworkProvider {
   }): Promise<boolean>;
   joinRoom(roomId: string): Promise<boolean>;
   getRoomList(): Promise<RoomData[]>;
-  sendEvent(code: number, data: EventData, reliable: boolean): void;
+  sendEvent(
+    code: number,
+    data: EventData,
+    reliable: boolean,
+    target?: 'others' | 'all' | 'master'
+  ): void;
   getLocalPlayerId(): string | null;
   getServerTime(): number;
   getCurrentRoomProperty(key: string): unknown;

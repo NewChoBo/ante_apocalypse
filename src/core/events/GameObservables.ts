@@ -39,4 +39,19 @@ export const GameObservables = {
 
   /** 플레이어 사망 */
   playerDied: new Observable<IPawn>(),
+
+  /** [Server Driven] 무기 발사 통보 */
+  weaponFire: new Observable<{
+    shooterId: string;
+    weaponId: string;
+    ammoRemaining?: number;
+    muzzleData?: any;
+  }>(),
+
+  /** [Server Driven] 사망 통보 */
+  onDied: new Observable<{
+    victimId: string;
+    killerId?: string;
+    reason?: string;
+  }>(),
 };

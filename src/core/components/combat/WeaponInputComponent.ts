@@ -1,6 +1,7 @@
 import { Mesh, Scene } from '@babylonjs/core';
 import { BaseComponent } from '@/core/components/base/BaseComponent';
 import { WeaponInventoryComponent } from './WeaponInventoryComponent';
+import { CombatComponent } from './CombatComponent';
 import { InputComponent } from '../input/InputComponent';
 import type { IPawn } from '../../../types/IPawn';
 import { InputAction } from '../../../types/InputTypes';
@@ -11,6 +12,7 @@ import { InputAction } from '../../../types/InputTypes';
  */
 export class WeaponInputComponent extends BaseComponent {
   public name = 'WeaponInput';
+  private combatComp: CombatComponent | null = null;
   private inventory: WeaponInventoryComponent | null = null;
 
   constructor(owner: IPawn, scene: Scene) {
@@ -19,6 +21,7 @@ export class WeaponInputComponent extends BaseComponent {
 
   public attach(target: Mesh): void {
     super.attach(target);
+    this.combatComp = this.owner.getComponent(CombatComponent) || null;
     this.inventory = this.owner.getComponent(WeaponInventoryComponent) || null;
   }
 
@@ -34,11 +37,10 @@ export class WeaponInputComponent extends BaseComponent {
     if (!inputComp) return;
 
     // 1. 발사 처리 (Fire)
-    // Continuous state check for auto-fire support
     if (inputComp.state[InputAction.FIRE]) {
-      this.inventory.currentWeapon.startFire();
+      this.combatComp?.startFire();
     } else {
-      this.inventory.currentWeapon.stopFire();
+      this.combatComp?.stopFire();
     }
 
     // 2. 조준 처리 (Aim)
@@ -46,11 +48,7 @@ export class WeaponInputComponent extends BaseComponent {
 
     // 3. 재장전 (Reload) - Edge detection
     if (inputComp.isButtonDown(InputAction.RELOAD)) {
-      const weapon = this.inventory.currentWeapon;
-      const firearm = weapon as { reload?(): void };
-      if (firearm && firearm.reload && typeof firearm.reload === 'function') {
-        firearm.reload();
-      }
+      this.combatComp?.reload();
     }
 
     // 4. 무기 교체 (Slots)

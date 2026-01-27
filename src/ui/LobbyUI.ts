@@ -351,13 +351,23 @@ export class LobbyUI {
     this.hideCreateModal();
   }
 
+  private listObserver: any = null;
+
   private setupListeners(): void {
-    this.networkManager.onRoomListUpdated.add((rooms) => {
+    this.listObserver = this.networkManager.onRoomListUpdated.add((rooms) => {
       this.updateRoomList(rooms);
     });
 
     // Initial fetch from cache
     this.updateRoomList(this.networkManager.getRoomList());
+  }
+
+  public dispose(): void {
+    if (this.listObserver) {
+      this.networkManager.onRoomListUpdated.remove(this.listObserver);
+      this.listObserver = null;
+    }
+    this.container.dispose();
   }
 
   private updateRoomList(rooms: RoomData[]): void {

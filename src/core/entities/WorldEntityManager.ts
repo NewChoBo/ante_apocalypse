@@ -53,11 +53,11 @@ export class WorldEntityManager implements IGameSystem {
 
     // 4. Death Detection (Sync Death)
     this.networkMediator.onPlayerDied.add((data) => {
-      // Player death is handled in MultiplayerSystem/SessionController
-      // But if an enemy died, it might be broadcasted as ON_DIED too
-      const entity = this.entities.get(data.playerId);
-      if (entity && entity.type === 'enemy') {
-        this.removeEntity(data.playerId);
+      // Generic cleanup for any pawn/target that died on server
+      const entityId = data.playerId;
+      if (this.entities.has(entityId)) {
+        console.log(`[WorldEntityManager] Entity ${entityId} died on server, removing.`);
+        this.removeEntity(entityId);
       }
     });
 

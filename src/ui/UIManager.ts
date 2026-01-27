@@ -164,6 +164,9 @@ export class UIManager {
   }
 
   private createLobbyScreen(): Container {
+    if (this.lobbyUI) {
+      this.lobbyUI.dispose();
+    }
     this.lobbyUI = new LobbyUI();
     const container = this.lobbyUI.getContainer();
     this.ui.addControl(container);
@@ -279,6 +282,10 @@ export class UIManager {
   }
 
   public dispose(): void {
+    if (this.lobbyUI) {
+      this.lobbyUI.dispose();
+      this.lobbyUI = null;
+    }
     this.ui.dispose();
   }
 }

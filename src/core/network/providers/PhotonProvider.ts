@@ -186,9 +186,19 @@ export class PhotonProvider implements INetworkProvider {
     this.client.leaveRoom();
   }
 
-  public sendEvent(code: number, data: EventData, reliable: boolean = true): void {
+  public sendEvent(
+    code: number,
+    data: EventData,
+    reliable: boolean = true,
+    target: 'others' | 'all' | 'master' = 'others'
+  ): void {
+    let receiverGroup = PhotonTyped.LoadBalancing.Constants.ReceiverGroup.Others;
+    if (target === 'all') receiverGroup = PhotonTyped.LoadBalancing.Constants.ReceiverGroup.All;
+    if (target === 'master')
+      receiverGroup = PhotonTyped.LoadBalancing.Constants.ReceiverGroup.MasterClient;
+
     this.client.raiseEvent(code, data, {
-      receivers: PhotonTyped.LoadBalancing.Constants.ReceiverGroup.Others,
+      receivers: receiverGroup,
       cache: reliable ? 1 : 0,
     });
   }

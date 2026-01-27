@@ -115,7 +115,8 @@ export class OnFiredPayload {
     public readonly muzzleData?: {
       position: Position;
       direction: Position;
-    }
+    },
+    public readonly ammoRemaining?: number
   ) {}
 }
 

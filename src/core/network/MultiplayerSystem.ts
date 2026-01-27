@@ -32,6 +32,12 @@ export class MultiplayerSystem implements IGameSystem {
   }
 
   public initialize(): void {
+    const myId = this.networkMediator.getSocketId();
+    if (myId) {
+      this.localPlayer.id = myId;
+      console.log(`[Multiplayer] Local player ID updated to: ${myId}`);
+    }
+
     const playerName = localStorage.getItem('playerName') || 'Anonymous';
     // Join with initial state
     const combat = this.localPlayer.getComponent(CombatComponent);

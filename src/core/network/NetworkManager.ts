@@ -2,6 +2,7 @@ import { Observable } from '@babylonjs/core';
 import { INetworkProvider } from './INetworkProvider';
 import { PhotonProvider } from './providers/PhotonProvider';
 import { ServerGameController } from '../server/ServerGameController';
+import { GameObservables } from '../events/GameObservables';
 import {
   RoomData,
   NetworkState,
@@ -141,6 +142,14 @@ export class NetworkManager {
             weaponId: fireData.weaponId,
             muzzleTransform: fireData.muzzleData,
           });
+
+          // Also notify global GameObservables for UI/Animation logic
+          GameObservables.weaponFire.notifyObservers({
+            shooterId: fireData.shooterId,
+            weaponId: fireData.weaponId,
+            ammoRemaining: fireData.ammoRemaining,
+            muzzleData: fireData.muzzleData,
+          });
           break;
         }
         case EventCode.ON_HIT: {
@@ -173,6 +182,9 @@ export class NetworkManager {
             playerId: deathData.victimId,
             attackerId: deathData.killerId || '',
           });
+
+          // Notify global GameObservables
+          GameObservables.onDied.notifyObservers(deathData);
           break;
         }
         case EventCode.TARGET_DESTROY:
@@ -237,7 +249,7 @@ export class NetworkManager {
   }
 
   public leaveRoom(): void {
-    this.provider.disconnect();
+    this.provider.leaveRoom();
   }
 
   public getState(): NetworkState {
@@ -276,16 +288,21 @@ export class NetworkManager {
     return this.lastRoomList;
   }
 
-  public sendEvent(code: EventCode, data: EventData, reliable: boolean = true): void {
-    this.provider.sendEvent(code, data, reliable);
+  public sendEvent(
+    code: EventCode,
+    data: EventData,
+    reliable: boolean = true,
+    target: 'others' | 'all' | 'master' = 'all'
+  ): void {
+    this.provider.sendEvent(code, data, reliable, target);
   }
 
   public requestFire(payload: ReqFirePayload): void {
-    this.sendEvent(EventCode.REQ_FIRE, payload, true);
+    this.sendEvent(EventCode.REQ_FIRE, payload, true, 'master');
   }
 
   public requestHit(payload: ReqHitPayload): void {
-    this.sendEvent(EventCode.REQ_HIT, payload, true);
+    this.sendEvent(EventCode.REQ_HIT, payload, true, 'master');
   }
 
   public syncWeapon(weaponId: string): void {

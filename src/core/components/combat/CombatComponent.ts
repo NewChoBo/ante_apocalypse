@@ -1,4 +1,4 @@
-import { Scene, Observer, Observable } from '@babylonjs/core';
+import { Scene, Observer, Observable, Mesh } from '@babylonjs/core';
 import { BaseComponent } from '../base/BaseComponent';
 import { WeaponInventoryComponent } from './WeaponInventoryComponent';
 import { IWeapon } from '../../../types/IWeapon';
@@ -31,28 +31,32 @@ export class CombatComponent extends BaseComponent {
       throw new Error('CombatComponent requires a CameraComponent on the Pawn');
     }
 
-    // 1. 컴포넌트들 생성 및 등록
+    // Components are created but not added yet to allow CombatComponent to be added to Pawn first
     this.hudSync = new HUDSyncComponent(owner, scene);
-    this.owner.addComponent(this.hudSync);
-
     this.inventory = new WeaponInventoryComponent(owner, scene);
-    this.owner.addComponent(this.inventory);
-
     this.input = new WeaponInputComponent(owner, scene);
+  }
+
+  public attach(target: Mesh): void {
+    super.attach(target);
+
+    // 1. Add sub-components to the owner
+    // Since CombatComponent is now attached, it is in the owner's component list.
+    this.owner.addComponent(this.hudSync);
+    this.owner.addComponent(this.inventory);
     this.owner.addComponent(this.input);
 
-    // 2. 이벤트 연결 (컴포넌트들이 Mesh에 attach된 후 안전해짐)
-    // 무기 변경 시 HUD 동기화 리스너 등록
+    // 2. Setup events
     this.inventory.onWeaponChanged.add((newWeapon) => {
       this.hudSync.syncAmmo(newWeapon);
       this.bindWeaponEvents(newWeapon);
     });
 
-    // 초기 HUD 동기화 및 바인딩
+    // Initial HUD sync and binding
     this.hudSync.syncAmmo(this.inventory.currentWeapon);
     this.bindWeaponEvents(this.inventory.currentWeapon);
 
-    // 이펙트 컴포넌트 초기화 및 등록
+    // Effect components
     this.attachEffect(FirearmEffectComponent);
     this.attachEffect(MeleeEffectComponent);
     this.attachEffect(ImpactEffectComponent);
@@ -104,6 +108,32 @@ export class CombatComponent extends BaseComponent {
 
   public addAmmoToAll(amount: number): void {
     this.inventory.addAmmoToAll(amount);
+  }
+
+  public fire(): void {
+    const weapon = this.getCurrentWeapon();
+    if (weapon) {
+      // Prediction is handled inside weapon.fire() which notifies onFirePredicted
+      weapon.fire();
+    }
+  }
+
+  public startFire(): void {
+    const weapon = this.getCurrentWeapon();
+    if (weapon) weapon.startFire();
+  }
+
+  public stopFire(): void {
+    const weapon = this.getCurrentWeapon();
+    if (weapon) weapon.stopFire();
+  }
+
+  public reload(): void {
+    const weapon = this.getCurrentWeapon();
+    const firearm = weapon as { reload?(): void };
+    if (firearm && firearm.reload) {
+      firearm.reload();
+    }
   }
 
   public dispose(): void {

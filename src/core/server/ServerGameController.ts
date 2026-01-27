@@ -40,6 +40,18 @@ export class ServerGameController {
       const { code, data, senderId } = payload;
       this.handlePacket(code, data, senderId || '');
     });
+
+    // Cleanup when player leaves
+    this.network.onPlayerLeft.add((playerId) => {
+      this.handlePlayerLeft(playerId);
+    });
+  }
+
+  private handlePlayerLeft(playerId: string) {
+    if (this.playerStates.has(playerId)) {
+      this.playerStates.delete(playerId);
+      console.log(`[Server] Player ${playerId} state cleaned up.`);
+    }
   }
 
   private handlePacket(code: number, data: any, senderId: string) {

@@ -107,15 +107,24 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
     return this.owner.id === myId;
   }
 
+  private currentBoundWeapon: IFirearm | null = null;
+
   private bindWeapon(weapon: IFirearm): void {
-    // Safety check: Ensure it's actually a Firearm (has muzzle transform)
+    // 1. Cleanup previous binding
+    if (this.currentBoundWeapon && this.weaponObserver) {
+      this.currentBoundWeapon.onFirePredicted.remove(this.weaponObserver);
+      this.weaponObserver = null;
+    }
+
+    // 2. Safety check: Ensure it's actually a Firearm
     if (!weapon || !('getMuzzleTransform' in weapon)) {
+      this.currentBoundWeapon = null;
       return;
     }
 
+    this.currentBoundWeapon = weapon;
     if (weapon.onFirePredicted) {
       this.weaponObserver = weapon.onFirePredicted.add((w) => {
-        // Double check in callback (though w should be the weapon itself)
         if ('getMuzzleTransform' in w) {
           const f = w as unknown as IFirearm;
           this.playEffect(f.name, f.getMuzzleTransform());
