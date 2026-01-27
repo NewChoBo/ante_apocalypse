@@ -54,11 +54,8 @@ export class Game {
         if (scene.activeCamera) {
           const deltaTime = this.engine.getDeltaTime() / 1000;
 
-          // Only stop the world tick if in singleplayer mode (Legacy comment removed)
-          const shouldTick = !this.isPaused;
-          if (shouldTick) {
-            this.update(deltaTime);
-          }
+          // Always tick the world (Menu is just an overlay)
+          this.update(deltaTime);
         }
         scene.render();
       }

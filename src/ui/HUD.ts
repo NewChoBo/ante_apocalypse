@@ -3,6 +3,7 @@ import {
   ammoStore,
   playerHealthStore,
   gameTimerStore,
+  gameStateStore,
   AmmoState,
 } from '../core/store/GameStore';
 import { GameObservables } from '../core/events/GameObservables';
@@ -32,6 +33,7 @@ export class HUD {
   private scoreUnsub: (() => void) | null = null;
   private timerUnsub: (() => void) | null = null;
   private healthUnsub: (() => void) | null = null;
+  private gameStateUnsub: (() => void) | null = null;
   private weaponFireObserver: Observer<{
     weaponId: string;
     ammoRemaining: number;
@@ -234,6 +236,14 @@ export class HUD {
       this.timerText.text = time;
       this.timerText.isVisible = time !== '00:00';
     });
+
+    // Game State (Crosshair / Visibility)
+    this.gameStateUnsub = gameStateStore.subscribe((state) => {
+      const isPaused = state === 'PAUSED';
+      if (this.crosshair) {
+        this.crosshair.isVisible = !isPaused;
+      }
+    });
   }
 
   public dispose(): void {
@@ -248,6 +258,10 @@ export class HUD {
     if (this.healthUnsub) {
       this.healthUnsub();
       this.healthUnsub = null;
+    }
+    if (this.gameStateUnsub) {
+      this.gameStateUnsub();
+      this.gameStateUnsub = null;
     }
     if (this.weaponFireObserver) {
       GameObservables.weaponFire.remove(this.weaponFireObserver);
