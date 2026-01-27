@@ -1,1 +1,1 @@
-export type GameMode = 'single' | 'multi';
+export type GameMode = 'multi';

@@ -45,7 +45,7 @@ export class Game {
 
   private isRunning = false;
   private isPaused = false;
-  private currentMode: GameMode = 'single';
+  private currentMode: GameMode = 'multi';
   private playerName: string = 'Anonymous';
   private renderFunction: () => void;
 
@@ -56,8 +56,8 @@ export class Game {
         if (scene.activeCamera) {
           const deltaTime = this.engine.getDeltaTime() / 1000;
 
-          // Only stop the world tick if in singleplayer mode
-          const shouldTick = !this.isPaused || this.currentMode !== 'single';
+          // Only stop the world tick if in singleplayer mode (Legacy comment removed)
+          const shouldTick = !this.isPaused;
           if (shouldTick) {
             this.update(deltaTime);
           }
@@ -118,14 +118,6 @@ export class Game {
     );
 
     lm.trackObserver(
-      this.uiManager.onStartSingleplayer,
-      this.uiManager.onStartSingleplayer.add(() => {
-        // Test: Start with Time Attack mode temporarily
-        this.start('single', 'time_attack');
-      })
-    );
-
-    lm.trackObserver(
       this.uiManager.onStartMultiplayer,
       this.uiManager.onStartMultiplayer.add(() => {
         // Start connection to Network (Photon)
@@ -157,7 +149,7 @@ export class Game {
     }
   }
 
-  public async start(mode: GameMode = 'single', ruleType: string = 'survival'): Promise<void> {
+  public async start(mode: GameMode = 'multi', ruleType: string = 'survival'): Promise<void> {
     if (this.isRunning) return;
     this.currentMode = mode;
 

@@ -38,7 +38,6 @@ export class UIManager {
 
   // Observables for Menu Actions
   public onLogin = new Observable<string>();
-  public onStartSingleplayer = new Observable<void>();
   public onStartMultiplayer = new Observable<void>();
   public onLogout = new Observable<void>();
   public onResume = new Observable<void>();
@@ -196,10 +195,6 @@ export class UIManager {
     logoSmall.height = '100px';
     logoSmall.paddingBottom = '40px';
     stack.addControl(logoSmall);
-
-    const singleBtn = this.createMenuButton('SINGLE_OP.EXE', 'LOCAL_SIMULATION');
-    singleBtn.onPointerUpObservable.add(() => this.onStartSingleplayer.notifyObservers());
-    stack.addControl(singleBtn);
 
     const multiBtn = this.createMenuButton('JOINT_OP.EXE', 'NETWORK_COORDINATED');
     multiBtn.onPointerUpObservable.add(() => this.onStartMultiplayer.notifyObservers());

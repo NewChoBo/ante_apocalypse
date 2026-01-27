@@ -58,7 +58,7 @@ export class SessionController implements IGameSystem {
 
   public async setup(
     levelData: LevelData,
-    mode: GameMode = 'single',
+    mode: GameMode = 'multi',
     playerName: string = 'Anonymous'
   ): Promise<void> {
     this.playerPawn = new PlayerPawn(this.scene);
