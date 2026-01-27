@@ -1,4 +1,5 @@
 import { NetworkManager } from '../network/NetworkManager';
+import { ServerEnemyController } from './ServerEnemyController';
 import {
   EventCode,
   ReqFirePayload,
@@ -10,7 +11,6 @@ import {
   OnStateSyncPayload,
   ReqTryPickupPayload,
   PickupSpawnData,
-  EnemySpawnData,
   TargetSpawnData,
   EnemyUpdateData,
   OnMatchStateSyncPayload,
@@ -40,7 +40,9 @@ interface ServerEntityState {
 
 export class ServerGameController {
   private network: NetworkManager;
+  private enemyController: ServerEnemyController;
   private playerStates: Map<string, ServerPlayerState> = new Map();
+  // entityStates now only holds static targets or other non-enemy AI entities
   private entityStates: Map<string, ServerEntityState> = new Map();
   private activePickups: Map<string, PickupSpawnData> = new Map();
 
@@ -81,6 +83,7 @@ export class ServerGameController {
 
   constructor() {
     this.network = NetworkManager.getInstance();
+    this.enemyController = new ServerEnemyController();
     this.setupListeners();
     this.startMatchTimer();
     console.log('%c[Server] Logical Server Started 🟢', 'color: lightgreen; font-weight: bold;');
@@ -95,6 +98,17 @@ export class ServerGameController {
   }
 
   private tick() {
+    // 0. Update AI
+    if (this.matchState === 'PLAYING') {
+      const playerPositions = new Map<string, { x: number; y: number; z: number }>();
+      this.playerStates.forEach((p) => {
+        if (!p.isDead && p.position) {
+          playerPositions.set(p.id, p.position);
+        }
+      });
+      this.enemyController.tick(0.1, playerPositions);
+    }
+
     // High-frequency tasks
     this.broadcastDeltaSync();
 
@@ -153,6 +167,7 @@ export class ServerGameController {
     this.remainingSeconds = 60;
     this.totalTeamScore = 0;
     this.playerScores.clear();
+    this.startMatchTimer(); // Ensure timer is running
     console.log('[Server] Match Started!');
   }
 
@@ -181,7 +196,29 @@ export class ServerGameController {
       }
     });
 
-    // Check Entities (Enemies/Targets)
+    // Check Enemies (From EnemyController)
+    this.enemyController.getEnemyStates().forEach((e) => {
+      const stateSummary = JSON.stringify({
+        p: e.position,
+        r: e.rotation,
+        h: e.health,
+        s: e.state,
+      });
+
+      if (this.lastSentStates.get(e.id) !== stateSummary) {
+        changedEnemies.push({
+          id: e.id,
+          position: e.position,
+          rotation: e.rotation,
+          health: e.health,
+          state: e.state,
+          isMoving: e.isMoving,
+        });
+        this.lastSentStates.set(e.id, stateSummary);
+      }
+    });
+
+    // Check Targets (From entityStates)
     this.entityStates.forEach((e) => {
       const stateSummary = JSON.stringify({
         p: e.position,
@@ -189,20 +226,12 @@ export class ServerGameController {
         h: e.health,
       });
       if (this.lastSentStates.get(e.id) !== stateSummary) {
-        if (e.type === 'enemy') {
-          changedEnemies.push({
-            id: e.id,
-            position: e.position!,
-            rotation: e.rotation,
-            health: e.health,
-          } as any);
-        } else {
-          changedTargets.push({
-            id: e.id,
-            position: e.position!,
-            health: e.health,
-          } as any);
-        }
+        // Targets only
+        changedTargets.push({
+          id: e.id,
+          position: e.position!,
+          health: e.health,
+        } as any);
         this.lastSentStates.set(e.id, stateSummary);
       }
     });
@@ -249,16 +278,6 @@ export class ServerGameController {
       } else if (code === EventCode.DESTROY_PICKUP) {
         const d = data as { id: string };
         this.activePickups.delete(d.id);
-      } else if (code === EventCode.SPAWN_ENEMY) {
-        const d = data as EnemySpawnData;
-        this.entityStates.set(d.id, {
-          id: d.id,
-          type: 'enemy',
-          health: 100, // Default enemy health
-          maxHealth: 100,
-          isDead: false,
-          position: d.position,
-        });
       } else if (code === EventCode.SPAWN_TARGET) {
         const d = data as TargetSpawnData;
         this.entityStates.set(d.id, {
@@ -270,18 +289,14 @@ export class ServerGameController {
           position: d.position,
           isMoving: d.isMoving,
         });
-      } else if (code === EventCode.ENEMY_MOVE) {
-        const d = data as EnemyUpdateData;
-        const state = this.entityStates.get(d.id);
-        if (state) {
-          state.position = d.position;
-          state.rotation = d.rotation;
-          this.recordHistory(d.id, d.position, Date.now());
-        }
-      } else if (code === EventCode.DESTROY_ENEMY || code === EventCode.TARGET_DESTROY) {
+      } else if (code === EventCode.TARGET_DESTROY) {
         const d = data as { id: string };
         this.entityStates.delete(d.id);
       }
+      // Note: ON_ENEMY_SPAWN is handled by ServerEnemyController internal logic + broadcast
+      // Server doesn't need to listen to its own broadcast to update map,
+      // but if we had distributed authority we might.
+      // Here, enemyController IS the source.
     });
   }
 
@@ -413,15 +428,20 @@ export class ServerGameController {
     const enemies: EnemyUpdateData[] = [];
     const targets: TargetSpawnData[] = [];
 
+    // Enemies from Controller
+    this.enemyController.getEnemyStates().forEach((e) => {
+      enemies.push({
+        id: e.id,
+        position: e.position,
+        rotation: e.rotation,
+        state: e.state,
+        isMoving: e.isMoving,
+      });
+    });
+
+    // Targets from entityStates
     this.entityStates.forEach((e) => {
-      if (e.type === 'enemy') {
-        enemies.push({
-          id: e.id,
-          position: e.position!,
-          rotation: e.rotation,
-          isMoving: e.isMoving,
-        });
-      } else if (e.type.includes('target')) {
+      if (e.type.includes('target')) {
         targets.push({
           id: e.id,
           type: e.type,
@@ -506,9 +526,21 @@ export class ServerGameController {
         isDead: playerTarget.isDead,
       };
     } else {
+      // Check Entity States (Targets)
       const entityTarget = this.entityStates.get(data.targetId);
       if (entityTarget) {
         target = entityTarget;
+      } else {
+        // Check Enemy Controller
+        const enemy = this.enemyController.getEnemyStates().get(data.targetId);
+        if (enemy) {
+          target = {
+            id: enemy.id,
+            type: 'enemy',
+            health: enemy.health,
+            isDead: false, // Enemy controller handles death state removal separately, keeping simple here
+          };
+        }
       }
     }
 
@@ -517,8 +549,6 @@ export class ServerGameController {
     // 2. Lag Compensation: Basic validation
     if (!this.validateHitWithLagComp(target.id, data.hitPosition)) {
       console.warn(`[Server] Potential hit validation failure for ${attackerId} -> ${target.id}`);
-      // In a strict server, we might return here.
-      // For now, let's just log and allow (soft authority).
     }
 
     target.health -= data.damage;
@@ -529,9 +559,13 @@ export class ServerGameController {
     this.playerScores.set(attackerId, currentScore + scoreGain);
     this.totalTeamScore += scoreGain;
 
-    // Apply back to source if it was a player
+    // Apply back to source
     if (playerTarget) {
       playerTarget.health = target.health;
+    } else if (target.type === 'enemy') {
+      // Update Enemy Controller
+      const enemy = this.enemyController.getEnemyStates().get(target.id);
+      if (enemy) enemy.health = target.health;
     }
 
     this.network.sendEvent(EventCode.ON_HIT, {
@@ -559,12 +593,18 @@ export class ServerGameController {
         reason: 'Shot',
       });
 
-      // Special handling for non-players: trigger destruction events if needed
+      // Special handling for non-players
       if (target.type !== 'player') {
         if (target.type === 'enemy') {
-          this.network.sendEvent(EventCode.DESTROY_ENEMY, { id: data.targetId });
+          // Let EnemyController know? OR just broadcast Destroy
+          // For now, simple destroy
+          this.network.sendEvent(EventCode.ON_ENEMY_DESTROY, { id: data.targetId });
+          this.enemyController.removeEnemy(data.targetId);
         } else if (target.type && target.type.includes('target')) {
           this.network.sendEvent(EventCode.TARGET_DESTROY, { id: data.targetId });
+          // Note: entityStates removal happens in setupListeners when listening to TARGET_DESTROY
+          // But Server is the authority, it should remove ITSELF
+          this.entityStates.delete(data.targetId);
         }
       }
     }

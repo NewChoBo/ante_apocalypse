@@ -16,6 +16,8 @@ import {
   OnAmmoSyncPayload,
   OnStateSyncPayload,
   OnStateDeltaPayload,
+  EnemySpawnData,
+  EnemyDestroyData,
   OnMatchStateSyncPayload,
   OnMatchEndPayload,
   OnScoreSyncPayload,
@@ -40,6 +42,8 @@ export class NetworkMediator {
   public onTargetDestroyed = new Observable<TargetDestroyData>();
   public onPickupSpawnRequested = new Observable<PickupSpawnData>();
   public onPickupDestroyRequested = new Observable<PickupDestroyData>();
+  public onEnemySpawnRequested = new Observable<EnemySpawnData>();
+  public onEnemyDestroyRequested = new Observable<EnemyDestroyData>();
 
   // Authoritative Network Events
   public onStateSync = new Observable<OnStateSyncPayload>();
@@ -121,6 +125,10 @@ export class NetworkMediator {
         this.onPickupSpawnRequested.notifyObservers(data as PickupSpawnData);
       } else if (code === EventCode.DESTROY_PICKUP) {
         this.onPickupDestroyRequested.notifyObservers(data as PickupDestroyData);
+      } else if (code === EventCode.ON_ENEMY_SPAWN) {
+        this.onEnemySpawnRequested.notifyObservers(data as EnemySpawnData);
+      } else if (code === EventCode.ON_ENEMY_DESTROY) {
+        this.onEnemyDestroyRequested.notifyObservers(data as EnemyDestroyData);
       } else if (code === EventCode.REQ_TRY_PICKUP) {
         this.onPickupTryRequested.notifyObservers({
           ...(data as ReqTryPickupPayload),

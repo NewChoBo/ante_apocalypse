@@ -9,8 +9,11 @@ export enum EventCode {
   SPAWN_TARGET = 12,
   REQ_INITIAL_STATE = 13,
   INITIAL_STATE = 14,
-  SPAWN_ENEMY = 16,
-  DESTROY_ENEMY = 17,
+
+  // [S -> C] Enemy Lifecycle
+  ON_ENEMY_SPAWN = 16,
+  ON_ENEMY_DESTROY = 17,
+
   SPAWN_PICKUP = 18,
   DESTROY_PICKUP = 19,
 
@@ -235,7 +238,8 @@ export class EnemyUpdateData {
     public readonly position: Position,
     public readonly rotation?: Rotation,
     public readonly state?: string,
-    public readonly isMoving?: boolean
+    public readonly isMoving?: boolean,
+    public readonly health?: number
   ) {}
 }
 
