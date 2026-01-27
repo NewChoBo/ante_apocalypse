@@ -116,7 +116,7 @@ export class CombatComponent extends BaseComponent {
     const weapon = this.getCurrentWeapon();
     if (weapon) {
       // 1. Prediction: Immediately play visuals/audio via weapon's internal event
-      // Do NOT deduct ammo/HP locally.
+      // [Optimistic] Deduct ammo locally via code below for responsiveness.
       const muzzle = (weapon as any).getMuzzleTransform
         ? (weapon as any).getMuzzleTransform()
         : null;

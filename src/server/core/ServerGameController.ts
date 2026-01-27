@@ -62,20 +62,10 @@ export class ServerGameController {
   private totalTeamScore: number = 0;
   private readonly TARGET_SCORE = 500;
 
-  // Anti-Cheat / Validation
-  private lastFireTimes: Map<string, Record<string, number>> = new Map();
-  private lastInputTimes: Map<string, number> = new Map();
-  private entityHistory: Map<
-    string,
-    { timestamp: number; position: { x: number; y: number; z: number } }[]
-  > = new Map();
-
   // Delta Sync tracking
   private lastSentStates: Map<string, string> = new Map();
   private fullSyncCounter: number = 0;
 
-  // Config
-  private readonly HISTORY_DURATION_MS = 1000; // 1 second of history
   private readonly DEFAULT_HP = 100;
   private readonly DEFAULT_WEAPON_DATA: Record<
     string,
@@ -317,7 +307,8 @@ export class ServerGameController {
     this.network.onPlayerJoined.add((player) => {
       this.initializePlayer(player.id, player.name || 'Anonymous');
       // WAIT for REQ_READY before sending snapshot
-      // this.sendWorldSnapshot(player.id);
+      // WAIT for REQ_READY before sending snapshot
+      // this.sendWorldSnapshot(player.id); // Validated: Moved to REQ_READY handler
     });
 
     this.network.onPlayerLeft.add((playerId) => {
@@ -366,41 +357,34 @@ export class ServerGameController {
     }
 
     const state = this.playerStates.get(senderId)!;
-    const now = Date.now();
+    // const now = Date.now(); // Unused if we trust client completely for movement
 
     switch (code) {
       case EventCode.MOVE: {
         const move = data as MovePayload;
-        // const lastTime = this.lastInputTimes.get(senderId) || 0;
-        // const dt = (now - lastTime) / 1000;
 
-        // DISABLE SPEED CHECK for Alpha
-        /*
-        if (lastTime > 0 && dt > 0.01) {
-             // ... speed check logic ...
-             return;
-        }
-        */
-
+        // [Smooth Gameplay] Trust Client Authority for Movement
+        // strict speed checks and rubber-banding correction (ON_POS_CORRECTION) are removed.
         state.position = move.position;
         state.rotation = move.rotation;
         state.weaponId = move.weaponId;
-        this.lastInputTimes.set(senderId, now);
 
-        this.recordHistory(senderId, move.position, now);
+        // History recording removed
         break;
       }
       case EventCode.REQ_READY:
-        // Client is fully loaded. Send Snapshot & Check Match Start
+        // [Handshake] Client is fully loaded. Send Snapshot & Check Match Start
         this.sendWorldSnapshot(senderId);
         if (this.matchState === 'READY' && this.playerStates.size >= 1) {
           this.startMatch();
         }
         break;
       case EventCode.REQ_FIRE:
+        // Process immediately (Event Driven)
         if (!state.isDead) this.processFire(senderId, state, data as ReqFirePayload);
         break;
       case EventCode.REQ_HIT:
+        // Process immediately (Event Driven)
         this.processHit(senderId, data as ReqHitPayload);
         break;
       case EventCode.REQ_RELOAD:
@@ -434,26 +418,6 @@ export class ServerGameController {
     }
   }
 
-  private recordHistory(
-    id: string,
-    position: { x: number; y: number; z: number },
-    timestamp: number
-  ) {
-    let history = this.entityHistory.get(id);
-    if (!history) {
-      history = [];
-      this.entityHistory.set(id, history);
-    }
-
-    history.push({ timestamp, position });
-
-    // Trim old history
-    const cutoff = timestamp - this.HISTORY_DURATION_MS;
-    while (history.length > 0 && history[0].timestamp < cutoff) {
-      history.shift();
-    }
-  }
-
   private initializePlayer(id: string, name: string = 'Anonymous') {
     const ammo: Record<string, { current: number; reserve: number; magazineSize: number }> = {};
     for (const [wId, config] of Object.entries(this.DEFAULT_WEAPON_DATA)) {
@@ -475,7 +439,7 @@ export class ServerGameController {
       rotation: { x: 0, y: 0, z: 0 },
     });
     this.playerScores.set(id, 0);
-    this.lastFireTimes.set(id, {});
+
     console.log(`[Server] Initialized Player State: ${id}`);
   }
 
@@ -531,7 +495,8 @@ export class ServerGameController {
     const config = this.DEFAULT_WEAPON_DATA[weaponId];
     if (!config) return;
 
-    // Fire rate check
+    // Fire rate check REMOVED - Trust Client
+    /*
     const now = Date.now();
     const playerFires = this.lastFireTimes.get(shooterId) || {};
     const lastFire = playerFires[weaponId] || 0;
@@ -540,6 +505,7 @@ export class ServerGameController {
       console.warn(`[Server] Fire rate violation: ${shooterId} with ${weaponId}`);
       return;
     }
+    */
 
     const ammoData = state.ammo[weaponId];
     if (!ammoData || ammoData.current <= 0) return;
@@ -548,8 +514,7 @@ export class ServerGameController {
       ammoData.current--;
     }
 
-    playerFires[weaponId] = now;
-    this.lastFireTimes.set(shooterId, playerFires);
+    // this.lastFireTimes update removed
 
     this.network.sendEvent(EventCode.ON_FIRED, {
       shooterId,
@@ -620,11 +585,8 @@ export class ServerGameController {
 
     if (!target || target.isDead) return;
 
-    // 2. Lag Compensation: Basic validation
-    if (!this.validateHitWithLagComp(target.id, data.hitPosition)) {
-      console.warn(`[Server] Potential hit validation failure for ${attackerId} -> ${target.id}`);
-      // ALLOW HIT ANYWAY for Alpha (Favor the Shooter)
-    }
+    // 2. Lag Compensation REMOVED - Trust Client
+    // if (!this.validateHitWithLagComp(target.id, data.hitPosition)) { ... }
 
     target.health -= data.damage;
 
@@ -706,29 +668,6 @@ export class ServerGameController {
         }
       }
     }
-  }
-
-  private validateHitWithLagComp(
-    targetId: string,
-    hitPos: { x: number; y: number; z: number }
-  ): boolean {
-    const history = this.entityHistory.get(targetId);
-    if (!history || history.length === 0) return true; // Default to true if no history (e.g. static)
-
-    // Check if hitPosition is close to ANY point in our 1-second history
-    // (A more advanced version would use attacker latency to find EXACT point)
-    const thresholdSquared = 2.0 * 2.0; // 2 meter radius tolerance
-
-    for (const entry of history) {
-      const distSq =
-        Math.pow(hitPos.x - entry.position.x, 2) +
-        Math.pow(hitPos.y - entry.position.y, 2) +
-        Math.pow(hitPos.z - entry.position.z, 2);
-
-      if (distSq < thresholdSquared) return true;
-    }
-
-    return false;
   }
 
   private processPickupRequest(
