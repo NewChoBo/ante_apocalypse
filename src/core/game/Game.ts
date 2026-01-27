@@ -14,13 +14,22 @@ import { NetworkManager } from '../network/NetworkManager';
 import { NetworkState } from '../network/NetworkProtocol';
 import { LifetimeManager } from './LifetimeManager';
 
+import levelsConfig from '@/assets/data/levels.json';
 import trainingGroundData from '@/assets/levels/training_ground.json';
 import combatZoneData from '@/assets/levels/combat_zone.json';
 
-const LEVELS: Record<string, LevelData> = {
-  training_ground: trainingGroundData as LevelData,
-  combat_zone: combatZoneData as LevelData,
+const LEVEL_DATA_MAP: Record<string, any> = {
+  '@/assets/levels/training_ground.json': trainingGroundData,
+  '@/assets/levels/combat_zone.json': combatZoneData,
 };
+
+const LEVELS: Record<string, LevelData> = Object.entries(levelsConfig).reduce(
+  (acc, [key, path]) => {
+    acc[key] = LEVEL_DATA_MAP[path as string] as LevelData;
+    return acc;
+  },
+  {} as Record<string, LevelData>
+);
 
 export class Game {
   private canvas!: HTMLCanvasElement;
@@ -90,6 +99,7 @@ export class Game {
       this.engine.runRenderLoop(this.renderFunction);
     }
   }
+
   private setupUIManagerEvents(): void {
     const lm = LifetimeManager.getInstance();
 

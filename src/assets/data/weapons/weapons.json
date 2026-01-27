@@ -1,0 +1,19 @@
+{
+  "Pistol": {
+    "magazineSize": 12,
+    "damage": 50,
+    "fireRate": 0.3,
+    "range": 50,
+    "reloadTime": 1.5,
+    "firingMode": "semi",
+    "recoilForce": 0.015,
+    "reserveAmmo": 120,
+    "muzzleOffset": { "x": 0, "y": 0.06, "z": 0.2 },
+    "model": {
+      "assetName": "rifle",
+      "targetSize": 0.3,
+      "position": { "x": 0.2, "y": -0.15, "z": 0.4 },
+      "rotation": { "x": 0, "y": 3.14159, "z": 0 }
+    }
+  }
+}

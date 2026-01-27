@@ -5,6 +5,7 @@ import { CameraComponent } from '../components/movement/CameraComponent';
 import { CombatComponent } from '../components/combat/CombatComponent';
 import { InputComponent } from '../components/input/InputComponent';
 import { playerHealthStore } from '../store/GameStore';
+import playerData from '@/assets/data/characters/player_default.json';
 
 /**
  * 1인칭 플레이어 캐릭터 실체 (Pawn).
@@ -19,10 +20,11 @@ export class PlayerPawn extends BasePawn {
   constructor(scene: Scene) {
     super(scene);
     this.id = 'player_local'; // Local player ID
-    this.damageProfile = {
-      multipliers: { head: 2.0, body: 1.0 },
-      defaultMultiplier: 1.0,
-    };
+
+    // Load stats from JSON
+    this.health = playerData.health;
+    this.maxHealth = playerData.maxHealth;
+    this.damageProfile = playerData.damageProfile as any;
 
     // 초기 체력 동기화
     playerHealthStore.set(this.health);
@@ -30,7 +32,13 @@ export class PlayerPawn extends BasePawn {
     // 단순한 히트박스 또는 투명 메쉬 (Pawn의 실체)
     this.mesh = Mesh.CreateBox('playerPawn', 0.5, scene);
     this.mesh.isVisible = false; // 1인칭에서는 자신의 몸이 안보이게 함
-    this.mesh.position.set(0, 1.75, -5);
+
+    // Set initial position from data
+    this.mesh.position.set(
+      playerData.initialPosition.x,
+      playerData.initialPosition.y,
+      playerData.initialPosition.z
+    );
 
     // 물리 충돌 설정
     this.mesh.checkCollisions = true;
@@ -81,7 +89,7 @@ export class PlayerPawn extends BasePawn {
 
   public addHealth(amount: number): void {
     if (this.health <= 0) return;
-    this.health = Math.min(100, this.health + amount);
+    this.health = Math.min(this.maxHealth, this.health + amount);
     playerHealthStore.set(this.health);
   }
 

@@ -1,0 +1,4 @@
+{
+  "training_ground": "@/assets/levels/training_ground.json",
+  "combat_zone": "@/assets/levels/combat_zone.json"
+}

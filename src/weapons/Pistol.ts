@@ -1,5 +1,6 @@
 import { Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
 import { Firearm } from './Firearm';
+import weaponData from '@/assets/data/weapons/weapons.json';
 
 /**
  * 권총 (Pistol) - 단발
@@ -7,13 +8,13 @@ import { Firearm } from './Firearm';
  */
 export class Pistol extends Firearm {
   public name = 'Pistol';
-  public magazineSize = 12;
-  public damage = 50; // 높은 단발 데미지
-  public fireRate = 0.3; // 발사 간격
-  public range = 50;
-  public reloadTime = 1.5;
-  public firingMode: 'semi' | 'auto' = 'semi';
-  public recoilForce = 0.015;
+  public magazineSize: number;
+  public damage: number;
+  public fireRate: number;
+  public range: number;
+  public reloadTime: number;
+  public firingMode: 'semi' | 'auto';
+  public recoilForce: number;
 
   constructor(
     scene: Scene,
@@ -21,16 +22,29 @@ export class Pistol extends Firearm {
     onScore?: (points: number) => void,
     applyRecoil?: (force: number) => void
   ) {
-    super(scene, camera, 12, 120, onScore, applyRecoil);
-    this.muzzleOffset = new Vector3(0, 0.06, 0.2);
+    const stats = (weaponData as any)['Pistol'];
+    super(scene, camera, stats.magazineSize, stats.reserveAmmo, onScore, applyRecoil);
 
-    // Scale: 0.3, Pos: (0.2, -0.15, 0.4), Rot: (0, PI, 0)
-    // Using 'rifle' asset for pistol (placeholder logic maintained)
+    this.magazineSize = stats.magazineSize;
+    this.damage = stats.damage;
+    this.fireRate = stats.fireRate;
+    this.range = stats.range;
+    this.reloadTime = stats.reloadTime;
+    this.firingMode = stats.firingMode;
+    this.recoilForce = stats.recoilForce;
+
+    this.muzzleOffset = new Vector3(
+      stats.muzzleOffset.x,
+      stats.muzzleOffset.y,
+      stats.muzzleOffset.z
+    );
+
+    // Instantiate model from JSON config
     this.instantiateWeaponModel(
-      'rifle',
-      0.3,
-      new Vector3(0.2, -0.15, 0.4),
-      new Vector3(0, Math.PI, 0)
+      stats.model.assetName,
+      stats.model.targetSize,
+      new Vector3(stats.model.position.x, stats.model.position.y, stats.model.position.z),
+      new Vector3(stats.model.rotation.x, stats.model.rotation.y, stats.model.rotation.z)
     );
   }
 
