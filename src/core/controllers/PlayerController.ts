@@ -3,6 +3,7 @@ import { IPawn } from '../../types/IPawn';
 import { InputComponent, InputState } from '../components/input/InputComponent';
 import { InputManager } from '../input/InputManager';
 import { InputAction } from '../../types/InputTypes';
+import { PlayerPawn } from '../pawns/PlayerPawn';
 
 export class PlayerController extends BaseController {
   private inputManager: InputManager;
@@ -60,12 +61,16 @@ export class PlayerController extends BaseController {
 
   protected onPossess(pawn: IPawn): void {
     console.log(`[PlayerController] Possessing pawn: ${pawn.id}`);
-    pawn.setupInput(true);
+    if (pawn instanceof PlayerPawn) {
+      pawn.setupInput(true);
+    }
   }
 
   protected onUnpossess(pawn: IPawn): void {
     console.log(`[PlayerController] Unpossessing pawn: ${pawn.id}`);
-    pawn.setupInput(false);
+    if (pawn instanceof PlayerPawn) {
+      pawn.setupInput(false);
+    }
   }
 
   public setInputBlocked(blocked: boolean): void {
