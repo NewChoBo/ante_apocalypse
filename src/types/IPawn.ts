@@ -31,6 +31,9 @@ export interface IPawn extends ITickable {
   /** 고유 ID */
   id: string;
 
+  /** 사망 상태 */
+  isDead: boolean;
+
   /** 업데이트 우선순위 */
   readonly priority: number;
 
