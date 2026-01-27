@@ -45,14 +45,14 @@ export class PickupManager implements IGameSystem {
     });
 
     // Master: Handle pickup requests
-    this.networkMediator.onPickupRequested.add((data) => {
+    this.networkMediator.onPickupTryRequested.add((data) => {
       if (this.networkMediator.isMasterClient()) {
-        this.processPickupRequest(data.id, data.requesterId);
+        this.processPickupRequest(data.id, data.senderId);
       }
     });
 
     // Client: Handle granted pickup
-    this.networkMediator.onPickupGranted.add((data) => {
+    this.networkMediator.onItemPicked.add((data) => {
       this.grantPickupToInventory(data.id, data.type, data.ownerId);
     });
 
@@ -144,9 +144,6 @@ export class PickupManager implements IGameSystem {
       const collectionRange = 3.0;
 
       if (distSq < collectionRange * collectionRange) {
-        console.log(
-          `[PickupManager] Candidate for collection: ${id}, dist: ${Math.sqrt(distSq).toFixed(2)}m`
-        );
         this.handleCollection(pickup, id);
       }
     });
@@ -155,13 +152,8 @@ export class PickupManager implements IGameSystem {
   private handleCollection(pickup: PickupActor, id: string): void {
     if (!this.player || pickup.destroyed) return;
 
-    console.log(
-      `[PickupManager] Handling collection for ${id}. SocketID: [${this.networkMediator.getSocketId()}]`
-    );
-
     // Single player mode: Grant immediately
     if (!this.networkMediator.getSocketId()) {
-      console.log(`[PickupManager] Single Player: Granting ${id} immediately`);
       this.grantPickupToInventory(id, pickup.type, 'local');
       this.pickups.delete(id);
       pickup.collect();
@@ -169,11 +161,13 @@ export class PickupManager implements IGameSystem {
     }
 
     if (this.networkMediator.isMasterClient()) {
-      console.log(`[PickupManager] Master: Processing ${id} locally`);
       this.processPickupRequest(id, this.networkMediator.getSocketId()!);
     } else {
-      console.log(`[PickupManager] Client: Requesting ${id} from Master`);
-      this.networkMediator.sendEvent(EventCode.REQ_PICKUP, { id });
+      const pos = pickup.mesh.getAbsolutePosition();
+      this.networkMediator.sendEvent(EventCode.REQ_TRY_PICKUP, {
+        id,
+        position: { x: pos.x, y: pos.y, z: pos.z },
+      });
     }
 
     // Optimistic: Mark as destroyed locally to prevent multiple request spamming
@@ -191,8 +185,8 @@ export class PickupManager implements IGameSystem {
     // 1. Mark as destroyed locally/Master side to prevent double grant
     pickup.destroyed = true;
 
-    // 2. Grant to requester
-    this.networkMediator.sendEvent(EventCode.PICKUP_GRANTED, {
+    // 2. Grant to everyone (via NetworkManager will handle broadcast)
+    this.networkMediator.sendEvent(EventCode.ON_ITEM_PICKED, {
       id: pickupId,
       type: pickup.type,
       ownerId: requesterId,
@@ -204,7 +198,6 @@ export class PickupManager implements IGameSystem {
     // 4. Local handling for Master if they are the requester (Others group doesn't loop back)
     const myId = this.networkMediator.getSocketId();
     if (requesterId === myId) {
-      console.log(`[PickupManager] Master loopback: Granting to self`);
       this.grantPickupToInventory(pickupId, pickup.type, requesterId);
       this.handleDestroyEvent({ id: pickupId });
     }
@@ -212,11 +205,7 @@ export class PickupManager implements IGameSystem {
 
   private grantPickupToInventory(_id: string, type: string, ownerId: string): void {
     const myId = this.networkMediator.getSocketId() || 'local';
-    console.log(
-      `[PickupManager] grantPickupToInventory: myId=[${myId}], ownerId=[${ownerId}], type=[${type}]`
-    );
     if (ownerId !== myId) {
-      console.warn(`[PickupManager] ID Mismatch: ownerId ${ownerId} != myId ${myId}`);
       return;
     }
 

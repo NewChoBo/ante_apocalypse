@@ -5,14 +5,11 @@ import {
   NetworkState,
   PlayerData,
   EnemyUpdateData,
-  EnemySpawnData,
-  EnemyDestroyData,
   TargetSpawnData,
   TargetDestroyData,
   PickupSpawnData,
   PickupDestroyData,
-  ReqPickupPayload,
-  PickupGrantedPayload,
+  ReqTryPickupPayload,
   ReqHitPayload,
   OnHitPayload,
   OnFiredPayload,
@@ -33,14 +30,14 @@ export class NetworkMediator {
   public onPlayerLeft = new Observable<string>();
   public onPlayerUpdated = new Observable<PlayerData>();
   public onEnemyUpdated = new Observable<EnemyUpdateData>();
-  public onEnemySpawnRequested = new Observable<EnemySpawnData>();
-  public onEnemyDestroyRequested = new Observable<EnemyDestroyData>();
   public onTargetSpawnRequested = new Observable<TargetSpawnData>();
   public onTargetDestroyed = new Observable<TargetDestroyData>();
   public onPickupSpawnRequested = new Observable<PickupSpawnData>();
   public onPickupDestroyRequested = new Observable<PickupDestroyData>();
-  public onPickupRequested = new Observable<{ id: string; requesterId: string }>();
-  public onPickupGranted = new Observable<PickupGrantedPayload>();
+
+  // Authoritative Pickup Events
+  public onPickupTryRequested = new Observable<ReqTryPickupPayload & { senderId: string }>();
+  public onItemPicked = new Observable<{ id: string; type: string; ownerId: string }>();
 
   public onHitRequested = new Observable<ReqHitPayload & { shooterId: string }>();
   public onHit = new Observable<OnHitPayload>();
@@ -49,6 +46,9 @@ export class NetworkMediator {
   public onAmmoSynced = new Observable<OnAmmoSyncPayload>();
 
   public onStateChanged = new Observable<NetworkState>();
+
+  // Raw event access if needed
+  public onEvent = new Observable<{ code: number; data: EventData; senderId: string }>();
 
   private constructor() {
     this.networkManager = NetworkManager.getInstance();
@@ -69,7 +69,6 @@ export class NetworkMediator {
     });
 
     this.networkManager.onPlayerJoined.add((data) => {
-      // Ensure rotation has w component
       const rot = data.rotation as { x: number; y: number; z: number; w?: number };
       const rotation = data.rotation ? { ...data.rotation, w: rot.w ?? 1 } : undefined;
       const playerData: PlayerData = { ...data, rotation };
@@ -100,34 +99,33 @@ export class NetworkMediator {
     });
 
     this.networkManager.onEvent.add((event) => {
-      if (event.code === EventCode.SPAWN_ENEMY) {
-        this.onEnemySpawnRequested.notifyObservers(event.data as EnemySpawnData);
-      } else if (event.code === EventCode.DESTROY_ENEMY) {
-        this.onEnemyDestroyRequested.notifyObservers(event.data as EnemyDestroyData);
-      } else if (event.code === EventCode.SPAWN_PICKUP) {
-        this.onPickupSpawnRequested.notifyObservers(event.data as PickupSpawnData);
-      } else if (event.code === EventCode.DESTROY_PICKUP) {
-        this.onPickupDestroyRequested.notifyObservers(event.data as PickupDestroyData);
-      } else if (event.code === EventCode.REQ_PICKUP) {
-        const payload = event.data as ReqPickupPayload;
-        this.onPickupRequested.notifyObservers({
-          id: payload.id,
-          requesterId: event.senderId || '',
+      // Forward to raw observers
+      this.onEvent.notifyObservers(event);
+
+      const { code, data, senderId } = event;
+
+      if (code === EventCode.SPAWN_PICKUP) {
+        this.onPickupSpawnRequested.notifyObservers(data as PickupSpawnData);
+      } else if (code === EventCode.DESTROY_PICKUP) {
+        this.onPickupDestroyRequested.notifyObservers(data as PickupDestroyData);
+      } else if (code === EventCode.REQ_TRY_PICKUP) {
+        this.onPickupTryRequested.notifyObservers({
+          ...(data as ReqTryPickupPayload),
+          senderId: senderId || '',
         });
-      } else if (event.code === EventCode.PICKUP_GRANTED) {
-        this.onPickupGranted.notifyObservers(event.data as PickupGrantedPayload);
-      } else if (event.code === EventCode.REQ_HIT) {
-        const payload = event.data as ReqHitPayload;
+      } else if (code === EventCode.ON_ITEM_PICKED) {
+        this.onItemPicked.notifyObservers(data as { id: string; type: string; ownerId: string });
+      } else if (code === EventCode.REQ_HIT) {
         this.onHitRequested.notifyObservers({
-          ...payload,
-          shooterId: event.senderId || '',
+          ...(data as ReqHitPayload),
+          shooterId: senderId || '',
         });
-      } else if (event.code === EventCode.ON_HIT) {
-        this.onHit.notifyObservers(event.data as OnHitPayload);
-      } else if (event.code === EventCode.ON_FIRED) {
-        this.onFired.notifyObservers(event.data as OnFiredPayload);
-      } else if (event.code === EventCode.ON_AMMO_SYNC) {
-        this.onAmmoSynced.notifyObservers(event.data as OnAmmoSyncPayload);
+      } else if (code === EventCode.ON_HIT) {
+        this.onHit.notifyObservers(data as OnHitPayload);
+      } else if (code === EventCode.ON_FIRED) {
+        this.onFired.notifyObservers(data as OnFiredPayload);
+      } else if (code === EventCode.ON_AMMO_SYNC) {
+        this.onAmmoSynced.notifyObservers(data as OnAmmoSyncPayload);
       }
     });
 
@@ -136,12 +134,6 @@ export class NetworkMediator {
     });
   }
 
-  /**
-   * Universal method to send events through the mediator.
-   * NOTE: Photon implementation currently uses ReceiverGroup.Others,
-   * meaning the Master Client will NOT receive their own events.
-   * Systems must handle Master Client logic locally or via direct processing.
-   */
   public sendEvent(code: EventCode, data: EventData, reliable: boolean = true): void {
     this.networkManager.sendEvent(code, data, reliable);
   }
@@ -151,6 +143,6 @@ export class NetworkMediator {
   }
 
   public getSocketId(): string | undefined {
-    return this.networkManager.getSocketId();
+    return this.networkManager.getSocketId() || undefined;
   }
 }

@@ -3,7 +3,6 @@ export enum EventCode {
   JOIN = 1,
   LEAVE = 2,
   MOVE = 3,
-  // FIRE = 5, // Deprecated in favor of REQ/ON pattern
   SYNC_WEAPON = 7,
   ENEMY_MOVE = 9,
   TARGET_DESTROY = 11,
@@ -14,21 +13,20 @@ export enum EventCode {
   DESTROY_ENEMY = 17,
   SPAWN_PICKUP = 18,
   DESTROY_PICKUP = 19,
-  // PLAYER_DEATH = 20, // Deprecated, use ON_DIED
-  REQ_PICKUP = 21,
-  PICKUP_GRANTED = 22,
 
   // [C -> S] Requests
   REQ_FIRE = 101,
-  REQ_RELOAD = 102,
-  REQ_HIT = 103,
+  REQ_HIT = 102,
+  REQ_TRY_PICKUP = 103,
+  REQ_RELOAD = 104,
 
   // [S -> C] Notifications
-  ON_FIRED = 203,
-  ON_HIT = 204,
-  ON_DIED = 205,
-  ON_STATE_SYNC = 206,
-  ON_AMMO_SYNC = 207,
+  ON_STATE_SYNC = 200,
+  ON_FIRED = 201,
+  ON_HIT = 202,
+  ON_DIED = 203,
+  ON_ITEM_PICKED = 204,
+  ON_AMMO_SYNC = 205,
 }
 
 export class RoomData {
@@ -160,8 +158,10 @@ export class OnDiedPayload {
 export class OnStateSyncPayload {
   constructor(
     public readonly timestamp: number,
-    public readonly players: PlayerData[]
-    // Add enemies/pickups here if needed
+    public readonly players: PlayerData[],
+    public readonly enemies: EnemyUpdateData[] = [],
+    public readonly targets: TargetSpawnData[] = [],
+    public readonly pickups: PickupSpawnData[] = []
   ) {}
 }
 
@@ -248,11 +248,14 @@ export class PlayerDeathPayload {
   ) {}
 }
 
-export class ReqPickupPayload {
-  constructor(public readonly id: string) {}
+export class ReqTryPickupPayload {
+  constructor(
+    public readonly id: string,
+    public readonly position: Position
+  ) {}
 }
 
-export class PickupGrantedPayload {
+export class OnItemPickedPayload {
   constructor(
     public readonly id: string,
     public readonly type: string,
@@ -282,5 +285,5 @@ export type EventData =
   | PlayerDeathPayload
   | EnemyUpdateData
   | PlayerData
-  | ReqPickupPayload
-  | PickupGrantedPayload;
+  | ReqTryPickupPayload
+  | OnItemPickedPayload;

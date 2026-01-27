@@ -5,11 +5,14 @@ import {
   ReqHitPayload,
   ReqReloadPayload,
   OnAmmoSyncPayload,
+  PlayerData,
+  MovePayload,
+  OnStateSyncPayload,
+  ReqTryPickupPayload,
+  PickupSpawnData,
 } from '../network/NetworkProtocol';
 
-interface ServerPlayerState {
-  id: string;
-  hp: number;
+interface ServerPlayerState extends PlayerData {
   ammo: Record<string, { current: number; reserve: number; magazineSize: number }>;
   isDead: boolean;
 }
@@ -17,6 +20,7 @@ interface ServerPlayerState {
 export class ServerGameController {
   private network: NetworkManager;
   private playerStates: Map<string, ServerPlayerState> = new Map();
+  private activePickups: Map<string, PickupSpawnData> = new Map();
 
   // Config
   private readonly DEFAULT_HP = 100;
@@ -35,51 +39,68 @@ export class ServerGameController {
   }
 
   private setupListeners() {
-    // Listen to Raw Events (Requests from Clients)
     this.network.onEvent.add((payload) => {
       const { code, data, senderId } = payload;
       this.handlePacket(code, data, senderId || '');
     });
 
-    // Cleanup when player leaves
-    this.network.onPlayerLeft.add((playerId) => {
-      this.handlePlayerLeft(playerId);
+    this.network.onPlayerJoined.add((player) => {
+      this.initializePlayer(player.id, player.name || 'Anonymous');
+      this.sendWorldSnapshot(player.id);
     });
-  }
 
-  private handlePlayerLeft(playerId: string) {
-    if (this.playerStates.has(playerId)) {
-      this.playerStates.delete(playerId);
-      console.log(`[Server] Player ${playerId} state cleaned up.`);
-    }
+    this.network.onPlayerLeft.add((playerId) => {
+      if (this.playerStates.has(playerId)) {
+        this.playerStates.delete(playerId);
+        console.log(`[Server] Player ${playerId} cleaned up.`);
+      }
+    });
+
+    // Capture spawned pickups for authority
+    this.network.onEvent.add((p) => {
+      if (p.code === EventCode.SPAWN_PICKUP) {
+        const data = p.data as PickupSpawnData;
+        this.activePickups.set(data.id, data);
+      } else if (p.code === EventCode.DESTROY_PICKUP) {
+        const data = p.data as { id: string };
+        this.activePickups.delete(data.id);
+      }
+    });
   }
 
   private handlePacket(code: number, data: any, senderId: string) {
     if (!senderId) return;
 
-    // Ensure player state exists
-    if (!this.playerStates.has(senderId)) this.initializePlayer(senderId);
+    if (!this.playerStates.has(senderId)) {
+      this.initializePlayer(senderId);
+    }
 
     const state = this.playerStates.get(senderId)!;
-    if (state.isDead) return;
 
     switch (code) {
+      case EventCode.MOVE: {
+        const move = data as MovePayload;
+        state.position = move.position;
+        state.rotation = move.rotation;
+        state.weaponId = move.weaponId;
+        break;
+      }
       case EventCode.REQ_FIRE:
-        console.log(`[Server] Received REQ_FIRE from ${senderId}`);
-        this.processFire(senderId, state, data as ReqFirePayload);
+        if (!state.isDead) this.processFire(senderId, state, data as ReqFirePayload);
         break;
       case EventCode.REQ_HIT:
-        console.log(`[Server] Received REQ_HIT from ${senderId}`);
         this.processHit(senderId, data as ReqHitPayload);
         break;
       case EventCode.REQ_RELOAD:
-        console.log(`[Server] Received REQ_RELOAD from ${senderId}`);
-        this.processReload(senderId, state, data as ReqReloadPayload);
+        if (!state.isDead) this.processReload(senderId, state, data as ReqReloadPayload);
+        break;
+      case EventCode.REQ_TRY_PICKUP:
+        this.processPickupRequest(senderId, state, data as ReqTryPickupPayload);
         break;
     }
   }
 
-  private initializePlayer(id: string) {
+  private initializePlayer(id: string, name: string = 'Anonymous') {
     const ammo: Record<string, { current: number; reserve: number; magazineSize: number }> = {};
     for (const [wId, config] of Object.entries(this.DEFAULT_WEAPON_DATA)) {
       ammo[wId] = {
@@ -91,95 +112,89 @@ export class ServerGameController {
 
     this.playerStates.set(id, {
       id,
-      hp: this.DEFAULT_HP,
+      name,
+      health: this.DEFAULT_HP,
       ammo,
       isDead: false,
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
     });
-    console.log(`[Server] Initialized Player: ${id}`);
+    console.log(`[Server] Initialized Player State: ${id}`);
+  }
+
+  private sendWorldSnapshot(_targetId: string) {
+    const players = Array.from(this.playerStates.values()).map((s) => ({
+      id: s.id,
+      name: s.name,
+      position: s.position,
+      rotation: s.rotation,
+      health: s.health,
+      weaponId: s.weaponId,
+    }));
+
+    const snapshot = new OnStateSyncPayload(
+      Date.now(),
+      players,
+      [], // enemies
+      [], // targets
+      Array.from(this.activePickups.values())
+    );
+
+    this.network.sendEvent(EventCode.ON_STATE_SYNC, snapshot, true, 'all');
   }
 
   private processFire(shooterId: string, state: ServerPlayerState, data: ReqFirePayload) {
-    const weaponId = data.weaponId || 'Rifle';
+    const weaponId = data.weaponId;
     const ammoData = state.ammo[weaponId];
 
-    // 1. Validation
-    if (!ammoData || ammoData.current <= 0) {
-      console.warn(`[Server] ${shooterId} Out of Ammo with ${weaponId}!`);
-      return;
-    }
+    if (!ammoData || ammoData.current <= 0) return;
 
-    // 2. Logic (Deduct Ammo)
     if (weaponId !== 'Bat' && weaponId !== 'Knife') {
       ammoData.current--;
     }
 
-    // 3. Broadcast Result (ON_FIRED)
     this.network.sendEvent(EventCode.ON_FIRED, {
       shooterId,
       weaponId,
-      muzzleData: (data as any).muzzleData, // Maintain existing structure for effects
+      muzzleData: data.muzzleData,
       ammoRemaining: ammoData.current,
     });
 
-    // 4. Sync Ammo to shooter (Reliable)
     const onAmmo = new OnAmmoSyncPayload(weaponId, ammoData.current, ammoData.reserve);
-    this.network.sendEvent(EventCode.ON_AMMO_SYNC, onAmmo, true);
+    this.network.sendEvent(EventCode.ON_AMMO_SYNC, onAmmo, true, 'all');
   }
 
-  private processReload(senderId: string, state: ServerPlayerState, data: ReqReloadPayload) {
+  private processReload(_senderId: string, state: ServerPlayerState, data: ReqReloadPayload) {
     const weaponId = data.weaponId;
     const ammoData = state.ammo[weaponId];
 
     if (ammoData && ammoData.reserve > 0 && ammoData.current < ammoData.magazineSize) {
       const needed = ammoData.magazineSize - ammoData.current;
       const amount = Math.min(needed, ammoData.reserve);
-
       ammoData.current += amount;
       ammoData.reserve -= amount;
 
-      console.log(
-        `[Server] User ${senderId} reloaded ${weaponId}. New Ammo: ${ammoData.current}/${ammoData.reserve}`
-      );
-
-      // Sync back to client
       const onAmmo = new OnAmmoSyncPayload(weaponId, ammoData.current, ammoData.reserve);
-      this.network.sendEvent(EventCode.ON_AMMO_SYNC, onAmmo, true);
+      this.network.sendEvent(EventCode.ON_AMMO_SYNC, onAmmo, true, 'all');
     }
   }
 
   private processHit(attackerId: string, data: ReqHitPayload) {
-    const targetState = this.playerStates.get(data.targetId);
+    const target = this.playerStates.get(data.targetId);
+    if (!target || target.isDead) return;
 
-    // For unregistered targets (like dummy targets), create a temp state
-    let effectiveTarget = targetState;
-    if (!effectiveTarget) {
-      effectiveTarget = {
-        id: data.targetId,
-        hp: 100,
-        ammo: {},
-        isDead: false,
-      };
-      this.playerStates.set(data.targetId, effectiveTarget);
-    }
+    target.health = (target.health || 100) - data.damage;
 
-    if (effectiveTarget.isDead) return;
-
-    // Apply Damage
-    effectiveTarget.hp -= data.damage;
-    console.log(`[Server] Target ${data.targetId} HP: ${effectiveTarget.hp}`);
-
-    // Broadcast ON_HIT
     this.network.sendEvent(EventCode.ON_HIT, {
       targetId: data.targetId,
       damage: data.damage,
-      remainingHealth: effectiveTarget.hp,
+      remainingHealth: target.health,
       shooterId: attackerId,
-      hitPosition: data.hitPosition,
     });
 
-    if (effectiveTarget.hp <= 0) {
-      effectiveTarget.isDead = true;
-      effectiveTarget.hp = 0;
+    if (target.health <= 0) {
+      target.isDead = true;
+      target.health = 0;
       this.network.sendEvent(EventCode.ON_DIED, {
         victimId: data.targetId,
         killerId: attackerId,
@@ -188,8 +203,32 @@ export class ServerGameController {
     }
   }
 
+  private processPickupRequest(
+    senderId: string,
+    state: ServerPlayerState,
+    data: ReqTryPickupPayload
+  ) {
+    const pickup = this.activePickups.get(data.id);
+    if (!pickup) return;
+
+    const dx = state.position!.x - pickup.position.x;
+    const dz = state.position!.z - pickup.position.z;
+    const distSq = dx * dx + dz * dz;
+
+    if (distSq < 5 * 5) {
+      this.activePickups.delete(data.id);
+      this.network.sendEvent(EventCode.ON_ITEM_PICKED, {
+        id: data.id,
+        type: pickup.type,
+        ownerId: senderId,
+      });
+      this.network.sendEvent(EventCode.DESTROY_PICKUP, { id: data.id });
+    }
+  }
+
   public dispose() {
     this.playerStates.clear();
+    this.activePickups.clear();
     console.log('[Server] Logical Server Stopped 🔴');
   }
 }

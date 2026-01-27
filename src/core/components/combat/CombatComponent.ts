@@ -10,6 +10,8 @@ import { ImpactEffectComponent } from './ImpactEffectComponent';
 import { CameraComponent } from '../movement/CameraComponent';
 import type { IPawn } from '../../../types/IPawn';
 import { crosshairKickStore } from '../../store/GameStore';
+import { NetworkManager } from '../../network/NetworkManager';
+import { ReqFirePayload } from '../../network/NetworkProtocol';
 
 /**
  * 캐릭터의 무기 인벤토리, 입력, UI 동기화를 조율하는 컴포넌트.
@@ -113,8 +115,31 @@ export class CombatComponent extends BaseComponent {
   public fire(): void {
     const weapon = this.getCurrentWeapon();
     if (weapon) {
-      // Prediction is handled inside weapon.fire() which notifies onFirePredicted
-      weapon.fire();
+      // 1. Prediction: Immediately play visuals/audio via weapon's internal event
+      // Do NOT deduct ammo/HP locally.
+      const muzzle = (weapon as any).getMuzzleTransform
+        ? (weapon as any).getMuzzleTransform()
+        : null;
+      const fired = weapon.fire();
+
+      if (fired) {
+        // 2. Authority: Send request to server
+        const network = NetworkManager.getInstance();
+        const req = new ReqFirePayload(
+          weapon.name,
+          muzzle
+            ? {
+                position: { x: muzzle.position.x, y: muzzle.position.y, z: muzzle.position.z },
+                direction: { x: muzzle.direction.x, y: muzzle.direction.y, z: muzzle.direction.z },
+              }
+            : undefined
+        );
+
+        network.requestFire(req);
+
+        // UI/Prediction logic
+        crosshairKickStore.set(crosshairKickStore.get() + 1);
+      }
     }
   }
 
