@@ -1,7 +1,8 @@
-import { Mesh, Vector3, Scene, Observer, Nullable } from '@babylonjs/core';
+import { Mesh, Vector3, Scene, Nullable } from '@babylonjs/core';
 import { IPawn } from '../../types/IPawn';
 import { BaseComponent, ComponentConstructor } from '../components/base/BaseComponent';
 import { IWorldEntity, DamageProfile } from '../../types/IWorldEntity';
+import { TickManager } from '../managers/TickManager';
 
 /**
  * 모든 Pawn의 공통 기능을 담은 추상 클래스.
@@ -21,17 +22,11 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
 
   protected scene: Scene;
   protected components: BaseComponent[] = [];
-  private _tickObserver: Nullable<Observer<Scene>> = null;
 
   constructor(scene: Scene) {
     this.scene = scene;
-    // 씬의 렌더 루프에 업데이트 등록 (Babylon.js 표준 방식)
-    this._tickObserver = this.scene.onBeforeRenderObservable.add(() => {
-      const deltaTime = this.scene.getEngine().getDeltaTime() / 1000;
-      if (this.isActive) {
-        this.tick(deltaTime);
-      }
-    });
+    // 중앙 TickManager에 등록
+    TickManager.getInstance().register(this);
   }
 
   /** ITickable 인터페이스 구현 (하위 클래스에서 상속받아 구현) */
@@ -96,10 +91,8 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
 
   /** 기본 리소스 해제 */
   public dispose(): void {
-    if (this._tickObserver) {
-      this.scene.onBeforeRenderObservable.remove(this._tickObserver);
-      this._tickObserver = null;
-    }
+    // TickManager에서 등록 해제
+    TickManager.getInstance().unregister(this);
 
     // 모든 컴포넌트 해제
     this.components.forEach((comp) => comp.dispose());
