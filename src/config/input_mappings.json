@@ -1,0 +1,24 @@
+{
+  "keyboard": {
+    "KeyW": "MOVE_FORWARD",
+    "KeyS": "MOVE_BACKWARD",
+    "KeyA": "MOVE_LEFT",
+    "KeyD": "MOVE_RIGHT",
+    "Space": "JUMP",
+    "ShiftLeft": "SPRINT",
+    "ControlLeft": "CROUCH",
+    "KeyR": "RELOAD",
+    "Digit1": "SLOT_1",
+    "Digit2": "SLOT_2",
+    "Digit3": "SLOT_3",
+    "Digit4": "SLOT_4",
+    "Tab": "INVENTORY",
+    "KeyI": "INSPECTOR",
+    "KeyH": "DEBUG_HEALTH",
+    "KeyJ": "DEBUG_AMMO"
+  },
+  "mouse": {
+    "0": "FIRE",
+    "2": "AIM"
+  }
+}

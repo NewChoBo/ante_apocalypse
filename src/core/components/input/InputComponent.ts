@@ -1,45 +1,19 @@
 import { Scene } from '@babylonjs/core';
 import { BaseComponent } from '../base/BaseComponent';
 import { IPawn } from '../../../types/IPawn';
+import { InputAction } from '../../../types/InputTypes';
 
-export interface InputState {
-  forward: boolean;
-  backward: boolean;
-  left: boolean;
-  right: boolean;
-  sprint: boolean;
-  jump: boolean;
-  crouch: boolean;
-  aim: boolean;
-  fire: boolean;
-  reload: boolean;
-  slot1: boolean;
-  slot2: boolean;
-  slot3: boolean;
-  slot4: boolean;
-}
+export type InputState = Record<InputAction, boolean>;
 
 export interface MouseDelta {
   x: number;
   y: number;
 }
 
-const INITIAL_INPUT_STATE: InputState = {
-  forward: false,
-  backward: false,
-  left: false,
-  right: false,
-  sprint: false,
-  jump: false,
-  crouch: false,
-  aim: false,
-  fire: false,
-  reload: false,
-  slot1: false,
-  slot2: false,
-  slot3: false,
-  slot4: false,
-};
+const INITIAL_INPUT_STATE: InputState = Object.values(InputAction).reduce((acc, action) => {
+  acc[action as InputAction] = false;
+  return acc;
+}, {} as InputState);
 
 export class InputComponent extends BaseComponent {
   public name = 'Input';

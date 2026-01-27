@@ -1,28 +1,11 @@
 import { BaseController } from './BaseController';
 import { IPawn } from '../../types/IPawn';
-import { InputComponent } from '../components/input/InputComponent';
+import { InputComponent, InputState } from '../components/input/InputComponent';
+import { InputManager } from '../input/InputManager';
+import { InputAction } from '../../types/InputTypes';
 
-/**
- * 실제 플레이어의 입력을 처리하는 컨트롤러.
- */
 export class PlayerController extends BaseController {
-  private keys = {
-    forward: false,
-    backward: false,
-    left: false,
-    right: false,
-    sprint: false,
-    jump: false,
-    crouch: false,
-    aim: false,
-    fire: false,
-    reload: false,
-    slot1: false,
-    slot2: false,
-    slot3: false,
-    slot4: false,
-  };
-
+  private inputManager: InputManager;
   private mouseDelta = { x: 0, y: 0 };
   private canvas: HTMLCanvasElement;
   private isInputBlocked = false;
@@ -30,26 +13,9 @@ export class PlayerController extends BaseController {
   constructor(id: string, canvas: HTMLCanvasElement) {
     super(id);
     this.canvas = canvas;
+    this.inputManager = InputManager.getInstance();
     this.setupInputEvents();
   }
-
-  private onKeyDown = (e: KeyboardEvent): void => {
-    // 포인터가 잠겨있을 때 (게임 플레이 중)
-    if (document.pointerLockElement === this.canvas) {
-      // 브라우저 단축키 차단 (Ctrl+D, Ctrl+S, Ctrl+W 등)
-      if (e.ctrlKey || e.metaKey || e.key === 'Tab') {
-        // 디버깅용 F12/Ctrl+Shift+I 등은 허용 (필요 시 수정)
-        if (e.key !== 'F12' && !(e.ctrlKey && e.shiftKey && e.key === 'I')) {
-          e.preventDefault();
-        }
-      }
-    }
-    this.updateKeyState(e.code, true);
-  };
-
-  private onKeyUp = (e: KeyboardEvent): void => {
-    this.updateKeyState(e.code, false);
-  };
 
   private onMouseMove = (e: MouseEvent): void => {
     if (document.pointerLockElement === this.canvas) {
@@ -58,86 +24,38 @@ export class PlayerController extends BaseController {
     }
   };
 
-  private onMouseDown = (e: MouseEvent): void => {
-    if (e.button === 0) this.updateKeyState('MouseLeft', true);
-    if (e.button === 2) this.updateKeyState('MouseRight', true);
-  };
-
-  private onMouseUp = (e: MouseEvent): void => {
-    if (e.button === 0) this.updateKeyState('MouseLeft', false);
-    if (e.button === 2) this.updateKeyState('MouseRight', false);
-  };
-
   private onContextMenu = (e: Event): void => {
     e.preventDefault();
   };
 
   private setupInputEvents(): void {
-    document.addEventListener('keydown', this.onKeyDown);
-    document.addEventListener('keyup', this.onKeyUp);
     document.addEventListener('mousemove', this.onMouseMove);
-
-    this.canvas.addEventListener('mousedown', this.onMouseDown);
-    this.canvas.addEventListener('mouseup', this.onMouseUp);
     this.canvas.addEventListener('contextmenu', this.onContextMenu);
   }
 
   public dispose(): void {
     super.dispose();
-    document.removeEventListener('keydown', this.onKeyDown);
-    document.removeEventListener('keyup', this.onKeyUp);
     document.removeEventListener('mousemove', this.onMouseMove);
-
-    this.canvas.removeEventListener('mousedown', this.onMouseDown);
-    this.canvas.removeEventListener('mouseup', this.onMouseUp);
     this.canvas.removeEventListener('contextmenu', this.onContextMenu);
   }
 
-  private updateKeyState(code: string, isPressed: boolean): void {
-    switch (code) {
-      case 'KeyW':
-        this.keys.forward = isPressed;
-        break;
-      case 'KeyS':
-        this.keys.backward = isPressed;
-        break;
-      case 'KeyA':
-        this.keys.left = isPressed;
-        break;
-      case 'KeyD':
-        this.keys.right = isPressed;
-        break;
-      case 'ShiftLeft':
-        this.keys.sprint = isPressed;
-        break;
-      case 'Space':
-        this.keys.jump = isPressed;
-        break;
-      case 'ControlLeft':
-        this.keys.crouch = isPressed;
-        break;
-      case 'MouseRight':
-        this.keys.aim = isPressed;
-        break;
-      case 'MouseLeft':
-        this.keys.fire = isPressed;
-        break;
-      case 'KeyR':
-        this.keys.reload = isPressed;
-        break;
-      case 'Digit1':
-        this.keys.slot1 = isPressed;
-        break;
-      case 'Digit2':
-        this.keys.slot2 = isPressed;
-        break;
-      case 'Digit3':
-        this.keys.slot3 = isPressed;
-        break;
-      case 'Digit4':
-        this.keys.slot4 = isPressed;
-        break;
-    }
+  private getActionState(): Partial<InputState> {
+    return {
+      [InputAction.MOVE_FORWARD]: this.inputManager.isActionActive(InputAction.MOVE_FORWARD),
+      [InputAction.MOVE_BACKWARD]: this.inputManager.isActionActive(InputAction.MOVE_BACKWARD),
+      [InputAction.MOVE_LEFT]: this.inputManager.isActionActive(InputAction.MOVE_LEFT),
+      [InputAction.MOVE_RIGHT]: this.inputManager.isActionActive(InputAction.MOVE_RIGHT),
+      [InputAction.SPRINT]: this.inputManager.isActionActive(InputAction.SPRINT),
+      [InputAction.JUMP]: this.inputManager.isActionActive(InputAction.JUMP),
+      [InputAction.CROUCH]: this.inputManager.isActionActive(InputAction.CROUCH),
+      [InputAction.AIM]: this.inputManager.isActionActive(InputAction.AIM),
+      [InputAction.FIRE]: this.inputManager.isActionActive(InputAction.FIRE),
+      [InputAction.RELOAD]: this.inputManager.isActionActive(InputAction.RELOAD),
+      [InputAction.SLOT_1]: this.inputManager.isActionActive(InputAction.SLOT_1),
+      [InputAction.SLOT_2]: this.inputManager.isActionActive(InputAction.SLOT_2),
+      [InputAction.SLOT_3]: this.inputManager.isActionActive(InputAction.SLOT_3),
+      [InputAction.SLOT_4]: this.inputManager.isActionActive(InputAction.SLOT_4),
+    };
   }
 
   protected onPossess(_pawn: IPawn): void {
@@ -152,22 +70,28 @@ export class PlayerController extends BaseController {
     this.isInputBlocked = blocked;
     if (blocked) {
       // 입력 차단 시 모든 키 해제
-      Object.keys(this.keys).forEach((k) => (this.keys[k as keyof typeof this.keys] = false));
+      this.inputManager.reset();
       this.mouseDelta.x = 0;
       this.mouseDelta.y = 0;
     }
   }
 
   public tick(_deltaTime: number): void {
-    if (!this.possessedPawn || this.isInputBlocked) return;
+    if (!this.possessedPawn || this.isInputBlocked) {
+      this.inputManager.update(); // Still update to clear "justPressed"
+      return;
+    }
 
     // Pawn의 InputComponent 업데이트
     if (this.possessedPawn) {
       const inputComp = this.possessedPawn.getComponent(InputComponent);
       if (inputComp instanceof InputComponent) {
-        inputComp.updateInput(this.keys, this.mouseDelta);
+        inputComp.updateInput(this.getActionState(), this.mouseDelta);
       }
     }
+
+    // Update InputManager state (copy current to previous)
+    this.inputManager.update();
 
     // 델타값 초기화
     this.mouseDelta.x = 0;

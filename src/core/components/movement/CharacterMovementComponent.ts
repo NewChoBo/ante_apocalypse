@@ -1,8 +1,9 @@
 import { Vector3, Scene, Ray } from '@babylonjs/core';
 import { BaseComponent } from '@/core/components/base/BaseComponent';
 import { CombatComponent } from '../combat/CombatComponent';
-import { InputComponent } from '../input/InputComponent';
+import { InputComponent, InputState } from '../input/InputComponent';
 import type { IPawn } from '../../../types/IPawn';
+import { InputAction } from '@/types/InputTypes';
 
 /**
  * 캐릭터의 이동, 중력, 점프 로직을 담당하는 컴포넌트.
@@ -38,21 +39,9 @@ export class CharacterMovementComponent extends BaseComponent {
     }
   }
 
-  private processMovement(
-    input: {
-      forward: boolean;
-      backward: boolean;
-      left: boolean;
-      right: boolean;
-      sprint: boolean;
-      jump: boolean;
-      crouch: boolean;
-      aim: boolean;
-    },
-    deltaTime: number
-  ): void {
+  private processMovement(input: InputState, deltaTime: number): void {
     // 1. 앉기 상태 처리 (높이 변경)
-    const targetHeight = input.crouch ? this.crouchHeight : this.playerHeight;
+    const targetHeight = input[InputAction.CROUCH] ? this.crouchHeight : this.playerHeight;
     this.currentHeight = targetHeight;
 
     const combatComp = this.owner.getComponent(CombatComponent);
@@ -60,11 +49,11 @@ export class CharacterMovementComponent extends BaseComponent {
     const weaponSpeedMult = weapon ? weapon.getMovementSpeedMultiplier() : 1.0;
 
     let speed = this.moveSpeed;
-    if (input.crouch && this.isGrounded) {
+    if (input[InputAction.CROUCH] && this.isGrounded) {
       speed *= this.crouchMultiplier;
-    } else if (input.aim && this.isGrounded) {
+    } else if (input[InputAction.AIM] && this.isGrounded) {
       speed *= weaponSpeedMult;
-    } else if (input.sprint) {
+    } else if (input[InputAction.SPRINT]) {
       speed *= this.sprintMultiplier;
     }
 
@@ -72,10 +61,10 @@ export class CharacterMovementComponent extends BaseComponent {
     const right = this.owner.mesh.getDirection(Vector3.Right());
 
     const moveDirection = Vector3.Zero();
-    if (input.forward) moveDirection.addInPlace(forward);
-    if (input.backward) moveDirection.subtractInPlace(forward);
-    if (input.right) moveDirection.addInPlace(right);
-    if (input.left) moveDirection.subtractInPlace(right);
+    if (input[InputAction.MOVE_FORWARD]) moveDirection.addInPlace(forward);
+    if (input[InputAction.MOVE_BACKWARD]) moveDirection.subtractInPlace(forward);
+    if (input[InputAction.MOVE_RIGHT]) moveDirection.addInPlace(right);
+    if (input[InputAction.MOVE_LEFT]) moveDirection.subtractInPlace(right);
 
     if (moveDirection.length() > 0) {
       moveDirection.normalize();
@@ -84,7 +73,7 @@ export class CharacterMovementComponent extends BaseComponent {
     }
 
     // 2. 점프 시도 (앉아있을 때는 점프 불가)
-    if (this.isGrounded && input.jump && !input.crouch) {
+    if (this.isGrounded && input[InputAction.JUMP] && !input[InputAction.CROUCH]) {
       this.velocityY = this.jumpForce;
       this.isGrounded = false;
     }
