@@ -15,16 +15,8 @@ import {
   TargetDestroyData,
   TargetSpawnData,
   ReqInitialStatePayload,
+  PlayerData,
 } from './NetworkProtocol';
-
-export interface PlayerState {
-  id: string;
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-  weaponId: string;
-  name: string;
-  health: number;
-}
 
 export interface FireEventData {
   playerId: string;
@@ -45,9 +37,9 @@ export class NetworkManager {
   private provider: INetworkProvider;
   private state: NetworkState = NetworkState.Disconnected;
 
-  public onPlayersList = new Observable<PlayerState[]>();
-  public onPlayerJoined = new Observable<PlayerState>();
-  public onPlayerUpdated = new Observable<PlayerState>();
+  public onPlayersList = new Observable<PlayerData[]>();
+  public onPlayerJoined = new Observable<PlayerData>();
+  public onPlayerUpdated = new Observable<PlayerData>();
   public onPlayerLeft = new Observable<string>();
   public onPlayerFired = new Observable<FireEventData>();
   public onPlayerDied = new Observable<DeathEventData>();
@@ -68,7 +60,6 @@ export class NetworkManager {
   public onTargetDestroy = new Observable<TargetDestroyData>();
   public onTargetSpawn = new Observable<TargetSpawnData>();
 
-  private playerStates: Map<string, PlayerState> = new Map();
   private lastRoomList: RoomData[] = [];
 
   private constructor() {
@@ -95,7 +86,7 @@ export class NetworkManager {
     };
 
     this.provider.onPlayerJoined = (user): void => {
-      const newState: PlayerState = {
+      const newState: PlayerData = {
         id: user.userId,
         name: user.name || 'Anonymous',
         position: { x: 0, y: 0, z: 0 },
@@ -103,12 +94,10 @@ export class NetworkManager {
         weaponId: 'Pistol',
         health: 100,
       };
-      this.playerStates.set(user.userId, newState);
       this.onPlayerJoined.notifyObservers(newState);
     };
 
     this.provider.onPlayerLeft = (id): void => {
-      this.playerStates.delete(id);
       this.onPlayerLeft.notifyObservers(id);
     };
 
@@ -118,12 +107,14 @@ export class NetworkManager {
       switch (code) {
         case EventCode.MOVE: {
           const moveData = data as MovePayload;
-          if (this.playerStates.has(senderId)) {
-            const state = this.playerStates.get(senderId)!;
-            state.position = moveData.position;
-            state.rotation = moveData.rotation;
-            this.onPlayerUpdated.notifyObservers(state);
-          }
+          // Stateless Relay: Pass data directly to observers
+          this.onPlayerUpdated.notifyObservers({
+            id: senderId,
+            name: 'Unknown',
+            position: moveData.position,
+            rotation: moveData.rotation,
+            weaponId: moveData.weaponId || 'Pistol',
+          });
           break;
         }
         case EventCode.FIRE: {
@@ -137,11 +128,14 @@ export class NetworkManager {
         }
         case EventCode.SYNC_WEAPON: {
           const syncData = data as SyncWeaponPayload;
-          if (this.playerStates.has(senderId)) {
-            const state = this.playerStates.get(senderId)!;
-            state.weaponId = syncData.weaponId;
-            this.onPlayerUpdated.notifyObservers(state);
-          }
+          // Stateless Relay
+          this.onPlayerUpdated.notifyObservers({
+            id: senderId,
+            name: 'Unknown',
+            position: { x: 0, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            weaponId: syncData.weaponId,
+          });
           break;
         }
         case EventCode.ENEMY_MOVE:
@@ -164,23 +158,6 @@ export class NetworkManager {
           break;
         case EventCode.INITIAL_STATE: {
           const initialState = data as InitialStatePayload;
-
-          // CRITICAL: Update local playerStates map so we can process future MOVE events from these players
-          if (initialState.players) {
-            initialState.players.forEach((p) => {
-              if (p.id !== this.getSocketId()) {
-                this.playerStates.set(p.id, {
-                  id: p.id,
-                  name: p.name || 'Unknown',
-                  position: p.position || { x: 0, y: 0, z: 0 },
-                  rotation: p.rotation || { x: 0, y: 0, z: 0 },
-                  weaponId: p.weaponId || 'Pistol',
-                  health: p.health || 100,
-                });
-              }
-            });
-          }
-
           this.onInitialStateReceived.notifyObservers(initialState);
           break;
         }
@@ -248,10 +225,6 @@ export class NetworkManager {
 
   public getRoomList(): RoomData[] {
     return this.lastRoomList;
-  }
-
-  public getAllPlayerStates(): PlayerState[] {
-    return Array.from(this.playerStates.values());
   }
 
   public sendEvent(code: EventCode, data: EventData, reliable: boolean = true): void {

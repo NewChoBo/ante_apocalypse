@@ -217,17 +217,12 @@ export class SessionController implements IGameSystem {
               );
             });
 
-          const playerStates = network.getAllPlayerStates().map(
-            (ps) =>
-              ({
-                id: ps.id,
-                name: ps.name,
-                position: ps.position,
-                rotation: ps.rotation,
-                weaponId: ps.weaponId,
-                health: ps.health,
-              }) as PlayerData
-          );
+          // Build Player States: Remote Players (from MultiplayerSystem) + Local Host
+          const playerStates: PlayerData[] = [];
+
+          if (this.multiplayerSystem) {
+            playerStates.push(...this.multiplayerSystem.getRemotePlayerStates());
+          }
 
           // IMPORTANT: Add self (Host) to the state!
           if (this.playerPawn) {

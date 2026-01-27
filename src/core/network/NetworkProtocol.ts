@@ -78,7 +78,8 @@ export class MovePayload {
   constructor(
     public readonly position: Position,
     public readonly rotation: Rotation,
-    public readonly velocity?: Position
+    public readonly velocity?: Position,
+    public readonly weaponId?: string // Added to support syncing weapon with movement
   ) {}
 }
 

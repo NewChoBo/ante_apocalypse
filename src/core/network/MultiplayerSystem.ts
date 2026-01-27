@@ -90,6 +90,19 @@ export class MultiplayerSystem implements IGameSystem {
           if (data.weaponId) {
             remote.updateWeapon(data.weaponId);
           }
+        } else {
+          // Late Join / Desync handling: Spawn player if missing
+          console.warn(
+            `[Multiplayer] Received update for unknown player ${data.id}, spawning now.`
+          );
+          this.spawnRemotePlayer({
+            id: data.id,
+            name: data.name || 'Unknown',
+            position: data.position,
+            rotation: data.rotation,
+            weaponId: data.weaponId || 'Pistol',
+            health: 100, // Default health
+          });
         }
       }
     });
@@ -156,5 +169,16 @@ export class MultiplayerSystem implements IGameSystem {
     // Mediator observers are cleared centrally or we could clear specific ones here
     this.remotePlayers.forEach((p) => p.dispose());
     this.remotePlayers.clear();
+  }
+
+  public getRemotePlayerStates(): PlayerData[] {
+    return Array.from(this.remotePlayers.values()).map((remote) => ({
+      id: remote.id,
+      name: remote.playerName,
+      position: { x: remote.mesh.position.x, y: remote.mesh.position.y, z: remote.mesh.position.z },
+      rotation: { x: 0, y: remote.mesh.rotation.y, z: 0 },
+      weaponId: remote.getComponent(CombatComponent)?.getCurrentWeapon()?.name || 'Pistol',
+      health: 100, // RemotePlayerPawn should eventually assume health tracking if needed
+    }));
   }
 }
