@@ -292,7 +292,7 @@ export class NetworkManager {
     code: EventCode,
     data: EventData,
     reliable: boolean = true,
-    target: 'others' | 'all' | 'master' = 'all'
+    target: 'others' | 'all' | 'master' | string = 'all'
   ): void {
     this.provider.sendEvent(code, data, reliable, target);
   }

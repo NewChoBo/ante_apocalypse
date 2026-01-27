@@ -17,7 +17,7 @@ export interface INetworkProvider {
     code: number,
     data: EventData,
     reliable: boolean,
-    target?: 'others' | 'all' | 'master'
+    target?: 'others' | 'all' | 'master' | string
   ): void;
   getLocalPlayerId(): string | null;
   getServerTime(): number;

@@ -19,6 +19,7 @@ export enum EventCode {
   REQ_HIT = 102,
   REQ_TRY_PICKUP = 103,
   REQ_RELOAD = 104,
+  REQ_USE_ITEM = 105,
 
   // [S -> C] Notifications
   ON_STATE_SYNC = 200,
@@ -27,6 +28,11 @@ export enum EventCode {
   ON_DIED = 203,
   ON_ITEM_PICKED = 204,
   ON_AMMO_SYNC = 205,
+  ON_MATCH_STATE_SYNC = 206,
+  ON_MATCH_END = 207,
+  ON_SCORE_SYNC = 208,
+  ON_POS_CORRECTION = 209,
+  ON_STATE_DELTA = 210,
 }
 
 export class RoomData {
@@ -165,6 +171,51 @@ export class OnStateSyncPayload {
   ) {}
 }
 
+// [ON] Match State Sync
+export class OnMatchStateSyncPayload {
+  constructor(
+    public readonly state: 'READY' | 'PLAYING' | 'GAME_OVER',
+    public readonly timeFormatted: string,
+    public readonly remainingSeconds: number
+  ) {}
+}
+
+// [ON] Match End
+export class OnMatchEndPayload {
+  constructor(
+    public readonly isWin: boolean,
+    public readonly winnerId?: string,
+    public readonly finalScores?: Record<string, number>
+  ) {}
+}
+
+// [ON] Score Sync
+export class OnScoreSyncPayload {
+  constructor(
+    public readonly scores: Record<string, number>,
+    public readonly totalScore?: number
+  ) {}
+}
+
+// [ON] Position Correction (Rubberbanding)
+export class OnPosCorrectionPayload {
+  constructor(
+    public readonly position: Position,
+    public readonly rotation?: Rotation,
+    public readonly sequence?: number
+  ) {}
+}
+
+// [ON] State Delta Sync
+export class OnStateDeltaPayload {
+  constructor(
+    public readonly timestamp: number,
+    public readonly changedPlayers: Partial<PlayerData>[],
+    public readonly changedEnemies: Partial<EnemyUpdateData>[],
+    public readonly changedTargets: Partial<TargetSpawnData>[]
+  ) {}
+}
+
 // [ON] Ammo Sync (Private or Public)
 export class OnAmmoSyncPayload {
   constructor(
@@ -255,6 +306,13 @@ export class ReqTryPickupPayload {
   ) {}
 }
 
+export class ReqUseItemPayload {
+  constructor(
+    public readonly itemId: string,
+    public readonly itemType: string
+  ) {}
+}
+
 export class OnItemPickedPayload {
   constructor(
     public readonly id: string,
@@ -286,4 +344,10 @@ export type EventData =
   | EnemyUpdateData
   | PlayerData
   | ReqTryPickupPayload
-  | OnItemPickedPayload;
+  | OnItemPickedPayload
+  | OnMatchStateSyncPayload
+  | OnMatchEndPayload
+  | OnScoreSyncPayload
+  | OnPosCorrectionPayload
+  | ReqUseItemPayload
+  | OnStateDeltaPayload;

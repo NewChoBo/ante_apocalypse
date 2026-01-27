@@ -190,15 +190,26 @@ export class PhotonProvider implements INetworkProvider {
     code: number,
     data: EventData,
     reliable: boolean = true,
-    target: 'others' | 'all' | 'master' = 'others'
+    target: 'others' | 'all' | 'master' | string = 'others'
   ): void {
     let receiverGroup = PhotonTyped.LoadBalancing.Constants.ReceiverGroup.Others;
-    if (target === 'all') receiverGroup = PhotonTyped.LoadBalancing.Constants.ReceiverGroup.All;
-    if (target === 'master')
+    let targetActors: number[] | undefined = undefined;
+
+    if (target === 'all') {
+      receiverGroup = PhotonTyped.LoadBalancing.Constants.ReceiverGroup.All;
+    } else if (target === 'master') {
       receiverGroup = PhotonTyped.LoadBalancing.Constants.ReceiverGroup.MasterClient;
+    } else if (target === 'others') {
+      receiverGroup = PhotonTyped.LoadBalancing.Constants.ReceiverGroup.Others;
+    } else {
+      // It's a specific peer ID (actorNr)
+      targetActors = [parseInt(target, 10)];
+      receiverGroup = 0; // Not used when targetActors is set
+    }
 
     this.client.raiseEvent(code, data, {
       receivers: receiverGroup,
+      targetActors: targetActors,
       cache: reliable ? 1 : 0,
     });
   }

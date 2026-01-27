@@ -3,6 +3,7 @@ import { Game } from '../game/Game';
 import { PlayerPawn } from '../pawns/PlayerPawn';
 import { UIScreen } from '../../ui/UIManager';
 import { gameStateStore, scoreStore, gameTimerStore } from '../store/GameStore';
+import { NetworkManager } from '../network/NetworkManager';
 
 export class TimeAttackRule implements IGameRule {
   private game: Game;
@@ -13,6 +14,11 @@ export class TimeAttackRule implements IGameRule {
 
   constructor(game: Game) {
     this.game = game;
+  }
+
+  private isMultiplayer(): boolean {
+    const network = NetworkManager.getInstance();
+    return !!network.getSocketId();
   }
 
   public onStart(): void {
@@ -29,19 +35,28 @@ export class TimeAttackRule implements IGameRule {
   public onUpdate(deltaTime: number): void {
     if (this.gameEnded) return;
 
-    this.currentTime -= deltaTime;
-
-    // Format time MM:SS
-    const minutes = Math.floor(this.currentTime / 60);
-    const seconds = Math.floor(this.currentTime % 60);
-    const formatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    gameTimerStore.set(formatted);
-
-    if (this.currentTime <= 0) {
-      this.handleGameOver(false); // Time Over -> Fail
+    if (this.isMultiplayer()) {
+      // In multiplayer, the timer is updated via gameTimerStore from the server.
+      // We still check win conditions if needed, but GameStore usually handles UI.
+      if (gameStateStore.get() === 'GAME_OVER') {
+        this.gameEnded = true;
+      }
     } else {
-      if (this.checkWinCondition()) {
-        this.handleGameOver(true); // Win
+      // Single player local logic
+      this.currentTime -= deltaTime;
+
+      // Format time MM:SS
+      const minutes = Math.floor(this.currentTime / 60);
+      const seconds = Math.floor(this.currentTime % 60);
+      const formatted = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      gameTimerStore.set(formatted);
+
+      if (this.currentTime <= 0) {
+        this.handleGameOver(false); // Time Over -> Fail
+      } else {
+        if (this.checkWinCondition()) {
+          this.handleGameOver(true); // Win
+        }
       }
     }
   }

@@ -5,7 +5,8 @@ import { RemotePlayerPawn } from '../pawns/RemotePlayerPawn';
 import { PlayerPawn } from '../pawns/PlayerPawn';
 import { CombatComponent } from '../components/combat/CombatComponent';
 import { WorldEntityManager } from '../entities/WorldEntityManager';
-import { EventCode, PlayerData } from './NetworkProtocol';
+import { EventCode, PlayerData, OnStateDeltaPayload } from './NetworkProtocol';
+import { gameStateStore, scoreStore, gameTimerStore } from '../store/GameStore';
 
 export class MultiplayerSystem implements IGameSystem {
   private scene: Scene;
@@ -154,6 +155,68 @@ export class MultiplayerSystem implements IGameSystem {
 
     this.networkMediator.onEnemyUpdated.add((_data) => {
       // Enemy specific sync can go here if needed
+    });
+
+    // Authoritative State Sync
+    this.networkMediator.onStateDelta.add((delta: OnStateDeltaPayload) => {
+      this.applyDeltaUpdate(delta);
+    });
+
+    this.networkMediator.onMatchStateSync.add((data) => {
+      gameTimerStore.set(data.timeFormatted);
+      if (data.state === 'GAME_OVER') {
+        gameStateStore.set('GAME_OVER');
+      } else if (data.state === 'PLAYING') {
+        gameStateStore.set('PLAYING');
+      }
+    });
+
+    this.networkMediator.onScoreSync.add((data) => {
+      if (data.totalScore !== undefined) {
+        scoreStore.set(data.totalScore);
+      }
+    });
+
+    this.networkMediator.onPosCorrection.add((data) => {
+      console.warn(`[Multiplayer] Position correction received from server!`);
+      this.localPlayer.mesh.position.set(data.position.x, data.position.y, data.position.z);
+      if (data.rotation) {
+        this.localPlayer.mesh.rotation.y = data.rotation.y;
+      }
+    });
+
+    // Update health authoritative
+    this.networkMediator.onHit.add((data) => {
+      if (data.targetId === this.localPlayer.id) {
+        this.localPlayer.updateHealth(data.remainingHealth);
+      }
+    });
+  }
+
+  private applyDeltaUpdate(delta: OnStateDeltaPayload) {
+    // Apply Player Deltas
+    delta.changedPlayers.forEach((p) => {
+      if (p.id === this.localPlayer.id) {
+        if (p.health !== undefined) this.localPlayer.updateHealth(p.health);
+        return;
+      }
+
+      const remote = this.remotePlayers.get(p.id!);
+      if (remote) {
+        if (p.position || p.rotation) {
+          remote.updateNetworkState(
+            p.position || remote.mesh.position,
+            p.rotation || remote.mesh.rotation
+          );
+        }
+        if (p.weaponId) remote.updateWeapon(p.weaponId);
+        if (p.health !== undefined) remote.updateHealth(p.health);
+      }
+    });
+
+    // Apply Enemy/Target Deltas (Can be handled by EnemyManager if needed, or here)
+    delta.changedEnemies.forEach((e) => {
+      this.networkMediator.onEnemyUpdated.notifyObservers(e as any);
     });
   }
 

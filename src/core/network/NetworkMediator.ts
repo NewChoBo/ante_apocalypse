@@ -14,6 +14,12 @@ import {
   OnHitPayload,
   OnFiredPayload,
   OnAmmoSyncPayload,
+  OnStateSyncPayload,
+  OnStateDeltaPayload,
+  OnMatchStateSyncPayload,
+  OnMatchEndPayload,
+  OnScoreSyncPayload,
+  OnPosCorrectionPayload,
   EventData,
 } from '../network/NetworkProtocol';
 
@@ -35,7 +41,14 @@ export class NetworkMediator {
   public onPickupSpawnRequested = new Observable<PickupSpawnData>();
   public onPickupDestroyRequested = new Observable<PickupDestroyData>();
 
-  // Authoritative Pickup Events
+  // Authoritative Network Events
+  public onStateSync = new Observable<OnStateSyncPayload>();
+  public onStateDelta = new Observable<OnStateDeltaPayload>();
+  public onMatchStateSync = new Observable<OnMatchStateSyncPayload>();
+  public onMatchEnd = new Observable<OnMatchEndPayload>();
+  public onScoreSync = new Observable<OnScoreSyncPayload>();
+  public onPosCorrection = new Observable<OnPosCorrectionPayload>();
+
   public onPickupTryRequested = new Observable<ReqTryPickupPayload & { senderId: string }>();
   public onItemPicked = new Observable<{ id: string; type: string; ownerId: string }>();
 
@@ -126,6 +139,18 @@ export class NetworkMediator {
         this.onFired.notifyObservers(data as OnFiredPayload);
       } else if (code === EventCode.ON_AMMO_SYNC) {
         this.onAmmoSynced.notifyObservers(data as OnAmmoSyncPayload);
+      } else if (code === EventCode.ON_STATE_SYNC) {
+        this.onStateSync.notifyObservers(data as OnStateSyncPayload);
+      } else if (code === EventCode.ON_STATE_DELTA) {
+        this.onStateDelta.notifyObservers(data as OnStateDeltaPayload);
+      } else if (code === EventCode.ON_MATCH_STATE_SYNC) {
+        this.onMatchStateSync.notifyObservers(data as OnMatchStateSyncPayload);
+      } else if (code === EventCode.ON_MATCH_END) {
+        this.onMatchEnd.notifyObservers(data as OnMatchEndPayload);
+      } else if (code === EventCode.ON_SCORE_SYNC) {
+        this.onScoreSync.notifyObservers(data as OnScoreSyncPayload);
+      } else if (code === EventCode.ON_POS_CORRECTION) {
+        this.onPosCorrection.notifyObservers(data as OnPosCorrectionPayload);
       }
     });
 
