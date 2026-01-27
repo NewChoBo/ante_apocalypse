@@ -71,8 +71,7 @@ export class PlayerPawn extends BasePawn {
       }
     } else {
       if (this.inputComponent) {
-        // Babylon.js behavior disposal is handled via removeBehavior or mesh dispose
-        this.mesh.removeBehavior(this.inputComponent);
+        this.removeComponent(this.inputComponent);
         this.inputComponent = null;
         console.log(`[PlayerPawn] InputComponent detached.`);
       }

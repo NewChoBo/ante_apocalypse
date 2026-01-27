@@ -20,6 +20,7 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
   public damageProfile?: DamageProfile;
 
   protected scene: Scene;
+  protected components: BaseComponent[] = [];
   private _tickObserver: Nullable<Observer<Scene>> = null;
 
   constructor(scene: Scene) {
@@ -52,14 +53,29 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
 
   /** 컴포넌트(Behavior) 추가 */
   public addComponent(component: BaseComponent): void {
+    this.components.push(component);
     if (this.mesh) {
       this.mesh.addBehavior(component);
     }
   }
 
+  /** 컴포넌트(Behavior) 제거 및 메모리 해제 */
+  public removeComponent(component: BaseComponent): void {
+    const index = this.components.indexOf(component);
+    if (index !== -1) {
+      this.components.splice(index, 1);
+    }
+
+    if (this.mesh) {
+      this.mesh.removeBehavior(component);
+    }
+
+    // 명시적 리소스 해제 호출
+    component.dispose();
+  }
+
   public getComponent<T extends BaseComponent>(type: ComponentConstructor<T>): T | undefined {
-    if (!this.mesh) return undefined;
-    return this.mesh.behaviors.find((b) => b instanceof type) as T;
+    return this.components.find((b) => b instanceof type) as T;
   }
 
   /** 모든 컴포넌트 업데이트 (Behavior가 각자 처리하므로 메서드는 공백으로 유지 가능하거나 제거) */
@@ -84,6 +100,10 @@ export abstract class BasePawn implements IPawn, IWorldEntity {
       this.scene.onBeforeRenderObservable.remove(this._tickObserver);
       this._tickObserver = null;
     }
+
+    // 모든 컴포넌트 해제
+    this.components.forEach((comp) => comp.dispose());
+    this.components = [];
 
     // Babylon.js mesh dispose 시 behaviors도 함께 해제되지만 명시적 호출
     if (this.mesh) {
