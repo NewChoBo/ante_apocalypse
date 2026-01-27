@@ -217,21 +217,45 @@ export class SessionController implements IGameSystem {
               );
             });
 
-          const initialState = new InitialStatePayload(
-            network.getAllPlayerStates().map(
-              (ps) =>
-                ({
-                  id: ps.id,
-                  name: ps.name,
-                  position: ps.position,
-                  rotation: ps.rotation,
-                  weaponId: ps.weaponId,
-                  health: ps.health,
-                }) as PlayerData
-            ),
-            enemyStates,
-            targetStates
+          const playerStates = network.getAllPlayerStates().map(
+            (ps) =>
+              ({
+                id: ps.id,
+                name: ps.name,
+                position: ps.position,
+                rotation: ps.rotation,
+                weaponId: ps.weaponId,
+                health: ps.health,
+              }) as PlayerData
           );
+
+          // IMPORTANT: Add self (Host) to the state!
+          if (this.playerPawn) {
+            const combat = this.playerPawn.getComponent(
+              CombatComponent as abstract new (...args: unknown[]) => CombatComponent
+            );
+            const myWeapon = combat?.getCurrentWeapon()?.name || 'Pistol';
+
+            playerStates.push({
+              id: network.getSocketId() || 'host',
+              name: localStorage.getItem('playerName') || 'Host',
+              position: {
+                x: this.playerPawn.mesh.position.x,
+                y: this.playerPawn.mesh.position.y,
+                z: this.playerPawn.mesh.position.z,
+              },
+              rotation: {
+                x: this.playerPawn.camera.rotation.x,
+                y: this.playerPawn.mesh.rotation.y, // Use mesh yaw
+                z: 0,
+              },
+              weaponId: myWeapon,
+              health: playerHealthStore.get(),
+              isMaster: true,
+            });
+          }
+
+          const initialState = new InitialStatePayload(playerStates, enemyStates, targetStates);
           network.sendEvent(EventCode.INITIAL_STATE, initialState);
         }
       })

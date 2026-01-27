@@ -164,6 +164,23 @@ export class NetworkManager {
           break;
         case EventCode.INITIAL_STATE: {
           const initialState = data as InitialStatePayload;
+
+          // CRITICAL: Update local playerStates map so we can process future MOVE events from these players
+          if (initialState.players) {
+            initialState.players.forEach((p) => {
+              if (p.id !== this.getSocketId()) {
+                this.playerStates.set(p.id, {
+                  id: p.id,
+                  name: p.name || 'Unknown',
+                  position: p.position || { x: 0, y: 0, z: 0 },
+                  rotation: p.rotation || { x: 0, y: 0, z: 0 },
+                  weaponId: p.weaponId || 'Pistol',
+                  health: p.health || 100,
+                });
+              }
+            });
+          }
+
           this.onInitialStateReceived.notifyObservers(initialState);
           break;
         }
