@@ -17,7 +17,6 @@ import {
   OnMatchEndPayload,
   OnScoreSyncPayload,
   ReqUseItemPayload,
-  OnStateDeltaPayload,
   OnPlayerRespawnPayload,
   ReqSwitchWeaponPayload,
   SyncWeaponPayload,
@@ -54,17 +53,12 @@ export class ServerGameController {
   // Match State
   private matchState: 'READY' | 'COUNTDOWN' | 'PLAYING' | 'GAME_OVER' = 'READY';
   private remainingSeconds: number = 60; // 1 minute default
-  private matchTimer: ReturnType<typeof setInterval> | null = null;
   private readonly RESPAWN_TIME_MS = 5000; // 5 seconds respawn
 
   // Scoring
   private playerScores: Map<string, number> = new Map();
   private totalTeamScore: number = 0;
   private readonly TARGET_SCORE = 500;
-
-  // Delta Sync tracking
-  private lastSentStates: Map<string, string> = new Map();
-  private fullSyncCounter: number = 0;
 
   private readonly DEFAULT_HP = 100;
   private readonly DEFAULT_WEAPON_DATA: Record<
@@ -81,27 +75,37 @@ export class ServerGameController {
     this.network = network;
     this.enemyController = new ServerEnemyController(network); // Pass network to sub-controller
     this.setupListeners();
-    this.startMatchTimer();
+    this.startLoops();
     console.log('%c[Server] Logical Server Started 🟢', 'color: lightgreen; font-weight: bold;');
   }
 
-  private lastTickTime: number = Date.now();
+  private aiInterval: ReturnType<typeof setInterval> | null = null;
+  private matchInterval: ReturnType<typeof setInterval> | null = null;
 
-  private startMatchTimer() {
-    if (this.matchTimer) clearInterval(this.matchTimer);
+  private startLoops() {
+    this.stopLoops();
 
-    this.lastTickTime = Date.now();
-    this.matchTimer = setInterval(() => {
-      this.tick();
-    }, 33); // 30Hz tick rate
+    // 1. AI Loop (Independent, e.g. 15Hz to save resources, or 30Hz for smooth)
+    let lastTime = Date.now();
+    this.aiInterval = setInterval(() => {
+      const now = Date.now();
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+      this.updateAI(dt);
+    }, 33);
+
+    // 2. Match Timer Loop (1Hz)
+    this.matchInterval = setInterval(() => {
+      this.updateMatchTimer();
+    }, 1000);
   }
 
-  private tick() {
-    const now = Date.now();
-    const dt = (now - this.lastTickTime) / 1000;
-    this.lastTickTime = now;
+  private stopLoops() {
+    if (this.aiInterval) clearInterval(this.aiInterval);
+    if (this.matchInterval) clearInterval(this.matchInterval);
+  }
 
-    // 0. Update AI
+  private updateAI(dt: number) {
     if (this.matchState === 'PLAYING') {
       const playerPositions = new Map<string, { x: number; y: number; z: number }>();
       this.playerStates.forEach((p) => {
@@ -109,32 +113,33 @@ export class ServerGameController {
           playerPositions.set(p.id, p.position);
         }
       });
-      this.enemyController.tick(dt, playerPositions);
+
+      // Calculate AI logic and get changes
+      const enemyUpdates = this.enemyController.tick(dt, playerPositions);
+
+      // Broadcast Enemy Moves Immediately (Event Driven)
+      enemyUpdates.forEach((update) => {
+        this.network.sendEvent(EventCode.ENEMY_MOVE, update, false, 'all');
+      });
     }
+  }
 
-    // High-frequency tasks
-    this.broadcastDeltaSync();
-
+  private updateMatchTimer() {
     // Low-frequency tasks (per second)
-    this.fullSyncCounter++;
-    if (this.fullSyncCounter >= 10) {
-      this.fullSyncCounter = 0;
+    if (this.matchState === 'PLAYING') {
+      this.remainingSeconds--;
 
-      if (this.matchState === 'PLAYING') {
-        this.remainingSeconds--;
-
-        if (this.remainingSeconds <= 0) {
-          this.remainingSeconds = 0;
-          this.endMatch(false); // Time out
-        }
-
-        if (this.totalTeamScore >= this.TARGET_SCORE) {
-          this.endMatch(true); // Victory
-        }
+      if (this.remainingSeconds <= 0) {
+        this.remainingSeconds = 0;
+        this.endMatch(false); // Time out
       }
 
-      this.broadcastMatchState();
+      if (this.totalTeamScore >= this.TARGET_SCORE) {
+        this.endMatch(true); // Victory
+      }
     }
+
+    this.broadcastMatchState();
   }
 
   private broadcastMatchState() {
@@ -177,12 +182,15 @@ export class ServerGameController {
     this.totalTeamScore = 0;
     this.playerScores.clear();
 
+    // Spawn Targets
+    this.spawnInitialTargets();
+
     // Reset Players (Respawn all)
     this.playerStates.forEach((p) => {
       this.respawnPlayer(p.id, true); // silent respawn
     });
 
-    this.startMatchTimer();
+    this.startLoops();
     console.log('[Server] Match Countdown Started!');
 
     // After 5 seconds, switch to PLAYING
@@ -219,82 +227,6 @@ export class ServerGameController {
         true,
         'all'
       );
-    }
-  }
-
-  private broadcastDeltaSync() {
-    const changedPlayers: Partial<PlayerData>[] = [];
-    const changedEnemies: Partial<EnemyUpdateData>[] = [];
-    const changedTargets: Partial<TargetSpawnData>[] = [];
-
-    // Check Players
-    this.playerStates.forEach((s) => {
-      const stateSummary = JSON.stringify({
-        p: s.position,
-        r: s.rotation,
-        w: s.weaponId,
-        h: s.health,
-      });
-      if (this.lastSentStates.get(s.id) !== stateSummary) {
-        changedPlayers.push({
-          id: s.id,
-          position: s.position,
-          rotation: s.rotation,
-          weaponId: s.weaponId,
-          health: s.health,
-        });
-        this.lastSentStates.set(s.id, stateSummary);
-      }
-    });
-
-    // Check Enemies (From EnemyController)
-    this.enemyController.getEnemyStates().forEach((e) => {
-      const stateSummary = JSON.stringify({
-        p: e.position,
-        r: e.rotation,
-        h: e.health,
-        s: e.state,
-      });
-
-      if (this.lastSentStates.get(e.id) !== stateSummary) {
-        changedEnemies.push({
-          id: e.id,
-          position: e.position,
-          rotation: e.rotation,
-          health: e.health,
-          state: e.state,
-          isMoving: e.isMoving,
-        });
-        this.lastSentStates.set(e.id, stateSummary);
-      }
-    });
-
-    // Check Targets (From entityStates)
-    this.entityStates.forEach((e) => {
-      const stateSummary = JSON.stringify({
-        p: e.position,
-        r: e.rotation,
-        h: e.health,
-      });
-      if (this.lastSentStates.get(e.id) !== stateSummary) {
-        // Targets only
-        changedTargets.push({
-          id: e.id,
-          position: e.position!,
-          health: e.health,
-        } as any);
-        this.lastSentStates.set(e.id, stateSummary);
-      }
-    });
-
-    if (changedPlayers.length > 0 || changedEnemies.length > 0 || changedTargets.length > 0) {
-      const payload = new OnStateDeltaPayload(
-        Date.now(),
-        changedPlayers,
-        changedEnemies,
-        changedTargets
-      );
-      this.network.sendEvent(EventCode.ON_STATE_DELTA, payload, false, 'all');
     }
   }
 
@@ -364,12 +296,12 @@ export class ServerGameController {
         const move = data as MovePayload;
 
         // [Smooth Gameplay] Trust Client Authority for Movement
-        // strict speed checks and rubber-banding correction (ON_POS_CORRECTION) are removed.
         state.position = move.position;
         state.rotation = move.rotation;
         state.weaponId = move.weaponId;
 
-        // History recording removed
+        // [Real-time Relay] Send to others immediately
+        this.network.sendEvent(EventCode.MOVE, move, false, 'others');
         break;
       }
       case EventCode.REQ_READY:
@@ -713,8 +645,47 @@ export class ServerGameController {
     }
   }
 
+  /* Target Spawning Logic (Moved from Client) */
+  private spawnInitialTargets() {
+    console.log('[Server] Spawning Initial Targets...');
+    // Clear existing
+    this.entityStates.forEach((e) => {
+      this.network.sendEvent(EventCode.TARGET_DESTROY, { id: e.id }, true, 'all');
+    });
+    this.entityStates.clear();
+
+    const distances = [10, 15, 20];
+    for (let lane = 0; lane < 5; lane++) {
+      const x = (lane - 2) * 7;
+      distances.forEach((z) => {
+        const isMoving = Math.random() > 0.5;
+        this.spawnTarget({ x, y: 1.0, z }, isMoving);
+      });
+    }
+  }
+
+  private spawnTarget(position: { x: number; y: number; z: number }, isMoving: boolean) {
+    const id = `target_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const type = isMoving ? 'moving_target' : 'static_target'; // Simplified types
+
+    const targetState: ServerEntityState = {
+      id,
+      type,
+      health: 100,
+      maxHealth: 100,
+      isDead: false,
+      position,
+      isMoving,
+    };
+
+    this.entityStates.set(id, targetState);
+
+    const payload = new TargetSpawnData(type, position, id, isMoving);
+    this.network.sendEvent(EventCode.SPAWN_TARGET, payload, true, 'all');
+  }
+
   public dispose() {
-    if (this.matchTimer) clearInterval(this.matchTimer);
+    this.stopLoops();
     this.playerStates.clear();
     this.entityStates.clear();
     this.activePickups.clear();

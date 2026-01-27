@@ -13,7 +13,6 @@ import {
   AnimationRange,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
-import { NetworkManager } from '../network/NetworkManager';
 import { AssetLoader } from '../loaders/AssetLoader';
 // import { PickupManager } from '../entities/PickupManager';
 
@@ -207,8 +206,6 @@ export class EnemyPawn extends BasePawn {
     // AI enemies do not have local player input components
   }
 
-  private _lastMoveTime: number = 0;
-
   public updateNetworkState(
     position: { x: number; y: number; z: number },
     rotation: { x: number; y: number; z: number }
@@ -230,13 +227,8 @@ export class EnemyPawn extends BasePawn {
 
   public tick(deltaTime: number): void {
     const now = performance.now();
-    const isMaster =
-      AssetLoader.getInstance().ready &&
-      (NetworkManager.getInstance().isMasterClient() ||
-        !NetworkManager.getInstance().getSocketId());
-
-    if (!isMaster && this.snapshots.length >= 2) {
-      // 1. Snapshot Interpolation for Non-Master clients
+    // [Server Authority] All clients (including host) interpolate server snapshots
+    if (this.snapshots.length >= 2) {
       const renderTime = now - this.INTERPOLATION_DELAY;
 
       let i = 0;
@@ -263,21 +255,6 @@ export class EnemyPawn extends BasePawn {
 
       if (i > 0) {
         this.snapshots.splice(0, i);
-      }
-    } else {
-      // 2. Master Client movement logic (Original)
-      const distance = Vector3.Distance(this.mesh.position, this._lastPosition);
-
-      if (distance > 0.005) {
-        this.isMoving = true;
-        this._lastMoveTime = now;
-      } else if (now - this._lastMoveTime > 200) {
-        this.isMoving = false;
-      }
-
-      // Apply Gravity
-      if (this.mesh) {
-        this.mesh.moveWithCollisions(new Vector3(0, -9.81 * deltaTime, 0));
       }
     }
 

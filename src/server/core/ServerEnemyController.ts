@@ -1,5 +1,5 @@
 import { IServerNetwork } from '../interfaces/IServerNetwork';
-import { EventCode, EnemySpawnData } from '../../shared/protocol/NetworkProtocol';
+import { EventCode, EnemySpawnData, EnemyUpdateData } from '../../shared/protocol/NetworkProtocol';
 import { SimpleVector3 } from '../../shared/math/Vector';
 
 interface ServerEnemy {
@@ -36,8 +36,9 @@ export class ServerEnemyController {
     this.network = network;
   }
 
-  public tick(deltaTime: number, playerPositions: Map<string, SimpleVector3>) {
+  public tick(deltaTime: number, playerPositions: Map<string, SimpleVector3>): EnemyUpdateData[] {
     const now = Date.now();
+    const changedEnemies: EnemyUpdateData[] = [];
 
     // 1. Spawning Logic
     if (now - this.lastSpawnTime > this.SPAWN_INTERVAL) {
@@ -64,14 +65,22 @@ export class ServerEnemyController {
         }
       });
 
+      let hasChanged = false;
+
       // State Machine
       if (nearestId && targetPos && nearestDistSq < this.AGGRO_RANGE * this.AGGRO_RANGE) {
         enemy.targetId = nearestId;
 
         if (nearestDistSq > this.ATTACK_RANGE * this.ATTACK_RANGE) {
           // CHASE
-          enemy.state = 'CHASE';
-          enemy.isMoving = true;
+          if (enemy.state !== 'CHASE') {
+            enemy.state = 'CHASE';
+            hasChanged = true;
+          }
+          if (!enemy.isMoving) {
+            enemy.isMoving = true;
+            hasChanged = true;
+          }
 
           // Move towards
           const dx = targetPos.x - enemy.position.x;
@@ -84,18 +93,46 @@ export class ServerEnemyController {
 
             // Simple rotation (look at target)
             enemy.rotation.y = Math.atan2(dx, dz);
+
+            // Start moving = changed
+            hasChanged = true;
           }
         } else {
           // ATTACK (Stop moving)
-          enemy.state = 'ATTACK';
-          enemy.isMoving = false;
+          if (enemy.state !== 'ATTACK') {
+            enemy.state = 'ATTACK';
+            hasChanged = true;
+          }
+          if (enemy.isMoving) {
+            enemy.isMoving = false;
+            hasChanged = true;
+          }
         }
       } else {
-        enemy.state = 'IDLE';
-        enemy.isMoving = false;
+        if (enemy.state !== 'IDLE') {
+          enemy.state = 'IDLE';
+          hasChanged = true;
+        }
+        if (enemy.isMoving) {
+          enemy.isMoving = false;
+          hasChanged = true;
+        }
         enemy.targetId = undefined;
       }
+
+      if (hasChanged) {
+        changedEnemies.push({
+          id: enemy.id,
+          position: enemy.position,
+          rotation: enemy.rotation,
+          state: enemy.state,
+          isMoving: enemy.isMoving,
+          health: enemy.health,
+        });
+      }
     });
+
+    return changedEnemies;
   }
 
   private spawnEnemy() {
