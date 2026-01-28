@@ -17,6 +17,7 @@ export enum UIScreen {
   LOGIN = 'LOGIN',
   MAIN_MENU = 'MAIN_MENU',
   LOBBY = 'LOBBY',
+  PAUSE = 'PAUSE',
   NONE = 'NONE',
 }
 
@@ -26,7 +27,7 @@ export class UIManager {
 
   // UI Containers
   private screens: Map<UIScreen, Container> = new Map();
-  private currentScreen: UIScreen = UIScreen.NONE;
+  public currentScreen: UIScreen = UIScreen.NONE;
   private lobbyUI: LobbyUI | null = null;
 
   // Visual Constants
@@ -75,6 +76,7 @@ export class UIManager {
     this.screens.set(UIScreen.LOGIN, this.createLoginScreen());
     this.screens.set(UIScreen.MAIN_MENU, this.createMainMenuScreen());
     this.screens.set(UIScreen.LOBBY, this.createLobbyScreen());
+    this.screens.set(UIScreen.PAUSE, this.createPauseScreen());
 
     // Hide all initially
     this.screens.forEach((s) => (s.isVisible = false));
@@ -266,6 +268,43 @@ export class UIManager {
     this.lobbyUI = new LobbyUI(this);
     const container = this.lobbyUI.getContainer();
     this.ui.addControl(container);
+    return container;
+  }
+
+  private createPauseScreen(): Container {
+    const container = new Rectangle('pause-container');
+    container.width = '100%';
+    container.height = '100%';
+    container.background = 'rgba(0, 0, 0, 0.7)';
+    container.thickness = 0;
+    this.ui.addControl(container);
+
+    const stack = new StackPanel();
+    stack.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    container.addControl(stack);
+
+    const title = new TextBlock();
+    title.text = 'PAUSED';
+    title.color = 'white';
+    title.fontSize = 48;
+    title.fontFamily = this.FONT_TACTICAL;
+    title.fontWeight = '800';
+    title.height = '80px';
+    stack.addControl(title);
+
+    const resumeBtn = this.createTacticalButton('RESUME OPERATIONS', '300px', '50px');
+    resumeBtn.onPointerUpObservable.add(() => this.onResume.notifyObservers());
+    stack.addControl(resumeBtn);
+
+    const spacer = new Rectangle();
+    spacer.height = '20px';
+    spacer.thickness = 0;
+    stack.addControl(spacer);
+
+    const abortBtn = this.createTacticalButton('ABORT MISSION', '300px', '50px');
+    abortBtn.onPointerUpObservable.add(() => this.onAbort.notifyObservers());
+    stack.addControl(abortBtn);
+
     return container;
   }
 

@@ -4,6 +4,7 @@ import { PlayerPawn } from '../PlayerPawn';
 import { PlayerController } from '../controllers/PlayerController';
 import { InventoryUI } from '../../ui/inventory/InventoryUI';
 import { gameStateStore } from '../store/GameStore';
+import { UIManager, UIScreen } from '../../ui/UIManager';
 
 export class GlobalInputManager {
   private static instance: GlobalInputManager;
@@ -82,6 +83,23 @@ export class GlobalInputManager {
         document.exitPointerLock();
       } else {
         if (this.canvas) this.canvas.requestPointerLock();
+      }
+    }
+
+    // 4. 포즈 메뉴 토글 (Escape)
+    if (e.code === 'Escape') {
+      if (isGameOver) return;
+
+      const ui = UIManager.getInstance();
+      if (ui) {
+        const isPaused = ui.currentScreen === UIScreen.PAUSE;
+        if (isPaused) {
+          ui.showScreen(UIScreen.NONE);
+          this.playerController!.setInputBlocked(false);
+        } else {
+          ui.showScreen(UIScreen.PAUSE);
+          this.playerController!.setInputBlocked(true);
+        }
       }
     }
   };

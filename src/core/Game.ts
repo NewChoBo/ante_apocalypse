@@ -110,6 +110,13 @@ export class Game {
 
     this.uiManager.onAbort.add(() => this.quitToMenu());
 
+    this.uiManager.onResume.add(() => {
+      this.uiManager.showScreen(UIScreen.NONE);
+      if (this.sessionController) {
+        this.sessionController.setInputBlocked(false);
+      }
+    });
+
     this.uiManager.onLogout.add(() => {
       NetworkManager.getInstance().leaveRoom();
       this.uiManager.showScreen(UIScreen.LOGIN);
