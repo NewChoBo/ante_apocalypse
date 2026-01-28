@@ -2,7 +2,7 @@ import { Observable, Vector3 } from '@babylonjs/core';
 import { IWorldEntity } from '../../types/IWorldEntity';
 import { IGameSystem } from '../../types/IGameSystem';
 import { NetworkMediator } from '../network/NetworkMediator';
-import { EventCode, OnDiedPayload } from '../../shared/protocol/NetworkProtocol';
+import { EventCode, OnDiedPayload, ReqHitPayload } from '../../shared/protocol/NetworkProtocol';
 
 /**
  * 전역 엔티티 관리자.
@@ -137,13 +137,13 @@ export class WorldEntityManager implements IGameSystem {
     // If broadcast is true, it means this call originated from some local interaction (e.g. Raycast)
     if (broadcast) {
       // Send REQ_HIT to Server.
-      this.networkMediator.sendEvent(EventCode.REQ_HIT, {
-        targetId: id,
-        damage: damage,
-        hitPosition: hitPoint
-          ? { x: hitPoint.x, y: hitPoint.y, z: hitPoint.z }
-          : { x: 0, y: 0, z: 0 },
-      });
+      // Send REQ_HIT to Server.
+      const payload = new ReqHitPayload(
+        id,
+        damage,
+        hitPoint ? { x: hitPoint.x, y: hitPoint.y, z: hitPoint.z } : { x: 0, y: 0, z: 0 }
+      );
+      this.networkMediator.sendEvent(EventCode.REQ_HIT, payload);
       // Do not apply logic locally. Wait for ON_HIT.
       return;
     }

@@ -164,6 +164,7 @@ export abstract class BaseWeapon implements IWeapon {
       entityId,
       damageAmount,
       { x: pickedPoint.x, y: pickedPoint.y, z: pickedPoint.z },
+      undefined, // Use default timestamp
       { x: 0, y: 1, z: 0 } // Default normal
     );
     NetworkManager.getInstance().requestHit(req);

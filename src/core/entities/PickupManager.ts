@@ -13,6 +13,7 @@ export class PickupManager implements IGameSystem {
   private scene: Scene | null = null;
   private player: PlayerPawn | null = null;
   private pickups: Map<string, PickupActor> = new Map();
+  private pendingPickups: Set<string> = new Set(); // Track pending requests
   public readonly priority = 30;
   private networkMediator: NetworkMediator;
 
@@ -68,6 +69,7 @@ export class PickupManager implements IGameSystem {
 
   private handleDestroyEvent(data: { id: string }): void {
     const pickup = this.pickups.get(data.id);
+    this.pendingPickups.delete(data.id); // Clean up pending state
     if (pickup) {
       pickup.collect();
       this.pickups.delete(data.id);
@@ -131,7 +133,7 @@ export class PickupManager implements IGameSystem {
   private handleCollection(pickup: PickupActor, id: string): void {
     if (!this.player || pickup.destroyed) return;
 
-    // Single player mode: Grant immediately
+    // Logic for Single Player (Offline)
     if (!this.networkMediator.getSocketId()) {
       this.grantPickupToInventory(id, pickup.type, 'local');
       this.pickups.delete(id);
@@ -139,15 +141,19 @@ export class PickupManager implements IGameSystem {
       return;
     }
 
-    // Standard Server-Authoritative Logic: Always Request
+    if (this.pendingPickups.has(id)) return; // Already requested
+
+    // Standard Server-Authoritative Logic
     const pos = pickup.mesh.getAbsolutePosition();
     this.networkMediator.sendEvent(EventCode.REQ_TRY_PICKUP, {
       id,
       position: { x: pos.x, y: pos.y, z: pos.z },
     });
 
-    // Optimistic: Mark as destroyed locally to prevent multiple request spamming
-    pickup.destroyed = true;
+    this.pendingPickups.add(id);
+    // Do NOT set destroyed=true here. Wait for DESTROY_PICKUP from server.
+    // If we destroy locally, we can't clean up the mesh if the map reference is lost.
+    // Plus, if server denies, we need to be able to try again later (after cooldown?).
   }
 
   // Executed on Master Client - DEPRECATED

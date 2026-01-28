@@ -141,6 +141,7 @@ export class ReqHitPayload {
     public readonly targetId: string,
     public readonly damage: number,
     public readonly hitPosition: Position,
+    public readonly timestamp: number = Date.now(), // Auto-assign if not provided
     public readonly hitNormal?: Position
   ) {}
 }

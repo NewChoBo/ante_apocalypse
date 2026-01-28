@@ -11,6 +11,7 @@ import {
   Observable,
 } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon';
+import { AssetLoader } from '../core/loaders/AssetLoader';
 
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm, IWeapon } from '../types/IWeapon';
@@ -117,6 +118,17 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
 
     this.lastFireTime = now;
     this.onFire();
+
+    // Sound
+    const sound = AssetLoader.getInstance().getSound('gunshot');
+    if (sound) {
+      if (typeof sound.setPlaybackRate === 'function') {
+        sound.setPlaybackRate(0.9 + Math.random() * 0.2); // Varied pitch
+      } else {
+        console.warn('[Firearm] sound.setPlaybackRate is missing on gunshot sound object', sound);
+      }
+      sound.play();
+    }
 
     // [Prediction] Client-side visual/audio effect
     this.onFirePredicted.notifyObservers(this);
@@ -250,11 +262,16 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
           }
         }
 
-        const hitReq = new ReqHitPayload(targetId, this.damage, {
-          x: pickInfo.pickedPoint!.x,
-          y: pickInfo.pickedPoint!.y,
-          z: pickInfo.pickedPoint!.z,
-        });
+        const hitReq = new ReqHitPayload(
+          targetId,
+          this.damage,
+          {
+            x: pickInfo.pickedPoint!.x,
+            y: pickInfo.pickedPoint!.y,
+            z: pickInfo.pickedPoint!.z,
+          }
+          // Default timestamp used
+        );
         NetworkManager.getInstance().requestHit(hitReq);
       }
 

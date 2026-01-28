@@ -12,6 +12,7 @@ import {
   OnPlayerRespawnPayload,
 } from '../../shared/protocol/NetworkProtocol';
 import { gameStateStore, scoreStore, gameTimerStore } from '../store/GameStore';
+import { NetworkInterpolation } from './NetworkInterpolation';
 
 export class MultiplayerSystem implements IGameSystem {
   private scene: Scene;
@@ -21,6 +22,7 @@ export class MultiplayerSystem implements IGameSystem {
   private shadowGenerator: ShadowGenerator;
   private lastUpdateTime = 0;
   private updateInterval = 50; // 20Hz update rate
+  private interpolator: NetworkInterpolation;
 
   constructor(
     scene: Scene,
@@ -32,6 +34,7 @@ export class MultiplayerSystem implements IGameSystem {
     this.localPlayer = localPlayer;
     this.shadowGenerator = shadowGenerator;
     this.networkMediator = NetworkMediator.getInstance();
+    this.interpolator = new NetworkInterpolation();
 
     this.setupListeners();
     localStorage.setItem('playerName', playerName);
@@ -67,21 +70,18 @@ export class MultiplayerSystem implements IGameSystem {
 
   public applyPlayerStates(states: PlayerData[]): void {
     if (!states) return;
+    // This is called from Initial State. We can feed it to interpolator too?
+    // Or just spawn missing players.
     console.log(`[Multiplayer] Applying ${states.length} player states from sync`);
     states.forEach((p) => {
       if (p.id !== this.networkMediator.getSocketId()) {
-        const remote = this.remotePlayers.get(p.id);
-        if (remote) {
-          remote.updateNetworkState(
-            p.position || { x: 0, y: 0, z: 0 },
-            p.rotation || { x: 0, y: 0, z: 0 }
-          );
-          if (p.weaponId) remote.updateWeapon(p.weaponId);
-        } else {
+        if (!this.remotePlayers.has(p.id)) {
           this.spawnRemotePlayer(p);
         }
       }
     });
+    // Also feed to interpolator to start clean
+    this.interpolator.addSnapshot(Date.now(), states);
   }
 
   private setupListeners(): void {
@@ -91,32 +91,26 @@ export class MultiplayerSystem implements IGameSystem {
       }
     });
 
+    // Old Direct Update Listener - DISABLED in favor of Interpolation
+    /*
     this.networkMediator.onPlayerUpdated.add((data) => {
       if (data.id !== this.networkMediator.getSocketId()) {
-        const remote = this.remotePlayers.get(data.id);
-        if (remote) {
-          // Apply default values if position or rotation are missing
-          const position = data.position || { x: 0, y: 0, z: 0 };
-          const rotation = data.rotation || { x: 0, y: 0, z: 0, w: 1 };
-          remote.updateNetworkState(position, rotation);
-          if (data.weaponId) {
-            remote.updateWeapon(data.weaponId);
-          }
-        } else {
-          // Late Join / Desync handling: Spawn player if missing
-          console.warn(
-            `[Multiplayer] Received update for unknown player ${data.id}, spawning now.`
-          );
-          this.spawnRemotePlayer({
-            id: data.id,
-            name: data.name || 'Unknown',
-            position: data.position,
-            rotation: data.rotation,
-            weaponId: data.weaponId || 'Pistol',
-            health: 100, // Default health
-          });
-        }
+        // ... (Legacy code)
       }
+    });
+    */
+
+    // NEW: Listen for Full State Sync (Snapshot)
+    this.networkMediator.onStateSync.add((data) => {
+      // Feed the snapshot buffer using LOCAL reception time to avoid clock sync issues
+      this.interpolator.addSnapshot(Date.now(), data.players);
+
+      // Also ensure players exist (Spawn check)
+      data.players.forEach((p) => {
+        if (p.id !== this.networkMediator.getSocketId() && !this.remotePlayers.has(p.id)) {
+          this.spawnRemotePlayer(p);
+        }
+      });
     });
 
     this.networkMediator.onPlayerLeft.add((id) => {
@@ -162,7 +156,7 @@ export class MultiplayerSystem implements IGameSystem {
       // Enemy specific sync can go here if needed
     });
 
-    // Authoritative State Sync
+    // Authoritative State Sync (Delta) - Optional if using Snapshots primarily
     this.networkMediator.onStateDelta.add((delta: OnStateDeltaPayload) => {
       this.applyDeltaUpdate(delta);
     });
@@ -206,7 +200,7 @@ export class MultiplayerSystem implements IGameSystem {
   }
 
   private applyDeltaUpdate(delta: OnStateDeltaPayload) {
-    // Apply Player Deltas
+    // Delta updates can still be useful for non-movement properties like Health
     delta.changedPlayers.forEach((p) => {
       if (p.id === this.localPlayer.id) {
         if (p.health !== undefined) this.localPlayer.updateHealth(p.health);
@@ -215,12 +209,8 @@ export class MultiplayerSystem implements IGameSystem {
 
       const remote = this.remotePlayers.get(p.id!);
       if (remote) {
-        if (p.position || p.rotation) {
-          remote.updateNetworkState(
-            p.position || remote.mesh.position,
-            p.rotation || remote.mesh.rotation
-          );
-        }
+        // Position/Rotation handled by Interpolator now, but if delta provides it, we CAN override
+        // But better to trust interpolator for movement.
         if (p.weaponId) remote.updateWeapon(p.weaponId);
         if (p.health !== undefined) remote.updateHealth(p.health);
       }
@@ -250,6 +240,8 @@ export class MultiplayerSystem implements IGameSystem {
 
   public update(): void {
     const now = performance.now();
+
+    // 1. Send Local State (Keep 20Hz)
     if (now - this.lastUpdateTime > this.updateInterval) {
       const combat = this.localPlayer.getComponent(CombatComponent) as CombatComponent;
       const weaponId = combat?.getCurrentWeapon()?.name || 'Pistol';
@@ -272,6 +264,28 @@ export class MultiplayerSystem implements IGameSystem {
         false
       );
       this.lastUpdateTime = now;
+    }
+
+    // 2. Apply Interpolation for Remote Players
+    // We use server time which is approx Date.now() if synchronized, or just local Date.now() if timestamps match.
+    // NetworkInterpolation expects the timestamp used in AddSnapshot.
+    // Server usually sends Date.now().
+    const renderTime = Date.now();
+    const interpolatedStates = this.interpolator.getInterpolatedState(renderTime);
+
+    if (interpolatedStates) {
+      interpolatedStates.forEach((state, id) => {
+        if (id !== this.localPlayer.id) {
+          const remote = this.remotePlayers.get(id);
+          if (remote) {
+            remote.updateNetworkState(
+              state.position || { x: 0, y: 0, z: 0 },
+              state.rotation || { x: 0, y: 0, z: 0 }
+            );
+            if (state.weaponId) remote.updateWeapon(state.weaponId);
+          }
+        }
+      });
     }
   }
 

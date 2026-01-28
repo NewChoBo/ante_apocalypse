@@ -60,6 +60,10 @@ export class ServerGameController {
   private totalTeamScore: number = 0;
   private readonly TARGET_SCORE = 500;
 
+  // Sub-tick Hit Registration
+  private hitboxHistory: { timestamp: number; players: Map<string, PlayerData> }[] = [];
+  private readonly HISTORY_DURATION_MS = 1000; // Keep 1 second of history
+
   private readonly DEFAULT_HP = 100;
   private readonly DEFAULT_WEAPON_DATA: Record<
     string,
@@ -81,6 +85,7 @@ export class ServerGameController {
 
   private aiInterval: ReturnType<typeof setInterval> | null = null;
   private matchInterval: ReturnType<typeof setInterval> | null = null;
+  private networkInterval: ReturnType<typeof setInterval> | null = null;
 
   private startLoops() {
     this.stopLoops();
@@ -98,11 +103,23 @@ export class ServerGameController {
     this.matchInterval = setInterval(() => {
       this.updateMatchTimer();
     }, 1000);
+
+    // 3. Network Loop (128Hz - High Precision, approx 8ms)
+    this.networkInterval = setInterval(() => {
+      this.broadcastWorldSnapshot();
+    }, 8);
   }
 
   private stopLoops() {
     if (this.aiInterval) clearInterval(this.aiInterval);
     if (this.matchInterval) clearInterval(this.matchInterval);
+    if (this.networkInterval) clearInterval(this.networkInterval);
+  }
+
+  private broadcastWorldSnapshot() {
+    // Optimization: Only send if match is active or at least one player is connected
+    if (this.playerStates.size === 0) return;
+    this.sendWorldSnapshot();
   }
 
   private updateAI(dt: number) {
@@ -301,7 +318,8 @@ export class ServerGameController {
         state.weaponId = move.weaponId;
 
         // [Real-time Relay] Send to others immediately
-        this.network.sendEvent(EventCode.MOVE, move, false, 'others');
+        // DISABLED for Interpolation Test
+        // this.network.sendEvent(EventCode.MOVE, move, false, 'others');
         break;
       }
       case EventCode.REQ_READY:
@@ -375,7 +393,7 @@ export class ServerGameController {
     console.log(`[Server] Initialized Player State: ${id}`);
   }
 
-  private sendWorldSnapshot(_targetId: string) {
+  private sendWorldSnapshot(_targetId?: string) {
     const players = Array.from(this.playerStates.values()).map((s) => ({
       id: s.id,
       name: s.name,
@@ -401,7 +419,7 @@ export class ServerGameController {
 
     // Targets from entityStates
     this.entityStates.forEach((e) => {
-      if (e.type.includes('target')) {
+      if (typeof e.type === 'string' && e.type.includes('target')) {
         targets.push({
           id: e.id,
           type: e.type,
@@ -420,6 +438,89 @@ export class ServerGameController {
     );
 
     this.network.sendEvent(EventCode.ON_STATE_SYNC, snapshot, true, 'all');
+
+    // [Sub-tick] Record Snapshot for History
+    // Clone players to avoid reference issues
+    const historyPlayers = new Map<string, PlayerData>();
+    this.playerStates.forEach((p) => {
+      historyPlayers.set(p.id, { ...p }); // Shallow copy is enough for position/rotation
+    });
+
+    this.hitboxHistory.push({
+      timestamp: snapshot.timestamp,
+      players: historyPlayers,
+    });
+
+    // Prune old history
+    const cutoff = Date.now() - this.HISTORY_DURATION_MS;
+    while (this.hitboxHistory.length > 0 && this.hitboxHistory[0].timestamp < cutoff) {
+      this.hitboxHistory.shift();
+    }
+  }
+
+  private validateHitSubtick(
+    targetId: string,
+    shotTimestamp: number,
+    hitPos: { x: number; y: number; z: number }
+  ): boolean {
+    if (this.hitboxHistory.length < 2) return true; // Not enough history, trust client (or fail)
+
+    // 1. Find Snapshots
+    let from: (typeof this.hitboxHistory)[0] | undefined;
+    let to: (typeof this.hitboxHistory)[0] | undefined;
+
+    for (let i = this.hitboxHistory.length - 1; i >= 0; i--) {
+      if (this.hitboxHistory[i].timestamp <= shotTimestamp) {
+        from = this.hitboxHistory[i];
+        to = this.hitboxHistory[i + 1]; // Can be undefined if we are at the latest
+        break;
+      }
+    }
+
+    if (!from) {
+      // Too old? Use oldest
+      from = this.hitboxHistory[0];
+      to = this.hitboxHistory[1]; // Might be undefined
+    }
+
+    let targetPos: { x: number; y: number; z: number } | undefined;
+
+    // 2. Interpolate
+    const fromPlayer = from.players.get(targetId);
+    if (!fromPlayer || !fromPlayer.position) return true; // Player not found?
+
+    if (!to) {
+      // Use exact 'from' position (latest recorded or oldest recorded)
+      targetPos = fromPlayer.position;
+    } else {
+      const toPlayer = to.players.get(targetId);
+      if (!toPlayer || !toPlayer.position) {
+        targetPos = fromPlayer.position;
+      } else {
+        const total = to.timestamp - from.timestamp;
+        const elapsed = shotTimestamp - from.timestamp;
+        const alpha = Math.max(0, Math.min(1, total > 0 ? elapsed / total : 0));
+
+        targetPos = {
+          x: fromPlayer.position.x + (toPlayer.position.x - fromPlayer.position.x) * alpha,
+          y: fromPlayer.position.y + (toPlayer.position.y - fromPlayer.position.y) * alpha,
+          z: fromPlayer.position.z + (toPlayer.position.z - fromPlayer.position.z) * alpha,
+        };
+      }
+    }
+
+    // 3. Distance Check
+    const dx = hitPos.x - targetPos!.x;
+    const dy = hitPos.y - targetPos!.y;
+    const dz = hitPos.z - targetPos!.z;
+    const distSq = dx * dx + dy * dy + dz * dz;
+
+    // Hitbox radius approx 0.5m -> 1.0m diameter needed? + Error margin
+    // Cylinder height ~2m.
+    // Simple sphere check for now with generous margin (e.g., 1.0m radius = 1.0m error allowed)
+    // 128Hz should be very accurate, but Latency jitter exists.
+    const HIT_RADIUS = 1.5; // Generous margin for testing
+    return distSq < HIT_RADIUS * HIT_RADIUS;
   }
 
   private processFire(shooterId: string, state: ServerPlayerState, data: ReqFirePayload) {
@@ -484,6 +585,7 @@ export class ServerGameController {
           id: string;
           type: string;
           position?: { x: number; y: number; z: number };
+          isMoving?: boolean;
         }
       | undefined;
 
@@ -510,6 +612,7 @@ export class ServerGameController {
             health: enemy.health,
             isDead: false,
             position: enemy.position,
+            isMoving: enemy.isMoving || false,
           };
         }
       }
@@ -517,8 +620,15 @@ export class ServerGameController {
 
     if (!target || target.isDead) return;
 
-    // 2. Lag Compensation REMOVED - Trust Client
-    // if (!this.validateHitWithLagComp(target.id, data.hitPosition)) { ... }
+    // 2. Sub-tick Lag Compensation
+    // Only valid for Players now (Enemies/Targets don't move or handled simply)
+    if (playerTarget && data.timestamp) {
+      const isValid = this.validateHitSubtick(target.id, data.timestamp, data.hitPosition);
+      if (!isValid) {
+        console.warn(`[Server] Sub-tick validation failed for ${attackerId} -> ${target.id}`);
+        return;
+      }
+    }
 
     target.health -= data.damage;
 
@@ -608,20 +718,31 @@ export class ServerGameController {
     data: ReqTryPickupPayload
   ) {
     const pickup = this.activePickups.get(data.id);
-    if (!pickup) return;
+    if (!pickup) {
+      console.warn(`[Server] Pickup request failed: Pickup ${data.id} not active.`);
+      return;
+    }
 
     const dx = state.position!.x - pickup.position.x;
     const dz = state.position!.z - pickup.position.z;
     const distSq = dx * dx + dz * dz;
 
     if (distSq < 5 * 5) {
+      console.log(`[Server] Pickup validated: ${data.id} by ${senderId}`);
       this.activePickups.delete(data.id);
-      this.network.sendEvent(EventCode.ON_ITEM_PICKED, {
-        id: data.id,
-        type: pickup.type,
-        ownerId: senderId,
-      });
-      this.network.sendEvent(EventCode.DESTROY_PICKUP, { id: data.id });
+      this.network.sendEvent(
+        EventCode.ON_ITEM_PICKED,
+        {
+          id: data.id,
+          type: pickup.type,
+          ownerId: senderId,
+        },
+        true,
+        'all'
+      );
+      this.network.sendEvent(EventCode.DESTROY_PICKUP, { id: data.id }, true, 'all');
+    } else {
+      console.warn(`[Server] Pickup denied: Too far. DistSq=${distSq}`);
     }
   }
 
@@ -680,7 +801,7 @@ export class ServerGameController {
 
     this.entityStates.set(id, targetState);
 
-    const payload = new TargetSpawnData(type, position, id, isMoving);
+    const payload = new TargetSpawnData(id, type, position, isMoving);
     this.network.sendEvent(EventCode.SPAWN_TARGET, payload, true, 'all');
   }
 
