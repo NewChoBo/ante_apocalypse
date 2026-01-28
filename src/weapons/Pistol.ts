@@ -15,12 +15,13 @@ import { AssetLoader } from '../core/AssetLoader';
  * firingMode = 'semi' - 클릭당 1발만 발사
  */
 export class Pistol extends Firearm {
+  // Removed hardcoded stats, these should be passed to the super constructor or managed by the base class
   public name = 'Pistol';
-  public magazineSize = 12;
-  public damage = 50; // 높은 단발 데미지
-  public fireRate = 0.3; // 발사 간격
-  public range = 50;
-  public reloadTime = 1.5;
+  public magazineSize = 0;
+  public damage = 0;
+  public fireRate = 0;
+  public range = 0;
+  public reloadTime = 0;
   public firingMode: 'semi' | 'auto' = 'semi';
   public recoilForce = 0.015;
 
@@ -30,7 +31,8 @@ export class Pistol extends Firearm {
     onScore?: (points: number) => void,
     applyRecoil?: (force: number) => void
   ) {
-    super(scene, camera, 12, 120, onScore, applyRecoil); // Pistol: 12발 탄창, 120발 예비 탄약
+    // 탄약 수량도 서버에서 관리하는 게 좋지만, 일단 기본값으로 초기화
+    super(scene, camera, 0, 0, onScore, applyRecoil);
     this.muzzleOffset = new Vector3(0, 0.06, 0.2); // 권총 총구 위치 조정
     this.createWeaponModel();
   }

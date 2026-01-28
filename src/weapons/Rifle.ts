@@ -18,13 +18,13 @@ import { AssetLoader } from '../core/AssetLoader';
  */
 export class Rifle extends Firearm {
   public name = 'Rifle';
-  public magazineSize = 30;
-  public damage = 25;
-  public fireRate = 0.1; // 초당 10발
-  public range = 100;
-  public reloadTime = 2.0;
+  public magazineSize = 0;
+  public damage = 0;
+  public fireRate = 0;
+  public range = 0;
+  public reloadTime = 0;
   public firingMode: 'semi' | 'auto' = 'auto';
-  public recoilForce = 0.008; // 소총은 연사 속도가 빨라 반동이 적음
+  public recoilForce = 0.008;
 
   constructor(
     scene: Scene,
@@ -32,7 +32,7 @@ export class Rifle extends Firearm {
     onScore?: (points: number) => void,
     applyRecoil?: (force: number) => void
   ) {
-    super(scene, camera, 30, 240, onScore, applyRecoil); // Rifle: 30발 탄창, 240발 예비 탄약
+    super(scene, camera, 0, 0, onScore, applyRecoil);
     this.muzzleOffset = new Vector3(0, 0.06, 0.4); // 소총 총구 위치 조정 // 총구 상단 정렬, 모델 회전 고려
     this.createWeaponModel();
   }

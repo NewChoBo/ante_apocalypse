@@ -15,8 +15,8 @@ import { GameObservables } from '../core/events/GameObservables';
  */
 export class Knife extends MeleeWeapon {
   public name = 'Knife';
-  public damage = 50;
-  public range = 4.0;
+  public damage = 0;
+  public range = 0;
 
   private swingAnimationTimer = 0;
   private isAnimating = false;

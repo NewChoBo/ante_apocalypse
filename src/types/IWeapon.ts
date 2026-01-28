@@ -63,6 +63,9 @@ export interface IWeapon {
   /** 탄약 추가 */
   addAmmo(amount: number): void;
 
+  /** 서버 데이터로 스태츠 업데이트 */
+  updateStats(stats: any): void;
+
   /** 리소스 해제 */
   dispose(): void;
 }

@@ -283,6 +283,29 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     }
   }
 
+  public override updateStats(stats: any): void {
+    const isInitialSync = this.magazineSize === 0;
+
+    super.updateStats(stats);
+    if (stats.magazineSize !== undefined) this.magazineSize = stats.magazineSize;
+    if (stats.fireRate !== undefined) this.fireRate = stats.fireRate;
+    if (stats.reloadTime !== undefined) this.reloadTime = stats.reloadTime;
+
+    // [신규] 최초 동기화 시 탄약 자동 지급
+    if (isInitialSync && this.magazineSize > 0) {
+      this.currentAmmo = this.magazineSize;
+      this.reserveAmmo = this.magazineSize * 5; // 소총 등 연사 무기를 위해 넉넉히 지급
+      console.log(
+        `[Firearm] ${this.name} initialized with ${this.currentAmmo} / ${this.reserveAmmo} ammo`
+      );
+    }
+
+    // 탄약 관련 상태 동기화 (탄창 크기 변경 시 필요할 수 있음)
+    if (this.isActive) {
+      this.updateAmmoStore();
+    }
+  }
+
   public dispose(): void {
     super.dispose();
   }

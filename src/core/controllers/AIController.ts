@@ -1,6 +1,9 @@
 import { BaseController } from './BaseController';
 import { EnemyPawn } from '../EnemyPawn';
 import { PlayerPawn } from '../PlayerPawn';
+import { NetworkManager } from '../systems/NetworkManager';
+import { EventCode } from '../network/NetworkProtocol';
+import { Vector3 } from '@babylonjs/core';
 
 export class AIController extends BaseController {
   private updateRate = 0.1; // 10 times per sec
@@ -20,6 +23,14 @@ export class AIController extends BaseController {
     super(id);
     this.possess(pawn);
     this.targetPlayer = target;
+
+    // [Authoritative Stats Sync]
+    NetworkManager.getInstance().onWeaponConfigsReceived.add((configs) => {
+      if (configs['Enemy_Melee']) {
+        this.damage = configs['Enemy_Melee'].damage;
+        console.log(`[AIController] Damage updated to ${this.damage} from server`);
+      }
+    });
   }
 
   protected onPossess(pawn: any): void {
@@ -80,7 +91,19 @@ export class AIController extends BaseController {
     const now = performance.now() / 1000;
     if (distance <= this.meleeAttackRange) {
       if (now - this.lastAttackTime >= this.attackCooldown) {
-        target.takeDamage(this.damage);
+        // [Authoritative Attack]
+        // 데미지 직접 적용 대신 서버에 사격(공격) 요청 전송
+        const muzzlePos = enemy.position.add(new Vector3(0, 0.5, 0));
+        const dir = target.position.subtract(muzzlePos).normalize();
+
+        NetworkManager.getInstance().sendEvent(EventCode.FIRE, {
+          weaponId: 'Enemy_Melee',
+          muzzleTransform: {
+            position: { x: muzzlePos.x, y: muzzlePos.y, z: muzzlePos.z },
+            direction: { x: dir.x, y: dir.y, z: dir.z },
+          },
+        });
+
         this.lastAttackTime = now;
       }
     }

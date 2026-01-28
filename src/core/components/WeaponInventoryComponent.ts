@@ -5,6 +5,7 @@ import { Pistol } from '../../weapons/Pistol';
 import { Rifle } from '../../weapons/Rifle';
 import { Knife } from '../../weapons/Knife';
 import { Bat } from '../../weapons/Bat';
+import { NetworkManager } from '../systems/NetworkManager';
 
 /**
  * 캐릭터가 보유한 무기들을 관리하고 교체 로직을 담당하는 컴포넌트.
@@ -28,6 +29,19 @@ export class WeaponInventoryComponent {
       new Knife(scene, camera, onScore),
       new Bat(scene, camera, onScore),
     ];
+
+    // [Authoritative Weapon Stats Sync]
+    NetworkManager.getInstance().onWeaponConfigsReceived.add((configs) => {
+      console.log('[WeaponInventory] Applying authoritative weapon configs from server');
+      this.weapons.forEach((w) => {
+        if (configs[w.name]) {
+          w.updateStats(configs[w.name]);
+        }
+      });
+    });
+
+    // 서버에 최신 무기 정보 요청
+    NetworkManager.getInstance().requestWeaponConfigs();
 
     // 초기 상태 설정
     this.weapons.forEach((w, i) => (i === 0 ? w.show() : w.hide()));

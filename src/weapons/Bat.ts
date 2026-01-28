@@ -16,8 +16,8 @@ import { GameObservables } from '../core/events/GameObservables';
  */
 export class Bat extends MeleeWeapon {
   public name = 'Bat';
-  public damage = 100;
-  public range = 6.0;
+  public damage = 0;
+  public range = 0;
 
   private swingAnimationTimer = 0;
   private isAnimating = false;
