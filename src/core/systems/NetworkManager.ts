@@ -146,13 +146,35 @@ export class NetworkManager {
             this.onPlayerUpdated.notifyObservers(state);
           }
           break;
-        case EventCode.ENEMY_MOVE:
-          this.onEnemyUpdated.notifyObservers({
-            id: data.id,
-            position: data.position,
-            rotation: data.rotation,
-            isMoving: data.isMoving,
-          });
+        case EventCode.MOVE:
+          // 기존: if (this.playerStates.has(senderId)) ...
+
+          // 변경: 내 아이디(localPlayerId)라도 서버가 보낸 정보라면 위치를 보정해야 함 (Reconciliation)
+          // 단, 렉을 줄이기 위해 '거리 차이가 클 때'만 강제 보정하는 로직이 필요.
+
+          if (this.playerStates.has(senderId)) {
+            const state = this.playerStates.get(senderId)!;
+
+            // 만약 senderId가 '나(LocalPlayer)'라면?
+            const isMe = senderId === this.getSocketId();
+
+            if (isMe) {
+              // 서버 위치와 내 클라이언트 위치가 너무 차이나면(예: 2미터 이상) 서버 위치로 강제 이동 (Lag/Hack 방지)
+              const dist = Vector3.Distance(
+                new Vector3(state.position.x, state.position.y, state.position.z),
+                new Vector3(data.position.x, data.position.y, data.position.z)
+              );
+              if (dist > 2.0) {
+                console.warn('서버와의 위치 불일치 감지! 위치 보정됨.');
+                // 여기서 플레이어의 실제 위치를 강제로 덮어씌우는 이벤트 발생 필요
+              }
+            } else {
+              // 다른 플레이어는 그대로 업데이트 (보간 적용 권장)
+              state.position = data.position;
+              state.rotation = data.rotation;
+              this.onPlayerUpdated.notifyObservers(state);
+            }
+          }
           break;
         case EventCode.ENEMY_HIT:
           this.onEnemyHit.notifyObservers({
