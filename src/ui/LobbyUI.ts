@@ -6,7 +6,6 @@ import {
   ScrollViewer,
   Control,
   Button,
-  InputText,
 } from '@babylonjs/gui';
 import { NetworkManager } from '../core/systems/NetworkManager';
 import { UIManager, UIScreen } from './UIManager';
@@ -17,7 +16,6 @@ export class LobbyUI {
   private roomListPanel: StackPanel;
   private networkManager: NetworkManager;
   private uiManager: UIManager;
-  private roomNameInput: InputText | null = null;
 
   // Visual Constants from UIManager (for consistency)
   private readonly PRIMARY_COLOR = '#ffc400';
@@ -100,54 +98,46 @@ export class LobbyUI {
     bottomControls.top = '-40px';
     content.addControl(bottomControls);
 
-    const createBtn = this.createButton('CREATE_SESSION', '200px');
-    createBtn.onPointerUpObservable.add(() => this.onCreateRoom());
-    bottomControls.addControl(createBtn);
-
-    // Room Name Input (Left of Create Button)
-    const input = new InputText();
-    input.width = '200px';
-    input.height = '40px';
-    input.text = 'OPER_ZONE_' + Math.floor(Math.random() * 1000);
-    input.color = 'white';
-    input.background = 'rgba(0, 0, 0, 0.5)';
-    input.focusedBackground = 'rgba(0, 0, 0, 0.8)';
-    input.thickness = 1;
-    input.fontFamily = this.FONT_MONO;
-    input.fontSize = 16;
-    input.placeholderText = 'ENTER ROOM NAME';
-    input.placeholderColor = 'gray';
-    input.onTextChangedObservable.add((input) => {
-      input.text = input.text.toUpperCase().replace(/[^A-Z0-9_]/g, '');
-    });
-    // Add before buttons? No, StackPanel order matters.
-    // Let's allow creating it first or move controls around.
-    // Ideally put it in bottomControls before buttons.
-
     // Create Refresh Button
     const refreshBtn = this.createButton('REFRESH_UI', '150px');
     refreshBtn.paddingLeft = '20px';
     refreshBtn.onPointerUpObservable.add(() => {
-      console.log('[Lobby] Refreshing UI...');
       this.networkManager.refreshRoomList();
       // Also update from cache immediately if available (in case refresh doesn't trigger event)
       this.updateRoomList(this.networkManager.getRoomList());
     });
 
-    // Re-ordering for layout: Input -> Create -> Refresh
-    bottomControls.clearControls();
-    bottomControls.addControl(input);
-
-    // Add Margin
-    const spacer = new Rectangle();
-    spacer.width = '10px';
-    spacer.thickness = 0;
-    bottomControls.addControl(spacer);
-
-    bottomControls.addControl(createBtn);
     bottomControls.addControl(refreshBtn);
 
-    this.roomNameInput = input;
+    // Create Room Button
+    const createBtn = this.createButton('CREATE_SQUAD', '150px');
+    createBtn.paddingLeft = '20px';
+    createBtn.onPointerUpObservable.add(async () => {
+      const playerName = localStorage.getItem('playerName') || 'COMMANDER';
+      const mapId = this.uiManager.getSelectedMap();
+
+      try {
+        // Request Dedicated Server to orchestrate room creation
+        const response = await fetch('http://localhost:3000/create-room', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mapId, playerName }),
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          console.log(`[Lobby] Dedicated Server created room: ${result.roomName}`);
+          // Join the room created by the server
+          this.networkManager.joinRoom(result.roomName);
+        } else {
+          console.error('[Lobby] Failed to request room creation:', result.error);
+        }
+      } catch (error) {
+        console.error('[Lobby] Error connecting to Dedicated Server API:', error);
+        // Fallback or alert user
+      }
+    });
+    bottomControls.addControl(createBtn);
 
     // Return button
     const backBtn = this.createButton('RETURN_TO_BASE', '200px');
@@ -246,14 +236,6 @@ export class LobbyUI {
     stack.addControl(joinBtn);
 
     return rect;
-  }
-
-  private onCreateRoom(): void {
-    const selectedMap = this.uiManager.getSelectedMap();
-    let roomName = this.roomNameInput?.text || `OPER_ZONE_${Math.floor(Math.random() * 10000)}`;
-    if (roomName.length === 0) roomName = `OPER_ZONE_${Math.floor(Math.random() * 10000)}`;
-
-    this.networkManager.createRoom(roomName, { mapId: selectedMap });
   }
 
   private createButton(text: string, width: string): Button {

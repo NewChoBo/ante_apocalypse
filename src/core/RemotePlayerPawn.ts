@@ -295,7 +295,7 @@ export class RemotePlayerPawn extends BasePawn {
 
     // 3. Rotation Interpolation
     // Yaw (Y) for body
-    let targetYaw = this.targetRotation.y;
+    const targetYaw = this.targetRotation.y;
     let diffYaw = targetYaw - this.mesh.rotation.y;
     // Normalize angle difference
     while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;

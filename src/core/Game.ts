@@ -29,8 +29,7 @@ export class Game {
   private uiManager!: UIManager;
 
   private isRunning = false;
-  private isPaused = false;
-  private currentMode: GameMode = 'single';
+  private currentMode: GameMode = 'multi';
   private playerName: string = 'Anonymous';
   private renderFunction: () => void;
 
@@ -40,12 +39,7 @@ export class Game {
       if (scene) {
         if (scene.activeCamera) {
           const deltaTime = this.engine.getDeltaTime() / 1000;
-
-          // Only stop the world tick if in singleplayer mode
-          const shouldTick = !this.isPaused || this.currentMode !== 'single';
-          if (shouldTick) {
-            this.update(deltaTime);
-          }
+          this.update(deltaTime);
         }
         scene.render();
       }
@@ -97,12 +91,7 @@ export class Game {
     // Clear old observers if any (UIManager.initialize already disposes old instance)
     this.uiManager.onLogin.add((name) => {
       this.playerName = name;
-      console.log(`Player logging in as: ${this.playerName}`);
       this.uiManager.showScreen(UIScreen.MAIN_MENU);
-    });
-
-    this.uiManager.onStartSingleplayer.add(() => {
-      this.start('single');
     });
 
     this.uiManager.onStartMultiplayer.add(() => {
@@ -119,29 +108,31 @@ export class Game {
       this.handleNetworkStateChange(state)
     );
 
-    this.uiManager.onResume.add(() => this.resume());
     this.uiManager.onAbort.add(() => this.quitToMenu());
+
+    this.uiManager.onLogout.add(() => {
+      NetworkManager.getInstance().leaveRoom();
+      this.uiManager.showScreen(UIScreen.LOGIN);
+    });
   }
 
   private handleNetworkStateChange(state: NetworkState): void {
     if (state === NetworkState.InRoom && !this.isRunning) {
       console.log('[Game] Joined room, starting multiplayer game...');
-      this.start('multi');
+      this.start();
     }
   }
 
-  public async start(mode: GameMode = 'single'): Promise<void> {
+  public async start(): Promise<void> {
     if (this.isRunning) return;
-    this.currentMode = mode;
+    this.currentMode = 'multi';
 
-    // Use map selected from UI (or synchronized from room if multi)
+    // Use map selected from UI (or synchronized from room)
     let mapKey = this.uiManager.getSelectedMap();
-    if (mode === 'multi') {
-      const syncedMap = NetworkManager.getInstance().getMapId();
-      if (syncedMap) {
-        mapKey = syncedMap;
-        console.log(`[Game] Using synchronized map: ${mapKey}`);
-      }
+    const syncedMap = NetworkManager.getInstance().getMapId();
+    if (syncedMap) {
+      mapKey = syncedMap;
+      console.log(`[Game] Using synchronized map: ${mapKey}`);
     }
     const levelData = LEVELS[mapKey] || LEVELS['training_ground'];
 
@@ -162,7 +153,7 @@ export class Game {
     }
 
     this.sessionController = new SessionController(scene, this.canvas, shadowGenerator);
-    await this.sessionController.initialize(levelData, mode, this.playerName);
+    await this.sessionController.initialize(levelData, this.playerName);
 
     // Ensure the player camera is active
     if (this.sessionController.getPlayerCamera()) {
@@ -171,12 +162,11 @@ export class Game {
 
     // Listen for player death to trigger Game Over
     GameObservables.playerDied.add(() => {
-      if (this.isRunning && !this.isPaused) this.gameOver();
+      if (this.isRunning) this.gameOver();
     });
 
     this.engine.hideLoadingUI();
     this.isRunning = true;
-    this.isPaused = false;
     gameStateStore.set('PLAYING');
 
     this.uiManager.showScreen(UIScreen.NONE);
@@ -188,39 +178,15 @@ export class Game {
     this.engine.runRenderLoop(this.renderFunction);
   }
 
-  private gameOver(): void {
-    this.isPaused = true;
+  public gameOver(): void {
+    this.isRunning = false;
     gameStateStore.set('GAME_OVER');
-    this.uiManager.setGameOverUI(true);
-    this.uiManager.showScreen(UIScreen.PAUSE);
+    // this.uiManager.setGameOverUI(true); // Removed
+    this.uiManager.showScreen(UIScreen.MAIN_MENU);
     this.uiManager.exitPointerLock();
-  }
-
-  public pause(): void {
-    if (!this.isRunning || this.isPaused) return;
-    this.isPaused = true;
-    gameStateStore.set('PAUSED');
-    this.uiManager.setGameOverUI(false);
-    this.uiManager.showScreen(UIScreen.PAUSE);
-    this.uiManager.exitPointerLock();
-    this.sessionController?.setInputBlocked(true);
-  }
-
-  public resume(): void {
-    if (!this.isPaused) return;
-    this.isPaused = false;
-    gameStateStore.set('PLAYING');
-    this.uiManager.showScreen(UIScreen.NONE);
-    this.sessionController?.setInputBlocked(false);
-  }
-
-  public togglePause(): void {
-    if (!this.isRunning) return;
-    this.isPaused ? this.resume() : this.pause();
   }
 
   public quitToMenu(): void {
-    this.isPaused = false;
     this.isRunning = false;
 
     this.uiManager.showScreen(UIScreen.NONE); // Cleanup current

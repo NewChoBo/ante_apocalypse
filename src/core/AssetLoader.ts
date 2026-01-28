@@ -131,7 +131,7 @@ export class AssetLoader {
             volume: 0.6,
           });
           this.sounds.set('swipe', swipeSound);
-        } catch (e) {
+        } catch {
           console.warn(`[AssetLoader][Load#${id}] Non-critical sound "swipe" failed.`);
         }
       }

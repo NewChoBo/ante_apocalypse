@@ -254,7 +254,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     mag.material = material;
 
     // 물리적 효과 시뮬레이션 (간단하게 관성 적용)
-    let velocity = new Vector3(0, -0.05, 0);
+    const velocity = new Vector3(0, -0.05, 0);
     const gravity = -0.01;
     let lifetime = 60; // 약 1초 (60프레임)
 

@@ -44,20 +44,17 @@ export class GlobalInputManager {
 
     if (!this.scene || !this.playerPawn || !this.playerController || !this.inventoryUI) return;
 
-    const isPaused = state === 'PAUSED' || state === 'GAME_OVER';
+    const isGameOver = state === 'GAME_OVER';
 
-    // 1. 디버그용 아이템 스폰 (H: Health, J: Ammo)
-    // 임시로 Game.isRunning 같은 상태를 GlobalInputManager가 알아야 함.
-    // 하지만 일단 기존 로직을 최대한 유지하면서 이동.
-
+    // 1. 아이템 스폰 (H: Health, J: Ammo)
     if (e.code === 'KeyH') {
-      if (!isPaused) {
+      if (!isGameOver) {
         PickupManager.getInstance().spawnPickup(this.playerPawn.mesh.position, 'health_pack');
         console.log('[DEBUG] Spawned Health Pickup');
       }
     }
     if (e.code === 'KeyJ') {
-      if (!isPaused) {
+      if (!isGameOver) {
         PickupManager.getInstance().spawnPickup(this.playerPawn.mesh.position, 'ammo_box');
         console.log('[DEBUG] Spawned Ammo Pickup');
       }
@@ -76,7 +73,7 @@ export class GlobalInputManager {
 
     // 3. 인벤토리 토글 (Tab)
     if (e.code === 'Tab') {
-      if (isPaused) return;
+      if (isGameOver) return;
       e.preventDefault();
       const isOpen = this.inventoryUI.toggle();
       this.playerController.setInputBlocked(isOpen);

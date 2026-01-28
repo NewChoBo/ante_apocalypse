@@ -129,23 +129,6 @@ export class PhotonProvider implements INetworkProvider {
     this.client.disconnect();
   }
 
-  public async createRoom(options: {
-    roomName?: string;
-    mapId: string;
-    maxPlayers: number;
-  }): Promise<boolean> {
-    const roomName = options.roomName || `${this.client.myActor().name}'s Room`;
-    const roomOptions: any = {
-      isVisible: true,
-      isOpen: true,
-      maxPlayers: options.maxPlayers || 4,
-      customGameProperties: { mapId: options.mapId || 'training_ground' },
-      propsListedInLobby: ['mapId'],
-    };
-
-    return this.client.createRoom(roomName, roomOptions);
-  }
-
   public async joinRoom(roomId: string): Promise<boolean> {
     return this.client.joinRoom(roomId);
   }

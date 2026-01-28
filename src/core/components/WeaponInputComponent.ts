@@ -40,13 +40,14 @@ export class WeaponInputComponent {
       case 'Digit4':
         this.inventory.switchWeaponBySlot(3);
         break;
-      case 'KeyR':
+      case 'KeyR': {
         const weapon = this.inventory.currentWeapon;
         const firearm = weapon as any;
         if (firearm.reload && typeof firearm.reload === 'function') {
           firearm.reload();
         }
         break;
+      }
     }
   };
 

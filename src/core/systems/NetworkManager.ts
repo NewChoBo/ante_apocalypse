@@ -1,37 +1,15 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { INetworkProvider } from '../network/INetworkProvider';
 import { PhotonProvider } from '../network/providers/PhotonProvider';
-import { RoomInfo, NetworkState, EventCode } from '../network/NetworkProtocol';
-
-export interface PlayerState {
-  id: string;
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-  weaponId: string;
-  name: string;
-  health: number;
-}
-
-export interface FireEventData {
-  playerId: string;
-  weaponId: string;
-  muzzleTransform?: {
-    position: { x: number; y: number; z: number };
-    direction: { x: number; y: number; z: number };
-  };
-}
-
-export interface HitEventData {
-  playerId: string;
-  damage: number;
-  newHealth: number;
-  attackerId: string;
-}
-
-export interface DeathEventData {
-  playerId: string;
-  attackerId: string;
-}
+import {
+  RoomInfo,
+  NetworkState,
+  EventCode,
+  PlayerState,
+  FireEventData,
+  HitEventData,
+  DeathEventData,
+} from '../network/NetworkProtocol';
 
 export class NetworkManager {
   private static instance: NetworkManager;
@@ -243,14 +221,6 @@ export class NetworkManager {
 
     this.provider.connect(userId).catch((e) => {
       console.error('[NetworkManager] Connect failed:', e);
-    });
-  }
-
-  public async createRoom(name: string, options?: { mapId: string }): Promise<boolean> {
-    return this.provider.createRoom({
-      roomName: name,
-      mapId: options?.mapId || 'training_ground',
-      maxPlayers: 4,
     });
   }
 

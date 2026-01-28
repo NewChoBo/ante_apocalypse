@@ -17,7 +17,6 @@ export enum UIScreen {
   LOGIN = 'LOGIN',
   MAIN_MENU = 'MAIN_MENU',
   LOBBY = 'LOBBY',
-  PAUSE = 'PAUSE',
   NONE = 'NONE',
 }
 
@@ -38,7 +37,6 @@ export class UIManager {
 
   // Observables for Menu Actions
   public onLogin = new Observable<string>();
-  public onStartSingleplayer = new Observable<void>();
   public onStartMultiplayer = new Observable<void>();
   public onLogout = new Observable<void>();
   public onResume = new Observable<void>();
@@ -77,7 +75,6 @@ export class UIManager {
     this.screens.set(UIScreen.LOGIN, this.createLoginScreen());
     this.screens.set(UIScreen.MAIN_MENU, this.createMainMenuScreen());
     this.screens.set(UIScreen.LOBBY, this.createLobbyScreen());
-    this.screens.set(UIScreen.PAUSE, this.createPauseScreen());
 
     // Hide all initially
     this.screens.forEach((s) => (s.isVisible = false));
@@ -197,11 +194,9 @@ export class UIManager {
     logoSmall.paddingBottom = '40px';
     stack.addControl(logoSmall);
 
-    const singleBtn = this.createMenuButton('SINGLE_OP.EXE', 'LOCAL_SIMULATION');
-    singleBtn.onPointerUpObservable.add(() => this.onStartSingleplayer.notifyObservers());
-    stack.addControl(singleBtn);
+    /* [REMOVED] Singleplayer Button */
 
-    const multiBtn = this.createMenuButton('JOINT_OP.EXE', 'NETWORK_COORDINATED');
+    const multiBtn = this.createMenuButton('DEPLOY_OP.EXE', 'ESTABLISH_UPLINK');
     multiBtn.onPointerUpObservable.add(() => this.onStartMultiplayer.notifyObservers());
     stack.addControl(multiBtn);
 
@@ -271,40 +266,6 @@ export class UIManager {
     this.lobbyUI = new LobbyUI(this);
     const container = this.lobbyUI.getContainer();
     this.ui.addControl(container);
-    return container;
-  }
-
-  private createPauseScreen(): Container {
-    const container = new Rectangle('pause-container');
-    container.width = '100%';
-    container.height = '100%';
-    container.background = 'rgba(0, 0, 0, 0.8)';
-    container.thickness = 0;
-    this.ui.addControl(container);
-
-    const stack = new StackPanel();
-    stack.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-    container.addControl(stack);
-
-    const title = new TextBlock('pause-title');
-    title.text = 'PAUSED';
-    title.color = 'white';
-    title.fontSize = 60;
-    title.fontFamily = this.FONT_TACTICAL;
-    title.height = '100px';
-    stack.addControl(title);
-
-    const resumeBtn = this.createTacticalButton('RESUME', '250px', '55px');
-    resumeBtn.name = 'resume-button';
-    resumeBtn.onPointerUpObservable.add(() => this.onResume.notifyObservers());
-    stack.addControl(resumeBtn);
-
-    const abortBtn = this.createTacticalButton('QUIT TO MENU', '250px', '55px');
-    abortBtn.color = '#ff4d4d';
-    abortBtn.paddingTop = '20px';
-    abortBtn.onPointerUpObservable.add(() => this.onAbort.notifyObservers());
-    stack.addControl(abortBtn);
-
     return container;
   }
 
@@ -379,25 +340,6 @@ export class UIManager {
     });
 
     return btn;
-  }
-
-  public setGameOverUI(isGameOver: boolean): void {
-    const pauseContainer = this.screens.get(UIScreen.PAUSE);
-    if (!pauseContainer) return;
-
-    const title = pauseContainer
-      .getDescendants()
-      .find((d) => d.name === 'pause-title') as TextBlock;
-    if (title) {
-      title.text = isGameOver ? 'MISSION_FAILED' : 'PAUSED';
-    }
-
-    const resumeBtn = pauseContainer
-      .getDescendants()
-      .find((d) => d.name === 'resume-button') as Control;
-    if (resumeBtn) {
-      resumeBtn.isVisible = !isGameOver;
-    }
   }
 
   public requestPointerLock(): void {

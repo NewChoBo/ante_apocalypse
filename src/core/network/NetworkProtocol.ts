@@ -22,18 +22,48 @@ export enum EventCode {
 }
 
 export interface RoomInfo {
-  id: string; // Changed from name to id for consistency
-  name: string; // Added for UI compatibility
-  maxPlayers: number;
+  id: string; // Photon Room Name
+  name: string;
   playerCount: number;
-  customProperties?: any;
+  maxPlayers: number;
   isOpen: boolean;
+  customProperties?: any;
 }
 
 export interface PlayerInfo {
   userId: string;
+  name: string;
   isMaster: boolean;
-  name?: string; // Added optional name
+}
+
+export interface PlayerState {
+  id: string;
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  weaponId: string;
+  name: string;
+  health: number;
+}
+
+export interface FireEventData {
+  playerId: string;
+  weaponId: string;
+  muzzleTransform?: {
+    position: { x: number; y: number; z: number };
+    direction: { x: number; y: number; z: number };
+  };
+}
+
+export interface HitEventData {
+  playerId: string;
+  damage: number;
+  newHealth: number;
+  attackerId: string;
+}
+
+export interface DeathEventData {
+  playerId: string;
+  attackerId: string;
 }
 
 export enum NetworkState {

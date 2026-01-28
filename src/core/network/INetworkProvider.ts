@@ -4,7 +4,7 @@ export interface INetworkProvider {
   // Methods
   connect(userId: string): Promise<boolean>;
   disconnect(): void;
-  createRoom(options: { roomName?: string; mapId: string; maxPlayers: number }): Promise<boolean>;
+
   joinRoom(roomId: string): Promise<boolean>;
   getRoomList(): Promise<RoomInfo[]>;
   sendEvent(code: number, data: any, reliable: boolean): void;

@@ -17,7 +17,6 @@ import { EventCode } from '../network/NetworkProtocol';
 import { GameObservables } from '../events/GameObservables';
 import { AssetLoader } from '../AssetLoader';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
-import { GameMode } from '../../types/GameMode';
 
 export class SessionController {
   private scene: Scene;
@@ -39,11 +38,7 @@ export class SessionController {
     this.shadowGenerator = shadowGenerator;
   }
 
-  public async initialize(
-    levelData: LevelData,
-    mode: GameMode = 'single',
-    playerName: string = 'Anonymous'
-  ): Promise<void> {
+  public async initialize(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
     this.playerPawn = new PlayerPawn(this.scene);
     WorldEntityManager.getInstance().registerEntity(this.playerPawn);
 
@@ -63,9 +58,8 @@ export class SessionController {
     this.setupInventory();
     this.setupInput();
 
-    if (mode === 'multi') {
-      this.setupMultiplayer(playerName);
-    }
+    // Always setup multiplayer in dedicated server architecture
+    this.setupMultiplayer(playerName);
   }
 
   private setupSystems(levelData: LevelData): void {
@@ -173,30 +167,9 @@ export class SessionController {
     );
 
     // Initial State Sync Logic
-    network.onInitialStateRequested.add(() => {
-      if (network.isMasterClient()) {
-        console.log('[Session] Providing initial state to new player');
-        const enemyStates = this.enemyManager?.getEnemyStates() || [];
-        // Extract player states from NetworkManager
-        const playerStates = network.getAllPlayerStates();
-
-        // Get non-pawn entities (targets) from WorldEntityManager
-        const targetStates = WorldEntityManager.getInstance()
-          .getEntitiesByType('static_target', 'moving_target', 'humanoid_target')
-          .map((t) => ({
-            id: t.id,
-            type: t.type,
-            position: { x: t.position.x, y: t.position.y, z: t.position.z },
-            isMoving: (t as any).isMoving || false,
-          }));
-
-        network.sendEvent(EventCode.INITIAL_STATE, {
-          players: playerStates,
-          enemies: enemyStates,
-          targets: targetStates,
-        });
-      }
-    });
+    // [Client Side] Always request state, never provide it (Server Authority)
+    console.log('[Session] Requesting initial state from Server...');
+    network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
 
     network.onInitialStateReceived.add((data) => {
       console.log('[Session] Received initial state sync');
@@ -218,10 +191,7 @@ export class SessionController {
       }
     });
 
-    if (!network.isMasterClient()) {
-      console.log('[Session] Requesting initial state from Master Client...');
-      network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
-    }
+    // Request logic moved up
   }
 
   private syncInventoryStore(): void {
