@@ -86,13 +86,6 @@ export class SessionController {
     this.healthUnsub = playerHealthStore.subscribe((health) => {
       if (health <= 0) {
         GameObservables.playerDied.notifyObservers(null);
-        if (this.multiplayerSystem) {
-          const nm = NetworkManager.getInstance();
-          nm.sendEvent(EventCode.PLAYER_DEATH, {
-            playerId: nm.getSocketId(),
-            attackerId: 'unknown',
-          });
-        }
       }
     });
 

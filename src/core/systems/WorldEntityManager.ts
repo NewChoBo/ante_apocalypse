@@ -32,12 +32,12 @@ export class WorldEntityManager {
   private setupNetworkListeners(): void {
     // 1. 타겟 피격 동기화
     this.networkManager.onTargetHit.add((data) => {
-      this.processHit(data.targetId, data.damage, data.part, false);
+      this.processHit(data.targetId, data.damage, data.part);
     });
 
     // 2. 적 피격 동기화
     this.networkManager.onEnemyHit.add((data) => {
-      this.processHit(data.id, data.damage, 'body', false);
+      this.processHit(data.id, data.damage, 'body');
     });
 
     // 3. 엔티티 파괴 동기화
@@ -97,13 +97,7 @@ export class WorldEntityManager {
   }
 
   /** 엔티티 피격 처리 (중앙 집중식) */
-  public processHit(
-    id: string,
-    damage: number,
-    part: string = 'body',
-    broadcast: boolean = true,
-    hitPoint?: Vector3
-  ): void {
+  public processHit(id: string, damage: number, part: string = 'body', hitPoint?: Vector3): void {
     const entity = this.entities.get(id);
     if (!entity || entity.isDead) return;
 
@@ -115,39 +109,15 @@ export class WorldEntityManager {
       finalDamage = damage * multiplier;
     }
 
+    // [수정] 클라이언트는 더 이상 직접 히트를 방송하지 않습니다.
+    // 서버가 FIRE 이벤트를 보고 직접 Raycast 판정을 내려 HIT을 방송하기 때문입니다.
+    // 여기서는 로컬 피격 연출(VFX, UI)만 수행합니다.
     entity.takeDamage(finalDamage, 'source', part, hitPoint);
     this.onEntityHit.notifyObservers({ id, part, damage: finalDamage });
 
-    if (broadcast) {
-      this.broadcastHit(entity, finalDamage, part);
-    }
-
     // 사망 시 처리
     if (entity.isDead) {
-      console.log(`[WorldEntityManager] Entity is dead after hit: ${id}, broadcast: ${broadcast}`);
-      if (broadcast || (entity.type === 'enemy' && this.networkManager.isMasterClient())) {
-        this.broadcastDestroy(entity);
-      }
       this.removeEntity(id);
-    }
-  }
-
-  private broadcastHit(entity: IWorldEntity, damage: number, part: string): void {
-    if (entity.type === 'enemy') {
-      this.networkManager.sendEvent(EventCode.ENEMY_HIT, { id: entity.id, damage });
-    } else if (entity.type === 'remote_player') {
-      this.networkManager.hit({ targetId: entity.id, damage });
-    } else {
-      // General target (StaticTarget, MovingTarget, HumanoidTarget)
-      this.networkManager.sendEvent(EventCode.TARGET_HIT, { targetId: entity.id, part, damage });
-    }
-  }
-
-  private broadcastDestroy(entity: IWorldEntity): void {
-    if (entity.type === 'enemy' && this.networkManager.isMasterClient()) {
-      this.networkManager.sendEvent(EventCode.DESTROY_ENEMY, { id: entity.id });
-    } else if (entity.type.includes('target')) {
-      this.networkManager.sendEvent(EventCode.TARGET_DESTROY, { targetId: entity.id });
     }
   }
 

@@ -5,6 +5,7 @@ import { RemotePlayerPawn } from '../RemotePlayerPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { CombatComponent } from '../components/CombatComponent';
 import { WorldEntityManager } from './WorldEntityManager';
+import { playerHealthStore } from '../store/GameStore';
 
 export class MultiplayerSystem {
   private scene: Scene;
@@ -41,16 +42,25 @@ export class MultiplayerSystem {
     });
   }
 
-  public applyPlayerStates(states: any[]): void {
-    console.log(`[Multiplayer] Applying ${states.length} player states from sync`);
+  public applyPlayerStates(states: PlayerState[]): void {
     states.forEach((p) => {
       if (p.id !== this.networkManager.getSocketId()) {
         const remote = this.remotePlayers.get(p.id);
         if (remote) {
           remote.updateNetworkState(p.position, p.rotation);
           if (p.weaponId) remote.updateWeapon(p.weaponId);
+          if (p.health !== undefined) remote.updateHealth(p.health);
         } else {
           this.spawnRemotePlayer(p);
+        }
+      } else {
+        // [Authoritative Local Player Health Sync]
+        if (p.health !== undefined && p.health !== this.localPlayer.health) {
+          this.localPlayer.health = p.health;
+          playerHealthStore.set(p.health);
+          if (p.health <= 0 && !this.localPlayer.isDead) {
+            this.localPlayer.die();
+          }
         }
       }
     });
@@ -91,23 +101,28 @@ export class MultiplayerSystem {
     });
 
     this.networkManager.onPlayerHit.add((data) => {
+      // 서버로부터 받은 '확정된 체력(newHealth)'을 우선적으로 사용
       if (data.playerId === this.networkManager.getSocketId()) {
-        // Local player hit
-        this.localPlayer.takeDamage(data.damage);
+        // Local player update
+        this.localPlayer.health = data.newHealth;
+        playerHealthStore.set(data.newHealth);
+        if (data.newHealth <= 0) this.localPlayer.die();
       } else {
         const remote = this.remotePlayers.get(data.playerId);
         if (remote) {
-          remote.takeDamage(data.damage);
+          remote.updateHealth(data.newHealth);
         }
       }
     });
 
     this.networkManager.onPlayerDied.add((data) => {
-      // If it's me, localPlayer.die() is already called by SessionController logic (health <= 0)
-      // If it's remote:
-      const remote = this.remotePlayers.get(data.playerId);
-      if (remote) {
-        remote.die();
+      if (data.playerId === this.networkManager.getSocketId()) {
+        this.localPlayer.die();
+      } else {
+        const remote = this.remotePlayers.get(data.playerId);
+        if (remote) {
+          remote.die();
+        }
       }
     });
   }

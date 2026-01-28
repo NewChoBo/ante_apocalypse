@@ -324,10 +324,6 @@ export class NetworkManager {
     this.provider.sendEvent(code, data, reliable);
   }
 
-  public hit(hitData: { targetId: string; damage: number }): void {
-    this.provider.sendEvent(EventCode.HIT, hitData, true);
-  }
-
   public getSocketId(): string | undefined {
     return this.provider.getLocalPlayerId() || undefined;
   }
