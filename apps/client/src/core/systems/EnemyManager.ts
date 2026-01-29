@@ -167,7 +167,7 @@ export class EnemyManager {
         enemy.mesh.rotation.set(state.rotation.x, state.rotation.y, state.rotation.z);
         enemy.updateHealthBar(state.health);
         if (state.isDead && !enemy.isDead) {
-          this.worldManager.processHit(state.id, 10000, 'body', false);
+          this.worldManager.processHit(state.id, 10000, 'body');
         }
       } else if (!state.isDead) {
         const pos = new Vector3(state.position.x, state.position.y, state.position.z);
