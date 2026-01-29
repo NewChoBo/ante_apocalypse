@@ -74,10 +74,8 @@ export class Pistol extends Firearm {
       // 3. 카메라에 부착 및 위치 잡기
       this.weaponMesh.parent = this.camera;
 
-      // 위치: 화면 오른쪽 아래 (고정값 사용)
-      // 회전: Y축 180도 (보통 GLB는 -Z가 정면이므로)
-      this.weaponMesh.position = new Vector3(0.2, -0.15, 0.4);
-      this.weaponMesh.rotation = new Vector3(0, Math.PI, 0);
+      // 위치: 화면 오른쪽 아래
+      this.weaponMesh.position = new Vector3(0.35, -0.25, 0.2);
 
       // 초기 가시성 설정 (현재 활성화 상태 따름)
       this.weaponMesh.setEnabled(this.isActive);

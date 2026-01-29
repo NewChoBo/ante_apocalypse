@@ -78,9 +78,9 @@ export class Rifle extends Firearm {
       // 3. 카메라에 부착 및 위치 잡기
       this.weaponMesh.parent = this.camera;
 
-      // 위치: 화면 오른쪽 아래 (소총은 좀 더 앞으로)
-      this.weaponMesh.position = new Vector3(0.25, -0.25, 0.6);
-      this.weaponMesh.rotation = new Vector3(0, Math.PI, 0);
+      // 위치: 화면 오른쪽 아래
+      this.weaponMesh.position = new Vector3(0.4, -0.35, 0.35); // 우측 하단 구석 배치 (X: 0.4, Y: -0.35, Z: 0.35)
+      this.weaponMesh.rotation = new Vector3(0, 0, 0); // 180도 회전 제거 (앞뒤 반전 해결)
 
       // 초기 가시성 설정
       this.weaponMesh.setEnabled(this.isActive);
@@ -122,7 +122,7 @@ export class Rifle extends Firearm {
       // 실패 시 폴백
       this.weaponMesh = MeshBuilder.CreateBox('rifle_fallback', { size: 0.1 }, this.scene);
       this.weaponMesh.parent = this.camera;
-      this.weaponMesh.position = new Vector3(0.35, -0.25, 0.45);
+      this.weaponMesh.position = new Vector3(0.4, -0.35, 0.35);
     }
   }
 
