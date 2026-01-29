@@ -41,8 +41,6 @@ export class NetworkManager {
     weaponConfigs?: Record<string, any>;
   }>();
 
-  public onWeaponConfigsReceived = new Observable<Record<string, any>>();
-
   // New Observables for Lobby/State
   public onRoomListUpdated = new Observable<RoomInfo[]>();
   public onStateChanged = new Observable<NetworkState>();
@@ -134,9 +132,6 @@ export class NetworkManager {
             attackerId: senderId,
           });
           break;
-        case EventCode.WEAPON_CONFIGS:
-          this.onWeaponConfigsReceived.notifyObservers(data);
-          break;
         case EventCode.SYNC_WEAPON:
           if (this.playerStates.has(senderId)) {
             const state = this.playerStates.get(senderId)!;
@@ -227,9 +222,6 @@ export class NetworkManager {
             weaponConfigs: data.weaponConfigs,
           });
 
-          if (data.weaponConfigs) {
-            this.onWeaponConfigsReceived.notifyObservers(data.weaponConfigs);
-          }
           break;
       }
     };
@@ -321,10 +313,6 @@ export class NetworkManager {
 
   public syncWeapon(weaponId: string): void {
     this.provider.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
-  }
-
-  public requestWeaponConfigs(): void {
-    this.provider.sendEvent(EventCode.REQ_WEAPON_CONFIGS, {}, true);
   }
 
   public sendEvent(code: number, data: any, reliable: boolean = true): void {

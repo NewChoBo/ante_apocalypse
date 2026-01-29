@@ -4,7 +4,7 @@ import { BaseComponent } from './components/BaseComponent';
 import { ITickable } from './interfaces/ITickable';
 import { TickManager } from './TickManager';
 import { IDestructible } from './interfaces/IDestructible';
-import { IWorldEntity, DamageProfile } from '../types/IWorldEntity';
+import { IWorldEntity, DamageProfile } from '@ante/game-core';
 
 /**
  * 모든 Pawn의 공통 기능을 담은 추상 클래스.

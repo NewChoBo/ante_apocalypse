@@ -1,12 +1,11 @@
 import { Mesh, Vector3, Scene } from '@babylonjs/core';
-import { ITarget } from '../types/ITarget.ts';
-import { IWorldEntity, DamageProfile } from '../types/IWorldEntity';
+import { IWorldEntity, DamageProfile } from '@ante/game-core';
 
 /**
  * 모든 타겟의 공통 추상 클래스.
  * 체력 관리 및 기본 물리 상호작용을 담당합니다.
  */
-export abstract class BaseTarget implements ITarget, IWorldEntity {
+export abstract class BaseTarget implements IWorldEntity {
   public abstract id: string;
   public abstract mesh: Mesh;
   public abstract type: string; // Added to satisfy ITarget

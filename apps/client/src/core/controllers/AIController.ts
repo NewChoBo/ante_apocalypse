@@ -2,7 +2,7 @@ import { BaseController } from './BaseController';
 import { EnemyPawn } from '../EnemyPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { NetworkManager } from '../systems/NetworkManager';
-import { EventCode } from '@ante/common';
+import { EventCode, WeaponRegistry } from '@ante/common';
 import { Vector3 } from '@babylonjs/core';
 
 export class AIController extends BaseController {
@@ -24,13 +24,11 @@ export class AIController extends BaseController {
     this.possess(pawn);
     this.targetPlayer = target;
 
-    // [Authoritative Stats Sync]
-    NetworkManager.getInstance().onWeaponConfigsReceived.add((configs) => {
-      if (configs['Enemy_Melee']) {
-        this.damage = configs['Enemy_Melee'].damage;
-        console.log(`[AIController] Damage updated to ${this.damage} from server`);
-      }
-    });
+    // [Authoritative Stats Sync] - Direct from monorepo config
+    if (WeaponRegistry['Enemy_Melee']) {
+      this.damage = WeaponRegistry['Enemy_Melee'].damage;
+      console.log(`[AIController] Damage set to ${this.damage} from shared registry`);
+    }
   }
 
   protected onPossess(pawn: any): void {

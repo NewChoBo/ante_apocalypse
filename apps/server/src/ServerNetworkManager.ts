@@ -1,6 +1,5 @@
 import Photon from 'photon-realtime';
 import { EventCode, PlayerState } from '@ante/common';
-import { WeaponRegistry } from './core/configs/WeaponConfig.ts';
 
 export class ServerNetworkManager {
   private client: any;
@@ -98,9 +97,6 @@ export class ServerNetworkManager {
 
   private handleEvent(code: number, data: any, senderId: string): void {
     switch (code) {
-      case EventCode.REQ_WEAPON_CONFIGS:
-        this.sendWeaponConfigs(senderId);
-        break;
       case EventCode.REQ_INITIAL_STATE:
         this.sendInitialState(senderId);
         break;
@@ -151,12 +147,6 @@ export class ServerNetworkManager {
     }
   }
 
-  public sendWeaponConfigs(targetId: string): void {
-    this.client.raiseEvent(EventCode.WEAPON_CONFIGS, WeaponRegistry, {
-      targetActors: [parseInt(targetId)],
-    });
-  }
-
   private sendInitialState(targetId: string): void {
     console.log(`[ServerNetwork] Sending Initial State to ${targetId}`);
     const playerParams: any[] = [];
@@ -170,7 +160,6 @@ export class ServerNetworkManager {
         players: playerParams,
         enemies: enemyStates,
         targets: targetStates,
-        weaponConfigs: WeaponRegistry,
       },
       { targetActors: [parseInt(targetId)] }
     );

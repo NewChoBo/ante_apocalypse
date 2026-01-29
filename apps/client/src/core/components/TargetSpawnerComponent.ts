@@ -5,7 +5,7 @@ import { HumanoidTarget } from '../../targets/HumanoidTarget';
 import { NetworkManager } from '../systems/NetworkManager';
 import { EventCode } from '@ante/common';
 import { WorldEntityManager } from '../systems/WorldEntityManager';
-import { IWorldEntity } from '../../types/IWorldEntity';
+import { IWorldEntity } from '@ante/game-core';
 
 /**
  * 타겟의 스폰 및 리스폰 로직을 담당하는 컴포넌트.

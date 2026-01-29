@@ -1,2 +1,1 @@
-// @ante/game-core placeholder
-export {};
+export * from './types/IWorldEntity.js';

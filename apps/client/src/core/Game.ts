@@ -9,9 +9,8 @@ import { PickupManager } from './systems/PickupManager';
 import { UIManager, UIScreen } from '../ui/UIManager';
 import { SceneManager } from './systems/SceneManager';
 import { SessionController } from './systems/SessionController';
-import { GameMode } from '../types/GameMode';
+import { GameMode, NetworkState } from '@ante/common';
 import { NetworkManager } from './systems/NetworkManager';
-import { NetworkState } from '@ante/common';
 
 import trainingGroundData from '../assets/levels/training_ground.json';
 import combatZoneData from '../assets/levels/combat_zone.json';

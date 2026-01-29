@@ -1,5 +1,5 @@
 import { Observable, Vector3 } from '@babylonjs/core';
-import { IWorldEntity } from '../../types/IWorldEntity';
+import { IWorldEntity } from '@ante/game-core';
 import { NetworkManager } from './NetworkManager';
 import { EventCode } from '@ante/common';
 
