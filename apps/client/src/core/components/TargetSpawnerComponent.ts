@@ -3,7 +3,6 @@ import { StaticTarget } from '../../targets/StaticTarget';
 import { MovingTarget } from '../../targets/MovingTarget';
 import { HumanoidTarget } from '../../targets/HumanoidTarget';
 import { NetworkManager } from '../systems/NetworkManager';
-import { EventCode } from '@ante/common';
 import { WorldEntityManager } from '../systems/WorldEntityManager';
 import { IWorldEntity } from '@ante/game-core';
 
@@ -13,9 +12,7 @@ import { IWorldEntity } from '@ante/game-core';
 export class TargetSpawnerComponent {
   private scene: Scene;
   private shadowGenerator: ShadowGenerator;
-  private targetIdCounter = 0;
   private worldManager: WorldEntityManager;
-  private respawnTimeout: any;
   private networkManager: NetworkManager;
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
@@ -29,23 +26,8 @@ export class TargetSpawnerComponent {
     });
 
     this.networkManager.onTargetDestroy.add(() => {
-      this.scheduleRespawn();
+      // Respawn logic is now handled by the authority (server/simulation)
     });
-  }
-
-  /** 초기 타겟 자동 스폰 */
-  public spawnInitialTargets(): void {
-    if (!this.networkManager.isMasterClient()) return;
-
-    const distances = [10, 15, 20];
-
-    for (let lane = 0; lane < 5; lane++) {
-      const x = (lane - 2) * 7;
-      distances.forEach((z) => {
-        const isMoving = Math.random() > 0.5;
-        this.spawnTarget(new Vector3(x, 1.0, z), isMoving);
-      });
-    }
   }
 
   /** 개별 타겟 스폰 */
@@ -53,21 +35,7 @@ export class TargetSpawnerComponent {
     if (this.scene.isDisposed) return '';
 
     if (!id) {
-      if (!this.networkManager.isMasterClient()) return '';
-      id = `target_${++this.targetIdCounter}_${Math.random().toString(36).substr(2, 4)}`;
-
-      if (!type) {
-        const randomType = Math.random();
-        if (randomType > 0.6) type = 'humanoid_target';
-        else type = isMoving ? 'moving_target' : 'static_target';
-      }
-
-      this.networkManager.sendEvent(EventCode.SPAWN_TARGET, {
-        type,
-        position: { x: position.x, y: position.y, z: position.z },
-        id,
-        isMoving,
-      });
+      return '';
     }
 
     if (!type) type = isMoving ? 'moving_target' : 'static_target';
@@ -92,23 +60,5 @@ export class TargetSpawnerComponent {
     return id!;
   }
 
-  /** 일정 시간 후 리스폰 예약 */
-  public scheduleRespawn(delayMs: number = 1500): void {
-    if (!this.networkManager.isMasterClient()) return;
-
-    this.respawnTimeout = setTimeout(() => {
-      if (this.scene.isDisposed) return;
-      const lane = Math.floor(Math.random() * 5);
-      const x = (lane - 2) * 7;
-      const z = 10 + Math.random() * 12;
-      const isMoving = Math.random() > 0.4;
-      this.spawnTarget(new Vector3(x, 1.0, z), isMoving);
-    }, delayMs);
-  }
-
-  public dispose(): void {
-    if (this.respawnTimeout) {
-      clearTimeout(this.respawnTimeout);
-    }
-  }
+  public dispose(): void {}
 }

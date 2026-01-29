@@ -1,6 +1,7 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { INetworkProvider } from '../network/INetworkProvider';
 import { PhotonProvider } from '../network/providers/PhotonProvider';
+import { INetworkAuthority } from '@ante/game-core';
 import {
   RoomInfo,
   NetworkState,
@@ -11,7 +12,7 @@ import {
   DeathEventData,
 } from '@ante/common';
 
-export class NetworkManager {
+export class NetworkManager implements INetworkAuthority {
   private static instance: NetworkManager;
   private provider: INetworkProvider;
 

@@ -50,7 +50,7 @@ export class PickupManager implements ITickable {
   private handleSpawnEvent(data: any): void {
     if (this.pickups.has(data.id)) return;
     const pos = new Vector3(data.position.x, data.position.y, data.position.z);
-    this.spawnPickup(pos, data.type, data.id, false); // False = don't broadcast
+    this.spawnPickup(pos, data.type, data.id); // Broadcast parameter removed
   }
 
   private handleDestroyEvent(data: any): void {
@@ -61,46 +61,13 @@ export class PickupManager implements ITickable {
     }
   }
 
-  public spawnPickup(
-    position: Vector3,
-    type: PickupType,
-    id?: string,
-    broadcast: boolean = true
-  ): void {
+  public spawnPickup(position: Vector3, type: PickupType, id: string): void {
     if (!this.scene) return;
 
-    // ID generation if not provided (Master origin)
-    const pickupId = id || `pickup_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-
     const pickup = new PickupActor(this.scene, position, type);
-    // Attach ID to pickup for Lookup? Or just use Map.
-    // We need to know ID when collecting.
-    (pickup as any).networkId = pickupId;
+    (pickup as any).networkId = id;
 
-    this.pickups.set(pickupId, pickup);
-
-    if (broadcast && this.networkManager.isMasterClient()) {
-      // Only Master broadcasts spawns ideally, but if we allow local spawn...
-      // Plan: Only Master logic calls this without ID.
-      if (this.networkManager.isMasterClient()) {
-        this.networkManager.sendEvent(EventCode.SPAWN_PICKUP, {
-          id: pickupId,
-          type,
-          position: { x: position.x, y: position.y, z: position.z },
-        });
-      }
-    }
-  }
-
-  public spawnRandomPickup(position: Vector3): void {
-    // Only Master decides spawning drops
-    if (!this.networkManager.isMasterClient()) return;
-
-    // 40% chance to spawn an item
-    if (Math.random() > 0.4) return;
-
-    const type: PickupType = Math.random() > 0.5 ? 'health_pack' : 'ammo_box';
-    this.spawnPickup(position, type);
+    this.pickups.set(id, pickup);
   }
 
   public tick(deltaTime: number): void {
@@ -165,7 +132,8 @@ export class PickupManager implements ITickable {
         position: pickup.mesh.getAbsolutePosition(),
       });
 
-      // Notify others
+      // Visual collection happens locally,
+      // but authority drives state change.
       this.networkManager.sendEvent(EventCode.DESTROY_PICKUP, { id });
 
       pickup.collect();

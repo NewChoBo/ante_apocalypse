@@ -1,7 +1,8 @@
 import Photon from 'photon-realtime';
 import { EventCode, PlayerState } from '@ante/common';
+import { INetworkAuthority } from '@ante/game-core';
 
-export class ServerNetworkManager {
+export class ServerNetworkManager implements INetworkAuthority {
   private client: any;
   private appId: string = process.env.VITE_PHOTON_APP_ID || '';
   private appVersion: string = process.env.VITE_PHOTON_APP_VERSION || '1.0.0';
@@ -19,6 +20,20 @@ export class ServerNetworkManager {
 
   public getPlayerState(id: string): PlayerState | undefined {
     return this.playerStates.get(id);
+  }
+
+  public isMasterClient(): boolean {
+    return true; // The server is always the authority
+  }
+
+  public getSocketId(): string | undefined {
+    return 'server';
+  }
+
+  public sendEvent(code: number, data: any, _reliable: boolean = true): void {
+    this.client.raiseEvent(code, data, {
+      receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
+    });
   }
 
   constructor() {

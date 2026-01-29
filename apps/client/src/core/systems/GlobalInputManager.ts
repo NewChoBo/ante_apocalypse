@@ -1,5 +1,4 @@
 import { Scene } from '@babylonjs/core';
-import { PickupManager } from './PickupManager';
 import { PlayerPawn } from '../PlayerPawn';
 import { PlayerController } from '../controllers/PlayerController';
 import { InventoryUI } from '../../ui/inventory/InventoryUI';
@@ -46,20 +45,6 @@ export class GlobalInputManager {
     if (!this.scene || !this.playerPawn || !this.playerController || !this.inventoryUI) return;
 
     const isGameOver = state === 'GAME_OVER';
-
-    // 1. 아이템 스폰 (H: Health, J: Ammo)
-    if (e.code === 'KeyH') {
-      if (!isGameOver) {
-        PickupManager.getInstance().spawnPickup(this.playerPawn.mesh.position, 'health_pack');
-        console.log('[DEBUG] Spawned Health Pickup');
-      }
-    }
-    if (e.code === 'KeyJ') {
-      if (!isGameOver) {
-        PickupManager.getInstance().spawnPickup(this.playerPawn.mesh.position, 'ammo_box');
-        console.log('[DEBUG] Spawned Ammo Pickup');
-      }
-    }
 
     // 2. 인스펙터 토글 (I)
     if (e.code === 'KeyI' && !e.repeat) {

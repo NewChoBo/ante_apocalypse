@@ -17,8 +17,6 @@ export class EnemyManager {
   private controllers: Map<string, AIController> = new Map();
   private networkManager: NetworkManager;
   private worldManager: WorldEntityManager;
-  private lastSyncTime = 0;
-  private syncInterval = 100; // 10Hz sync
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
     this.scene = scene;
@@ -68,16 +66,6 @@ export class EnemyManager {
     }
   }
 
-  public spawnEnemies(spawnPoints: number[][], targetPlayer: PlayerPawn): void {
-    if (this.networkManager.isMasterClient()) {
-      spawnPoints.forEach((point, index) => {
-        const id = `enemy_${index}`;
-        const position = Vector3.FromArray(point);
-        this.createEnemy(id, position, targetPlayer);
-      });
-    }
-  }
-
   public createEnemy(id: string, position: Vector3, target?: PlayerPawn): EnemyPawn {
     const enemy = new EnemyPawn(this.scene, position, this.shadowGenerator);
     enemy.id = id;
@@ -100,13 +88,8 @@ export class EnemyManager {
     this.controllers.forEach((c) => c.tick(deltaTime));
 
     this.enemies.forEach((enemy, id) => {
-      // 사망 혹은 제거 체크
+      // 사망 혹은 제거 체크 (Visual only)
       if (enemy.isDead || enemy.mesh.isDisposed()) {
-        // Master인 경우 파괴 이벤트 전송 (WorldManager에서 처리할 수도 있지만 여기서 보장)
-        if (this.networkManager.isMasterClient()) {
-          this.networkManager.sendEvent(EventCode.DESTROY_ENEMY, { id });
-        }
-
         // 제거 처리
         this.worldManager.removeEntity(id);
         this.enemies.delete(id);
@@ -114,31 +97,6 @@ export class EnemyManager {
         this.controllers.delete(id);
       }
     });
-
-    if (this.networkManager.isMasterClient()) {
-      const now = performance.now();
-      if (now - this.lastSyncTime > this.syncInterval) {
-        this.enemies.forEach((enemy, id) => {
-          if (!enemy.isDead && !enemy.mesh.isDisposed()) {
-            this.networkManager.sendEvent(
-              EventCode.ENEMY_MOVE,
-              {
-                id,
-                position: { x: enemy.position.x, y: enemy.position.y, z: enemy.position.z },
-                rotation: {
-                  x: enemy.mesh.rotation.x,
-                  y: enemy.mesh.rotation.y,
-                  z: enemy.mesh.rotation.z,
-                },
-                isMoving: enemy.isMoving,
-              },
-              false
-            );
-          }
-        });
-        this.lastSyncTime = now;
-      }
-    }
   }
 
   public getEnemyStates(): any[] {

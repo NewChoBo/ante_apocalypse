@@ -12,7 +12,6 @@ import {
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { AssetLoader } from './AssetLoader';
-import { PickupManager } from './systems/PickupManager';
 import { DynamicTexture } from '@babylonjs/core';
 
 export class EnemyPawn extends BasePawn {
@@ -260,8 +259,7 @@ export class EnemyPawn extends BasePawn {
     this.isDead = true;
     console.log('Enemy Died');
 
-    // 아이템 드롭
-    PickupManager.getInstance().spawnRandomPickup(this.position);
+    // Item drop is now handled by the authority (server/simulation)
 
     // 죽었음을 시각적으로 표시 (일단 비활성화)
     // 실제로는 사망 애니메이션을 재생하거나 래그돌을 적용할 수 있음

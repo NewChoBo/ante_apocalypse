@@ -64,11 +64,11 @@ export class SessionController {
 
   private setupSystems(levelData: LevelData): void {
     this.targetSpawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
-    this.targetSpawner.spawnInitialTargets();
+    // Initial layout is now handled by the authority (server/simulation)
 
     if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
       this.enemyManager = new EnemyManager(this.scene, this.shadowGenerator);
-      this.enemyManager.spawnEnemies(levelData.enemySpawns, this.playerPawn!);
+      // Spawning is now handled by the authority
     }
 
     PickupManager.getInstance().initialize(this.scene, this.playerPawn!);
@@ -131,9 +131,9 @@ export class SessionController {
           }
           inventoryStore.setKey('bagItems', bag);
 
+          // Dropping items should be handled by authority (server/simulation)
           const dropPos = this.playerPawn.mesh.position.clone();
-          dropPos.y += 0.5;
-          PickupManager.getInstance().spawnPickup(dropPos, item.id as any);
+          console.log(`[Session] Dropped item: ${item.id} at ${dropPos}`);
         }
       },
     });

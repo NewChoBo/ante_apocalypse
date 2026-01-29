@@ -10,6 +10,17 @@ import {
 import { ServerNetworkManager } from './ServerNetworkManager.ts';
 import { ServerApi } from './ServerApi.ts';
 import { WeaponRegistry } from '@ante/common';
+import {
+  WorldSimulation,
+  BaseEnemyManager,
+  BasePickupManager,
+  BaseTargetSpawner,
+} from '@ante/game-core';
+
+// Server-side concrete implementations (can be simple wrappers or extensions if needed)
+class ServerEnemyManager extends BaseEnemyManager {}
+class ServerPickupManager extends BasePickupManager {}
+class ServerTargetSpawner extends BaseTargetSpawner {}
 
 export class ServerGameController {
   private networkManager: ServerNetworkManager;
@@ -18,6 +29,7 @@ export class ServerGameController {
 
   private engine: NullEngine;
   private scene: Scene;
+  private simulation: WorldSimulation;
 
   // [추가] 플레이어 ID와 물리 메쉬(Hitbox) 매핑
   private playerMeshes: Map<string, AbstractMesh> = new Map();
@@ -29,6 +41,14 @@ export class ServerGameController {
     this.engine = new NullEngine();
     this.scene = new Scene(this.engine);
 
+    // [신규] 시뮬레이션 엔진 초기화
+    this.simulation = new WorldSimulation(
+      new ServerEnemyManager(this.networkManager),
+      new ServerPickupManager(this.networkManager),
+      new ServerTargetSpawner(this.networkManager),
+      this.networkManager
+    );
+
     // [추가된 부분] 서버용 더미 카메라 생성
     // 서버는 화면을 그리지 않지만, 씬 구동을 위해 카메라가 필수입니다.
     const camera = new ArcRotateCamera('ServerCamera', 0, 0, 10, Vector3.Zero(), this.scene);
@@ -39,7 +59,17 @@ export class ServerGameController {
     ground.position.y = 0;
 
     // [추가] 네트워크 이벤트 연결
-    this.networkManager.onPlayerJoin = (id) => this.createPlayerHitbox(id);
+    this.networkManager.onPlayerJoin = (id) => {
+      this.createPlayerHitbox(id);
+      // 첫 플레이어가 입장하면 게임 레이아웃 생성
+      if (this.playerMeshes.size === 1) {
+        this.simulation.targets.spawnInitialTargets();
+        this.simulation.enemies.spawnEnemiesAt([
+          [5, 0, 5],
+          [-5, 0, 5],
+        ]);
+      }
+    };
     this.networkManager.onPlayerLeave = (id) => this.removePlayerHitbox(id);
     this.networkManager.onPlayerMove = (id, pos, rot) => this.updatePlayerHitbox(id, pos, rot);
     this.networkManager.onFireRequest = (id, origin, dir) => this.processFireEvent(id, origin, dir);
