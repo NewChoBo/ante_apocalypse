@@ -58,7 +58,7 @@ export class NetworkManager implements INetworkAuthority {
   }>();
 
   private playerStates: Map<string, PlayerState> = new Map();
-  private currentState: NetworkState = NetworkState.Disconnected;
+  public currentState: NetworkState = NetworkState.Disconnected;
   private lastRoomList: RoomInfo[] = [];
 
   private constructor() {
@@ -87,8 +87,25 @@ export class NetworkManager implements INetworkAuthority {
 
   private setupProviderListeners(): void {
     this.provider.onStateChanged = (state) => {
+      console.log(`[NetworkManager] Network state changed: ${this.currentState} -> ${state}`);
       this.currentState = state;
       this.onStateChanged.notifyObservers(state);
+
+      // Auto-reconnect logic
+      if (state === NetworkState.Disconnected || state === NetworkState.Error) {
+        const userId = localStorage.getItem('playerName') || 'COMMANDER';
+        console.warn(`[NetworkManager] Disconnected. Attempting auto-reconnect for ${userId}...`);
+
+        // Reconnect after a delay to avoid spamming
+        setTimeout(() => {
+          if (
+            this.currentState === NetworkState.Disconnected ||
+            this.currentState === NetworkState.Error
+          ) {
+            this.connect(userId);
+          }
+        }, 3000);
+      }
     };
 
     this.provider.onRoomListUpdated = (rooms) => {
@@ -243,6 +260,13 @@ export class NetworkManager implements INetworkAuthority {
   }
 
   public async joinRoom(name: string): Promise<boolean> {
+    if (
+      this.currentState !== NetworkState.InLobby &&
+      this.currentState !== NetworkState.ConnectedToMaster
+    ) {
+      console.warn(`[NetworkManager] Cannot join room: Invalid state ${this.currentState}`);
+      return false;
+    }
     return this.provider.joinRoom(name);
   }
 

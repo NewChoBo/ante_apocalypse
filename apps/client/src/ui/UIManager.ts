@@ -10,6 +10,8 @@ import {
 } from '@babylonjs/gui';
 import { Scene, Observable } from '@babylonjs/core';
 import { LobbyUI } from './LobbyUI';
+import { NetworkManager } from '../core/systems/NetworkManager';
+import { NetworkState } from '@ante/common';
 
 type TacticalButton = Button & { _updateStyles?: () => void };
 
@@ -48,6 +50,18 @@ export class UIManager {
   private constructor(scene: Scene) {
     this.ui = AdvancedDynamicTexture.CreateFullscreenUI('UI', true, scene);
     this.createScreens();
+    this.setupNetworkListeners();
+  }
+
+  private setupNetworkListeners(): void {
+    const network = NetworkManager.getInstance();
+    network.onStateChanged.add((state) => {
+      if (state === NetworkState.Disconnected || state === NetworkState.Error) {
+        this.showNotification('COMMUNICATION_LINK_LOST - ATTEMPTING_RECONNECT');
+      } else if (state === NetworkState.ConnectedToMaster || state === NetworkState.InLobby) {
+        this.showNotification('UPLINK_ESTABLISHED');
+      }
+    });
   }
 
   public static initialize(scene: Scene): UIManager {

@@ -113,7 +113,8 @@ export class PhotonProvider implements INetworkProvider {
       case States.Error:
         return NetworkState.Error;
       default:
-        return NetworkState.Disconnected;
+        // Other intermediate states like LeavingRoom, etc.
+        return NetworkState.Connecting;
     }
   }
 
@@ -130,7 +131,22 @@ export class PhotonProvider implements INetworkProvider {
   }
 
   public async joinRoom(roomId: string): Promise<boolean> {
-    return this.client.joinRoom(roomId);
+    if (!this.client.isInLobby() && !this.client.isJoinedToRoom()) {
+      console.warn('[PhotonProvider] Cannot join room: Not in lobby or already in a room.');
+      return false;
+    }
+
+    if (!this.client.isConnectedToMaster() && !this.client.isConnectedToNameServer()) {
+      console.error('[PhotonProvider] Cannot join room: Not connected to master/name server.');
+      return false;
+    }
+
+    try {
+      return this.client.joinRoom(roomId);
+    } catch (e) {
+      console.error('[PhotonProvider] joinRoom exception:', e);
+      return false;
+    }
   }
 
   public getRoomList(): Promise<RoomInfo[]> {

@@ -156,8 +156,53 @@ export class LobbyUI {
       this.updateRoomList(rooms);
     });
 
+    this.networkManager.onStateChanged.add((state) => {
+      this.handleStateChange(state);
+    });
+
     // Initial fetch from cache
     this.updateRoomList(this.networkManager.getRoomList());
+    this.handleStateChange(this.networkManager.currentState as any); // Use current state
+  }
+
+  private handleStateChange(state: string): void {
+    const isDisconnected = state === 'Disconnected' || state === 'Error' || state === 'Connecting';
+
+    // Find Join buttons and Create button to disable them
+    this.container.getDescendants().forEach((control) => {
+      if (control instanceof Button) {
+        if (
+          control.name?.startsWith('join-') ||
+          control.name === 'btn-CREATE_SQUAD' ||
+          control.name === 'btn-REFRESH_UI'
+        ) {
+          control.isEnabled = !isDisconnected;
+          control.alpha = isDisconnected ? 0.3 : 1.0;
+        }
+      }
+    });
+
+    // Show reconnecting message if needed
+    let messageBox = this.container
+      .getDescendants()
+      .find((d) => d.name === 'network-status-msg') as TextBlock;
+    if (isDisconnected) {
+      if (!messageBox) {
+        messageBox = new TextBlock('network-status-msg');
+        messageBox.color = '#ff4d4d';
+        messageBox.fontSize = 14;
+        messageBox.fontFamily = this.FONT_MONO;
+        messageBox.height = '30px';
+        messageBox.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+        messageBox.top = '50px';
+        this.container.addControl(messageBox);
+      }
+      messageBox.text =
+        state === 'Connecting' ? 'ESTABLISHING_UPLINK...' : 'OFFLINE_MODE - ATTEMPTING_RECONNECT';
+      messageBox.isVisible = true;
+    } else if (messageBox) {
+      messageBox.isVisible = false;
+    }
   }
 
   private updateRoomList(rooms: RoomInfo[]): void {
