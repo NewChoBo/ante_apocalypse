@@ -127,6 +127,12 @@ export class Game {
     if (state === NetworkState.InRoom && !this.isRunning) {
       console.log('[Game] Joined room, starting multiplayer game...');
       this.start();
+    } else if (state === NetworkState.Error || state === NetworkState.Disconnected) {
+      if (this.isRunning) {
+        console.warn(`[Game] Network failure detected (State: ${state}). Returning to menu.`);
+        this.quitToMenu();
+        this.uiManager.showNotification('COMMUNICATION_LINK_LOST:_REVERTING_TO_STAGING');
+      }
     }
   }
 

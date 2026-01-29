@@ -406,6 +406,38 @@ export class UIManager {
     }
   }
 
+  public showNotification(message: string): void {
+    const notification = new Rectangle('notification');
+    notification.width = '400px';
+    notification.height = '60px';
+    notification.background = this.BG_COLOR;
+    notification.color = this.PRIMARY_COLOR;
+    notification.thickness = 2;
+    notification.cornerRadius = 5;
+    notification.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    notification.top = '40px';
+    this.ui.addControl(notification);
+
+    const text = new TextBlock();
+    text.text = message;
+    text.color = 'white';
+    text.fontSize = 16;
+    text.fontFamily = this.FONT_MONO;
+    notification.addControl(text);
+
+    // Fade out and remove
+    let alpha = 1;
+    const interval = setInterval(() => {
+      alpha -= 0.05;
+      if (alpha <= 0) {
+        notification.dispose();
+        clearInterval(interval);
+      } else {
+        notification.alpha = alpha;
+      }
+    }, 150);
+  }
+
   public dispose(): void {
     this.ui.dispose();
   }
