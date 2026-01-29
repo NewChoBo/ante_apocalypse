@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint src --fix",
     "format": "prettier --write src/**/*.{ts,css,html}",
-    "check": "tsc --noEmit && eslint src"
+    "check": "tsc --noEmit && eslint src",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ante/common": "*",
