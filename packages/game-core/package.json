@@ -1,0 +1,14 @@
+{
+  "name": "@ante/game-core",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ante/common": "*",
+    "@babylonjs/core": "^8.47.0"
+  }
+}

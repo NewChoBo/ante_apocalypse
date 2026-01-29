@@ -1,35 +1,21 @@
 {
-  "name": "ante_apocalypse",
+  "name": "ante-apocalypse-monorepo",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "lint": "eslint src --fix",
-    "format": "prettier --write src/**/*.{ts,css,html}",
-    "check": "tsc --noEmit && eslint src"
+    "dev:client": "npm run dev -w @ante/client",
+    "dev:server": "npm run dev -w @ante/server",
+    "build": "npm run build -ws",
+    "check": "npm run check -ws",
+    "lint": "npm run lint -ws",
+    "format": "npm run format -ws"
   },
   "devDependencies": {
-    "@babylonjs/inspector": "^8.47.0",
-    "eslint": "^9.18.0",
-    "eslint-config-prettier": "^10.0.1",
-    "eslint-plugin-prettier": "^5.2.3",
-    "happy-dom": "^20.3.7",
-    "prettier": "^3.4.2",
-    "ts-node": "^10.9.2",
-    "tsx": "^4.21.0",
     "typescript": "~5.7.3",
-    "typescript-eslint": "^8.20.0",
-    "vite": "^6.0.7",
-    "vitest": "^4.0.18"
-  },
-  "dependencies": {
-    "@babylonjs/core": "^8.47.0",
-    "@babylonjs/gui": "^8.47.0",
-    "@babylonjs/loaders": "^8.47.0",
-    "nanostores": "^1.1.0",
-    "photon-realtime": "^4.4.0"
+    "prettier": "^3.4.2",
+    "eslint": "^9.18.0"
   }
 }

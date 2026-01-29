@@ -1,0 +1,32 @@
+{
+  "name": "@ante/client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --fix",
+    "format": "prettier --write src/**/*.{ts,css,html}",
+    "check": "tsc --noEmit && eslint src"
+  },
+  "dependencies": {
+    "@ante/common": "*",
+    "@ante/game-core": "*",
+    "@babylonjs/core": "^8.47.0",
+    "@babylonjs/gui": "^8.47.0",
+    "@babylonjs/loaders": "^8.47.0",
+    "nanostores": "^1.1.0",
+    "photon-realtime": "^4.4.0"
+  },
+  "devDependencies": {
+    "@babylonjs/inspector": "^8.47.0",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-prettier": "^5.2.3",
+    "prettier": "^3.4.2",
+    "typescript": "~5.7.3",
+    "vite": "^6.0.7"
+  }
+}
