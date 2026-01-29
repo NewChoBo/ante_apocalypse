@@ -16,14 +16,7 @@ export class ServerNetworkManager implements INetworkAuthority {
   public onPlayerJoin?: (id: string) => void;
   public onPlayerLeave?: (id: string) => void;
   public onPlayerMove?: (id: string, pos: any, rot: any) => void;
-  public onFireRequest?: (
-    id: string,
-    origin: any,
-    dir: any,
-    weaponId?: string,
-    hitInfo?: { targetId: string; bodyPart: string; point: { x: number; y: number; z: number } },
-    timestamp?: number
-  ) => void;
+  public onFireRequest?: (id: string, origin: any, dir: any, weaponId?: string) => void;
 
   public getPlayerState(id: string): PlayerState | undefined {
     return this.playerStates.get(id);
@@ -156,21 +149,14 @@ export class ServerNetworkManager implements INetworkAuthority {
       }
 
       case EventCode.FIRE:
-        // [연결] 컨트롤러에게 발사 알림 (Hybrid: 클라이언트 판정 검증)
-        if (this.onFireRequest) {
-          const origin = data.origin || data.muzzleTransform?.position;
-          const direction = data.direction || data.muzzleTransform?.direction;
-
-          if (origin && direction) {
-            this.onFireRequest(
-              senderId,
-              origin,
-              direction,
-              data.weaponId,
-              data.hitInfo, // 클라이언트 히트 정보 전달
-              data.timestamp // 지연 보상용 타임스탬프 전달
-            );
-          }
+        // [연결] 컨트롤러에게 발사 알림 (Raycast 판정 요청)
+        if (this.onFireRequest && data.muzzleTransform) {
+          this.onFireRequest(
+            senderId,
+            data.muzzleTransform.position,
+            data.muzzleTransform.direction,
+            data.weaponId // [신규] 무기 아이디 전달
+          );
         }
         break;
     }

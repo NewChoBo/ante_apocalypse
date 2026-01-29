@@ -95,64 +95,9 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
 
     this.currentAmmo--;
     this.lastFireTime = now;
-
-    // --- 1. 레이 계산 (Origin + Spread) ---
-    const rayOrigin = this.camera.globalPosition.clone();
-    const forward = this.camera.getForwardRay().direction;
-    const spread = this.isAiming ? 0.01 : 0.05;
-    const randomSpread = new Vector3(
-      (Math.random() - 0.5) * spread,
-      (Math.random() - 0.5) * spread,
-      (Math.random() - 0.5) * spread
-    );
-    const rayDirection = forward.add(randomSpread).normalize();
-
-    // --- 2. 클라이언트 레이캐스트 (프록시 히트박스 + 월드 충돌) ---
-    const ray = new Ray(rayOrigin, rayDirection, this.range);
-    const pickInfo = this.scene.pickWithRay(ray, (mesh) => {
-      // 1. 플레이어 자신 제외
-      if (mesh.name === 'playerPawn') return false;
-
-      // 2. 히트박스 혹은 일반 Pickable 메쉬(환경) 허용
-      return mesh.isPickable && (mesh.metadata?.type === 'hitbox' || mesh.isVisible);
-    });
-
-    // 히트 정보 수집
-    let hitInfo:
-      | { targetId: string; bodyPart: string; point: { x: number; y: number; z: number } }
-      | undefined;
-
-    if (pickInfo?.hit && pickInfo.pickedMesh) {
-      // 공통 타격 이펙트 (VFX)
-      GameObservables.hitEffect.notifyObservers({
-        position: pickInfo.pickedPoint!,
-        normal: pickInfo.getNormal(true) || Vector3.Up(),
-      });
-
-      // 피격 대상 확인 (히트박스 메타데이터 사용)
-      const meta = pickInfo.pickedMesh.metadata;
-      if (meta && meta.type === 'hitbox') {
-        const targetId = meta.targetId;
-        const bodyPart = meta.bodyPart;
-        hitInfo = {
-          targetId,
-          bodyPart,
-          point: {
-            x: pickInfo.pickedPoint!.x,
-            y: pickInfo.pickedPoint!.y,
-            z: pickInfo.pickedPoint!.z,
-          },
-        };
-      }
-
-      // 로컬 히트 처리 (VFX, 점수 등 - 서버 검증 후 최종 데미지 반영)
-      this.processHit(pickInfo.pickedMesh as Mesh, pickInfo.pickedPoint!, this.damage);
-    }
-
-    // --- 3. 발사 연출 호출 (Recoil Animation 등) ---
     this.onFire();
 
-    // 발사 이벤트 발행 (VFX 등)
+    // 발사 이벤트 발행
     GameObservables.weaponFire.notifyObservers({
       weaponId: this.name,
       ammoRemaining: this.currentAmmo,
@@ -160,7 +105,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
       muzzleTransform: this.getMuzzleTransform(),
     });
 
-    // --- 4. 네트워크 전송 (판정 데이터 + HitInfo 포함) ---
+    // 네트워크 발사 이벤트 전송
     const muzzle = this.getMuzzleTransform();
     NetworkManager.getInstance().fire({
       weaponId: this.name,
@@ -168,9 +113,6 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
         position: { x: muzzle.position.x, y: muzzle.position.y, z: muzzle.position.z },
         direction: { x: muzzle.direction.x, y: muzzle.direction.y, z: muzzle.direction.z },
       },
-      origin: { x: rayOrigin.x, y: rayOrigin.y, z: rayOrigin.z },
-      direction: { x: rayDirection.x, y: rayDirection.y, z: rayDirection.z },
-      hitInfo, // 클라이언트 판정 결과 전송
     });
 
     // 자체 반동 처리
@@ -253,8 +195,36 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     };
   }
 
-  // [DEPRECATED] performRaycast() is no longer used.
-  // Raycasting is now performed inline in fire() and hitInfo is sent to the server.
+  protected performRaycast(): void {
+    const forwardRay = this.camera.getForwardRay(this.range);
+
+    // 탄 퍼짐 계산 (정조준 시 감소)
+    const spread = this.isAiming ? 0.01 : 0.05;
+    const randomSpread = new Vector3(
+      (Math.random() - 0.5) * spread,
+      (Math.random() - 0.5) * spread,
+      (Math.random() - 0.5) * spread
+    );
+
+    const direction = forwardRay.direction.add(randomSpread).normalize();
+    const ray = new Ray(this.camera.globalPosition, direction, this.range);
+
+    const pickInfo = this.scene.pickWithRay(ray, (mesh) => {
+      // 투명한 메쉬나 플레이어 자신 제외하고 모든 pickable 메쉬 허용
+      return mesh.isPickable && mesh.isVisible && mesh.name !== 'playerPawn';
+    });
+
+    if (pickInfo?.hit && pickInfo.pickedMesh) {
+      // 1. 공통 타격 이펙트 (벽, 바닥, 타겟 모두 포함)
+      GameObservables.hitEffect.notifyObservers({
+        position: pickInfo.pickedPoint!,
+        normal: pickInfo.getNormal(true) || Vector3.Up(),
+      });
+
+      // 2. 통합 히트 프로세싱 (적, 타겟 등)
+      this.processHit(pickInfo.pickedMesh as Mesh, pickInfo.pickedPoint!, this.damage);
+    }
+  }
 
   protected updateAmmoStore(): void {
     ammoStore.set({
