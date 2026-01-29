@@ -35,7 +35,7 @@ export class TargetSpawnerComponent {
 
   /** 초기 타겟 자동 스폰 */
   public spawnInitialTargets(): void {
-    if (!this.networkManager.isMasterClient() && this.networkManager.getSocketId()) return;
+    if (!this.networkManager.isMasterClient()) return;
 
     const distances = [10, 15, 20];
 
@@ -53,7 +53,7 @@ export class TargetSpawnerComponent {
     if (this.scene.isDisposed) return '';
 
     if (!id) {
-      if (!this.networkManager.isMasterClient() && this.networkManager.getSocketId()) return '';
+      if (!this.networkManager.isMasterClient()) return '';
       id = `target_${++this.targetIdCounter}_${Math.random().toString(36).substr(2, 4)}`;
 
       if (!type) {
@@ -94,7 +94,7 @@ export class TargetSpawnerComponent {
 
   /** 일정 시간 후 리스폰 예약 */
   public scheduleRespawn(delayMs: number = 1500): void {
-    if (!this.networkManager.isMasterClient() && this.networkManager.getSocketId()) return;
+    if (!this.networkManager.isMasterClient()) return;
 
     this.respawnTimeout = setTimeout(() => {
       if (this.scene.isDisposed) return;

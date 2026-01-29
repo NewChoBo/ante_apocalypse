@@ -79,7 +79,7 @@ export class PickupManager implements ITickable {
 
     this.pickups.set(pickupId, pickup);
 
-    if (broadcast && (this.networkManager.isMasterClient() || !this.networkManager.getSocketId())) {
+    if (broadcast && this.networkManager.isMasterClient()) {
       // Only Master broadcasts spawns ideally, but if we allow local spawn...
       // Plan: Only Master logic calls this without ID.
       if (this.networkManager.isMasterClient()) {
@@ -94,7 +94,7 @@ export class PickupManager implements ITickable {
 
   public spawnRandomPickup(position: Vector3): void {
     // Only Master decides spawning drops
-    if (!this.networkManager.isMasterClient() && this.networkManager.getSocketId()) return;
+    if (!this.networkManager.isMasterClient()) return;
 
     // 40% chance to spawn an item
     if (Math.random() > 0.4) return;

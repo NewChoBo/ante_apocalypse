@@ -9,7 +9,7 @@ import { PickupManager } from './systems/PickupManager';
 import { UIManager, UIScreen } from '../ui/UIManager';
 import { SceneManager } from './systems/SceneManager';
 import { SessionController } from './systems/SessionController';
-import { GameMode, NetworkState } from '@ante/common';
+import { NetworkState } from '@ante/common';
 import { NetworkManager } from './systems/NetworkManager';
 
 import trainingGroundData from '../assets/levels/training_ground.json';
@@ -28,7 +28,6 @@ export class Game {
   private uiManager!: UIManager;
 
   private isRunning = false;
-  private currentMode: GameMode = 'multi';
   private playerName: string = 'Anonymous';
   private renderFunction: () => void;
 
@@ -137,7 +136,6 @@ export class Game {
 
   public async start(): Promise<void> {
     if (this.isRunning) return;
-    this.currentMode = 'multi';
 
     // Use map selected from UI (or synchronized from room)
     let mapKey = this.uiManager.getSelectedMap();
@@ -214,9 +212,7 @@ export class Game {
     PickupManager.getInstance().clear();
     AssetLoader.getInstance().clear();
 
-    if (this.currentMode === 'multi') {
-      NetworkManager.getInstance().leaveRoom();
-    }
+    NetworkManager.getInstance().leaveRoom();
 
     this.initMenu();
   }

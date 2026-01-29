@@ -69,7 +69,7 @@ export class EnemyManager {
   }
 
   public spawnEnemies(spawnPoints: number[][], targetPlayer: PlayerPawn): void {
-    if (this.networkManager.isMasterClient() || !this.networkManager.getSocketId()) {
+    if (this.networkManager.isMasterClient()) {
       spawnPoints.forEach((point, index) => {
         const id = `enemy_${index}`;
         const position = Vector3.FromArray(point);
@@ -86,7 +86,7 @@ export class EnemyManager {
     // WorldManager에 등록하여 전역 피격 및 관리가 가능하게 함
     this.worldManager.registerEntity(enemy);
 
-    if (this.networkManager.isMasterClient() || !this.networkManager.getSocketId()) {
+    if (this.networkManager.isMasterClient()) {
       if (target) {
         const controller = new AIController(`ai_${id}`, enemy, target);
         this.controllers.set(id, controller);
