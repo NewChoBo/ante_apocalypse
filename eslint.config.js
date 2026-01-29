@@ -3,14 +3,18 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
+  {
+    ignores: ['**/node_modules/**', '**/dist/**', '**/build/**', '*.config.js', '*.config.ts'],
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   prettier,
   {
-    files: ['src/**/*.ts'],
+    files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parserOptions: {
-        project: './tsconfig.json',
+        project: true,
+        tsconfigRootDir: import.meta.dirname,
       },
     },
     rules: {
@@ -18,13 +22,10 @@ export default tseslint.config(
       '@typescript-eslint/explicit-function-return-type': 'warn',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
-      
+
       // 일반 규칙
       'no-console': 'warn',
       'prefer-const': 'error',
     },
-  },
-  {
-    ignores: ['node_modules/', 'dist/', '*.config.js', '*.config.ts'],
   }
 );
