@@ -9,7 +9,7 @@ import {
 } from '@babylonjs/gui';
 import { NetworkManager } from '../core/systems/NetworkManager';
 import { UIManager, UIScreen } from './UIManager';
-import { RoomInfo } from '../core/network/NetworkProtocol';
+import { RoomInfo } from '@ante/common';
 
 export class LobbyUI {
   private container: Container;

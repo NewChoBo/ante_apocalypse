@@ -1,6 +1,6 @@
 import * as Photon from 'photon-realtime';
 import { INetworkProvider } from '../INetworkProvider';
-import { RoomInfo, NetworkState, PlayerInfo } from '../NetworkProtocol';
+import { RoomInfo, NetworkState, PlayerInfo } from '@ante/common';
 
 /**
  * Photon Realtime Cloud를 이용한 네트워크 프로바이더 구현체.

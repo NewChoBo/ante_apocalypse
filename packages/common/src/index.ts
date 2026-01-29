@@ -1,2 +1,1 @@
-// @ante/common placeholder
-export {};
+export * from './network/NetworkProtocol.js';

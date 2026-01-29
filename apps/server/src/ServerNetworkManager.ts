@@ -1,5 +1,5 @@
 import Photon from 'photon-realtime';
-import { EventCode, PlayerState } from './core/network/NetworkProtocol.ts';
+import { EventCode, PlayerState } from '@ante/common';
 import { WeaponRegistry } from './core/configs/WeaponConfig.ts';
 
 export class ServerNetworkManager {
@@ -8,7 +8,7 @@ export class ServerNetworkManager {
   private appVersion: string = process.env.VITE_PHOTON_APP_VERSION || '1.0.0';
 
   private playerStates: Map<string, PlayerState> = new Map();
-  
+
   // [추가] 연결 대기용 Promise Resolver
   private connectionResolver: (() => void) | null = null;
 
@@ -79,8 +79,8 @@ export class ServerNetworkManager {
   public async createGameRoom(name?: string, mapId?: string): Promise<void> {
     // 안전장치: 연결 끊김 상태 확인
     if (!this.client.isConnectedToMaster() && !this.client.isInLobby()) {
-        console.error("[ServerNetwork] Cannot create room: Not connected.");
-        throw new Error("Server disconnected from Photon.");
+      console.error('[ServerNetwork] Cannot create room: Not connected.');
+      throw new Error('Server disconnected from Photon.');
     }
 
     const roomName = name || 'TrainingGround_Server';
@@ -152,11 +152,9 @@ export class ServerNetworkManager {
   }
 
   public sendWeaponConfigs(targetId: string): void {
-    this.client.raiseEvent(
-      EventCode.WEAPON_CONFIGS,
-      WeaponRegistry,
-      { targetActors: [parseInt(targetId)] }
-    );
+    this.client.raiseEvent(EventCode.WEAPON_CONFIGS, WeaponRegistry, {
+      targetActors: [parseInt(targetId)],
+    });
   }
 
   private sendInitialState(targetId: string): void {
@@ -183,7 +181,7 @@ export class ServerNetworkManager {
 
     // 현재 모든 플레이어의 상태를 스냅샷으로 생성
     const playerParams: any[] = Array.from(this.playerStates.values());
-    
+
     // 월드 전체 상태 방송 (스냅샷 전송)
     this.client.raiseEvent(
       EventCode.INITIAL_STATE,
@@ -204,12 +202,16 @@ export class ServerNetworkManager {
     if (targetState) {
       targetState.health = Math.max(0, targetState.health - hitData.damage);
       console.log(`[ServerNetwork] Player ${hitData.targetId} Health: ${targetState.health}`);
-      
+
       // 피격 정보 방송 (상태 포함)
-      this.client.raiseEvent(EventCode.HIT, {
-        ...hitData,
-        newHealth: targetState.health
-      }, { receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All });
+      this.client.raiseEvent(
+        EventCode.HIT,
+        {
+          ...hitData,
+          newHealth: targetState.health,
+        },
+        { receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All }
+      );
 
       // 사망 처리
       if (targetState.health <= 0) {
@@ -220,10 +222,14 @@ export class ServerNetworkManager {
 
   public broadcastDeath(playerId: string, attackerId: string): void {
     console.log(`[ServerNetwork] 💀 Player ${playerId} was killed by ${attackerId}`);
-    this.client.raiseEvent(EventCode.PLAYER_DEATH, {
-      playerId,
-      attackerId
-    }, { receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All });
+    this.client.raiseEvent(
+      EventCode.PLAYER_DEATH,
+      {
+        playerId,
+        attackerId,
+      },
+      { receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All }
+    );
   }
 
   public disconnect(): void {

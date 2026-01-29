@@ -6,7 +6,7 @@ import { TickManager } from '../TickManager';
 import { inventoryStore, BagItem } from '../store/GameStore';
 import { GameObservables } from '../events/GameObservables';
 import { NetworkManager } from './NetworkManager';
-import { EventCode } from '../network/NetworkProtocol';
+import { EventCode } from '@ante/common';
 
 export class PickupManager implements ITickable {
   private static instance: PickupManager;

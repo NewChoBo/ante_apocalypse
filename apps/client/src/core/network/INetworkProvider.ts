@@ -1,4 +1,4 @@
-import { NetworkState, RoomInfo, PlayerInfo } from './NetworkProtocol';
+import { NetworkState, RoomInfo, PlayerInfo } from '@ante/common';
 
 export interface INetworkProvider {
   // Methods

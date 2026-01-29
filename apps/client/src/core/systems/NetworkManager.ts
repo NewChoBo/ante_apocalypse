@@ -9,7 +9,7 @@ import {
   FireEventData,
   HitEventData,
   DeathEventData,
-} from '../network/NetworkProtocol';
+} from '@ante/common';
 
 export class NetworkManager {
   private static instance: NetworkManager;
@@ -119,14 +119,6 @@ export class NetworkManager {
       this.onEvent.notifyObservers({ code, data, senderId });
 
       switch (code) {
-        case EventCode.MOVE:
-          if (this.playerStates.has(senderId)) {
-            const state = this.playerStates.get(senderId)!;
-            state.position = data.position;
-            state.rotation = data.rotation;
-            this.onPlayerUpdated.notifyObservers(state);
-          }
-          break;
         case EventCode.FIRE:
           this.onPlayerFired.notifyObservers({
             playerId: senderId,

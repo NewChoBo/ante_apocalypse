@@ -2,7 +2,7 @@ import { BaseController } from './BaseController';
 import { EnemyPawn } from '../EnemyPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { NetworkManager } from '../systems/NetworkManager';
-import { EventCode } from '../network/NetworkProtocol';
+import { EventCode } from '@ante/common';
 import { Vector3 } from '@babylonjs/core';
 
 export class AIController extends BaseController {

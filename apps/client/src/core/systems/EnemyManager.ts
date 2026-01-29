@@ -3,7 +3,7 @@ import { EnemyPawn } from '../EnemyPawn';
 import { AIController } from '../controllers/AIController';
 import { PlayerPawn } from '../PlayerPawn';
 import { NetworkManager } from './NetworkManager';
-import { EventCode } from '../network/NetworkProtocol';
+import { EventCode } from '@ante/common';
 import { WorldEntityManager } from './WorldEntityManager';
 
 /**

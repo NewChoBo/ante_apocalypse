@@ -13,7 +13,7 @@ import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
 import { WorldEntityManager } from './WorldEntityManager';
 import { EnemyManager } from './EnemyManager';
-import { EventCode } from '../network/NetworkProtocol';
+import { EventCode } from '@ante/common';
 import { GameObservables } from '../events/GameObservables';
 import { AssetLoader } from '../AssetLoader';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';

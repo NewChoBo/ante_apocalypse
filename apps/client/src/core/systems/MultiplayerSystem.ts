@@ -1,6 +1,6 @@
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
 import { NetworkManager } from './NetworkManager';
-import { PlayerState } from '../network/NetworkProtocol';
+import { PlayerState } from '@ante/common';
 import { RemotePlayerPawn } from '../RemotePlayerPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { CombatComponent } from '../components/CombatComponent';

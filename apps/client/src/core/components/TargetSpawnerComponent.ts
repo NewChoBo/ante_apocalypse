@@ -3,7 +3,7 @@ import { StaticTarget } from '../../targets/StaticTarget';
 import { MovingTarget } from '../../targets/MovingTarget';
 import { HumanoidTarget } from '../../targets/HumanoidTarget';
 import { NetworkManager } from '../systems/NetworkManager';
-import { EventCode } from '../network/NetworkProtocol';
+import { EventCode } from '@ante/common';
 import { WorldEntityManager } from '../systems/WorldEntityManager';
 import { IWorldEntity } from '../../types/IWorldEntity';
 

@@ -1,7 +1,7 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { IWorldEntity } from '../../types/IWorldEntity';
 import { NetworkManager } from './NetworkManager';
-import { EventCode } from '../network/NetworkProtocol';
+import { EventCode } from '@ante/common';
 
 /**
  * 전역 엔티티 관리자.
