@@ -4,3 +4,4 @@ export * from './systems/BaseEnemyManager.js';
 export * from './systems/BasePickupManager.js';
 export * from './systems/BaseTargetSpawner.js';
 export * from './simulation/WorldSimulation.js';
+export * from './systems/HitboxSystem.js';

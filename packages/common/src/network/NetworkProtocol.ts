@@ -54,6 +54,16 @@ export interface FireEventData {
     position: { x: number; y: number; z: number };
     direction: { x: number; y: number; z: number };
   };
+  // Authority Raycast Data
+  origin?: { x: number; y: number; z: number };
+  direction?: { x: number; y: number; z: number };
+  // Client-Side Hit Claim (Hybrid Model)
+  hitInfo?: {
+    targetId: string;
+    bodyPart: string; // 'head', 'body', 'leg', etc.
+    point: { x: number; y: number; z: number };
+  };
+  timestamp?: number; // Server time for lag compensation
 }
 
 export interface HitEventData {

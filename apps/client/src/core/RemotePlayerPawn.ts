@@ -15,6 +15,7 @@ import {
 import { BasePawn } from './BasePawn';
 import { AssetLoader } from './AssetLoader';
 import { ParticleSystem, Texture } from '@babylonjs/core';
+import { HitboxSystem, HitboxGroup, HitboxPart } from '@ante/game-core';
 
 /**
  * 다른 네트워크 플레이어를 나타내는 Pawn.
@@ -44,6 +45,7 @@ export class RemotePlayerPawn extends BasePawn {
   private idleRange: any;
   private walkRange: any;
   private currentAnim = 'idle';
+  private hitboxGroup: HitboxGroup | null = null;
 
   constructor(
     scene: Scene,
@@ -184,6 +186,8 @@ export class RemotePlayerPawn extends BasePawn {
         this.headBoneNode =
           this.skeleton.bones.find((b) => b.name.toLowerCase().includes('head')) ||
           this.skeleton.bones.find((b) => b.name.toLowerCase().includes('neck'));
+
+        this.createHitboxes();
       }
 
       entries.rootNodes.forEach((node) => {
@@ -221,6 +225,32 @@ export class RemotePlayerPawn extends BasePawn {
     } catch (e) {
       console.error('Failed to load remote player model:', e);
     }
+  }
+
+  private createHitboxes(): void {
+    if (!this.skeleton || !this.visualMesh) return;
+
+    this.hitboxGroup = HitboxSystem.getInstance().createHitboxGroup(this.id, this.scene, this.mesh);
+
+    // 뼈대 찾기 및 부착
+    const headBone = this.skeleton.bones.find((b) => b.name.toLowerCase().includes('head'));
+    const bodyBone =
+      this.skeleton.bones.find((b) => b.name.toLowerCase().includes('spine1')) ||
+      this.skeleton.bones.find((b) => b.name.toLowerCase().includes('spine'));
+    const legBone = this.skeleton.bones.find((b) => b.name.toLowerCase().includes('hips'));
+
+    if (headBone && this.hitboxGroup.parts.has(HitboxPart.HEAD)) {
+      this.hitboxGroup.parts.get(HitboxPart.HEAD)!.attachToBone(headBone, this.visualMesh as Mesh);
+    }
+    if (bodyBone && this.hitboxGroup.parts.has(HitboxPart.BODY)) {
+      this.hitboxGroup.parts.get(HitboxPart.BODY)!.attachToBone(bodyBone, this.visualMesh as Mesh);
+    }
+    if (legBone && this.hitboxGroup.parts.has(HitboxPart.LEG)) {
+      this.hitboxGroup.parts.get(HitboxPart.LEG)!.attachToBone(legBone, this.visualMesh as Mesh);
+    }
+
+    // 디버그용: 히트박스 가시성 설정 (필요시 true)
+    // this.hitboxGroup.parts.forEach(p => p.isVisible = true);
   }
 
   public updateWeapon(_weaponId: string): void {

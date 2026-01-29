@@ -332,8 +332,20 @@ export class NetworkManager implements INetworkAuthority {
       position: { x: number; y: number; z: number };
       direction: { x: number; y: number; z: number };
     };
+    origin?: { x: number; y: number; z: number };
+    direction?: { x: number; y: number; z: number };
+    hitInfo?: {
+      targetId: string;
+      bodyPart: string;
+      point: { x: number; y: number; z: number };
+    };
   }): void {
-    this.provider.sendEvent(EventCode.FIRE, fireData, true);
+    const data: FireEventData = {
+      ...fireData,
+      playerId: this.getLocalPlayerId() || '',
+      timestamp: this.provider.getServerTime(),
+    };
+    this.provider.sendEvent(EventCode.FIRE, data, true);
   }
 
   public syncWeapon(weaponId: string): void {
@@ -350,6 +362,10 @@ export class NetworkManager implements INetworkAuthority {
 
   public getServerTime(): number {
     return this.provider.getServerTime();
+  }
+
+  public getLocalPlayerId(): string | null {
+    return this.provider.getLocalPlayerId();
   }
 
   public refreshRoomList(): void {

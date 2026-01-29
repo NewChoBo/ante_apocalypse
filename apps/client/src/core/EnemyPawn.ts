@@ -13,6 +13,7 @@ import {
 import { BasePawn } from './BasePawn';
 import { AssetLoader } from './AssetLoader';
 import { DynamicTexture } from '@babylonjs/core';
+import { HitboxSystem, HitboxGroup, HitboxPart } from '@ante/game-core';
 
 export class EnemyPawn extends BasePawn {
   public mesh: Mesh;
@@ -27,6 +28,7 @@ export class EnemyPawn extends BasePawn {
   private shadowGenerator: ShadowGenerator;
   private _healthBar: Mesh | null = null;
   private _healthBarTexture: DynamicTexture | null = null;
+  private hitboxGroup: HitboxGroup | null = null;
 
   // Animation Ranges
   private idleRange: any;
@@ -141,41 +143,12 @@ export class EnemyPawn extends BasePawn {
         if (this.idleRange) {
           this.scene.beginAnimation(this.skeleton, this.idleRange.from, this.idleRange.to, true);
         }
+
+        this.createHitboxes();
       }
 
       // Now that animation is started and skeleton is linked, show the mesh
       this.visualMesh.setEnabled(true);
-
-      // Create Head Hitbox
-      if (this.skeleton) {
-        const headBone = this.skeleton.bones.find((b) => b.name.toLowerCase().includes('head'));
-        if (headBone) {
-          const headBox = MeshBuilder.CreateBox('headBox', { size: 0.25 }, this.scene);
-
-          const transformNode = headBone.getTransformNode();
-          if (transformNode) {
-            console.log('[EnemyPawn] Attaching headBox to TransformNode'); // eslint-disable-line no-console
-            headBox.parent = transformNode;
-            headBox.position = Vector3.Zero();
-            headBox.rotation = Vector3.Zero();
-          } else {
-            console.log('[EnemyPawn] Attaching headBox using attachToBone'); // eslint-disable-line no-console
-            try {
-              headBox.attachToBone(headBone, this.visualMesh);
-            } catch (e) {
-              console.error('[EnemyPawn] Failed to attach to bone', e); // eslint-disable-line no-console
-            }
-          }
-
-          headBox.visibility = 0; // Invisible but pickable
-          headBox.isPickable = true;
-          headBox.metadata = { type: 'enemy', pawn: this, bodyPart: 'head' };
-
-          // Removed redundant parenting to visualMesh
-        } else {
-          console.warn('[EnemyPawn] Head bone not found in skeleton');
-        }
-      }
 
       // Dispose Placeholder
       if (this.placeholderMesh) {
@@ -189,6 +162,33 @@ export class EnemyPawn extends BasePawn {
       const mat = new StandardMaterial('errMat', this.scene);
       mat.diffuseColor = Color3.Red();
       this.mesh.material = mat;
+    }
+  }
+
+  private createHitboxes(): void {
+    if (!this.skeleton || !this.visualMesh) return;
+
+    this.hitboxGroup = HitboxSystem.getInstance().createHitboxGroup(
+      this.id || 'enemy',
+      this.scene,
+      this.mesh
+    );
+
+    // 뼈대 찾기 및 부착
+    const headBone = this.skeleton.bones.find((b) => b.name.toLowerCase().includes('head'));
+    const bodyBone =
+      this.skeleton.bones.find((b) => b.name.toLowerCase().includes('spine1')) ||
+      this.skeleton.bones.find((b) => b.name.toLowerCase().includes('spine'));
+    const legBone = this.skeleton.bones.find((b) => b.name.toLowerCase().includes('hips'));
+
+    if (headBone && this.hitboxGroup.parts.has(HitboxPart.HEAD)) {
+      this.hitboxGroup.parts.get(HitboxPart.HEAD)!.attachToBone(headBone, this.visualMesh as Mesh);
+    }
+    if (bodyBone && this.hitboxGroup.parts.has(HitboxPart.BODY)) {
+      this.hitboxGroup.parts.get(HitboxPart.BODY)!.attachToBone(bodyBone, this.visualMesh as Mesh);
+    }
+    if (legBone && this.hitboxGroup.parts.has(HitboxPart.LEG)) {
+      this.hitboxGroup.parts.get(HitboxPart.LEG)!.attachToBone(legBone, this.visualMesh as Mesh);
     }
   }
 

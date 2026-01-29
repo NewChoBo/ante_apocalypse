@@ -1,12 +1,4 @@
-import {
-  NullEngine,
-  Scene,
-  MeshBuilder,
-  ArcRotateCamera,
-  Vector3,
-  AbstractMesh,
-  Ray,
-} from '@babylonjs/core';
+import { NullEngine, Scene, MeshBuilder, ArcRotateCamera, Vector3, Ray } from '@babylonjs/core';
 import { ServerNetworkManager } from './ServerNetworkManager.ts';
 import { ServerApi } from './ServerApi.ts';
 import { WeaponRegistry } from '@ante/common';
@@ -15,7 +7,16 @@ import {
   BaseEnemyManager,
   BasePickupManager,
   BaseTargetSpawner,
+  HitboxSystem,
+  HitboxPart,
+  HitboxGroup,
 } from '@ante/game-core';
+
+interface PlayerStateLog {
+  timestamp: number;
+  position: Vector3;
+  rotation: Vector3;
+}
 
 // Server-side concrete implementations (can be simple wrappers or extensions if needed)
 class ServerEnemyManager extends BaseEnemyManager {}
@@ -32,7 +33,9 @@ export class ServerGameController {
   private simulation: WorldSimulation;
 
   // [추가] 플레이어 ID와 물리 메쉬(Hitbox) 매핑
-  private playerMeshes: Map<string, AbstractMesh> = new Map();
+  private playerHitboxes: Map<string, HitboxGroup> = new Map();
+  private stateHistory: Map<string, PlayerStateLog[]> = new Map();
+  private readonly MAX_HISTORY_MS = 1000; // 1초간의 위치 기록 유지
 
   constructor() {
     this.networkManager = new ServerNetworkManager();
@@ -62,7 +65,7 @@ export class ServerGameController {
     this.networkManager.onPlayerJoin = (id) => {
       this.createPlayerHitbox(id);
       // 첫 플레이어가 입장하면 게임 레이아웃 생성
-      if (this.playerMeshes.size === 1) {
+      if (this.playerHitboxes.size === 1) {
         this.simulation.targets.spawnInitialTargets();
         this.simulation.enemies.spawnEnemiesAt([
           [5, 0, 5],
@@ -72,7 +75,8 @@ export class ServerGameController {
     };
     this.networkManager.onPlayerLeave = (id) => this.removePlayerHitbox(id);
     this.networkManager.onPlayerMove = (id, pos, rot) => this.updatePlayerHitbox(id, pos, rot);
-    this.networkManager.onFireRequest = (id, origin, dir) => this.processFireEvent(id, origin, dir);
+    this.networkManager.onFireRequest = (id, origin, dir, weaponId, hitInfo, timestamp) =>
+      this.processFireEvent(id, origin, dir, weaponId, hitInfo, timestamp);
 
     console.log('[ServerGameController] Physics World Initialized');
   }
@@ -109,53 +113,104 @@ export class ServerGameController {
     }, 1000);
   }
 
-  // [신규] 플레이어 캡슐 생성
+  // [신규] 멀티 파트 히트박스 생성
   private createPlayerHitbox(id: string) {
-    if (this.playerMeshes.has(id)) return;
+    if (this.playerHitboxes.has(id)) return;
 
-    // 높이 2m, 지름 1m 캡슐 (일반적인 FPS 캐릭터 크기)
-    const hitbox = MeshBuilder.CreateCapsule(
-      'Player_' + id,
-      { height: 2, radius: 0.5 },
-      this.scene
-    );
-    hitbox.position.y = 1; // 발이 바닥에 닿게 보정
-    hitbox.checkCollisions = true; // 충돌 처리 활성화
+    const group = HitboxSystem.getInstance().createHitboxGroup(id, this.scene);
+    this.playerHitboxes.set(id, group);
+    this.stateHistory.set(id, []);
 
-    // 사격 판정을 위한 메타데이터
-    hitbox.metadata = { isPlayer: true, id: id };
-
-    this.playerMeshes.set(id, hitbox);
-    console.log(`[Server] Created Hitbox for Player: ${id}`);
+    console.log(`[Server] Created Multi-Part Hitbox for Player: ${id}`);
   }
 
-  // [신규] 플레이어 이동 동기화
+  // [신규] 플레이어 이동 동기화 및 기록 저장
   private updatePlayerHitbox(id: string, pos: any, rot: any) {
-    const hitbox = this.playerMeshes.get(id);
-    if (hitbox) {
-      // 서버의 캡슐을 클라이언트 위치로 순간이동 (추후 보간 적용 가능)
-      hitbox.position.set(pos.x, pos.y, pos.z);
-      // 회전은 보통 Y축(Heading)만 중요
-      if (rot) hitbox.rotation.set(rot.x, rot.y, rot.z);
+    const group = this.playerHitboxes.get(id);
+    if (group) {
+      const position = new Vector3(pos.x, pos.y, pos.z);
+      const rotation = rot ? new Vector3(rot.x, rot.y, rot.z) : Vector3.Zero();
+
+      // 현재 히트박스 위치 업데이트
+      group.root.position.copyFrom(position);
+      group.root.rotation.copyFrom(rotation);
+
+      // 위치 기록 추가 (지연 보상용)
+      const history = this.stateHistory.get(id) || [];
+      const now = Date.now(); // Photon ServerTime 대신 로컬 서버 시간 사용 (상대적 시간 동일)
+      history.push({ timestamp: now, position, rotation });
+
+      // 오래된 기록 삭제
+      while (history.length > 0 && now - history[0].timestamp > this.MAX_HISTORY_MS) {
+        history.shift();
+      }
+      this.stateHistory.set(id, history);
     }
   }
 
   // [신규] 플레이어 퇴장 처리
   private removePlayerHitbox(id: string) {
-    const hitbox = this.playerMeshes.get(id);
-    if (hitbox) {
-      hitbox.dispose();
-      this.playerMeshes.delete(id);
-      console.log(`[Server] Removed Hitbox for Player: ${id}`);
+    const group = this.playerHitboxes.get(id);
+    if (group) {
+      HitboxSystem.getInstance().removeHitboxGroup(id);
+      this.playerHitboxes.delete(id);
+      this.stateHistory.delete(id);
+      console.log(`[Server] Removed Multi-Part Hitbox for Player: ${id}`);
     }
   }
 
-  // [신규] 사격 판정 로직 (Raycast)
+  // [핵심] 지연 보상 (Lag Compensation): 특정 시점으로 월드 되감기
+  private rewindScene(clientTimestamp: number): Map<string, { pos: Vector3; rot: Vector3 }> {
+    const originalStates: Map<string, { pos: Vector3; rot: Vector3 }> = new Map();
+
+    this.playerHitboxes.forEach((group, id) => {
+      // 현재 상태 백업
+      originalStates.set(id, {
+        pos: group.root.position.clone(),
+        rot: group.root.rotation.clone(),
+      });
+
+      // 히스토리에서 가장 가까운 시점 찾기
+      const history = this.stateHistory.get(id) || [];
+      if (history.length > 0) {
+        let closest = history[0];
+        let minDiff = Math.abs(clientTimestamp - closest.timestamp);
+
+        for (const log of history) {
+          const diff = Math.abs(clientTimestamp - log.timestamp);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = log;
+          }
+        }
+
+        // 히트박스 되감기
+        group.root.position.copyFrom(closest.position);
+        group.root.rotation.copyFrom(closest.rotation);
+      }
+    });
+
+    return originalStates;
+  }
+
+  private restoreScene(originalStates: Map<string, { pos: Vector3; rot: Vector3 }>) {
+    originalStates.forEach((state, id) => {
+      const group = this.playerHitboxes.get(id);
+      if (group) {
+        group.root.position.copyFrom(state.pos);
+        group.root.rotation.copyFrom(state.rot);
+      }
+    });
+  }
+
+  // [Authoritative] 사격 판정 로직 (서버 최종 권한 + 지연 보상)
   public processFireEvent(
     playerId: string,
     origin: any,
     direction: any,
-    weaponIdOverride?: string
+    weaponIdOverride?: string,
+    _clientHitInfo?: any,
+    timestamp?: number
   ) {
     const playerState = this.networkManager.getPlayerState(playerId);
     const weaponId = weaponIdOverride || playerState?.weaponId || 'Pistol';
@@ -163,29 +218,44 @@ export class ServerGameController {
 
     const rayOrigin = new Vector3(origin.x, origin.y, origin.z);
     const rayDir = new Vector3(direction.x, direction.y, direction.z);
+
+    // 1. 지연 보상 수행 (되감기)
+    const shooterTime = timestamp || Date.now();
+    const backup = this.rewindScene(shooterTime);
+
+    // 2. 서버 측 레이캐스트 판정 (멀티 파트 히트박스 대상)
     const ray = new Ray(rayOrigin, rayDir, weaponStats.range);
+    const pickInfo = HitboxSystem.getInstance().pickWithRay(ray, this.scene);
 
-    // 서버 월드에서 레이 발사! (발사자 본인은 피격 대상에서 제외 - AI 발사의 경우 sender(MasterClient)가 제외됨)
-    const hitInfo = this.scene.pickWithRay(ray, (mesh) => {
-      return mesh.metadata?.id !== playerId;
-    });
+    // 3. 월드 복구
+    this.restoreScene(backup);
 
-    if (hitInfo && hitInfo.hit && hitInfo.pickedMesh) {
-      console.log(
-        `[Server] 🎯 HIT! Shooter: ${playerId} (${weaponId}) -> Target: ${hitInfo.pickedMesh.name}`
-      );
+    // 4. 결과 처리
+    if (pickInfo?.hit && pickInfo.pickedMesh) {
+      const meta = pickInfo.pickedMesh.metadata;
 
-      // 맞은 대상이 플레이어라면 데미지 처리 방송
-      if (hitInfo.pickedMesh.metadata?.isPlayer) {
-        const targetId = hitInfo.pickedMesh.metadata.id;
+      if (meta && meta.type === 'hitbox') {
+        const targetId = meta.targetId;
+        const bodyPart = meta.bodyPart;
+
+        if (targetId === playerId) return; // 자가 피해 방지
+
+        console.log(
+          `[Server] 🔥 Authoritative HIT! ${playerId} -> ${targetId} (${bodyPart}) at ${shooterTime}`
+        );
+
+        let damageMultiplier = 1.0;
+        if (bodyPart === HitboxPart.HEAD) damageMultiplier = 2.0;
+        else if (bodyPart === HitboxPart.LEG) damageMultiplier = 0.8;
+
         this.networkManager.broadcastHit({
-          targetId,
-          damage: weaponStats.damage,
+          targetId: targetId,
+          damage: Math.round(weaponStats.damage * damageMultiplier),
           attackerId: playerId,
         });
       }
     } else {
-      console.log(`[Server] 💨 Miss by ${playerId} with ${weaponId}`);
+      console.log(`[Server] 💨 Miss by ${playerId} at ${shooterTime}`);
     }
   }
 
