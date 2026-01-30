@@ -5,6 +5,7 @@ export interface INetworkProvider {
   connect(userId: string): Promise<boolean>;
   disconnect(): void;
 
+  createRoom(name: string, options?: any): Promise<boolean>;
   joinRoom(roomId: string): Promise<boolean>;
   getRoomList(): Promise<RoomInfo[]>;
   sendEvent(code: number, data: any, reliable: boolean): void;

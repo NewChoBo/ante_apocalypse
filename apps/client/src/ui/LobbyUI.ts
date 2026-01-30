@@ -115,25 +115,10 @@ export class LobbyUI {
     createBtn.onPointerUpObservable.add(async () => {
       const playerName = localStorage.getItem('playerName') || 'COMMANDER';
       const mapId = this.uiManager.getSelectedMap();
+      const roomName = `OPS_${playerName}_${Math.floor(Math.random() * 1000)}`;
 
-      try {
-        // Request Dedicated Server to orchestrate room creation
-        const response = await fetch('http://localhost:3000/create-room', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mapId, playerName }),
-        });
-
-        const result = await response.json();
-        if (result.success) {
-          // Join the room created by the server
-          this.networkManager.joinRoom(result.roomName);
-        } else {
-          // Handle failure (e.g., show message in UI)
-        }
-      } catch {
-        // Handle network error
-      }
+      // Client-side Room Creation
+      await this.networkManager.createRoom(roomName, mapId);
     });
     bottomControls.addControl(createBtn);
 

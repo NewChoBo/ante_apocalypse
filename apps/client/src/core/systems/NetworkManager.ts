@@ -252,6 +252,21 @@ export class NetworkManager implements INetworkAuthority {
     return this.provider.joinRoom(name);
   }
 
+  public async createRoom(name: string, mapId: string): Promise<boolean> {
+    if (
+      this.currentState !== NetworkState.InLobby &&
+      this.currentState !== NetworkState.ConnectedToMaster
+    ) {
+      return false;
+    }
+    const options = {
+      maxPlayers: 20,
+      customGameProperties: { mapId },
+      propsListedInLobby: ['mapId'],
+    };
+    return this.provider.createRoom(name, options);
+  }
+
   public leaveRoom(): void {
     this.provider.disconnect();
   }

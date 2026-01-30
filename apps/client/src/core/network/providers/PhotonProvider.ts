@@ -149,6 +149,19 @@ export class PhotonProvider implements INetworkProvider {
     }
   }
 
+  public async createRoom(name: string, options?: any): Promise<boolean> {
+    if (!this.client.isConnectedToMaster()) {
+      logger.error('Cannot create room: Not connected to Master Server.');
+      return false;
+    }
+    try {
+      return this.client.createRoom(name, options);
+    } catch (e) {
+      logger.error('createRoom exception:', e);
+      return false;
+    }
+  }
+
   public getRoomList(): Promise<RoomInfo[]> {
     // Photon LoadBalancingClient automatically updates availableRooms
     // We can return the current scheduled/cached list or wrap a one-time fetch if needed.
