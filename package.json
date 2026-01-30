@@ -2,17 +2,18 @@
   "name": "ante-apocalypse-monorepo",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@9.1.0",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev:client": "npm run dev -w @ante/client",
-    "dev:server": "npm run dev -w @ante/server",
-    "build": "npm run build --ws",
-    "check": "npm run check --ws",
-    "lint": "npm run lint --ws",
-    "format": "npm run format --ws",
+    "dev:client": "pnpm --filter @ante/client dev",
+    "dev:server": "pnpm --filter @ante/server dev",
+    "build": "pnpm -r build",
+    "check": "pnpm -r check",
+    "lint": "pnpm -r lint",
+    "format": "pnpm -r format",
     "test": "vitest run",
     "test:watch": "vitest"
   },

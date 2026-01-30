@@ -11,8 +11,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@ante/common": "*",
-    "@ante/game-core": "*",
+    "@ante/common": "workspace:*",
+    "@ante/game-core": "workspace:*",
     "@babylonjs/core": "^8.47.0",
     "@babylonjs/loaders": "^8.47.0",
     "cors": "^2.8.5",
