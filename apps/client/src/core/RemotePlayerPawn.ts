@@ -217,6 +217,24 @@ export class RemotePlayerPawn extends BasePawn {
         if (this.idleRange) {
           this.scene.beginAnimation(this.skeleton, this.idleRange.from, this.idleRange.to, true);
         }
+
+        // Add Head Hitbox
+        const headBone = this.skeleton.bones.find((b) => b.name.toLowerCase().includes('head'));
+        if (headBone) {
+          const headBox = MeshBuilder.CreateBox('headBox_' + this.id, { size: 0.25 }, this.scene);
+          // Attach to TransformNode if available, otherwise bone
+          const transformNode = headBone.getTransformNode();
+          if (transformNode) {
+            headBox.parent = transformNode;
+            headBox.position = Vector3.Zero();
+          } else {
+            headBox.attachToBone(headBone, this.visualMesh!);
+          }
+
+          headBox.visibility = 0; // Invisible but pickable
+          headBox.isPickable = true;
+          headBox.metadata = { type: 'remote_player', pawn: this, bodyPart: 'head' };
+        }
       }
     } catch (e) {
       console.error('Failed to load remote player model:', e);

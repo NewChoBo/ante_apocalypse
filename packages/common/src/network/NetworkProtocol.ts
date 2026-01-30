@@ -62,6 +62,7 @@ export interface HitEventData {
   damage: number;
   newHealth: number;
   attackerId: string;
+  hitPart?: string; // (선택) 헤드샷 등 부위
 }
 
 export interface DeathEventData {

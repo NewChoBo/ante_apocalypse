@@ -72,11 +72,14 @@ export class ServerGameController {
     this.networkManager.onPlayerMove = (id, pos, rot) => this.updatePlayerHitbox(id, pos, rot);
     this.networkManager.onFireRequest = (id, origin, dir) => this.processFireEvent(id, origin, dir);
     this.networkManager.onHitRequest = (shooterId, data) => {
-      console.log(`[Server] Trusted Hit: ${shooterId} hit ${data.targetId} for ${data.damage} dmg`);
+      console.log(
+        `[Server] Trusted Hit: ${shooterId} hit ${data.targetId} (${data.hitPart}) for ${data.damage} dmg`
+      );
       this.networkManager.broadcastHit({
         targetId: data.targetId,
         damage: data.damage,
         attackerId: shooterId,
+        hitPart: data.hitPart,
       });
     };
 

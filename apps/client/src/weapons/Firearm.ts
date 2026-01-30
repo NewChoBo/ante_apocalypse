@@ -225,20 +225,41 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
       // 2. 서버에 피격 요청 전송
       const targetMesh = result.pickedMesh;
 
-      // Pawn ID 추출 시도 (플레이어 등)
+      // 부위 감지 (metadata.bodyPart: 'head', 'body' 등)
+      const hitPart = targetMesh.metadata?.bodyPart || 'body';
+
+      // Pawn 및 데미지 배율 추출 시도
       let targetId = targetMesh.metadata?.id || targetMesh.name;
+      let finalDamage = this.damage;
+
       if (targetMesh.metadata?.pawn) {
-        targetId = targetMesh.metadata.pawn.id;
+        const pawn = targetMesh.metadata.pawn;
+        targetId = pawn.id;
+
+        // 데미지 배율 적용
+        if (pawn.damageProfile) {
+          const multiplier =
+            pawn.damageProfile.multipliers?.[hitPart] ??
+            pawn.damageProfile.defaultMultiplier ??
+            1.0;
+          finalDamage = Math.floor(this.damage * multiplier);
+          if (multiplier > 1.1) {
+            console.log(
+              `[Firearm] Critical Hit! Part: ${hitPart}, Multiplier: ${multiplier}, Final Damage: ${finalDamage}`
+            );
+          }
+        }
       }
 
       NetworkManager.getInstance().requestHit({
         targetId,
-        damage: this.damage,
+        damage: finalDamage,
         weaponId: this.name,
+        hitPart: hitPart,
       });
 
       // 3. 통합 히트 프로세싱 (로컬 연출 등)
-      this.processHit(targetMesh, result.pickedPoint!, this.damage);
+      this.processHit(targetMesh, result.pickedPoint!, finalDamage);
     }
   }
 

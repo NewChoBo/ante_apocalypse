@@ -224,12 +224,19 @@ export class ServerNetworkManager implements INetworkAuthority {
   }
 
   // [신규] 피격 결과 방송 (Broadcasting)
-  public broadcastHit(hitData: { targetId: string; damage: number; attackerId: string }): void {
+  public broadcastHit(hitData: {
+    targetId: string;
+    damage: number;
+    attackerId: string;
+    hitPart?: string;
+  }): void {
     // 서버측 상태 업데이트
     const targetState = this.playerStates.get(hitData.targetId);
     if (targetState) {
       targetState.health = Math.max(0, targetState.health - hitData.damage);
-      console.log(`[ServerNetwork] Player ${hitData.targetId} Health: ${targetState.health}`);
+      console.log(
+        `[ServerNetwork] Player ${hitData.targetId} Health: ${targetState.health} (HitPart: ${hitData.hitPart})`
+      );
 
       // 피격 정보 방송 (상태 포함)
       this.client.raiseEvent(
