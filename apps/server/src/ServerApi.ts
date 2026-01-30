@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { ServerNetworkManager } from './ServerNetworkManager.ts';
-import { WeaponRegistry } from '@ante/common';
+import { WeaponRegistry } from '@ante/game-core';
 
 export class ServerApi {
   private app: express.Application;

@@ -1,13 +1,14 @@
 import Photon from 'photon-realtime';
 import { EventCode, PlayerState } from '@ante/common';
-import { INetworkAuthority } from '@ante/game-core';
+import { INetworkAuthority, WorldEntityManager, NetworkDispatcher } from '@ante/game-core';
 
 export class ServerNetworkManager implements INetworkAuthority {
   private client: any;
   private appId: string = process.env.VITE_PHOTON_APP_ID || '';
   private appVersion: string = process.env.VITE_PHOTON_APP_VERSION || '1.0.0';
 
-  private playerStates: Map<string, PlayerState> = new Map();
+  private entityManager: WorldEntityManager = new WorldEntityManager();
+  private dispatcher: NetworkDispatcher = new NetworkDispatcher();
 
   // [추가] 연결 대기용 Promise Resolver
   private connectionResolver: (() => void) | null = null;
@@ -20,7 +21,7 @@ export class ServerNetworkManager implements INetworkAuthority {
   public onHitRequest?: (shooterId: string, data: any) => void;
 
   public getPlayerState(id: string): PlayerState | undefined {
-    return this.playerStates.get(id);
+    return this.entityManager.getEntity(id) as unknown as PlayerState;
   }
 
   public isMasterClient(): boolean {
@@ -36,7 +37,6 @@ export class ServerNetworkManager implements INetworkAuthority {
       receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
     });
   }
-
   constructor() {
     // LoadBalancingClient 생성
     this.client = new (Photon as any).LoadBalancing.LoadBalancingClient(
@@ -45,7 +45,68 @@ export class ServerNetworkManager implements INetworkAuthority {
       this.appVersion
     );
 
+    this.setupDispatcher();
     this.setupListeners();
+  }
+
+  private setupDispatcher(): void {
+    this.dispatcher.register(EventCode.REQ_INITIAL_STATE, (_data, senderId) => {
+      this.sendInitialState(senderId);
+    });
+
+    this.dispatcher.register(EventCode.MOVE, (data, senderId) => {
+      if (senderId === this.client.myActor().actorNr.toString()) return;
+
+      let entity = this.entityManager.getEntity(senderId) as unknown as PlayerState;
+      if (!entity) {
+        if (this.onPlayerJoin) this.onPlayerJoin(senderId);
+
+        const actor = this.client.myRoom().actors[parseInt(senderId)];
+        const name = actor?.name || 'Unknown';
+
+        entity = {
+          id: senderId,
+          name: name,
+          position: data.position,
+          rotation: data.rotation,
+          weaponId: 'Pistol',
+          health: 100,
+        };
+        (entity as any).type = 'remote_player'; // IWorldEntity type
+        this.entityManager.register(entity as any);
+      } else {
+        entity.position = data.position;
+        entity.rotation = data.rotation;
+      }
+
+      if (this.onPlayerMove) {
+        this.onPlayerMove(senderId, data.position, data.rotation);
+      }
+    });
+
+    this.dispatcher.register(EventCode.SYNC_WEAPON, (data, senderId) => {
+      const state = this.getPlayerState(senderId);
+      if (state) {
+        state.weaponId = data.weaponId;
+      }
+    });
+
+    this.dispatcher.register(EventCode.FIRE, (data, senderId) => {
+      if (this.onFireRequest && data.muzzleTransform) {
+        this.onFireRequest(
+          senderId,
+          data.muzzleTransform.position,
+          data.muzzleTransform.direction,
+          data.weaponId
+        );
+      }
+    });
+
+    this.dispatcher.register(EventCode.REQUEST_HIT, (data, senderId) => {
+      if (this.onHitRequest) {
+        this.onHitRequest(senderId, data);
+      }
+    });
   }
 
   private setupListeners(): void {
@@ -64,7 +125,7 @@ export class ServerNetworkManager implements INetworkAuthority {
     };
 
     this.client.onEvent = (code: number, content: any, actorNr: number) => {
-      this.handleEvent(code, content, actorNr.toString());
+      this.dispatcher.dispatch(code, content, actorNr.toString());
     };
 
     this.client.onActorJoin = (actor: any) => {
@@ -81,15 +142,17 @@ export class ServerNetworkManager implements INetworkAuthority {
 
       console.log(`[ServerNetwork] Player Joined: ${id} (${name})`);
 
-      if (!this.playerStates.has(id)) {
-        this.playerStates.set(id, {
+      if (!this.entityManager.getEntity(id)) {
+        const state: PlayerState = {
           id: id,
           name: name,
           position: { x: 0, y: 0, z: 0 },
           rotation: { x: 0, y: 0, z: 0 },
           weaponId: 'Pistol',
           health: 100,
-        });
+        };
+        (state as any).type = 'remote_player';
+        this.entityManager.register(state as any);
       }
 
       // [연결] 컨트롤러에게 알림
@@ -97,10 +160,10 @@ export class ServerNetworkManager implements INetworkAuthority {
     };
 
     this.client.onActorLeave = (actor: any) => {
-      console.log(`[ServerNetwork] Player Left: ${actor.actorNr}`);
-      this.playerStates.delete(actor.actorNr.toString());
-      // [연결] 컨트롤러에게 알림
-      if (this.onPlayerLeave) this.onPlayerLeave(actor.actorNr.toString());
+      const id = actor.actorNr.toString();
+      console.log(`[ServerNetwork] Player Left: ${id}`);
+      this.entityManager.unregister(id);
+      if (this.onPlayerLeave) this.onPlayerLeave(id);
     };
   }
 
@@ -134,74 +197,9 @@ export class ServerNetworkManager implements INetworkAuthority {
     this.client.createRoom(roomName, roomOptions);
   }
 
-  private handleEvent(code: number, data: any, senderId: string): void {
-    switch (code) {
-      case EventCode.REQ_INITIAL_STATE:
-        this.sendInitialState(senderId);
-        break;
-
-      case EventCode.MOVE: {
-        // [서버 본인 제외 전사적용]
-        if (senderId === this.client.myActor().actorNr.toString()) return;
-
-        if (!this.playerStates.has(senderId)) {
-          // 플레이어 최초 발견 시에도 Hitbox 생성 요청
-          if (this.onPlayerJoin) this.onPlayerJoin(senderId);
-
-          const actor = this.client.myRoom().actors[parseInt(senderId)];
-          const name = actor?.name || 'Unknown';
-
-          this.playerStates.set(senderId, {
-            id: senderId,
-            name: name,
-            position: { x: 0, y: 0, z: 0 },
-            rotation: { x: 0, y: 0, z: 0 },
-            weaponId: 'Pistol',
-            health: 100,
-          });
-        }
-        const state = this.playerStates.get(senderId)!;
-        state.position = data.position;
-        state.rotation = data.rotation;
-
-        // [연결] 컨트롤러에게 이동 알림 (Hitbox 이동)
-        if (this.onPlayerMove) {
-          this.onPlayerMove(senderId, data.position, data.rotation);
-        }
-        break;
-      }
-
-      case EventCode.SYNC_WEAPON: {
-        const state = this.playerStates.get(senderId);
-        if (state) {
-          state.weaponId = data.weaponId;
-        }
-        break;
-      }
-
-      case EventCode.FIRE:
-        // [연결] 컨트롤러에게 발사 알림 (Raycast 판정 요청)
-        if (this.onFireRequest && data.muzzleTransform) {
-          this.onFireRequest(
-            senderId,
-            data.muzzleTransform.position,
-            data.muzzleTransform.direction,
-            data.weaponId // [신규] 무기 아이디 전달
-          );
-        }
-        break;
-      case EventCode.REQUEST_HIT:
-        if (this.onHitRequest) {
-          this.onHitRequest(senderId, data);
-        }
-        break;
-    }
-  }
-
   private sendInitialState(targetId: string): void {
     console.log(`[ServerNetwork] Sending Initial State to ${targetId}`);
-    const playerParams: any[] = [];
-    this.playerStates.forEach((state) => playerParams.push(state));
+    const playerParams: any[] = this.entityManager.getAllEntities();
     const enemyStates: any[] = [];
     const targetStates: any[] = [];
 
@@ -217,10 +215,11 @@ export class ServerNetworkManager implements INetworkAuthority {
   }
 
   public broadcastState(): void {
-    if (this.playerStates.size === 0) return;
+    const players = this.entityManager.getAllEntities() as unknown as PlayerState[];
+    if (players.length === 0) return;
 
     // 현재 모든 플레이어의 상태를 스냅샷으로 생성
-    const playerParams: any[] = Array.from(this.playerStates.values());
+    const playerParams: any[] = players;
 
     // 월드 전체 상태 방송 (스냅샷 전송)
     this.client.raiseEvent(
@@ -243,7 +242,7 @@ export class ServerNetworkManager implements INetworkAuthority {
     hitPart?: string;
   }): void {
     // 서버측 상태 업데이트
-    const targetState = this.playerStates.get(hitData.targetId);
+    const targetState = this.getPlayerState(hitData.targetId);
     if (targetState) {
       targetState.health = Math.max(0, targetState.health - hitData.damage);
       console.log(

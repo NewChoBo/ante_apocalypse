@@ -2,7 +2,8 @@ import { BaseController } from './BaseController';
 import { EnemyPawn } from '../EnemyPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { NetworkManager } from '../systems/NetworkManager';
-import { EventCode, WeaponRegistry } from '@ante/common';
+import { EventCode } from '@ante/common';
+import { WeaponRegistry } from '@ante/game-core';
 import { Vector3 } from '@babylonjs/core';
 
 export class AIController extends BaseController {

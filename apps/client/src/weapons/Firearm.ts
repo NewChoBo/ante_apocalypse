@@ -11,7 +11,7 @@ import { GameObservables } from '../core/events/GameObservables';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon';
 import { NetworkManager } from '../core/systems/NetworkManager';
-import { HitScanSystem } from '@ante/game-core';
+import { HitScanSystem, DamageSystem } from '@ante/game-core';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
@@ -236,18 +236,11 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
         const pawn = targetMesh.metadata.pawn;
         targetId = pawn.id;
 
-        // 데미지 배율 적용
-        if (pawn.damageProfile) {
-          const multiplier =
-            pawn.damageProfile.multipliers?.[hitPart] ??
-            pawn.damageProfile.defaultMultiplier ??
-            1.0;
-          finalDamage = Math.floor(this.damage * multiplier);
-          if (multiplier > 1.1) {
-            console.log(
-              `[Firearm] Critical Hit! Part: ${hitPart}, Multiplier: ${multiplier}, Final Damage: ${finalDamage}`
-            );
-          }
+        // DamageSystem을 이용한 공통 데미지 계산 로직 적용
+        finalDamage = DamageSystem.calculateDamage(this.damage, hitPart, pawn.damageProfile);
+
+        if (finalDamage > this.damage) {
+          console.log(`[Firearm] Critical Hit! Part: ${hitPart}, Final Damage: ${finalDamage}`);
         }
       }
 

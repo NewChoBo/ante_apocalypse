@@ -12,6 +12,7 @@ import {
   DeathEventData,
   RequestHitData,
 } from '@ante/common';
+import { WorldEntityManager, NetworkDispatcher } from '@ante/game-core';
 
 export class NetworkManager implements INetworkAuthority {
   private static instance: NetworkManager;
@@ -58,12 +59,15 @@ export class NetworkManager implements INetworkAuthority {
     isMoving: boolean;
   }>();
 
-  private playerStates: Map<string, PlayerState> = new Map();
+  private entityManager: WorldEntityManager = new WorldEntityManager();
+  private dispatcher: NetworkDispatcher = new NetworkDispatcher();
+
   public currentState: NetworkState = NetworkState.Disconnected;
   private lastRoomList: RoomInfo[] = [];
 
   private constructor() {
     this.provider = new PhotonProvider();
+    this.setupDispatcher();
     this.setupProviderListeners();
   }
 
@@ -84,6 +88,106 @@ export class NetworkManager implements INetworkAuthority {
       NetworkManager.instance = new NetworkManager();
     }
     return NetworkManager.instance;
+  }
+
+  private setupDispatcher(): void {
+    this.dispatcher.register(EventCode.FIRE, (data, senderId) => {
+      this.onPlayerFired.notifyObservers({
+        playerId: senderId,
+        weaponId: data.weaponId,
+        muzzleTransform: data.muzzleTransform,
+      });
+    });
+
+    this.dispatcher.register(EventCode.HIT, (data, senderId) => {
+      this.onPlayerHit.notifyObservers({
+        playerId: data.targetId,
+        damage: data.damage,
+        newHealth: data.newHealth || 0,
+        attackerId: data.attackerId || senderId,
+      });
+    });
+
+    this.dispatcher.register(EventCode.SYNC_WEAPON, (data, senderId) => {
+      const entity = this.entityManager.getEntity(senderId);
+      if (entity && entity.type === 'remote_player') {
+        (entity as any).weaponId = data.weaponId;
+        this.onPlayerUpdated.notifyObservers(entity as any);
+      }
+    });
+
+    this.dispatcher.register(EventCode.MOVE, (data, senderId) => {
+      const entity = this.entityManager.getEntity(senderId);
+      if (entity && entity.type === 'remote_player') {
+        const isMe = senderId === this.getSocketId();
+        if (isMe) {
+          const dist = Vector3.Distance(
+            entity.position,
+            new Vector3(data.position.x, data.position.y, data.position.z)
+          );
+          if (dist > 2.0) {
+            console.warn('서버와의 위치 불일치 감지! 위치 보정됨.');
+          }
+        } else {
+          entity.position.set(data.position.x, data.position.y, data.position.z);
+          // rotation handling... (BasePawn might need rotation set)
+          this.onPlayerUpdated.notifyObservers(entity as any);
+        }
+      }
+    });
+
+    this.dispatcher.register(EventCode.ENEMY_HIT, (data) => {
+      this.onEnemyHit.notifyObservers({ id: data.id, damage: data.damage });
+    });
+
+    this.dispatcher.register(EventCode.TARGET_HIT, (data) => {
+      this.onTargetHit.notifyObservers({
+        targetId: data.targetId,
+        part: data.part,
+        damage: data.damage,
+      });
+    });
+
+    this.dispatcher.register(EventCode.PLAYER_DEATH, (data) => {
+      this.onPlayerDied.notifyObservers({
+        playerId: data.playerId,
+        attackerId: data.attackerId,
+      });
+    });
+
+    this.dispatcher.register(EventCode.TARGET_DESTROY, (data) => {
+      this.onTargetDestroy.notifyObservers({ targetId: data.targetId });
+    });
+
+    this.dispatcher.register(EventCode.SPAWN_TARGET, (data) => {
+      this.onTargetSpawn.notifyObservers({
+        type: data.type,
+        position: new Vector3(data.position.x, data.position.y, data.position.z),
+        id: data.id,
+        isMoving: data.isMoving,
+      });
+    });
+
+    this.dispatcher.register(EventCode.REQ_INITIAL_STATE, (_data, senderId) => {
+      this.onInitialStateRequested.notifyObservers({ senderId });
+    });
+
+    this.dispatcher.register(EventCode.INITIAL_STATE, (data) => {
+      if (data.players && Array.isArray(data.players)) {
+        data.players.forEach((_p: PlayerState) => {
+          // WorldEntityManager handles storage, but we still need to know if it's a PlayerState
+          // In a full refactor, RemotePlayerPawn would be added to WorldEntityManager
+        });
+        console.log(`[NetworkManager] Synced ${data.players.length} players from Initial State`);
+      }
+
+      this.onInitialStateReceived.notifyObservers({
+        players: data.players,
+        enemies: data.enemies,
+        targets: data.targets,
+        weaponConfigs: data.weaponConfigs,
+      });
+    });
   }
 
   private setupProviderListeners(): void {
@@ -115,134 +219,25 @@ export class NetworkManager implements INetworkAuthority {
     };
 
     this.provider.onPlayerJoined = (user) => {
-      const newState: PlayerState = {
+      // NOTE: BasePawn-based registration should happen in MultiplayerSystem
+      this.onPlayerJoined.notifyObservers({
         id: user.userId,
         name: user.name || 'Anonymous',
         position: { x: 0, y: 0, z: 0 },
         rotation: { x: 0, y: 0, z: 0 },
         weaponId: 'Pistol',
         health: 100,
-      };
-      this.playerStates.set(user.userId, newState);
-      this.onPlayerJoined.notifyObservers(newState);
+      });
     };
 
     this.provider.onPlayerLeft = (id) => {
-      this.playerStates.delete(id);
+      this.entityManager.unregister(id);
       this.onPlayerLeft.notifyObservers(id);
     };
 
     this.provider.onEvent = (code, data, senderId) => {
       this.onEvent.notifyObservers({ code, data, senderId });
-
-      switch (code) {
-        case EventCode.FIRE:
-          this.onPlayerFired.notifyObservers({
-            playerId: senderId,
-            weaponId: data.weaponId,
-            muzzleTransform: data.muzzleTransform,
-          });
-          break;
-        case EventCode.HIT:
-          this.onPlayerHit.notifyObservers({
-            playerId: data.targetId,
-            damage: data.damage,
-            newHealth: data.newHealth || 0,
-            attackerId: data.attackerId || senderId, // data.attackerId가 있으면 그것을 사용
-          });
-          break;
-        case EventCode.SYNC_WEAPON:
-          if (this.playerStates.has(senderId)) {
-            const state = this.playerStates.get(senderId)!;
-            state.weaponId = data.weaponId;
-            this.onPlayerUpdated.notifyObservers(state);
-          }
-          break;
-        case EventCode.MOVE:
-          // 기존: if (this.playerStates.has(senderId)) ...
-
-          // 변경: 내 아이디(localPlayerId)라도 서버가 보낸 정보라면 위치를 보정해야 함 (Reconciliation)
-          // 단, 렉을 줄이기 위해 '거리 차이가 클 때'만 강제 보정하는 로직이 필요.
-
-          if (this.playerStates.has(senderId)) {
-            const state = this.playerStates.get(senderId)!;
-
-            // 만약 senderId가 '나(LocalPlayer)'라면?
-            const isMe = senderId === this.getSocketId();
-
-            if (isMe) {
-              // 서버 위치와 내 클라이언트 위치가 너무 차이나면(예: 2미터 이상) 서버 위치로 강제 이동 (Lag/Hack 방지)
-              const dist = Vector3.Distance(
-                new Vector3(state.position.x, state.position.y, state.position.z),
-                new Vector3(data.position.x, data.position.y, data.position.z)
-              );
-              if (dist > 2.0) {
-                console.warn('서버와의 위치 불일치 감지! 위치 보정됨.');
-                // 여기서 플레이어의 실제 위치를 강제로 덮어씌우는 이벤트 발생 필요
-              }
-            } else {
-              // 다른 플레이어는 그대로 업데이트 (보간 적용 권장)
-              state.position = data.position;
-              state.rotation = data.rotation;
-              this.onPlayerUpdated.notifyObservers(state);
-            }
-          }
-          break;
-        case EventCode.ENEMY_HIT:
-          this.onEnemyHit.notifyObservers({
-            id: data.id,
-            damage: data.damage,
-          });
-          break;
-        case EventCode.TARGET_HIT:
-          this.onTargetHit.notifyObservers({
-            targetId: data.targetId,
-            part: data.part,
-            damage: data.damage,
-          });
-          break;
-        case EventCode.PLAYER_DEATH:
-          this.onPlayerDied.notifyObservers({
-            playerId: data.playerId,
-            attackerId: data.attackerId,
-          });
-          break;
-        case EventCode.TARGET_DESTROY:
-          this.onTargetDestroy.notifyObservers({
-            targetId: data.targetId,
-          });
-          break;
-        case EventCode.SPAWN_TARGET:
-          this.onTargetSpawn.notifyObservers({
-            type: data.type,
-            position: new Vector3(data.position.x, data.position.y, data.position.z),
-            id: data.id,
-            isMoving: data.isMoving,
-          });
-          break;
-        case EventCode.REQ_INITIAL_STATE:
-          this.onInitialStateRequested.notifyObservers({ senderId });
-          break;
-        case EventCode.INITIAL_STATE:
-          // Update internal state with received players
-          if (data.players && Array.isArray(data.players)) {
-            data.players.forEach((p: PlayerState) => {
-              this.playerStates.set(p.id, p);
-            });
-            console.log(
-              `[NetworkManager] Synced ${data.players.length} players from Initial State`
-            );
-          }
-
-          this.onInitialStateReceived.notifyObservers({
-            players: data.players,
-            enemies: data.enemies,
-            targets: data.targets,
-            weaponConfigs: data.weaponConfigs,
-          });
-
-          break;
-      }
+      this.dispatcher.dispatch(code, data, senderId);
     };
   }
 
@@ -303,18 +298,21 @@ export class NetworkManager implements INetworkAuthority {
         weaponId: data.weaponId,
         health: 100,
       };
-      this.playerStates.set(myId, myState);
+      (myState as any).type = 'remote_player';
+      this.entityManager.register(myState as any);
     }
     this.updateState(data);
   }
 
   public updateState(data: { position: Vector3; rotation: Vector3; weaponId: string }): void {
     const myId = this.getSocketId();
-    if (myId && this.playerStates.has(myId)) {
-      const state = this.playerStates.get(myId)!;
-      state.position = { x: data.position.x, y: data.position.y, z: data.position.z };
-      state.rotation = { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z };
-      state.weaponId = data.weaponId;
+    if (myId) {
+      const state = this.entityManager.getEntity(myId) as unknown as PlayerState;
+      if (state) {
+        state.position = { x: data.position.x, y: data.position.y, z: data.position.z };
+        state.rotation = { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z };
+        state.weaponId = data.weaponId;
+      }
     }
 
     this.provider.sendEvent(
@@ -367,6 +365,6 @@ export class NetworkManager implements INetworkAuthority {
   }
 
   public getAllPlayerStates(): PlayerState[] {
-    return Array.from(this.playerStates.values());
+    return this.entityManager.getEntitiesByType('remote_player') as unknown as PlayerState[];
   }
 }

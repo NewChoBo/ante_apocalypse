@@ -1,15 +1,14 @@
 import { Observable, Vector3 } from '@babylonjs/core';
-import { IWorldEntity } from '@ante/game-core';
+import { IWorldEntity, WorldEntityManager as BaseEntityManager } from '@ante/game-core';
 import { NetworkManager } from './NetworkManager';
 import { EventCode } from '@ante/common';
 
 /**
- * 전역 엔티티 관리자.
- * 적, 타겟, 타 플레이어 등 모든 '피격 및 동기화 가능한' 엔티티를 관리합니다.
+ * 전역 엔티티 관리자 (클라이언트 확장).
+ * Babylon.js 전용 로직(Observable, Hit 처리 등)을 포함합니다.
  */
-export class WorldEntityManager {
+export class WorldEntityManager extends BaseEntityManager {
   private static instance: WorldEntityManager;
-  private entities: Map<string, IWorldEntity> = new Map();
   private networkManager: NetworkManager;
 
   // 알림용 옵저버
@@ -18,6 +17,7 @@ export class WorldEntityManager {
   public onEntityHit = new Observable<{ id: string; part: string; damage: number }>();
 
   private constructor() {
+    super();
     this.networkManager = NetworkManager.getInstance();
     this.setupNetworkListeners();
   }
@@ -50,17 +50,14 @@ export class WorldEntityManager {
   }
 
   /** 엔티티 등록 */
-  public registerEntity(entity: IWorldEntity): void {
-    if (this.entities.has(entity.id)) {
-      console.warn(`[WorldEntityManager] Entity with ID ${entity.id} already exists. Overwriting.`);
-    }
-    this.entities.set(entity.id, entity);
+  public override register(entity: IWorldEntity): void {
+    super.register(entity);
     this.onEntityAdded.notifyObservers(entity);
   }
 
   /** 엔티티 제거 */
-  public removeEntity(id: string): void {
-    const entity = this.entities.get(id);
+  public override unregister(id: string): void {
+    const entity = this.getEntity(id);
     if (entity) {
       console.log(
         `[WorldEntityManager] Attempting to remove entity: ${id}, isDead: ${entity.isDead}`
@@ -69,11 +66,8 @@ export class WorldEntityManager {
         entity.die();
       }
 
-      // 엔티티 타입에 따라 즉시 삭제할지, 연출을 기다릴지 결정할 수 있지만
-      // 안전을 위해 일단 내부 맵에서 제거하고 dispose를 호출합니다.
-      // (타겟 등의 애니메이션이 끊길 수 있으므로 나중에 개선 여지가 있음)
       entity.dispose();
-      this.entities.delete(id);
+      super.unregister(id);
       this.onEntityRemoved.notifyObservers(id);
       console.log(`[WorldEntityManager] Entity successfully removed: ${id}`);
     } else {
@@ -81,24 +75,24 @@ export class WorldEntityManager {
     }
   }
 
-  /** 엔티티 조회 */
-  public getEntity(id: string): IWorldEntity | undefined {
-    return this.entities.get(id);
+  // Backward compatibility alias
+  public removeEntity(id: string): void {
+    this.unregister(id);
   }
 
-  /** 모든 엔티티 반환 */
-  public getAllEntities(): IWorldEntity[] {
-    return Array.from(this.entities.values());
+  // Alias for backward compatibility
+  public registerEntity(entity: IWorldEntity): void {
+    this.register(entity);
   }
 
   /** 특정 타입의 모든 엔티티 조회 */
-  public getEntitiesByType(...types: string[]): IWorldEntity[] {
-    return Array.from(this.entities.values()).filter((e) => types.includes(e.type));
+  public override getEntitiesByType(...types: string[]): IWorldEntity[] {
+    return this.getAllEntities().filter((e) => types.includes(e.type));
   }
 
   /** 엔티티 피격 처리 (중앙 집중식) */
   public processHit(id: string, damage: number, part: string = 'body', hitPoint?: Vector3): void {
-    const entity = this.entities.get(id);
+    const entity = this.getEntity(id);
     if (!entity || entity.isDead) return;
 
     // 데미지 계산 (엔티티의 프로필 활용)
@@ -121,8 +115,8 @@ export class WorldEntityManager {
     }
   }
 
-  public clear(): void {
-    this.entities.forEach((e) => e.dispose());
-    this.entities.clear();
+  public override clear(): void {
+    this.getAllEntities().forEach((e) => e.dispose());
+    super.clear();
   }
 }
