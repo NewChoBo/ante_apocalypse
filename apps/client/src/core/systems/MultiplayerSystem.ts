@@ -75,6 +75,10 @@ export class MultiplayerSystem {
       });
     });
 
+    this.networkManager.onInitialStateReceived.add((data) => {
+      this.applyPlayerStates(data.players);
+    });
+
     this.networkManager.onPlayerJoined.add((player) => {
       if (player.id !== this.networkManager.getSocketId()) {
         this.spawnRemotePlayer(player);

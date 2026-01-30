@@ -68,9 +68,23 @@ export class ServerNetworkManager implements INetworkAuthority {
     };
 
     this.client.onActorJoin = (actor: any) => {
-      console.log(`[ServerNetwork] Player Joined: ${actor.actorNr}`);
+      const id = actor.actorNr.toString();
+      const name = actor.name || 'Anonymous';
+      console.log(`[ServerNetwork] Player Joined: ${id} (${name})`);
+
+      if (!this.playerStates.has(id)) {
+        this.playerStates.set(id, {
+          id: id,
+          name: name,
+          position: { x: 0, y: 0, z: 0 },
+          rotation: { x: 0, y: 0, z: 0 },
+          weaponId: 'Pistol',
+          health: 100,
+        });
+      }
+
       // [연결] 컨트롤러에게 알림
-      if (this.onPlayerJoin) this.onPlayerJoin(actor.actorNr.toString());
+      if (this.onPlayerJoin) this.onPlayerJoin(id);
     };
 
     this.client.onActorLeave = (actor: any) => {
@@ -121,9 +135,13 @@ export class ServerNetworkManager implements INetworkAuthority {
         if (!this.playerStates.has(senderId)) {
           // 플레이어 최초 발견 시에도 Hitbox 생성 요청
           if (this.onPlayerJoin) this.onPlayerJoin(senderId);
+
+          const actor = this.client.myRoom().actors[parseInt(senderId)];
+          const name = actor?.name || 'Unknown';
+
           this.playerStates.set(senderId, {
             id: senderId,
-            name: 'Unknown',
+            name: name,
             position: { x: 0, y: 0, z: 0 },
             rotation: { x: 0, y: 0, z: 0 },
             weaponId: 'Pistol',
