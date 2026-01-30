@@ -63,4 +63,7 @@ export abstract class BaseTargetSpawner {
     const isMoving = Math.random() > 0.4;
     return { position: new Vector3(x, 1.0, z), isMoving };
   }
+  public spawnTargetAt(id: string, type: string, position: Vector3, isMoving: boolean): void {
+    this.broadcastTargetSpawn(id, type, position, isMoving);
+  }
 }

@@ -1,3 +1,4 @@
+import { BasePickupManager } from '@ante/game-core';
 import { Scene, Vector3 } from '@babylonjs/core';
 import { PickupActor, PickupType } from '../entities/PickupActor';
 import { PlayerPawn } from '../PlayerPawn';
@@ -8,7 +9,7 @@ import { GameObservables } from '../events/GameObservables';
 import { NetworkManager } from './NetworkManager';
 import { EventCode } from '@ante/common';
 
-export class PickupManager implements ITickable {
+export class PickupManager extends BasePickupManager implements ITickable {
   private static instance: PickupManager;
   private scene: Scene | null = null;
   private player: PlayerPawn | null = null;
@@ -17,7 +18,9 @@ export class PickupManager implements ITickable {
   private networkManager: NetworkManager;
 
   private constructor() {
-    this.networkManager = NetworkManager.getInstance();
+    const netManager = NetworkManager.getInstance();
+    super(netManager);
+    this.networkManager = netManager;
   }
 
   public static getInstance(): PickupManager {
@@ -145,7 +148,9 @@ export class PickupManager implements ITickable {
 
       // Visual collection happens locally,
       // but authority drives state change.
-      this.networkManager.sendEvent(EventCode.DESTROY_PICKUP, { id });
+      // Visual collection happens locally,
+      // but authority drives state change.
+      this.requestDestroyPickup(id);
 
       pickup.collect();
       this.pickups.delete(id);
@@ -179,5 +184,16 @@ export class PickupManager implements ITickable {
   public clear(): void {
     this.pickups.forEach((p) => p.dispose());
     this.pickups.clear();
+  }
+
+  // [Override] Logic for Master Client
+  public override requestSpawnPickup(id: string, type: string, position: Vector3): void {
+    super.requestSpawnPickup(id, type, position); // Broadcast to Others
+    this.spawnPickup(position, type as PickupType, id); // Spawn Locally
+  }
+
+  public override requestDestroyPickup(id: string): void {
+    super.requestDestroyPickup(id); // Broadcast to Others
+    this.handleDestroyEvent({ id }); // Destroy Locally
   }
 }

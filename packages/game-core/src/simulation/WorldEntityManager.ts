@@ -10,7 +10,17 @@ const logger = new Logger('WorldEntityManager');
  * 클라이언트와 서버 모두에서 엔티티를 ID 기반으로 추적하고 관리합니다.
  */
 export class WorldEntityManager {
+  private static instance: WorldEntityManager;
   private entities: Map<string, IWorldEntity> = new Map();
+
+  protected constructor() {}
+
+  public static getInstance(): WorldEntityManager {
+    if (!WorldEntityManager.instance) {
+      WorldEntityManager.instance = new WorldEntityManager();
+    }
+    return WorldEntityManager.instance;
+  }
 
   /**
    * 엔티티 등록

@@ -21,7 +21,7 @@ export class CombatComponent extends BaseComponent {
   constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
 
-    const cameraComp = owner.getComponent(CameraComponent);
+    const cameraComp = owner.getComponent(CameraComponent) as CameraComponent;
     if (!cameraComp) {
       throw new Error('CombatComponent requires a CameraComponent on the Pawn');
     }
@@ -55,7 +55,7 @@ export class CombatComponent extends BaseComponent {
   private attachEffect<T extends BaseComponent>(
     componentClass: new (owner: BasePawn, scene: Scene) => T
   ): T {
-    const comp = new componentClass(this.owner, this.scene);
+    const comp = new componentClass(this.owner as BasePawn, this.scene);
     this.owner.addComponent(comp);
     return comp;
   }

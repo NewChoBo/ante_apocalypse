@@ -7,7 +7,7 @@ import { NetworkManager } from './NetworkManager';
  * Babylon.js 전용 로직(Observable, Hit 처리 등)을 포함합니다.
  */
 export class WorldEntityManager extends BaseEntityManager {
-  private static instance: WorldEntityManager;
+  private static clientInstance: WorldEntityManager;
   private networkManager: NetworkManager;
 
   // 알림용 옵저버
@@ -22,10 +22,10 @@ export class WorldEntityManager extends BaseEntityManager {
   }
 
   public static getInstance(): WorldEntityManager {
-    if (!WorldEntityManager.instance) {
-      WorldEntityManager.instance = new WorldEntityManager();
+    if (!WorldEntityManager.clientInstance) {
+      WorldEntityManager.clientInstance = new WorldEntityManager();
     }
-    return WorldEntityManager.instance;
+    return WorldEntityManager.clientInstance;
   }
 
   private setupNetworkListeners(): void {

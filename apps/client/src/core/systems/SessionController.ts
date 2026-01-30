@@ -11,9 +11,10 @@ import { NetworkManager } from './NetworkManager';
 import { MultiplayerSystem } from './MultiplayerSystem';
 import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
-import { WorldEntityManager } from './WorldEntityManager';
 import { EnemyManager } from './EnemyManager';
 import { EventCode, InitialStatePayload, SpawnTargetPayload } from '@ante/common';
+import { WorldSimulation, WaveSurvivalRule } from '@ante/game-core';
+import { WorldEntityManager } from './WorldEntityManager';
 import { GameObservables } from '../events/GameObservables';
 import { AssetLoader } from '../AssetLoader';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
@@ -30,6 +31,7 @@ export class SessionController {
   private inventoryUI: InventoryUI | null = null;
   private enemyManager: EnemyManager | null = null;
   private targetSpawner: TargetSpawnerComponent | null = null;
+  private simulation: WorldSimulation | null = null;
   private healthUnsub: (() => void) | null = null;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, shadowGenerator: ShadowGenerator) {
@@ -40,7 +42,7 @@ export class SessionController {
 
   public async initialize(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
     this.playerPawn = new PlayerPawn(this.scene);
-    WorldEntityManager.getInstance().registerEntity(this.playerPawn);
+    WorldEntityManager.getInstance().register(this.playerPawn);
 
     if (levelData.playerSpawn) {
       this.playerPawn.position = Vector3.FromArray(levelData.playerSpawn);
@@ -107,7 +109,7 @@ export class SessionController {
 
         if (weaponId) {
           const combat = this.playerPawn?.getComponent(CombatComponent);
-          combat?.equipWeapon(weaponId);
+          (combat as CombatComponent)?.equipWeapon(weaponId);
         }
       },
       onUseItem: (itemId: string): void => {
@@ -159,8 +161,28 @@ export class SessionController {
     );
 
     // Initial State Sync Logic
-    // [Client Side] Always request state, never provide it (Server Authority)
-    network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
+    // Initial State Sync Logic
+    // If Master Client (Host), we initialize the world locally (Authoritative)
+    // If Guest, we request initial state.
+
+    // Initialize WorldSimulation with Client managers
+    if (this.enemyManager && this.targetSpawner) {
+      this.simulation = new WorldSimulation(
+        this.enemyManager,
+        PickupManager.getInstance(),
+        this.targetSpawner,
+        network
+      );
+      this.simulation.setGameRule(new WaveSurvivalRule());
+    }
+
+    if (network.isMasterClient()) {
+      if (this.simulation) {
+        this.simulation.initializeRequest(); // Spawns enemies/targets
+      }
+    } else {
+      network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
+    }
 
     network.onInitialStateReceived.add((data: InitialStatePayload): void => {
       if (this.enemyManager) {
@@ -189,7 +211,7 @@ export class SessionController {
     const combat = this.playerPawn.getComponent(CombatComponent);
     if (!combat) return;
 
-    const weapons = combat.getWeapons();
+    const weapons = (combat as CombatComponent).getWeapons();
     const slots: (string | null)[] = [null, null, null, null];
     weapons.forEach((w, i) => {
       if (i < 4) slots[i] = w.name;

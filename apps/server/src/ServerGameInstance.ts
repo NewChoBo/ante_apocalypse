@@ -20,6 +20,7 @@ import {
   BaseTargetSpawner,
   HitRegistrationSystem,
   TickManager,
+  WaveSurvivalRule,
 } from '@ante/game-core';
 import { ServerEnemyPawn } from './core/ServerEnemyPawn.ts';
 import { ServerTargetPawn } from './core/ServerTargetPawn.ts';
@@ -148,6 +149,9 @@ export class ServerGameInstance {
       this.networkManager
     );
 
+    // [신규] 게임 룰(모드) 설정
+    this.simulation.setGameRule(new WaveSurvivalRule());
+
     // [추가된 부분] 서버용 더미 카메라 생성
     // 서버는 화면을 그리지 않지만, 씬 구동을 위해 카메라가 필수입니다.
     const camera = new ArcRotateCamera('ServerCamera', 0, 0, 10, Vector3.Zero(), this.scene);
@@ -162,11 +166,7 @@ export class ServerGameInstance {
       this.createPlayerPawn(id);
       // 첫 플레이어가 입장하면 게임 레이아웃 생성
       if (this.playerPawns.size === 1) {
-        this.simulation.targets.spawnInitialTargets();
-        this.simulation.enemies.spawnEnemiesAt([
-          [5, 0, 5],
-          [-5, 0, 5],
-        ]);
+        this.simulation.initializeRequest();
       }
     };
     this.networkManager.onPlayerLeave = (id: string) => this.removePlayerPawn(id);

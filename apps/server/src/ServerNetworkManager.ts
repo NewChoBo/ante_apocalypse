@@ -21,7 +21,7 @@ export class ServerNetworkManager implements INetworkAuthority {
   private appId: string = process.env.VITE_PHOTON_APP_ID || '';
   private appVersion: string = process.env.VITE_PHOTON_APP_VERSION || '1.0.0';
 
-  private entityManager: WorldEntityManager = new WorldEntityManager();
+  private entityManager: WorldEntityManager = WorldEntityManager.getInstance();
   private dispatcher: NetworkDispatcher = new NetworkDispatcher();
 
   // [추가] 연결 대기용 Promise Resolver
