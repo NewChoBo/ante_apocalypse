@@ -40,10 +40,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check (Lint & Type Check)
+        run: npm run check -w @ante/client
+
       - name: Build
         env:
           VITE_PHOTON_APP_ID: ${{ secrets.VITE_PHOTON_APP_ID }}
-        run: npm run build
+        run: npm run build -w @ante/client
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -51,7 +54,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './dist'
+          path: './apps/client/dist'
 
       - name: Deploy to GitHub Pages
         id: deployment
