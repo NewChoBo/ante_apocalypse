@@ -114,7 +114,8 @@ export class LogicalServer {
 
       // 3. 네트워크 상태 전파 (TickRate 조절)
       if (currentTime - lastTickTime >= tickInterval) {
-        this.networkManager.broadcastState();
+        const enemyStates = this.enemyManager.getEnemyStates();
+        this.networkManager.broadcastState(enemyStates);
         lastTickTime = currentTime;
       }
     });
@@ -136,6 +137,13 @@ export class LogicalServer {
 
       // 회전은 보통 Y축(Heading)만 중요
       if (rot) pawn.mesh.rotation.set(rot.x, rot.y, rot.z);
+    }
+
+    // Also update entityManager so broadcastState sends correct positions
+    const state = this.networkManager.getPlayerState(id);
+    if (state) {
+      state.position = { x: pos.x, y: pos.y, z: pos.z };
+      state.rotation = { x: rot.x, y: rot.y, z: rot.z };
     }
   }
 

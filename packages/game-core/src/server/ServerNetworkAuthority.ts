@@ -184,13 +184,21 @@ export class ServerNetworkAuthority extends BasePhotonClient {
     this.sendEventToActor(EventCode.INITIAL_STATE, payload, parseInt(targetId));
   }
 
-  public broadcastState(): void {
+  public broadcastState(
+    enemyStates: {
+      id: string;
+      position: Vector3;
+      rotation: Vector3;
+      health: number;
+      isDead: boolean;
+    }[] = []
+  ): void {
     const players = this.entityManager.getAllEntities() as unknown as PlayerState[];
     if (players.length === 0) return;
 
     const payload: InitialStatePayload = {
       players: players,
-      enemies: [],
+      enemies: enemyStates,
       targets: [],
     };
 

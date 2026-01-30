@@ -44,4 +44,30 @@ export class ServerEnemyManager extends BaseEnemyManager {
   protected getEnemyPawn(id: string): ServerEnemyPawn | undefined {
     return this.enemyPawns.get(id);
   }
+
+  public getEnemyStates(): {
+    id: string;
+    position: commonVector3;
+    rotation: commonVector3;
+    health: number;
+    isDead: boolean;
+  }[] {
+    const states: {
+      id: string;
+      position: commonVector3;
+      rotation: commonVector3;
+      health: number;
+      isDead: boolean;
+    }[] = [];
+    this.enemyPawns.forEach((pawn, id) => {
+      states.push({
+        id,
+        position: { x: pawn.mesh.position.x, y: pawn.mesh.position.y, z: pawn.mesh.position.z },
+        rotation: { x: pawn.mesh.rotation.x, y: pawn.mesh.rotation.y, z: pawn.mesh.rotation.z },
+        health: pawn.health,
+        isDead: pawn.isDead,
+      });
+    });
+    return states;
+  }
 }

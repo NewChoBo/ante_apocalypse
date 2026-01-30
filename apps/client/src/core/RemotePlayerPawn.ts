@@ -5,7 +5,6 @@ import {
   StandardMaterial,
   Color3,
   MeshBuilder,
-  DynamicTexture,
   AbstractMesh,
   Skeleton,
   AnimationPropertiesOverride,
@@ -14,8 +13,9 @@ import {
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { AssetLoader } from './AssetLoader';
-import { ParticleSystem, Texture } from '@babylonjs/core';
+import { ParticleSystem, Texture, DynamicTexture } from '@babylonjs/core';
 import { Logger } from '@ante/common';
+import { HealthBarComponent } from './components/HealthBarComponent';
 
 const logger = new Logger('RemotePlayerPawn');
 
@@ -30,8 +30,7 @@ export class RemotePlayerPawn extends BasePawn {
   public id: string;
   public playerName: string;
   private _nameLabel: Mesh | null = null;
-  private _healthBar: Mesh | null = null;
-  private _healthBarTexture: DynamicTexture | null = null;
+  private healthBarComponent: HealthBarComponent | null = null;
   public type = 'remote_player';
   public isMoving = false;
 
@@ -73,7 +72,15 @@ export class RemotePlayerPawn extends BasePawn {
     this.mesh.rotationQuaternion = null;
 
     this.createNameLabel(scene, name);
-    this.createHealthBar(scene);
+
+    // Health Bar Component
+    this.healthBarComponent = new HealthBarComponent(this, scene, {
+      style: 'player',
+      width: 1.5,
+      height: 0.2,
+      yOffset: 0.8,
+    });
+    this.addComponent(this.healthBarComponent);
 
     this.mesh.isPickable = true;
     this.mesh.metadata = {
@@ -112,54 +119,6 @@ export class RemotePlayerPawn extends BasePawn {
     plane.material = mat;
     this._nameLabel = plane;
     logger.info(`Created name label for ${name}`);
-  }
-
-  private createHealthBar(scene: Scene): void {
-    const plane = MeshBuilder.CreatePlane(
-      'healthBar_' + this.id,
-      { width: 1.5, height: 0.2 },
-      scene
-    );
-    plane.position.y = 0.8; // Above name label
-    plane.parent = this.mesh;
-    plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
-
-    const texture = new DynamicTexture(
-      'healthTex_' + this.id,
-      { width: 300, height: 40 },
-      scene,
-      true
-    );
-    texture.hasAlpha = true;
-    this._healthBarTexture = texture;
-    this.updateHealthBar(100);
-
-    const mat = new StandardMaterial('healthMat_' + this.id, scene);
-    mat.diffuseTexture = texture;
-    mat.emissiveColor = Color3.White();
-    mat.backFaceCulling = false;
-    plane.material = mat;
-    this._healthBar = plane;
-  }
-
-  private updateHealthBar(health: number): void {
-    if (!this._healthBarTexture) return;
-    const ctx = this._healthBarTexture.getContext();
-    const width = 300;
-    const height = 40;
-    const healthPct = Math.max(0, health) / 100;
-
-    ctx.clearRect(0, 0, width, height);
-
-    // Background
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-    ctx.fillRect(0, 0, width, height);
-
-    // Health
-    ctx.fillStyle = healthPct > 0.5 ? '#00ff00' : healthPct > 0.2 ? '#ffff00' : '#ff0000';
-    ctx.fillRect(2, 2, (width - 4) * healthPct, height - 4);
-
-    this._healthBarTexture.update();
   }
 
   public initialize(): void {}
@@ -360,12 +319,12 @@ export class RemotePlayerPawn extends BasePawn {
     logger.info(`Hit for ${amount} damage.`);
     // Note: Actual health sync comes from NetworkManager/MultiplayerSystem updates
     // But if we want local prediction or visual feedback:
-    this.updateHealthBar(this.health - amount); // Prediction
+    this.healthBarComponent?.updateHealth(this.health - amount); // Prediction
   }
 
   public updateHealth(health: number): void {
     this.health = health;
-    this.updateHealthBar(health);
+    this.healthBarComponent?.updateHealth(health);
   }
 
   public die(): void {
@@ -457,7 +416,5 @@ export class RemotePlayerPawn extends BasePawn {
     super.dispose();
     if (this.weaponMesh) this.weaponMesh.dispose();
     if (this._nameLabel) this._nameLabel.dispose();
-    if (this._healthBar) this._healthBar.dispose();
-    if (this._healthBarTexture) this._healthBarTexture.dispose();
   }
 }

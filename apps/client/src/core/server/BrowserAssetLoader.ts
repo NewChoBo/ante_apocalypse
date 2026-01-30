@@ -6,9 +6,8 @@ const logger = new Logger('BrowserAssetLoader');
 
 export class BrowserAssetLoader implements IServerAssetLoader {
   public async loadModel(scene: Scene, modelName: string): Promise<LoadedModel> {
-    // In browser, we load from /assets/models/
-    // SceneLoader handles the path relative to the root or base URL.
-    const rootUrl = '/assets/models/';
+    // In browser (Vite dev), assets are served from /src/assets/models/
+    const rootUrl = '/src/assets/models/';
 
     logger.info(`Loading model via BrowserAssetLoader: ${rootUrl + modelName}`);
 
