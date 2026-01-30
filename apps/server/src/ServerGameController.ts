@@ -205,39 +205,11 @@ export class ServerGameController {
           if (hitId === data.targetId) {
             isValidHit = true;
             console.log(`[Server] Hit Verified! Part: ${hitPart}`);
-
             // Optional: Recalculate damage based on server-side body part
-            // finalDamage = calculateDamage(...)
-          } else {
-            console.warn(`[Server] Hit Invalid: Ray hit ${hitId} instead of ${data.targetId}`);
-          }
-        } else {
-          console.warn(`[Server] Hit Invalid: Ray hit nothing.`);
-          console.log(
-            `[Debug] Ray Origin: ${rayOrigin.toString()}, Dir: ${rayDirection.toString()}`
-          );
-
-          // Debug target position
-          const targetMesh =
-            this.enemyManager.getEnemyMesh(data.targetId) ||
-            this.targetSpawner.getTargetMesh(data.targetId) ||
-            this.enemyManager.getEnemyMesh(data.targetId) ||
-            this.targetSpawner.getTargetMesh(data.targetId) ||
-            this.playerPawns.get(data.targetId)?.mesh;
-          if (targetMesh) {
-            console.log(
-              `[Debug] Target ${data.targetId} Pos: ${targetMesh.absolutePosition.toString()}`
-            );
-            console.log(
-              `[Debug] Target ${data.targetId} Bounds: ${targetMesh.getBoundingInfo().boundingBox.minimumWorld} ~ ${targetMesh.getBoundingInfo().boundingBox.maximumWorld}`
-            );
-          } else {
-            console.log(`[Debug] Target ${data.targetId} NOT FOUND`);
           }
         }
       } else {
         // Fallback for old clients or missing data (allow or reject based on policy)
-        console.warn(`[Server] Hit Request missing origin/direction. Allowing for legacy support.`);
         isValidHit = true;
       }
 
@@ -272,7 +244,7 @@ export class ServerGameController {
     this.isRunning = true;
 
     let lastTickTime = Date.now();
-    const tickInterval = 100; // 10Hz (100ms마다 방송)
+    const tickInterval = 16; // 60Hz for smoother gameplay and faster response
 
     // 3. 게임 루프: 렌더링 대신 씬 업데이트 수행
     this.engine.runRenderLoop(() => {

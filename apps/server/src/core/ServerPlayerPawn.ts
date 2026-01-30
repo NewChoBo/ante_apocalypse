@@ -103,13 +103,7 @@ export class ServerPlayerPawn {
         this.skeleton.animationPropertiesOverride.enableBlending = true;
         this.skeleton.animationPropertiesOverride.blendingSpeed = 0.1;
 
-        // Debug Animation Ranges
-        console.log(
-          `[Server] Skeleton ${this.skeleton.name} has ${this.skeleton.getAnimationRanges()?.length || 0} ranges.`
-        );
-        this.skeleton.getAnimationRanges()?.forEach((r) => {
-          if (r) console.log(`[Server] Anim: ${r.name} (${r.from}-${r.to})`);
-        });
+        // Debug Animation Ranges (Removed for production)
 
         // Ensure Idle animation is playing so bones are in correct place
         const idleRange = this.skeleton.getAnimationRange('YBot_Idle');
