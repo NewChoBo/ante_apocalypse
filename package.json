@@ -9,10 +9,10 @@
   "scripts": {
     "dev:client": "npm run dev -w @ante/client",
     "dev:server": "npm run dev -w @ante/server",
-    "build": "npm run build -ws",
-    "check": "npm run check -ws",
-    "lint": "npm run lint -ws",
-    "format": "npm run format -ws",
+    "build": "npm run build --ws",
+    "check": "npm run check --ws",
+    "lint": "npm run lint --ws",
+    "format": "npm run format --ws",
     "test": "vitest run",
     "test:watch": "vitest"
   },

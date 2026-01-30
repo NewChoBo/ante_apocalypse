@@ -159,7 +159,7 @@ export class ServerGameController {
     this.networkManager.onHitRequest = (shooterId: string, data: RequestHitData) => {
       // 1. Validate Hit using Server Raycast
       let isValidHit = false;
-      let finalDamage = data.damage;
+      const finalDamage = data.damage;
 
       logger.info(`Validating Hit from ${shooterId} on ${data.targetId}`);
 
