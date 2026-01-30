@@ -148,8 +148,8 @@ export abstract class BaseWeapon implements IWeapon {
 
     const part = metadata.bodyPart || metadata.part || 'body';
 
-    // 1. Process via WorldEntityManager (Handles Multipliers, Score Dispatching (via observers), and Network Sync)
-    WorldEntityManager.getInstance().processHit(entityId, damageAmount, part, pickedPoint);
+    // 1. Process via WorldEntityManager (isAuthoritative=false for prediction)
+    WorldEntityManager.getInstance().processHit(entityId, damageAmount, part, pickedPoint, false);
 
     // 2. Score processing (using hardcoded fallback for now, or we could use onEntityHit observer)
     if (this.onScoreCallback) {

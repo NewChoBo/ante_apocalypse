@@ -239,7 +239,7 @@ export class ServerNetworkManager implements INetworkAuthority {
   }
 
   // [신규] 피격 결과 방송 (Broadcasting)
-  public broadcastHit(hitData: HitEventData): void {
+  public broadcastHit(hitData: HitEventData, code: number = EventCode.HIT): void {
     // 서버측 상태 업데이트
     const targetState = this.getPlayerState(hitData.targetId);
     if (targetState) {
@@ -248,8 +248,8 @@ export class ServerNetworkManager implements INetworkAuthority {
         `Player ${hitData.targetId} Health: ${targetState.health} (Part: ${hitData.part})`
       );
 
-      // 피격 정보 방송 (상태 포함)
-      this.client.raiseEvent(EventCode.HIT, hitData, {
+      // 피격 정보 방송 (상대 코드 사용)
+      this.client.raiseEvent(code, hitData, {
         receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
       });
 
@@ -259,8 +259,8 @@ export class ServerNetworkManager implements INetworkAuthority {
       }
     } else {
       // [신규] 플레이어가 아닌 대상(에너미, 타겟 등)에 대한 히트도 브로드캐스트
-      logger.info(`Non-player Hit Broadcasted: ${hitData.targetId}`);
-      this.client.raiseEvent(EventCode.HIT, hitData, {
+      logger.info(`Non-player Hit Broadcasted: ${hitData.targetId} with Code ${code}`);
+      this.client.raiseEvent(code, hitData, {
         receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
       });
     }

@@ -32,13 +32,13 @@ export class WorldEntityManager extends BaseEntityManager {
     // 1. 타겟 피격 동기화
     this.networkManager.onTargetHit.add(
       (data: { targetId: string; damage: number; part: string }): void => {
-        this.processHit(data.targetId, data.damage, data.part);
+        this.processHit(data.targetId, data.damage, data.part, undefined, true);
       }
     );
 
     // 2. 적 피격 동기화
     this.networkManager.onEnemyHit.add((data: { id: string; damage: number }): void => {
-      this.processHit(data.id, data.damage, 'body');
+      this.processHit(data.id, data.damage, 'body', undefined, true);
     });
 
     // 3. 타겟 파괴 동기화
@@ -54,6 +54,11 @@ export class WorldEntityManager extends BaseEntityManager {
     // 5. 아이템 파괴 동기화
     this.networkManager.onPickupDestroyed.add((data: { id: string }): void => {
       this.removeEntity(data.id);
+    });
+
+    // 6. 플레이어 피격 동기화 (WorldEntityManager에서도 처리하여 이펙트 및 상태 일관성 유지)
+    this.networkManager.onPlayerHit.add((data) => {
+      this.processHit(data.targetId, data.damage, data.part || 'body', undefined, true);
     });
   }
 
@@ -93,7 +98,13 @@ export class WorldEntityManager extends BaseEntityManager {
   }
 
   /** 엔티티 피격 처리 (중앙 집중식) */
-  public processHit(id: string, damage: number, part: string = 'body', hitPoint?: Vector3): void {
+  public processHit(
+    id: string,
+    damage: number,
+    part: string = 'body',
+    hitPoint?: Vector3,
+    isAuthoritative: boolean = false
+  ): void {
     const entity = this.getEntity(id);
     if (!entity || entity.isDead) return;
 
@@ -107,8 +118,11 @@ export class WorldEntityManager extends BaseEntityManager {
 
     // [수정] 클라이언트는 더 이상 직접 히트를 방송하지 않습니다.
     // 서버가 FIRE 이벤트를 보고 직접 Raycast 판정을 내려 HIT을 방송하기 때문입니다.
-    // 여기서는 로컬 피격 연출(VFX, UI)만 수행합니다.
-    entity.takeDamage(finalDamage, 'source', part, hitPoint);
+    // 여기서는 로컬 피격 연출(VFX, UI)만 수행하며, 실제 데미지 적용은 서버 확정 후에만 합니다.
+    if (isAuthoritative) {
+      entity.takeDamage(finalDamage, 'source', part, hitPoint);
+    }
+
     this.onEntityHit.notifyObservers({ id, part, damage: finalDamage });
 
     // 사망 시 처리

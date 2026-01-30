@@ -14,7 +14,7 @@ export class MultiplayerSystem {
   private networkManager: NetworkManager;
   private shadowGenerator: ShadowGenerator;
   private lastUpdateTime = 0;
-  private updateInterval = 50; // 20Hz update rate
+  private updateInterval = 8; // ~128Hz update rate (extremely responsive)
 
   constructor(
     scene: Scene,
@@ -55,11 +55,16 @@ export class MultiplayerSystem {
         }
       } else {
         // [Authoritative Local Player Health Sync]
-        if (p.health !== undefined && p.health !== this.localPlayer.health) {
-          this.localPlayer.health = p.health;
-          playerHealthStore.set(p.health);
-          if (p.health <= 0 && !this.localPlayer.isDead) {
-            this.localPlayer.die();
+        // We rely on EventCode.HIT for immediate damage feedback.
+        // We only use the state broadcast as a fallback for significant desyncs (> 2 HP).
+        if (p.health !== undefined) {
+          const healthDiff = Math.abs(p.health - this.localPlayer.health);
+          if (healthDiff > 2) {
+            this.localPlayer.health = p.health;
+            playerHealthStore.set(p.health);
+            if (p.health <= 0 && !this.localPlayer.isDead) {
+              this.localPlayer.die();
+            }
           }
         }
       }

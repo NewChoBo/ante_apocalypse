@@ -13,7 +13,7 @@ import {
 } from '@babylonjs/core';
 import { ServerNetworkManager } from './ServerNetworkManager.ts';
 import { ServerApi } from './ServerApi.ts';
-import { RequestHitData, Vector3 as commonVector3, Logger } from '@ante/common';
+import { RequestHitData, Vector3 as commonVector3, Logger, EventCode } from '@ante/common';
 import {
   WorldSimulation,
   BaseEnemyManager,
@@ -173,49 +173,66 @@ export class ServerGameController {
         const rayOrigin = new Vector3(data.origin.x, data.origin.y, data.origin.z);
         const rayDirection = new Vector3(data.direction.x, data.direction.y, data.direction.z);
 
-        // 1. Force Update World Matrix for the target to ensure accurate raycast
-        // Find the target mesh first to update it
+        // 1. Find the target mesh
         const specificTargetMesh =
           this.enemyManager.getEnemyMesh(data.targetId) ||
           this.targetSpawner.getTargetMesh(data.targetId) ||
           this.playerPawns.get(data.targetId)?.mesh;
 
         if (specificTargetMesh) {
-          // Force computation of world matrix for the root and its children (hitboxes)
           specificTargetMesh.computeWorldMatrix(true);
           specificTargetMesh
             .getChildMeshes(false)
             .forEach((child) => child.computeWorldMatrix(true));
-        }
 
-        // Raycast against all meshes (enemies, players, obstacles)
-        // Note: For now, we only have enemy hitboxes and player hitboxes in the scene
-        const result = HitScanSystem.doRaycast(
-          this.scene,
-          rayOrigin,
-          rayDirection, // Direction
-          100, // Range
-          (mesh) => {
-            return mesh.metadata?.id === data.targetId;
-          }
-        );
+          // 2. Try Exact Raycast first (Strict)
+          const result = HitScanSystem.doRaycast(
+            this.scene,
+            rayOrigin,
+            rayDirection,
+            100,
+            (mesh) => mesh.metadata?.id === data.targetId
+          );
 
-        if (result.hit && result.pickedMesh) {
-          const hitId = result.pickedMesh.metadata?.id;
-          const hitPart = result.pickedMesh.metadata?.bodyPart || 'body';
-
-          if (hitId === data.targetId) {
+          if (result.hit && result.pickedMesh) {
             isValidHit = true;
-            logger.info(`Hit Verified! Part: ${hitPart}`);
-            // Optional: Recalculate damage based on server-side body part
+            const hitPart = result.pickedMesh.metadata?.bodyPart || 'body';
+            logger.info(`[Strict] Hit Verified: ${data.targetId} (${hitPart})`);
+          } else {
+            // 3. Lenient Validation (Shooter Favor)
+            // If strict raycast fails, check how close the ray passed to the target's center.
+            // This accounts for small desync in positions.
+            const targetPos = specificTargetMesh.getAbsolutePosition();
+
+            // Perpendicular distance from targetPos to the line defined by ray
+            const v = targetPos.subtract(rayOrigin);
+            // distance = |(P-O) x d| / |d|. Since d is normalized, just |(P-O) x d|
+            const dist = Vector3.Cross(v, rayDirection).length();
+
+            // Allow hit if ray passes within 0.8 units of the target center (approx. player radius + margin)
+            const margin = 0.8;
+            if (dist < margin) {
+              isValidHit = true;
+              logger.info(
+                `[Lenient] Hit Accepted by Distance Support: ${dist.toFixed(3)}m < ${margin}m`
+              );
+            } else {
+              logger.warn(`[Rejected] Hit too far: Distance=${dist.toFixed(3)}m`);
+            }
           }
+        } else {
+          logger.warn(`[Rejected] Target mesh not found: ${data.targetId}`);
         }
       } else {
-        // Fallback for old clients or missing data (allow or reject based on policy)
+        // Fallback for missing ray data
         isValidHit = true;
       }
 
       if (isValidHit) {
+        // Determine Event Code based on target type
+        const isPlayer = this.playerPawns.has(data.targetId);
+        const eventCode = isPlayer ? EventCode.HIT : EventCode.TARGET_HIT;
+
         // Calculate new health based on server state
         const targetState = this.networkManager.getPlayerState(data.targetId);
         let newHealth = 0;
@@ -224,15 +241,19 @@ export class ServerGameController {
         }
 
         logger.info(
-          `Processing Hit: ${shooterId} hit ${data.targetId} (${data.part}) for ${finalDamage} dmg. NewHealth: ${newHealth}`
+          `Processing Hit: ${shooterId} hit ${data.targetId} (${data.part}) for ${finalDamage} dmg. NewHealth: ${newHealth} (Type: ${isPlayer ? 'Player' : 'Target'})`
         );
-        this.networkManager.broadcastHit({
-          targetId: data.targetId,
-          damage: finalDamage,
-          attackerId: shooterId,
-          part: data.part,
-          newHealth: newHealth,
-        });
+
+        this.networkManager.broadcastHit(
+          {
+            targetId: data.targetId,
+            damage: finalDamage,
+            attackerId: shooterId,
+            part: data.part,
+            newHealth: newHealth,
+          },
+          eventCode
+        );
       }
     };
 
@@ -245,8 +266,8 @@ export class ServerGameController {
     this.api.start();
     this.isRunning = true;
 
-    let lastTickTime = Date.now();
-    const tickInterval = 16; // 60Hz for smoother gameplay and faster response
+    let lastTickTime = performance.now();
+    const tickInterval = 7.8; // 128Hz for extremely smooth and responsive high-performance update
 
     // 3. 게임 루프: 렌더링 대신 씬 업데이트 수행
     this.engine.runRenderLoop(() => {
@@ -255,8 +276,8 @@ export class ServerGameController {
       // Babylon 물리/로직 업데이트
       this.scene.render();
 
-      // 4. 네트워크 상태 전파 (TickRate 제절)
-      const now = Date.now();
+      // 4. 네트워크 상태 전파 (TickRate 조절)
+      const now = performance.now();
       if (now - lastTickTime >= tickInterval) {
         this.networkManager.broadcastState();
         lastTickTime = now;
