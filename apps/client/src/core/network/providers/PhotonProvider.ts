@@ -1,6 +1,7 @@
 import * as Photon from 'photon-realtime';
 import { INetworkProvider } from '../INetworkProvider';
 import { RoomInfo, NetworkState, PlayerInfo, Logger } from '@ante/common';
+import { mapPhotonState, mapRoomList } from '@ante/game-core';
 
 const logger = new Logger('PhotonProvider');
 
@@ -40,7 +41,7 @@ export class PhotonProvider implements INetworkProvider {
 
   private setupListeners(): void {
     this.client.onStateChange = (state: number) => {
-      const mappedState = this.mapState(state);
+      const mappedState = mapPhotonState(state);
       logger.info(`State changed: ${mappedState}`);
 
       // Auto-join lobby when connected to master
@@ -55,14 +56,7 @@ export class PhotonProvider implements INetworkProvider {
     };
 
     this.client.onRoomListUpdate = (rooms: any[]) => {
-      const roomInfos: RoomInfo[] = rooms.map((r) => ({
-        id: r.name,
-        name: r.name,
-        playerCount: r.playerCount,
-        maxPlayers: r.maxPlayers,
-        isOpen: r.isOpen,
-        customProperties: r.getCustomProperties(),
-      }));
+      const roomInfos: RoomInfo[] = mapRoomList(rooms);
       this.onRoomListUpdated?.(roomInfos);
     };
 
@@ -106,31 +100,6 @@ export class PhotonProvider implements INetworkProvider {
       logger.error(`Error ${errorCode}: ${errorMsg}`);
       this.onStateChanged?.(NetworkState.Error);
     };
-  }
-
-  private mapState(photonState: number): NetworkState {
-    const States = (Photon as any).LoadBalancing.LoadBalancingClient.State;
-    switch (photonState) {
-      case States.Uninitialized:
-      case States.Disconnected:
-        return NetworkState.Disconnected;
-      case States.ConnectingToNameServer:
-      case States.ConnectingToMasterserver:
-      case States.ConnectingToGameserver:
-        return NetworkState.Connecting;
-      case States.ConnectedToNameServer:
-      case States.ConnectedToMaster:
-        return NetworkState.ConnectedToMaster;
-      case States.JoinedLobby:
-        return NetworkState.InLobby;
-      case States.Joined:
-        return NetworkState.InRoom;
-      case States.Error:
-        return NetworkState.Error;
-      default:
-        // Other intermediate states like LeavingRoom, etc.
-        return NetworkState.Connecting;
-    }
   }
 
   public async connect(userId: string): Promise<boolean> {
@@ -178,19 +147,8 @@ export class PhotonProvider implements INetworkProvider {
   }
 
   public getRoomList(): Promise<RoomInfo[]> {
-    // Photon LoadBalancingClient automatically updates availableRooms
-    // We can return the current scheduled/cached list or wrap a one-time fetch if needed.
-    // However, LoadBalancingClient usually syncs rooms via callbacks.
-    // We will return a resolved promise with the current known list.
     const rooms = this.client.availableRooms() || [];
-    const roomInfos: RoomInfo[] = rooms.map((r: any) => ({
-      id: r.name, // Use name as ID
-      maxPlayers: r.maxPlayers,
-      playerCount: r.playerCount,
-      customProperties: r.getCustomProperties(),
-      isOpen: r.isOpen,
-    }));
-    return Promise.resolve(roomInfos);
+    return Promise.resolve(mapRoomList(rooms));
   }
 
   public leaveRoom(): void {
@@ -255,14 +213,6 @@ export class PhotonProvider implements INetworkProvider {
 
     const rooms = this.client.availableRooms() || [];
     logger.info('Manual room list refresh:', rooms);
-    const roomInfos: RoomInfo[] = rooms.map((r: any) => ({
-      id: r.name,
-      name: r.name,
-      playerCount: r.playerCount,
-      maxPlayers: r.maxPlayers,
-      isOpen: r.isOpen,
-      customProperties: r.getCustomProperties(),
-    }));
-    this.onRoomListUpdated?.(roomInfos);
+    this.onRoomListUpdated?.(mapRoomList(rooms));
   }
 }
