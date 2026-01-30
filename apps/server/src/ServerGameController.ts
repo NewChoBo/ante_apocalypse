@@ -19,7 +19,8 @@ import {
   BaseEnemyManager,
   BasePickupManager,
   BaseTargetSpawner,
-  HitScanSystem,
+  HitRegistrationSystem,
+  TickManager,
 } from '@ante/game-core';
 import { ServerEnemyPawn } from './core/ServerEnemyPawn.ts';
 import { ServerTargetPawn } from './core/ServerTargetPawn.ts';
@@ -160,6 +161,7 @@ export class ServerGameController {
       // 1. Validate Hit using Server Raycast
       let isValidHit = false;
       const finalDamage = data.damage;
+      let hitPart = data.part || 'body';
 
       logger.info(`Validating Hit from ${shooterId} on ${data.targetId}`);
 
@@ -174,51 +176,31 @@ export class ServerGameController {
         const rayDirection = new Vector3(data.direction.x, data.direction.y, data.direction.z);
 
         // 1. Find the target mesh
-        const specificTargetMesh =
+        const targetMesh =
           this.enemyManager.getEnemyMesh(data.targetId) ||
           this.targetSpawner.getTargetMesh(data.targetId) ||
           this.playerPawns.get(data.targetId)?.mesh;
 
-        if (specificTargetMesh) {
-          specificTargetMesh.computeWorldMatrix(true);
-          specificTargetMesh
-            .getChildMeshes(false)
-            .forEach((child) => child.computeWorldMatrix(true));
-
-          // 2. Try Exact Raycast first (Strict)
-          const result = HitScanSystem.doRaycast(
+        if (targetMesh) {
+          // 2. Use common HitRegistrationSystem for validation
+          const validation = HitRegistrationSystem.validateHit(
             this.scene,
+            data.targetId,
             rayOrigin,
             rayDirection,
-            100,
-            (mesh) => mesh.metadata?.id === data.targetId
+            targetMesh,
+            0.8 // margin
           );
 
-          if (result.hit && result.pickedMesh) {
-            isValidHit = true;
-            const hitPart = result.pickedMesh.metadata?.bodyPart || 'body';
-            logger.info(`[Strict] Hit Verified: ${data.targetId} (${hitPart})`);
+          isValidHit = validation.isValid;
+          hitPart = validation.part;
+
+          if (isValidHit) {
+            logger.info(
+              `[${validation.method.toUpperCase()}] Hit Verified: ${data.targetId} (${hitPart})`
+            );
           } else {
-            // 3. Lenient Validation (Shooter Favor)
-            // If strict raycast fails, check how close the ray passed to the target's center.
-            // This accounts for small desync in positions.
-            const targetPos = specificTargetMesh.getAbsolutePosition();
-
-            // Perpendicular distance from targetPos to the line defined by ray
-            const v = targetPos.subtract(rayOrigin);
-            // distance = |(P-O) x d| / |d|. Since d is normalized, just |(P-O) x d|
-            const dist = Vector3.Cross(v, rayDirection).length();
-
-            // Allow hit if ray passes within 0.8 units of the target center (approx. player radius + margin)
-            const margin = 0.8;
-            if (dist < margin) {
-              isValidHit = true;
-              logger.info(
-                `[Lenient] Hit Accepted by Distance Support: ${dist.toFixed(3)}m < ${margin}m`
-              );
-            } else {
-              logger.warn(`[Rejected] Hit too far: Distance=${dist.toFixed(3)}m`);
-            }
+            logger.warn(`[Rejected] Hit too far: Distance=${validation.distance?.toFixed(3)}m`);
           }
         } else {
           logger.warn(`[Rejected] Target mesh not found: ${data.targetId}`);
@@ -267,20 +249,27 @@ export class ServerGameController {
     this.isRunning = true;
 
     let lastTickTime = performance.now();
+    let lastFrameTime = performance.now();
     const tickInterval = 7.8; // 128Hz for extremely smooth and responsive high-performance update
 
     // 3. 게임 루프: 렌더링 대신 씬 업데이트 수행
     this.engine.runRenderLoop(() => {
       if (!this.isRunning) return;
 
-      // Babylon 물리/로직 업데이트
+      const currentTime = performance.now();
+      const deltaTime = (currentTime - lastFrameTime) / 1000;
+      lastFrameTime = currentTime;
+
+      // 1. 공통 로직 틱 (TickManager에 등록된 폰 등 업데이트)
+      TickManager.getInstance().tick(deltaTime);
+
+      // 2. Babylon 물리/로직 업데이트
       this.scene.render();
 
       // 4. 네트워크 상태 전파 (TickRate 조절)
-      const now = performance.now();
-      if (now - lastTickTime >= tickInterval) {
+      if (currentTime - lastTickTime >= tickInterval) {
         this.networkManager.broadcastState();
-        lastTickTime = now;
+        lastTickTime = currentTime;
       }
     });
 

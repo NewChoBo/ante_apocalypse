@@ -11,17 +11,19 @@ import {
 import * as path from 'path';
 import * as fs from 'fs';
 import { Logger } from '@ante/common';
+import { BasePawn } from '@ante/game-core';
 
 const logger = new Logger('ServerPlayerPawn');
 
-export class ServerPlayerPawn {
-  public mesh: Mesh;
-  public id: string;
+export class ServerPlayerPawn extends BasePawn {
+  public override mesh: Mesh;
   public visualMesh: AbstractMesh | null = null;
   public skeleton: Skeleton | null = null;
   public headBox: Mesh | null = null;
+  public override type = 'player';
 
   constructor(id: string, scene: Scene, position: Vector3) {
+    super(scene);
     this.id = id;
 
     // 1. Root Collider (Pivot at eye level: 1.75m) - Matches RemotePlayerPawn
@@ -140,7 +142,26 @@ export class ServerPlayerPawn {
     }
   }
 
-  public dispose() {
-    this.mesh.dispose();
+  public tick(_deltaTime: number): void {
+    // 서버측에서는 컴포넌트 업데이트 정도만 수행
+    this.updateComponents(_deltaTime);
+  }
+
+  public takeDamage(amount: number): void {
+    if (this.isDead) return;
+    this.health = Math.max(0, this.health - amount);
+    if (this.health <= 0) {
+      this.die();
+    }
+  }
+
+  public die(): void {
+    this.isDead = true;
+    this.health = 0;
+    logger.info(`ServerPlayerPawn ${this.id} died.`);
+  }
+
+  public override dispose() {
+    super.dispose();
   }
 }

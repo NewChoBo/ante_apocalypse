@@ -1,5 +1,7 @@
 import { IWorldEntity } from '../types/IWorldEntity.js';
+import { DamageSystem } from '../systems/DamageSystem.js';
 import { Logger } from '@ante/common';
+import { Vector3 } from '@babylonjs/core';
 
 const logger = new Logger('WorldEntityManager');
 
@@ -53,6 +55,31 @@ export class WorldEntityManager {
    */
   public findEntity(predicate: (entity: IWorldEntity) => boolean): IWorldEntity | undefined {
     return Array.from(this.entities.values()).find(predicate);
+  }
+
+  /**
+   * 엔티티 피격 처리 (중앙 집중식 공통 로직)
+   * @returns 계산된 최종 데미지
+   */
+  public processHit(
+    id: string,
+    damage: number,
+    part: string = 'body',
+    hitPoint?: Vector3,
+    isAuthoritative: boolean = false
+  ): number {
+    const entity = this.getEntity(id);
+    if (!entity || entity.isDead) return 0;
+
+    // 공통 데미지 시스템을 사용하여 계산
+    const finalDamage = DamageSystem.calculateDamage(damage, part, entity.damageProfile);
+
+    // 권위가 있는 경우(서버 혹은 수신된 확정 패킷) 실제 데미지 적용
+    if (isAuthoritative) {
+      entity.takeDamage(finalDamage, 'source', part, hitPoint);
+    }
+
+    return finalDamage;
   }
 
   /**

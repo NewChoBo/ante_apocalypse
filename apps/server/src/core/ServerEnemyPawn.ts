@@ -1,15 +1,16 @@
 import { Mesh, MeshBuilder, Scene, Vector3 } from '@babylonjs/core';
 import { Logger } from '@ante/common';
+import { BasePawn } from '@ante/game-core';
 
 const logger = new Logger('ServerEnemyPawn');
 
-export class ServerEnemyPawn {
-  public mesh: Mesh;
+export class ServerEnemyPawn extends BasePawn {
+  public override mesh: Mesh;
   public headBox: Mesh;
-  public id: string;
-  public isDead = false;
+  public override type = 'enemy';
 
   constructor(id: string, scene: Scene, position: Vector3) {
+    super(scene);
     this.id = id;
 
     // 1. Root Collider (Body) - Matches client's root collider
@@ -48,7 +49,25 @@ export class ServerEnemyPawn {
     logger.info(`Created Enemy Pawn ${id} at ${position}`);
   }
 
-  public dispose() {
-    this.mesh.dispose(); // Children (headBox) are disposed automatically
+  public tick(deltaTime: number): void {
+    this.updateComponents(deltaTime);
+  }
+
+  public takeDamage(amount: number): void {
+    if (this.isDead) return;
+    this.health = Math.max(0, this.health - amount);
+    if (this.health <= 0) {
+      this.die();
+    }
+  }
+
+  public die(): void {
+    this.isDead = true;
+    this.health = 0;
+    logger.info(`ServerEnemyPawn ${this.id} died.`);
+  }
+
+  public override dispose() {
+    super.dispose();
   }
 }

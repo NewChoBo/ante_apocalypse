@@ -98,37 +98,20 @@ export class WorldEntityManager extends BaseEntityManager {
   }
 
   /** 엔티티 피격 처리 (중앙 집중식) */
-  public processHit(
+  public override processHit(
     id: string,
     damage: number,
     part: string = 'body',
     hitPoint?: Vector3,
     isAuthoritative: boolean = false
-  ): void {
-    const entity = this.getEntity(id);
-    if (!entity || entity.isDead) return;
+  ): number {
+    const finalDamage = super.processHit(id, damage, part, hitPoint, isAuthoritative);
 
-    // 데미지 계산 (엔티티의 프로필 활용)
-    let finalDamage = damage;
-    if (entity.damageProfile) {
-      const multiplier =
-        entity.damageProfile.multipliers[part] ?? entity.damageProfile.defaultMultiplier;
-      finalDamage = damage * multiplier;
+    if (finalDamage > 0) {
+      this.onEntityHit.notifyObservers({ id, part, damage: finalDamage });
     }
 
-    // [수정] 클라이언트는 더 이상 직접 히트를 방송하지 않습니다.
-    // 서버가 FIRE 이벤트를 보고 직접 Raycast 판정을 내려 HIT을 방송하기 때문입니다.
-    // 여기서는 로컬 피격 연출(VFX, UI)만 수행하며, 실제 데미지 적용은 서버 확정 후에만 합니다.
-    if (isAuthoritative) {
-      entity.takeDamage(finalDamage, 'source', part, hitPoint);
-    }
-
-    this.onEntityHit.notifyObservers({ id, part, damage: finalDamage });
-
-    // 사망 시 처리
-    if (entity.isDead) {
-      this.removeEntity(id);
-    }
+    return finalDamage;
   }
 
   public override clear(): void {

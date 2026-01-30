@@ -1,13 +1,15 @@
 import { Mesh, MeshBuilder, Scene, Vector3 } from '@babylonjs/core';
 import { Logger } from '@ante/common';
+import { BasePawn } from '@ante/game-core';
 
 const logger = new Logger('ServerTargetPawn');
 
-export class ServerTargetPawn {
-  public mesh: Mesh;
-  public id: string;
+export class ServerTargetPawn extends BasePawn {
+  public override mesh: Mesh;
+  public override type = 'target';
 
   constructor(id: string, scene: Scene, position: Vector3) {
+    super(scene);
     this.id = id;
 
     // Matches Client StaticTarget: Cylinder { height: 0.1, diameter: 1.5 }
@@ -29,7 +31,25 @@ export class ServerTargetPawn {
     logger.info(`Created Target Pawn ${id} at ${position}`);
   }
 
-  public dispose() {
-    this.mesh.dispose();
+  public tick(deltaTime: number): void {
+    this.updateComponents(deltaTime);
+  }
+
+  public takeDamage(amount: number): void {
+    if (this.isDead) return;
+    this.health = Math.max(0, this.health - amount);
+    if (this.health <= 0) {
+      this.die();
+    }
+  }
+
+  public die(): void {
+    this.isDead = true;
+    this.health = 0;
+    logger.info(`ServerTargetPawn ${this.id} destroyed.`);
+  }
+
+  public override dispose() {
+    super.dispose();
   }
 }
