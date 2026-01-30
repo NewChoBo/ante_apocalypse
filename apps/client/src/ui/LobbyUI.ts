@@ -7,6 +7,7 @@ import {
   Control,
   Button,
   Checkbox,
+  InputText,
 } from '@babylonjs/gui';
 import { NetworkManager } from '../core/systems/NetworkManager';
 import { UIManager, UIScreen } from './UIManager';
@@ -21,7 +22,6 @@ export class LobbyUI {
   private roomListPanel: StackPanel;
   private networkManager: NetworkManager;
   private uiManager: UIManager;
-  private hostLocalCheckbox: Checkbox | null = null;
 
   // Visual Constants from UIManager (for consistency)
   private readonly PRIMARY_COLOR = '#ffc400';
@@ -115,53 +115,11 @@ export class LobbyUI {
 
     bottomControls.addControl(refreshBtn);
 
-    // [New] Host Local Checkbox Panel
-    const hostPanel = new StackPanel();
-    hostPanel.isVertical = false;
-    hostPanel.width = '200px';
-    hostPanel.paddingLeft = '20px';
-    bottomControls.addControl(hostPanel);
-
-    this.hostLocalCheckbox = new Checkbox();
-    this.hostLocalCheckbox.width = '20px';
-    this.hostLocalCheckbox.height = '20px';
-    this.hostLocalCheckbox.isChecked = true; // Default to true for testing
-    this.hostLocalCheckbox.color = this.PRIMARY_COLOR;
-    hostPanel.addControl(this.hostLocalCheckbox);
-
-    const hostLabel = new TextBlock();
-    hostLabel.text = 'HOST LOCALLY';
-    hostLabel.color = 'white';
-    hostLabel.fontSize = 14;
-    hostLabel.fontFamily = this.FONT_MONO;
-    hostLabel.paddingLeft = '10px';
-    hostLabel.width = '150px';
-    hostLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    hostPanel.addControl(hostLabel);
-
     // Create Room Button
     const createBtn = this.createButton('CREATE_SQUAD', '150px');
     createBtn.paddingLeft = '20px';
-    createBtn.onPointerUpObservable.add(async () => {
-      const playerName = localStorage.getItem('playerName') || 'COMMANDER';
-      const mapId = this.uiManager.getSelectedMap();
-      const roomName = `OPS_${playerName}_${Math.floor(Math.random() * 1000)}`;
-
-      if (this.hostLocalCheckbox?.isChecked) {
-        logger.info('Creating Local Server Session...');
-        try {
-          await LocalServerManager.getInstance().startSession(roomName, mapId);
-          // Wait briefly for Photon to register the room, then join as client
-          await this.networkManager.joinRoom(roomName);
-        } catch (e) {
-          logger.error('Failed to create or join local server room:', e);
-          LocalServerManager.getInstance().stopSession();
-          return;
-        }
-      } else {
-        // Client-side Room Creation (Dedicated Logic or Peer-to-Peer without LogicalServer)
-        await this.networkManager.createRoom(roomName, mapId);
-      }
+    createBtn.onPointerUpObservable.add(() => {
+      this.showCreateRoomModal();
     });
     bottomControls.addControl(createBtn);
 
@@ -310,6 +268,168 @@ export class LobbyUI {
     stack.addControl(joinBtn);
 
     return rect;
+  }
+
+  private showCreateRoomModal(): void {
+    const modalOverlay = new Rectangle('modal-overlay');
+    modalOverlay.width = '100%';
+    modalOverlay.height = '100%';
+    modalOverlay.background = 'rgba(0, 0, 0, 0.8)';
+    modalOverlay.thickness = 0;
+    modalOverlay.isPointerBlocker = true;
+    this.container.addControl(modalOverlay);
+
+    const modal = new Rectangle('create-room-modal');
+    modal.width = '600px';
+    modal.height = '500px';
+    modal.background = this.BG_COLOR;
+    modal.color = this.PRIMARY_COLOR;
+    modal.thickness = 2;
+    modalOverlay.addControl(modal);
+
+    const stack = new StackPanel();
+    stack.paddingTop = '20px';
+    stack.spacing = 20;
+    modal.addControl(stack);
+
+    const title = new TextBlock();
+    title.text = 'CONFIGURE_SQUAD_CHANNEL';
+    title.color = 'white';
+    title.fontSize = 24;
+    title.fontFamily = this.FONT_TACTICAL;
+    title.fontWeight = '700';
+    title.height = '40px';
+    stack.addControl(title);
+
+    // Room Name
+    const nameLabel = this.createModalLabel('CHANNEL_ID:');
+    stack.addControl(nameLabel);
+
+    const playerName = localStorage.getItem('playerName') || 'COMMANDER';
+    const roomInput = new InputText();
+    roomInput.width = '400px';
+    roomInput.height = '40px';
+    roomInput.text = `OPS_${playerName}_${Math.floor(Math.random() * 1000)}`;
+    roomInput.color = 'white';
+    roomInput.background = 'rgba(255, 255, 255, 0.05)';
+    roomInput.fontFamily = this.FONT_MONO;
+    stack.addControl(roomInput);
+
+    // Map Selection
+    const mapLabel = this.createModalLabel('DEPLOYMENT_ZONE:');
+    stack.addControl(mapLabel);
+
+    const mapGrid = new StackPanel();
+    mapGrid.isVertical = false;
+    mapGrid.height = '50px';
+    stack.addControl(mapGrid);
+
+    let selectedMap = 'training_ground';
+    const mapBtns: Button[] = [];
+
+    const createMapOption = (id: string, label: string) => {
+      const btn = Button.CreateSimpleButton('modal-map-' + id, label);
+      btn.width = '180px';
+      btn.height = '35px';
+      btn.fontFamily = this.FONT_MONO;
+      btn.fontSize = 12;
+      btn.thickness = 1;
+      btn.paddingRight = '10px';
+
+      const updateMapStyles = () => {
+        const isSelected = selectedMap === id;
+        btn.color = isSelected ? 'black' : 'white';
+        btn.background = isSelected ? this.PRIMARY_COLOR : 'rgba(255,255,255,0.05)';
+      };
+
+      btn.onPointerUpObservable.add(() => {
+        selectedMap = id;
+        mapBtns.forEach((b) => {
+          const isSel = b.name === 'modal-map-' + id;
+          b.color = isSel ? 'black' : 'white';
+          b.background = isSel ? this.PRIMARY_COLOR : 'rgba(255,255,255,0.05)';
+        });
+      });
+
+      updateMapStyles();
+      mapBtns.push(btn);
+      return btn;
+    };
+
+    mapGrid.addControl(createMapOption('training_ground', 'TRAINING_GD'));
+    mapGrid.addControl(createMapOption('combat_zone', 'COMBAT_ZONE'));
+
+    // Host Locally Toggle
+    const hostTogglePanel = new StackPanel();
+    hostTogglePanel.isVertical = false;
+    hostTogglePanel.height = '40px';
+    stack.addControl(hostTogglePanel);
+
+    const checkbox = new Checkbox();
+    checkbox.width = '20px';
+    checkbox.height = '20px';
+    checkbox.isChecked = true;
+    checkbox.color = this.PRIMARY_COLOR;
+    hostTogglePanel.addControl(checkbox);
+
+    const checkboxLabel = new TextBlock();
+    checkboxLabel.text = 'ESTABLISH_LOCAL_SERVER_AUTHORITY';
+    checkboxLabel.color = 'white';
+    checkboxLabel.fontSize = 12;
+    checkboxLabel.fontFamily = this.FONT_MONO;
+    checkboxLabel.paddingLeft = '10px';
+    checkboxLabel.width = '350px';
+    checkboxLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    hostTogglePanel.addControl(checkboxLabel);
+
+    // Action Buttons
+    const buttonPanel = new StackPanel();
+    buttonPanel.isVertical = false;
+    buttonPanel.height = '100px';
+    buttonPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
+    stack.addControl(buttonPanel);
+
+    const cancelBtn = this.createButton('ABORT', '150px');
+    cancelBtn.color = '#ff4d4d';
+    cancelBtn.onPointerUpObservable.add(() => {
+      modalOverlay.dispose();
+    });
+    buttonPanel.addControl(cancelBtn);
+
+    const initBtn = this.createButton('INITIATE', '200px');
+    initBtn.paddingLeft = '20px';
+    initBtn.onPointerUpObservable.add(async () => {
+      const roomName = roomInput.text;
+      const mapId = selectedMap;
+
+      modalOverlay.dispose();
+
+      if (checkbox.isChecked) {
+        logger.info('Creating Local Server Session...');
+        try {
+          await LocalServerManager.getInstance().startSession(roomName, mapId);
+          await this.networkManager.joinRoom(roomName);
+        } catch (e) {
+          logger.error('Failed to create or join local server room:', e);
+          LocalServerManager.getInstance().stopSession();
+        }
+      } else {
+        await this.networkManager.createRoom(roomName, mapId);
+      }
+    });
+    buttonPanel.addControl(initBtn);
+  }
+
+  private createModalLabel(text: string): TextBlock {
+    const label = new TextBlock();
+    label.text = text;
+    label.color = this.PRIMARY_COLOR;
+    label.fontSize = 12;
+    label.fontFamily = this.FONT_MONO;
+    label.height = '20px';
+    label.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    label.paddingLeft = '100px';
+    return label;
   }
 
   private createButton(text: string, width: string): Button {

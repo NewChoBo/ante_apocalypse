@@ -15,8 +15,6 @@ import { NetworkState, Logger } from '@ante/common';
 
 const logger = new Logger('UIManager');
 
-type TacticalButton = Button & { _updateStyles?: () => void };
-
 export enum UIScreen {
   LOGIN = 'LOGIN',
   MAIN_MENU = 'MAIN_MENU',
@@ -217,55 +215,6 @@ export class UIManager {
     const multiBtn = this.createMenuButton('DEPLOY_OP.EXE', 'ESTABLISH_UPLINK');
     multiBtn.onPointerUpObservable.add(() => this.onStartMultiplayer.notifyObservers());
     stack.addControl(multiBtn);
-
-    const mapLabel = new TextBlock();
-    mapLabel.text = 'SELECT_DEPLOYMENT_ZONE:';
-    mapLabel.color = this.PRIMARY_COLOR;
-    mapLabel.fontSize = 12;
-    mapLabel.fontFamily = this.FONT_MONO;
-    mapLabel.height = '40px';
-    mapLabel.paddingTop = '20px';
-    mapLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    stack.addControl(mapLabel);
-
-    const mapGrid = new StackPanel('map-selector');
-    mapGrid.isVertical = false;
-    mapGrid.height = '60px';
-    mapGrid.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    stack.addControl(mapGrid);
-
-    const mapButtons: TacticalButton[] = [];
-
-    const createMapBtn = (id: string, label: string) => {
-      const btn = Button.CreateSimpleButton('map-btn-' + id, label);
-      btn.width = '150px';
-      btn.height = '40px';
-      btn.fontFamily = this.FONT_MONO;
-      btn.fontSize = 12;
-      btn.thickness = 1;
-      btn.paddingRight = '10px';
-
-      const updateStyles = () => {
-        const isSelected = this.selectedMap === id;
-        btn.color = isSelected ? 'black' : 'white';
-        btn.background = isSelected ? this.PRIMARY_COLOR : 'rgba(255,255,255,0.05)';
-        btn.alpha = isSelected ? 1 : 0.6;
-      };
-
-      updateStyles();
-
-      btn.onPointerUpObservable.add(() => {
-        this.selectedMap = id;
-        mapButtons.forEach((b) => b._updateStyles?.());
-      });
-
-      (btn as TacticalButton)._updateStyles = updateStyles;
-      mapButtons.push(btn as TacticalButton);
-      return btn;
-    };
-
-    mapGrid.addControl(createMapBtn('training_ground', 'TRAINING_GD'));
-    mapGrid.addControl(createMapBtn('combat_zone', 'COMBAT_ZONE'));
 
     const spacer = new Rectangle();
     spacer.height = '40px';
