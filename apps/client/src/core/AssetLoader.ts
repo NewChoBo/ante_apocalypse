@@ -8,6 +8,7 @@ import {
 } from '@babylonjs/core';
 import '@babylonjs/loaders/glTF';
 import { Logger } from '@ante/common';
+import { settingsStore } from './store/SettingsStore';
 
 const logger = new Logger('AssetLoader');
 
@@ -118,6 +119,27 @@ export class AssetLoader {
       if (!this.audioEngine) {
         logger.info(`[Load#${id}] Initializing AudioEngine...`);
         this.audioEngine = await CreateAudioEngineAsync();
+
+        // Apply initial volume
+        const currentSettings = settingsStore.get();
+        if (this.audioEngine) {
+          const v2 = this.audioEngine as any;
+          v2.volume = currentSettings.masterVolume;
+          if (typeof v2.setVolume === 'function') {
+            v2.setVolume(currentSettings.masterVolume);
+          }
+        }
+
+        // Subscribe to volume changes
+        settingsStore.subscribe((state) => {
+          if (this.audioEngine) {
+            const v2 = this.audioEngine as any;
+            v2.volume = state.masterVolume;
+            if (typeof v2.setVolume === 'function') {
+              v2.setVolume(state.masterVolume);
+            }
+          }
+        });
       }
 
       if (scene.isDisposed) throw new Error('Scene disposed during audio initialization');

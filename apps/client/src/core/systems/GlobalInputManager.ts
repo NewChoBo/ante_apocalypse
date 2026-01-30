@@ -77,6 +77,12 @@ export class GlobalInputManager {
 
       const ui = UIManager.getInstance();
       if (ui) {
+        if (ui.currentScreen === UIScreen.SETTINGS) {
+          // If we are in game (which we are if GlobalInputManager is active), return to PAUSE
+          ui.showScreen(UIScreen.PAUSE);
+          return;
+        }
+
         const isPaused = ui.currentScreen === UIScreen.PAUSE;
         if (isPaused) {
           ui.showScreen(UIScreen.NONE);

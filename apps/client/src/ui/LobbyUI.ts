@@ -174,19 +174,21 @@ export class LobbyUI {
       .getDescendants()
       .find((d) => d.name === 'network-status-msg') as TextBlock;
     if (isDisconnected) {
-      if (!messageBox) {
-        messageBox = new TextBlock('network-status-msg');
-        messageBox.color = '#ff4d4d';
-        messageBox.fontSize = 14;
-        messageBox.fontFamily = this.FONT_MONO;
-        messageBox.height = '30px';
-        messageBox.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-        messageBox.top = '50px';
-        this.container.addControl(messageBox);
+      if (this.container && this.container.host) {
+        if (!messageBox) {
+          messageBox = new TextBlock('network-status-msg');
+          messageBox.color = '#ff4d4d';
+          messageBox.fontSize = 14;
+          messageBox.fontFamily = this.FONT_MONO;
+          messageBox.height = '30px';
+          messageBox.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+          messageBox.top = '50px';
+          this.container.addControl(messageBox);
+        }
+        messageBox.text =
+          state === 'Connecting' ? 'ESTABLISHING_UPLINK...' : 'OFFLINE_MODE - ATTEMPTING_RECONNECT';
+        messageBox.isVisible = true;
       }
-      messageBox.text =
-        state === 'Connecting' ? 'ESTABLISHING_UPLINK...' : 'OFFLINE_MODE - ATTEMPTING_RECONNECT';
-      messageBox.isVisible = true;
     } else if (messageBox) {
       messageBox.isVisible = false;
     }

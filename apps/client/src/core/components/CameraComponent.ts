@@ -2,6 +2,7 @@ import { UniversalCamera, Vector3, Scene } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { CombatComponent } from './CombatComponent';
 import type { BasePawn } from '../BasePawn';
+import { settingsStore } from '../store/SettingsStore';
 
 export interface RotationInput {
   x: number;
@@ -14,6 +15,7 @@ export interface RotationInput {
 export class CameraComponent extends BaseComponent {
   public camera: UniversalCamera;
   private mouseSensitivity = 0.002;
+  private settingsUnsubscribe: (() => void) | null = null;
   private minPitch = -Math.PI / 2 + 0.1;
   private maxPitch = Math.PI / 2 - 0.1;
 
@@ -33,6 +35,13 @@ export class CameraComponent extends BaseComponent {
     this.camera.minZ = 0.1;
     this.camera.fov = this.defaultFOV;
     this.camera.inputs.clear(); // 컨트롤러에서 제어하므로 입력 해제
+
+    // 초기 감도 설정 및 구독
+    const currentSettings = settingsStore.get();
+    this.mouseSensitivity = currentSettings.mouseSensitivity;
+    this.settingsUnsubscribe = settingsStore.subscribe((state) => {
+      this.mouseSensitivity = state.mouseSensitivity;
+    });
   }
 
   /** 마우스 델타값에 기반해 회전 처리 */
@@ -94,6 +103,9 @@ export class CameraComponent extends BaseComponent {
 
   public dispose(): void {
     super.dispose();
+    if (this.settingsUnsubscribe) {
+      this.settingsUnsubscribe();
+    }
     this.camera.dispose();
   }
 }

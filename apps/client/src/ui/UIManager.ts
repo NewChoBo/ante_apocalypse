@@ -7,10 +7,12 @@ import {
   Button,
   InputText,
   Container,
+  Slider,
 } from '@babylonjs/gui';
 import { Scene, Observable } from '@babylonjs/core';
 import { LobbyUI } from './LobbyUI';
 import { NetworkManager } from '../core/systems/NetworkManager';
+import { settingsStore } from '../core/store/SettingsStore';
 import { NetworkState, Logger } from '@ante/common';
 
 const logger = new Logger('UIManager');
@@ -20,6 +22,7 @@ export enum UIScreen {
   MAIN_MENU = 'MAIN_MENU',
   LOBBY = 'LOBBY',
   PAUSE = 'PAUSE',
+  SETTINGS = 'SETTINGS',
   NONE = 'NONE',
 }
 
@@ -91,6 +94,7 @@ export class UIManager {
     this.screens.set(UIScreen.MAIN_MENU, this.createMainMenuScreen());
     this.screens.set(UIScreen.LOBBY, this.createLobbyScreen());
     this.screens.set(UIScreen.PAUSE, this.createPauseScreen());
+    this.screens.set(UIScreen.SETTINGS, this.createSettingsScreen());
 
     // Hide all initially
     this.screens.forEach((s) => (s.isVisible = false));
@@ -216,8 +220,13 @@ export class UIManager {
     multiBtn.onPointerUpObservable.add(() => this.onStartMultiplayer.notifyObservers());
     stack.addControl(multiBtn);
 
+    const settingsBtn = this.createTacticalButton('SETTINGS', '250px', '40px');
+    settingsBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    settingsBtn.onPointerUpObservable.add(() => this.showScreen(UIScreen.SETTINGS));
+    stack.addControl(settingsBtn);
+
     const spacer = new Rectangle();
-    spacer.height = '40px';
+    spacer.height = '20px';
     spacer.thickness = 0;
     stack.addControl(spacer);
 
@@ -261,6 +270,11 @@ export class UIManager {
     resumeBtn.onPointerUpObservable.add(() => this.onResume.notifyObservers());
     stack.addControl(resumeBtn);
 
+    const settingsBtn = this.createTacticalButton('SETTINGS', '300px', '50px');
+    settingsBtn.paddingTop = '10px';
+    settingsBtn.onPointerUpObservable.add(() => this.showScreen(UIScreen.SETTINGS));
+    stack.addControl(settingsBtn);
+
     const spacer = new Rectangle();
     spacer.height = '20px';
     spacer.thickness = 0;
@@ -269,6 +283,90 @@ export class UIManager {
     const abortBtn = this.createTacticalButton('ABORT MISSION', '300px', '50px');
     abortBtn.onPointerUpObservable.add(() => this.onAbort.notifyObservers());
     stack.addControl(abortBtn);
+
+    return container;
+  }
+
+  private createSettingsScreen(): Container {
+    const container = new Rectangle('settings-container');
+    container.width = '100%';
+    container.height = '100%';
+    container.background = this.BG_COLOR;
+    container.thickness = 0;
+    this.ui.addControl(container);
+
+    const stack = new StackPanel();
+    stack.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    stack.spacing = 30;
+    container.addControl(stack);
+
+    const header = new TextBlock();
+    header.text = 'O.S. CONFIGURATION';
+    header.color = 'white';
+    header.fontSize = 48;
+    header.fontFamily = this.FONT_TACTICAL;
+    header.fontWeight = '800';
+    header.height = '80px';
+    stack.addControl(header);
+
+    const currentSettings = settingsStore.get();
+
+    // -- Volume Control --
+    const volPanel = new StackPanel();
+    volPanel.height = '80px';
+    stack.addControl(volPanel);
+
+    const volLabel = new TextBlock();
+    volLabel.text = `MASTER_VOLUME: ${Math.round(currentSettings.masterVolume * 100)}%`;
+    volLabel.color = this.PRIMARY_COLOR;
+    volLabel.fontSize = 14;
+    volLabel.fontFamily = this.FONT_MONO;
+    volLabel.height = '30px';
+    volPanel.addControl(volLabel);
+
+    const volSlider = new Slider();
+    volSlider.minimum = 0;
+    volSlider.maximum = 1;
+    volSlider.value = currentSettings.masterVolume;
+    volSlider.height = '20px';
+    volSlider.width = '400px';
+    volSlider.color = this.PRIMARY_COLOR;
+    volSlider.background = 'rgba(255, 255, 255, 0.1)';
+    volSlider.onValueChangedObservable.add((value) => {
+      settingsStore.setKey('masterVolume', value);
+      volLabel.text = `MASTER_VOLUME: ${Math.round(value * 100)}%`;
+    });
+    volPanel.addControl(volSlider);
+
+    // -- Sensitivity Control --
+    const sensPanel = new StackPanel();
+    sensPanel.height = '80px';
+    stack.addControl(sensPanel);
+
+    const sensLabel = new TextBlock();
+    // Sensitivity UI scale: 100 is 0.01
+    sensLabel.text = `INPUT_SENSITIVITY: ${Math.round(currentSettings.mouseSensitivity * 10000)}`;
+    sensLabel.color = this.PRIMARY_COLOR;
+    sensLabel.fontSize = 14;
+    sensLabel.fontFamily = this.FONT_MONO;
+    sensLabel.height = '30px';
+    sensPanel.addControl(sensLabel);
+
+    const sensSlider = new Slider();
+    sensSlider.minimum = 0.0001;
+    sensSlider.maximum = 0.01;
+    sensSlider.value = currentSettings.mouseSensitivity;
+    sensSlider.height = '20px';
+    sensSlider.width = '400px';
+    sensSlider.color = this.PRIMARY_COLOR;
+    sensSlider.background = 'rgba(255, 255, 255, 0.1)';
+    sensSlider.onValueChangedObservable.add((value) => {
+      settingsStore.setKey('mouseSensitivity', value);
+      sensLabel.text = `INPUT_SENSITIVITY: ${Math.round(value * 10000)}`;
+    });
+    sensPanel.addControl(sensSlider);
+
+    stack.addControl(sensPanel);
 
     return container;
   }

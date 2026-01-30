@@ -45,6 +45,17 @@ export class Game {
       }
     };
 
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Escape') {
+        if (this.uiManager && this.uiManager.currentScreen === UIScreen.SETTINGS) {
+          if (!this.isRunning) {
+            this.uiManager.showScreen(UIScreen.MAIN_MENU);
+          }
+          // In-game is handled by GlobalInputManager
+        }
+      }
+    });
+
     this.initCanvas();
     this.initEngine();
     this.sceneManager = new SceneManager(this.engine);
@@ -161,7 +172,10 @@ export class Game {
     try {
       await AssetLoader.getInstance().load(scene);
     } catch (e) {
-      logger.error('Failed to preload assets:', e);
+      logger.error('CRITICAL: Failed to preload assets. Aborting game start.', e);
+      this.uiManager.showNotification('SYSTEM_FAILURE:_REQUIRED_ASSETS_MISSING');
+      this.quitToMenu();
+      return;
     }
 
     this.sessionController = new SessionController(scene, this.canvas, shadowGenerator);
