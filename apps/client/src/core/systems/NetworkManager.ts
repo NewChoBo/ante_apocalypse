@@ -287,6 +287,13 @@ export class NetworkManager implements INetworkAuthority {
   }
 
   public leaveRoom(): void {
+    // Stop local server if running (host leaving room)
+    // Dynamic import to avoid circular dependency, but wrapped in void
+    void import('../server/LocalServerManager').then(({ LocalServerManager }) => {
+      if (LocalServerManager.getInstance().isServerRunning()) {
+        LocalServerManager.getInstance().stopSession();
+      }
+    });
     this.provider.disconnect();
   }
 

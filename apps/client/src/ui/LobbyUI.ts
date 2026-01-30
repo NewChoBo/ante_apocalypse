@@ -149,10 +149,15 @@ export class LobbyUI {
 
       if (this.hostLocalCheckbox?.isChecked) {
         logger.info('Creating Local Server Session...');
-        await LocalServerManager.getInstance().startSession(roomName, mapId);
-        // Wait briefly for Photon to register the room (if needed)
-        // Then join it as a client
-        await this.networkManager.joinRoom(roomName);
+        try {
+          await LocalServerManager.getInstance().startSession(roomName, mapId);
+          // Wait briefly for Photon to register the room, then join as client
+          await this.networkManager.joinRoom(roomName);
+        } catch (e) {
+          logger.error('Failed to create or join local server room:', e);
+          LocalServerManager.getInstance().stopSession();
+          return;
+        }
       } else {
         // Client-side Room Creation (Dedicated Logic or Peer-to-Peer without LogicalServer)
         await this.networkManager.createRoom(roomName, mapId);

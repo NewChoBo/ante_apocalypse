@@ -2,7 +2,6 @@ import { NullEngine, Scene, MeshBuilder, ArcRotateCamera, Vector3 } from '@babyl
 import { ServerNetworkAuthority } from './ServerNetworkAuthority.js';
 import { RequestHitData, Vector3 as commonVector3, Logger, EventCode } from '@ante/common';
 import { WorldSimulation } from '../simulation/WorldSimulation.js';
-import { TickManager } from '../systems/TickManager.js';
 import { WaveSurvivalRule } from '../rules/WaveSurvivalRule.js';
 import { HitRegistrationSystem } from '../systems/HitRegistrationSystem.js';
 
@@ -95,7 +94,6 @@ export class LogicalServer {
     this.isRunning = true;
 
     let lastTickTime = performance.now();
-    let lastFrameTime = performance.now();
     const tickInterval = 7.8; // 128Hz
 
     // 게임 루프: 렌더링 대신 씬 업데이트 수행
@@ -103,13 +101,13 @@ export class LogicalServer {
       if (!this.isRunning) return;
 
       const currentTime = performance.now();
-      const deltaTime = (currentTime - lastFrameTime) / 1000;
-      lastFrameTime = currentTime;
 
-      // 1. 공통 로직 틱 (TickManager에 등록된 폰 등 업데이트)
-      TickManager.getInstance().tick(deltaTime);
+      // NOTE: TickManager.tick() is intentionally NOT called here.
+      // When client hosts locally, TickManager is a singleton shared with client.
+      // Calling it here would double-tick player movement.
+      // Server only needs to update its own scene and simulation.
 
-      // 2. Babylon 물리/로직 업데이트
+      // 1. Babylon 물리/로직 업데이트
       this.scene.render();
 
       // 3. 네트워크 상태 전파 (TickRate 조절)
