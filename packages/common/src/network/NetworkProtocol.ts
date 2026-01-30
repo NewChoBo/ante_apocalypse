@@ -21,6 +21,7 @@ export enum EventCode {
   PLAYER_DEATH = 20,
   REQ_WEAPON_CONFIGS = 21,
   WEAPON_CONFIGS = 22,
+  REQUEST_HIT = 23,
 }
 
 export interface RoomInfo {
@@ -66,6 +67,13 @@ export interface HitEventData {
 export interface DeathEventData {
   playerId: string;
   attackerId: string;
+}
+
+export interface RequestHitData {
+  targetId: string; // 맞은 엔티티 ID
+  damage: number; // 적용할 데미지
+  hitPart?: string; // (선택) 헤드샷 등 부위
+  weaponId: string; // (선택) 로그용
 }
 
 export enum NetworkState {

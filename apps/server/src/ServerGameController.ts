@@ -5,11 +5,9 @@ import {
   ArcRotateCamera,
   Vector3,
   AbstractMesh,
-  Ray,
 } from '@babylonjs/core';
 import { ServerNetworkManager } from './ServerNetworkManager.ts';
 import { ServerApi } from './ServerApi.ts';
-import { WeaponRegistry } from '@ante/common';
 import {
   WorldSimulation,
   BaseEnemyManager,
@@ -73,6 +71,14 @@ export class ServerGameController {
     this.networkManager.onPlayerLeave = (id) => this.removePlayerHitbox(id);
     this.networkManager.onPlayerMove = (id, pos, rot) => this.updatePlayerHitbox(id, pos, rot);
     this.networkManager.onFireRequest = (id, origin, dir) => this.processFireEvent(id, origin, dir);
+    this.networkManager.onHitRequest = (shooterId, data) => {
+      console.log(`[Server] Trusted Hit: ${shooterId} hit ${data.targetId} for ${data.damage} dmg`);
+      this.networkManager.broadcastHit({
+        targetId: data.targetId,
+        damage: data.damage,
+        attackerId: shooterId,
+      });
+    };
 
     console.log('[ServerGameController] Physics World Initialized');
   }
@@ -150,43 +156,15 @@ export class ServerGameController {
     }
   }
 
-  // [신규] 사격 판정 로직 (Raycast)
   public processFireEvent(
     playerId: string,
-    origin: any,
-    direction: any,
-    weaponIdOverride?: string
+    _origin: any,
+    _direction: any,
+    _weaponIdOverride?: string
   ) {
-    const playerState = this.networkManager.getPlayerState(playerId);
-    const weaponId = weaponIdOverride || playerState?.weaponId || 'Pistol';
-    const weaponStats = WeaponRegistry[weaponId] || WeaponRegistry['Pistol'];
-
-    const rayOrigin = new Vector3(origin.x, origin.y, origin.z);
-    const rayDir = new Vector3(direction.x, direction.y, direction.z);
-    const ray = new Ray(rayOrigin, rayDir, weaponStats.range);
-
-    // 서버 월드에서 레이 발사! (발사자 본인은 피격 대상에서 제외 - AI 발사의 경우 sender(MasterClient)가 제외됨)
-    const hitInfo = this.scene.pickWithRay(ray, (mesh) => {
-      return mesh.metadata?.id !== playerId;
-    });
-
-    if (hitInfo && hitInfo.hit && hitInfo.pickedMesh) {
-      console.log(
-        `[Server] 🎯 HIT! Shooter: ${playerId} (${weaponId}) -> Target: ${hitInfo.pickedMesh.name}`
-      );
-
-      // 맞은 대상이 플레이어라면 데미지 처리 방송
-      if (hitInfo.pickedMesh.metadata?.isPlayer) {
-        const targetId = hitInfo.pickedMesh.metadata.id;
-        this.networkManager.broadcastHit({
-          targetId,
-          damage: weaponStats.damage,
-          attackerId: playerId,
-        });
-      }
-    } else {
-      console.log(`[Server] 💨 Miss by ${playerId} with ${weaponId}`);
-    }
+    // 클라이언트 주도 방식에서는 서버에서 물리 연산(Raycast)을 수행하지 않습니다.
+    // 단순히 발사 이벤트가 발생했음을 로그에 남기거나, 필요한 경우 비주얼 처리를 위해 브로드캐스트할 수 있습니다.
+    console.log(`[Server] Fire Event: ${playerId}`);
   }
 
   public stop(): void {

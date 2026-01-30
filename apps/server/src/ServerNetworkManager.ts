@@ -17,6 +17,7 @@ export class ServerNetworkManager implements INetworkAuthority {
   public onPlayerLeave?: (id: string) => void;
   public onPlayerMove?: (id: string, pos: any, rot: any) => void;
   public onFireRequest?: (id: string, origin: any, dir: any, weaponId?: string) => void;
+  public onHitRequest?: (shooterId: string, data: any) => void;
 
   public getPlayerState(id: string): PlayerState | undefined {
     return this.playerStates.get(id);
@@ -159,6 +160,11 @@ export class ServerNetworkManager implements INetworkAuthority {
           );
         }
         break;
+      case EventCode.REQUEST_HIT:
+        if (this.onHitRequest) {
+          this.onHitRequest(senderId, data);
+        }
+        break;
     }
   }
 
@@ -221,6 +227,13 @@ export class ServerNetworkManager implements INetworkAuthority {
       if (targetState.health <= 0) {
         this.broadcastDeath(hitData.targetId, hitData.attackerId);
       }
+    } else {
+      // [신규] 플레이어가 아닌 대상(에너미, 타겟 등)에 대한 히트도 브로드캐스트
+      // 클라이언트가 이 정보를 받아 각자 필요한 시각 효과나 체력 감소를 처리하도록 함
+      console.log(`[ServerNetwork] Non-player Hit Broadcasted: ${hitData.targetId}`);
+      this.client.raiseEvent(EventCode.HIT, hitData, {
+        receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
+      });
     }
   }
 

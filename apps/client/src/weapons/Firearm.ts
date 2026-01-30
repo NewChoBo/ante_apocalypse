@@ -1,9 +1,7 @@
 import {
   Scene,
   UniversalCamera,
-  Ray,
   Vector3,
-  Mesh,
   MeshBuilder,
   StandardMaterial,
   Color3,
@@ -13,6 +11,7 @@ import { GameObservables } from '../core/events/GameObservables';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon';
 import { NetworkManager } from '../core/systems/NetworkManager';
+import { HitScanSystem } from '@ante/game-core';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
@@ -207,22 +206,39 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     );
 
     const direction = forwardRay.direction.add(randomSpread).normalize();
-    const ray = new Ray(this.camera.globalPosition, direction, this.range);
+    const rayOrigin = this.camera.globalPosition;
+    const result = HitScanSystem.doRaycast(
+      this.scene,
+      rayOrigin,
+      direction,
+      this.range,
+      (mesh) => mesh.name !== 'playerPawn'
+    );
 
-    const pickInfo = this.scene.pickWithRay(ray, (mesh) => {
-      // 투명한 메쉬나 플레이어 자신 제외하고 모든 pickable 메쉬 허용
-      return mesh.isPickable && mesh.isVisible && mesh.name !== 'playerPawn';
-    });
-
-    if (pickInfo?.hit && pickInfo.pickedMesh) {
-      // 1. 공통 타격 이펙트 (벽, 바닥, 타겟 모두 포함)
+    if (result.hit && result.pickedMesh) {
+      // 1. 공통 타격 이펙트 (반응성 확보)
       GameObservables.hitEffect.notifyObservers({
-        position: pickInfo.pickedPoint!,
-        normal: pickInfo.getNormal(true) || Vector3.Up(),
+        position: result.pickedPoint!,
+        normal: result.normal || Vector3.Up(),
       });
 
-      // 2. 통합 히트 프로세싱 (적, 타겟 등)
-      this.processHit(pickInfo.pickedMesh as Mesh, pickInfo.pickedPoint!, this.damage);
+      // 2. 서버에 피격 요청 전송
+      const targetMesh = result.pickedMesh;
+
+      // Pawn ID 추출 시도 (플레이어 등)
+      let targetId = targetMesh.metadata?.id || targetMesh.name;
+      if (targetMesh.metadata?.pawn) {
+        targetId = targetMesh.metadata.pawn.id;
+      }
+
+      NetworkManager.getInstance().requestHit({
+        targetId,
+        damage: this.damage,
+        weaponId: this.name,
+      });
+
+      // 3. 통합 히트 프로세싱 (로컬 연출 등)
+      this.processHit(targetMesh, result.pickedPoint!, this.damage);
     }
   }
 

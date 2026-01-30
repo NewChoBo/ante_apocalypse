@@ -189,7 +189,7 @@ export class RemotePlayerPawn extends BasePawn {
       entries.rootNodes.forEach((node) => {
         if (node instanceof AbstractMesh) {
           node.isPickable = true;
-          node.metadata = { type: 'enemy', pawn: this, bodyPart: 'body' };
+          node.metadata = { type: 'remote_player', pawn: this, bodyPart: 'body' };
         }
         node.getChildMeshes().forEach((m) => {
           m.isPickable = true;

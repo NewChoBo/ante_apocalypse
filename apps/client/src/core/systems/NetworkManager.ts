@@ -10,6 +10,7 @@ import {
   FireEventData,
   HitEventData,
   DeathEventData,
+  RequestHitData,
 } from '@ante/common';
 
 export class NetworkManager implements INetworkAuthority {
@@ -147,7 +148,7 @@ export class NetworkManager implements INetworkAuthority {
             playerId: data.targetId,
             damage: data.damage,
             newHealth: data.newHealth || 0,
-            attackerId: senderId,
+            attackerId: data.attackerId || senderId, // data.attackerId가 있으면 그것을 사용
           });
           break;
         case EventCode.SYNC_WEAPON:
@@ -338,6 +339,10 @@ export class NetworkManager implements INetworkAuthority {
 
   public syncWeapon(weaponId: string): void {
     this.provider.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
+  }
+
+  public requestHit(hitData: RequestHitData): void {
+    this.provider.sendEvent(EventCode.REQUEST_HIT, hitData, true);
   }
 
   public sendEvent(code: number, data: any, reliable: boolean = true): void {
