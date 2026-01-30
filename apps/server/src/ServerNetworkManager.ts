@@ -1,9 +1,20 @@
 import Photon from 'photon-realtime';
-import { EventCode, PlayerState } from '@ante/common';
+import {
+  EventCode,
+  PlayerState,
+  FireEventData,
+  HitEventData,
+  DeathEventData,
+  RequestHitData,
+  Vector3,
+  MovePayload,
+  InitialStatePayload,
+  SyncWeaponPayload,
+} from '@ante/common';
 import { INetworkAuthority, WorldEntityManager, NetworkDispatcher } from '@ante/game-core';
 
 export class ServerNetworkManager implements INetworkAuthority {
-  private client: any;
+  private client: any; // Photon.LoadBalancing.LoadBalancingClient
   private appId: string = process.env.VITE_PHOTON_APP_ID || '';
   private appVersion: string = process.env.VITE_PHOTON_APP_VERSION || '1.0.0';
 
@@ -16,9 +27,9 @@ export class ServerNetworkManager implements INetworkAuthority {
   // [추가] 외부로 내보낼 콜백 함수들
   public onPlayerJoin?: (id: string) => void;
   public onPlayerLeave?: (id: string) => void;
-  public onPlayerMove?: (id: string, pos: any, rot: any) => void;
-  public onFireRequest?: (id: string, origin: any, dir: any, weaponId?: string) => void;
-  public onHitRequest?: (shooterId: string, data: any) => void;
+  public onPlayerMove?: (id: string, pos: Vector3, rot: Vector3) => void;
+  public onFireRequest?: (id: string, origin: Vector3, dir: Vector3, weaponId?: string) => void;
+  public onHitRequest?: (shooterId: string, data: RequestHitData) => void;
 
   public getPlayerState(id: string): PlayerState | undefined {
     return this.entityManager.getEntity(id) as unknown as PlayerState;
@@ -32,7 +43,7 @@ export class ServerNetworkManager implements INetworkAuthority {
     return 'server';
   }
 
-  public sendEvent(code: number, data: any, _reliable: boolean = true): void {
+  public sendEvent(code: number, data: unknown, _reliable: boolean = true): void {
     this.client.raiseEvent(code, data, {
       receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
     });
@@ -50,11 +61,11 @@ export class ServerNetworkManager implements INetworkAuthority {
   }
 
   private setupDispatcher(): void {
-    this.dispatcher.register(EventCode.REQ_INITIAL_STATE, (_data, senderId) => {
+    this.dispatcher.register(EventCode.REQ_INITIAL_STATE, (_data: unknown, senderId: string) => {
       this.sendInitialState(senderId);
     });
 
-    this.dispatcher.register(EventCode.MOVE, (data, senderId) => {
+    this.dispatcher.register(EventCode.MOVE, (data: MovePayload, senderId: string) => {
       if (senderId === this.client.myActor().actorNr.toString()) return;
 
       let entity = this.entityManager.getEntity(senderId) as unknown as PlayerState;
@@ -72,7 +83,7 @@ export class ServerNetworkManager implements INetworkAuthority {
           weaponId: 'Pistol',
           health: 100,
         };
-        (entity as any).type = 'remote_player'; // IWorldEntity type
+        (entity as unknown as { type: string }).type = 'remote_player'; // IWorldEntity type
         this.entityManager.register(entity as any);
       } else {
         entity.position = data.position;
@@ -84,14 +95,14 @@ export class ServerNetworkManager implements INetworkAuthority {
       }
     });
 
-    this.dispatcher.register(EventCode.SYNC_WEAPON, (data, senderId) => {
+    this.dispatcher.register(EventCode.SYNC_WEAPON, (data: SyncWeaponPayload, senderId: string) => {
       const state = this.getPlayerState(senderId);
       if (state) {
         state.weaponId = data.weaponId;
       }
     });
 
-    this.dispatcher.register(EventCode.FIRE, (data, senderId) => {
+    this.dispatcher.register(EventCode.FIRE, (data: FireEventData, senderId: string) => {
       if (this.onFireRequest && data.muzzleTransform) {
         this.onFireRequest(
           senderId,
@@ -102,7 +113,7 @@ export class ServerNetworkManager implements INetworkAuthority {
       }
     });
 
-    this.dispatcher.register(EventCode.REQUEST_HIT, (data, senderId) => {
+    this.dispatcher.register(EventCode.REQUEST_HIT, (data: RequestHitData, senderId: string) => {
       if (this.onHitRequest) {
         this.onHitRequest(senderId, data);
       }
@@ -124,7 +135,7 @@ export class ServerNetworkManager implements INetworkAuthority {
       }
     };
 
-    this.client.onEvent = (code: number, content: any, actorNr: number) => {
+    this.client.onEvent = (code: number, content: unknown, actorNr: number) => {
       this.dispatcher.dispatch(code, content, actorNr.toString());
     };
 
@@ -134,9 +145,6 @@ export class ServerNetworkManager implements INetworkAuthority {
 
       // [서버 본인 제외] 서버(방장 더미)는 플레이어 목록 및 히트박스 생성에서 제외
       if (actor.actorNr === this.client.myActor().actorNr) {
-        console.log(
-          `[ServerNetwork] Server actor joined (ID: ${id}). Skipping character creation.`
-        );
         return;
       }
 
@@ -151,7 +159,7 @@ export class ServerNetworkManager implements INetworkAuthority {
           weaponId: 'Pistol',
           health: 100,
         };
-        (state as any).type = 'remote_player';
+        (state as unknown as { type: string }).type = 'remote_player';
         this.entityManager.register(state as any);
       }
 
@@ -199,65 +207,48 @@ export class ServerNetworkManager implements INetworkAuthority {
 
   private sendInitialState(targetId: string): void {
     console.log(`[ServerNetwork] Sending Initial State to ${targetId}`);
-    const playerParams: any[] = this.entityManager.getAllEntities();
-    const enemyStates: any[] = [];
-    const targetStates: any[] = [];
+    const players = this.entityManager.getAllEntities() as unknown as PlayerState[];
+    const payload: InitialStatePayload = {
+      players,
+      enemies: [],
+      targets: [],
+    };
 
-    this.client.raiseEvent(
-      EventCode.INITIAL_STATE,
-      {
-        players: playerParams,
-        enemies: enemyStates,
-        targets: targetStates,
-      },
-      { targetActors: [parseInt(targetId)] }
-    );
+    this.client.raiseEvent(EventCode.INITIAL_STATE, payload, {
+      targetActors: [parseInt(targetId)],
+    });
   }
 
   public broadcastState(): void {
     const players = this.entityManager.getAllEntities() as unknown as PlayerState[];
     if (players.length === 0) return;
 
-    // 현재 모든 플레이어의 상태를 스냅샷으로 생성
-    const playerParams: any[] = players;
+    const payload: InitialStatePayload = {
+      players: players,
+      enemies: [],
+      targets: [],
+      // weaponConfigs: WeaponRegistry,
+    };
 
-    // 월드 전체 상태 방송 (스냅샷 전송)
-    this.client.raiseEvent(
-      EventCode.INITIAL_STATE,
-      {
-        players: playerParams,
-        enemies: [],
-        targets: [],
-        // weaponConfigs: WeaponRegistry, // [최적화] 매 프레임 보낼 필요 없음
-      },
-      { receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All }
-    );
+    this.client.raiseEvent(EventCode.INITIAL_STATE, payload, {
+      receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
+    });
   }
 
   // [신규] 피격 결과 방송 (Broadcasting)
-  public broadcastHit(hitData: {
-    targetId: string;
-    damage: number;
-    attackerId: string;
-    hitPart?: string;
-  }): void {
+  public broadcastHit(hitData: HitEventData): void {
     // 서버측 상태 업데이트
     const targetState = this.getPlayerState(hitData.targetId);
     if (targetState) {
-      targetState.health = Math.max(0, targetState.health - hitData.damage);
+      targetState.health = hitData.newHealth;
       console.log(
-        `[ServerNetwork] Player ${hitData.targetId} Health: ${targetState.health} (HitPart: ${hitData.hitPart})`
+        `[ServerNetwork] Player ${hitData.targetId} Health: ${targetState.health} (Part: ${hitData.part})`
       );
 
       // 피격 정보 방송 (상태 포함)
-      this.client.raiseEvent(
-        EventCode.HIT,
-        {
-          ...hitData,
-          newHealth: targetState.health,
-        },
-        { receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All }
-      );
+      this.client.raiseEvent(EventCode.HIT, hitData, {
+        receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
+      });
 
       // 사망 처리
       if (targetState.health <= 0) {
@@ -265,7 +256,6 @@ export class ServerNetworkManager implements INetworkAuthority {
       }
     } else {
       // [신규] 플레이어가 아닌 대상(에너미, 타겟 등)에 대한 히트도 브로드캐스트
-      // 클라이언트가 이 정보를 받아 각자 필요한 시각 효과나 체력 감소를 처리하도록 함
       console.log(`[ServerNetwork] Non-player Hit Broadcasted: ${hitData.targetId}`);
       this.client.raiseEvent(EventCode.HIT, hitData, {
         receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
@@ -273,16 +263,15 @@ export class ServerNetworkManager implements INetworkAuthority {
     }
   }
 
-  public broadcastDeath(playerId: string, attackerId: string): void {
-    console.log(`[ServerNetwork] 💀 Player ${playerId} was killed by ${attackerId}`);
-    this.client.raiseEvent(
-      EventCode.PLAYER_DEATH,
-      {
-        playerId,
-        attackerId,
-      },
-      { receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All }
-    );
+  public broadcastDeath(targetId: string, attackerId: string): void {
+    console.log(`[ServerNetwork] 💀 Player ${targetId} was killed by ${attackerId}`);
+    const payload: DeathEventData = {
+      targetId,
+      attackerId,
+    };
+    this.client.raiseEvent(EventCode.PLAYER_DEATH, payload, {
+      receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
+    });
   }
 
   public disconnect(): void {

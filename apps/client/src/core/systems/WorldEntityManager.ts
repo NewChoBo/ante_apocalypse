@@ -1,7 +1,6 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { IWorldEntity, WorldEntityManager as BaseEntityManager } from '@ante/game-core';
 import { NetworkManager } from './NetworkManager';
-import { EventCode } from '@ante/common';
 
 /**
  * 전역 엔티티 관리자 (클라이언트 확장).
@@ -40,12 +39,19 @@ export class WorldEntityManager extends BaseEntityManager {
       this.processHit(data.id, data.damage, 'body');
     });
 
-    // 3. 엔티티 파괴 동기화
-    this.networkManager.onEvent.add((event) => {
-      if (event.code === EventCode.TARGET_DESTROY || event.code === EventCode.DESTROY_ENEMY) {
-        const id = event.data.targetId || event.data.id;
-        this.removeEntity(id);
-      }
+    // 3. 타겟 파괴 동기화
+    this.networkManager.onTargetDestroy.add((data) => {
+      this.removeEntity(data.targetId);
+    });
+
+    // 4. 적 파괴 동기화
+    this.networkManager.onEnemyDestroyed.add((data) => {
+      this.removeEntity(data.id);
+    });
+
+    // 5. 아이템 파괴 동기화
+    this.networkManager.onPickupDestroyed.add((data) => {
+      this.removeEntity(data.id);
     });
   }
 

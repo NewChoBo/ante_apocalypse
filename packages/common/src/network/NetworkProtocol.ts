@@ -24,6 +24,12 @@ export enum EventCode {
   REQUEST_HIT = 23,
 }
 
+export interface Vector3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
 export interface RoomInfo {
   id: string; // Photon Room Name
   name: string;
@@ -41,40 +47,94 @@ export interface PlayerInfo {
 
 export interface PlayerState {
   id: string;
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
+  position: Vector3;
+  rotation: Vector3;
   weaponId: string;
   name: string;
   health: number;
+}
+
+export interface MovePayload {
+  position: Vector3;
+  rotation: Vector3;
+  weaponId: string;
 }
 
 export interface FireEventData {
   playerId: string;
   weaponId: string;
   muzzleTransform?: {
-    position: { x: number; y: number; z: number };
-    direction: { x: number; y: number; z: number };
+    position: Vector3;
+    direction: Vector3;
   };
 }
 
 export interface HitEventData {
-  playerId: string;
+  targetId: string;
+  attackerId: string;
   damage: number;
   newHealth: number;
-  attackerId: string;
-  hitPart?: string; // (선택) 헤드샷 등 부위
+  part?: string;
 }
 
 export interface DeathEventData {
-  playerId: string;
+  targetId: string;
   attackerId: string;
 }
 
 export interface RequestHitData {
-  targetId: string; // 맞은 엔티티 ID
-  damage: number; // 적용할 데미지
-  hitPart?: string; // (선택) 헤드샷 등 부위
-  weaponId: string; // (선택) 로그용
+  targetId: string;
+  damage: number;
+  part?: string;
+  weaponId: string;
+}
+
+export interface InitialStatePayload {
+  players: PlayerState[];
+  enemies: any[]; // To be typed later if needed
+  targets?: any[];
+  weaponConfigs?: Record<string, any>;
+}
+
+export interface SyncWeaponPayload {
+  weaponId: string;
+}
+
+export interface EnemyMovePayload {
+  id: string;
+  position: Vector3;
+  rotation: Vector3;
+  isMoving?: boolean;
+}
+
+export interface EnemyHitPayload {
+  id: string;
+  damage: number;
+}
+
+export interface TargetHitPayload {
+  targetId: string;
+  part: string;
+  damage: number;
+}
+
+export interface TargetDestroyPayload {
+  targetId: string;
+}
+
+export interface SpawnTargetPayload {
+  type: string;
+  position: Vector3;
+  id: string;
+  isMoving: boolean;
+}
+
+export interface EnemyDestroyPayload {
+  id: string;
+}
+
+export interface PickupDestroyPayload {
+  id: string;
 }
 
 export enum NetworkState {

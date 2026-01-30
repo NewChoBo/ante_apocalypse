@@ -22,7 +22,8 @@ export class TargetSpawnerComponent {
     this.networkManager = NetworkManager.getInstance();
 
     this.networkManager.onTargetSpawn.add((data) => {
-      this.spawnTarget(data.position, data.isMoving, data.id, data.type);
+      const position = new Vector3(data.position.x, data.position.y, data.position.z);
+      this.spawnTarget(position, data.isMoving, data.id, data.type);
     });
 
     this.networkManager.onTargetDestroy.add(() => {

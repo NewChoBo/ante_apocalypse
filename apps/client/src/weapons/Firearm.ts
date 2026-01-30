@@ -226,7 +226,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
       const targetMesh = result.pickedMesh;
 
       // 부위 감지 (metadata.bodyPart: 'head', 'body' 등)
-      const hitPart = targetMesh.metadata?.bodyPart || 'body';
+      const part = targetMesh.metadata?.bodyPart || 'body';
 
       // Pawn 및 데미지 배율 추출 시도
       let targetId = targetMesh.metadata?.id || targetMesh.name;
@@ -237,10 +237,10 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
         targetId = pawn.id;
 
         // DamageSystem을 이용한 공통 데미지 계산 로직 적용
-        finalDamage = DamageSystem.calculateDamage(this.damage, hitPart, pawn.damageProfile);
+        finalDamage = DamageSystem.calculateDamage(this.damage, part, pawn.damageProfile);
 
         if (finalDamage > this.damage) {
-          console.log(`[Firearm] Critical Hit! Part: ${hitPart}, Final Damage: ${finalDamage}`);
+          console.log(`[Firearm] Critical Hit! Part: ${part}, Final Damage: ${finalDamage}`);
         }
       }
 
@@ -248,7 +248,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
         targetId,
         damage: finalDamage,
         weaponId: this.name,
-        hitPart: hitPart,
+        part: part,
       });
 
       // 3. 통합 히트 프로세싱 (로컬 연출 등)

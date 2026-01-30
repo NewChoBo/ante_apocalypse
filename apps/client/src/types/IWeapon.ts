@@ -7,7 +7,7 @@ export interface IMuzzleProvider {
   getMuzzleTransform(): {
     position: Vector3;
     direction: Vector3;
-    transformNode?: any;
+    transformNode?: unknown;
   };
 }
 
@@ -64,7 +64,7 @@ export interface IWeapon {
   addAmmo(amount: number): void;
 
   /** 서버 데이터로 스태츠 업데이트 */
-  updateStats(stats: any): void;
+  updateStats(stats: Partial<Record<string, any>>): void;
 
   /** 리소스 해제 */
   dispose(): void;
@@ -76,7 +76,7 @@ export interface IWeapon {
 export interface MuzzleTransform {
   position: Vector3;
   direction: Vector3;
-  transformNode?: any;
+  transformNode?: unknown;
   localMuzzlePosition?: Vector3;
 }
 

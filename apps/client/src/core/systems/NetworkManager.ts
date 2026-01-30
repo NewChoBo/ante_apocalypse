@@ -11,8 +11,18 @@ import {
   HitEventData,
   DeathEventData,
   RequestHitData,
+  EnemyMovePayload,
+  EnemyHitPayload,
+  InitialStatePayload,
+  TargetHitPayload,
+  TargetDestroyPayload,
+  SpawnTargetPayload,
+  SyncWeaponPayload,
+  MovePayload,
+  EnemyDestroyPayload,
+  PickupDestroyPayload,
 } from '@ante/common';
-import { WorldEntityManager, NetworkDispatcher } from '@ante/game-core';
+import { NetworkDispatcher } from '@ante/game-core';
 
 export class NetworkManager implements INetworkAuthority {
   private static instance: NetworkManager;
@@ -27,39 +37,26 @@ export class NetworkManager implements INetworkAuthority {
   public onPlayerDied = new Observable<DeathEventData>();
 
   // Enemy Synchronization
-  public onEnemyUpdated = new Observable<{
-    id: string;
-    position: any;
-    rotation: any;
-    isMoving?: boolean;
-  }>();
-  public onEnemyHit = new Observable<{ id: string; damage: number }>();
+  public onEnemyUpdated = new Observable<EnemyMovePayload>();
+  public onEnemyHit = new Observable<EnemyHitPayload>();
+  public onEnemyDestroyed = new Observable<EnemyDestroyPayload>();
+  public onPickupDestroyed = new Observable<PickupDestroyPayload>();
 
   // State Synchronization
   public onInitialStateRequested = new Observable<{ senderId: string }>();
-  public onInitialStateReceived = new Observable<{
-    players: any[];
-    enemies: any[];
-    targets?: any[];
-    weaponConfigs?: Record<string, any>;
-  }>();
+  public onInitialStateReceived = new Observable<InitialStatePayload>();
 
   // New Observables for Lobby/State
   public onRoomListUpdated = new Observable<RoomInfo[]>();
   public onStateChanged = new Observable<NetworkState>();
-  public onEvent = new Observable<{ code: number; data: any; senderId: string }>();
+  public onEvent = new Observable<{ code: number; data: unknown; senderId: string }>();
 
   // Target Observables
-  public onTargetHit = new Observable<{ targetId: string; part: string; damage: number }>();
-  public onTargetDestroy = new Observable<{ targetId: string }>();
-  public onTargetSpawn = new Observable<{
-    type: string;
-    position: Vector3;
-    id: string;
-    isMoving: boolean;
-  }>();
+  public onTargetHit = new Observable<TargetHitPayload>();
+  public onTargetDestroy = new Observable<TargetDestroyPayload>();
+  public onTargetSpawn = new Observable<SpawnTargetPayload>();
 
-  private entityManager: WorldEntityManager = new WorldEntityManager();
+  private players: Map<string, PlayerState> = new Map();
   private dispatcher: NetworkDispatcher = new NetworkDispatcher();
 
   public currentState: NetworkState = NetworkState.Disconnected;
@@ -91,7 +88,7 @@ export class NetworkManager implements INetworkAuthority {
   }
 
   private setupDispatcher(): void {
-    this.dispatcher.register(EventCode.FIRE, (data, senderId) => {
+    this.dispatcher.register(EventCode.FIRE, (data: FireEventData, senderId: string) => {
       this.onPlayerFired.notifyObservers({
         playerId: senderId,
         weaponId: data.weaponId,
@@ -99,80 +96,71 @@ export class NetworkManager implements INetworkAuthority {
       });
     });
 
-    this.dispatcher.register(EventCode.HIT, (data, senderId) => {
-      this.onPlayerHit.notifyObservers({
-        playerId: data.targetId,
-        damage: data.damage,
-        newHealth: data.newHealth || 0,
-        attackerId: data.attackerId || senderId,
-      });
+    this.dispatcher.register(EventCode.HIT, (data: HitEventData) => {
+      this.onPlayerHit.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.SYNC_WEAPON, (data, senderId) => {
-      const entity = this.entityManager.getEntity(senderId);
-      if (entity && entity.type === 'remote_player') {
-        (entity as any).weaponId = data.weaponId;
-        this.onPlayerUpdated.notifyObservers(entity as any);
+    this.dispatcher.register(EventCode.DESTROY_ENEMY, (data: EnemyDestroyPayload) => {
+      this.onEnemyDestroyed.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.DESTROY_PICKUP, (data: PickupDestroyPayload) => {
+      this.onPickupDestroyed.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.SYNC_WEAPON, (data: SyncWeaponPayload, senderId: string) => {
+      const player = this.players.get(senderId);
+      if (player) {
+        player.weaponId = data.weaponId;
+        this.onPlayerUpdated.notifyObservers(player);
       }
     });
 
-    this.dispatcher.register(EventCode.MOVE, (data, senderId) => {
-      const entity = this.entityManager.getEntity(senderId);
-      if (entity && entity.type === 'remote_player') {
+    this.dispatcher.register(EventCode.MOVE, (data: MovePayload, senderId: string) => {
+      const player = this.players.get(senderId);
+      if (player) {
         const isMe = senderId === this.getSocketId();
         if (isMe) {
           const dist = Vector3.Distance(
-            entity.position,
+            new Vector3(player.position.x, player.position.y, player.position.z),
             new Vector3(data.position.x, data.position.y, data.position.z)
           );
           if (dist > 2.0) {
             console.warn('서버와의 위치 불일치 감지! 위치 보정됨.');
           }
         } else {
-          entity.position.set(data.position.x, data.position.y, data.position.z);
-          // rotation handling... (BasePawn might need rotation set)
-          this.onPlayerUpdated.notifyObservers(entity as any);
+          player.position = { x: data.position.x, y: data.position.y, z: data.position.z };
+          player.rotation = { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z };
+          this.onPlayerUpdated.notifyObservers(player);
         }
       }
     });
 
-    this.dispatcher.register(EventCode.ENEMY_HIT, (data) => {
-      this.onEnemyHit.notifyObservers({ id: data.id, damage: data.damage });
+    this.dispatcher.register(EventCode.ENEMY_MOVE, (data: EnemyMovePayload) => {
+      this.onEnemyUpdated.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.TARGET_HIT, (data) => {
-      this.onTargetHit.notifyObservers({
-        targetId: data.targetId,
-        part: data.part,
-        damage: data.damage,
-      });
+    this.dispatcher.register(EventCode.TARGET_HIT, (data: TargetHitPayload) => {
+      this.onTargetHit.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.PLAYER_DEATH, (data) => {
-      this.onPlayerDied.notifyObservers({
-        playerId: data.playerId,
-        attackerId: data.attackerId,
-      });
+    this.dispatcher.register(EventCode.PLAYER_DEATH, (data: DeathEventData) => {
+      this.onPlayerDied.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.TARGET_DESTROY, (data) => {
-      this.onTargetDestroy.notifyObservers({ targetId: data.targetId });
+    this.dispatcher.register(EventCode.TARGET_DESTROY, (data: TargetDestroyPayload) => {
+      this.onTargetDestroy.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.SPAWN_TARGET, (data) => {
-      this.onTargetSpawn.notifyObservers({
-        type: data.type,
-        position: new Vector3(data.position.x, data.position.y, data.position.z),
-        id: data.id,
-        isMoving: data.isMoving,
-      });
+    this.dispatcher.register(EventCode.SPAWN_TARGET, (data: SpawnTargetPayload) => {
+      this.onTargetSpawn.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.REQ_INITIAL_STATE, (_data, senderId) => {
+    this.dispatcher.register(EventCode.REQ_INITIAL_STATE, (_data: any, senderId: string) => {
       this.onInitialStateRequested.notifyObservers({ senderId });
     });
 
-    this.dispatcher.register(EventCode.INITIAL_STATE, (data) => {
+    this.dispatcher.register(EventCode.INITIAL_STATE, (data: InitialStatePayload) => {
       if (data.players && Array.isArray(data.players)) {
         data.players.forEach((_p: PlayerState) => {
           // WorldEntityManager handles storage, but we still need to know if it's a PlayerState
@@ -231,7 +219,7 @@ export class NetworkManager implements INetworkAuthority {
     };
 
     this.provider.onPlayerLeft = (id) => {
-      this.entityManager.unregister(id);
+      this.players.delete(id);
       this.onPlayerLeft.notifyObservers(id);
     };
 
@@ -298,8 +286,7 @@ export class NetworkManager implements INetworkAuthority {
         weaponId: data.weaponId,
         health: 100,
       };
-      (myState as any).type = 'remote_player';
-      this.entityManager.register(myState as any);
+      this.players.set(myId, myState);
     }
     this.updateState(data);
   }
@@ -307,7 +294,7 @@ export class NetworkManager implements INetworkAuthority {
   public updateState(data: { position: Vector3; rotation: Vector3; weaponId: string }): void {
     const myId = this.getSocketId();
     if (myId) {
-      const state = this.entityManager.getEntity(myId) as unknown as PlayerState;
+      const state = this.players.get(myId);
       if (state) {
         state.position = { x: data.position.x, y: data.position.y, z: data.position.z };
         state.rotation = { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z };
@@ -365,6 +352,6 @@ export class NetworkManager implements INetworkAuthority {
   }
 
   public getAllPlayerStates(): PlayerState[] {
-    return this.entityManager.getEntitiesByType('remote_player') as unknown as PlayerState[];
+    return Array.from(this.players.values());
   }
 }

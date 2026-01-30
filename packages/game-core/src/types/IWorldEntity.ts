@@ -30,6 +30,9 @@ export interface IWorldEntity {
   /** 보간용 데이터 (선택사항) */
   isMoving?: boolean;
 
+  /** 무기 정보 (선택사항) */
+  weaponId?: string;
+
   /** 데미지 배율 정보 */
   damageProfile?: DamageProfile;
 

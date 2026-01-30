@@ -8,6 +8,7 @@ import {
 } from '@babylonjs/core';
 import { ServerNetworkManager } from './ServerNetworkManager.ts';
 import { ServerApi } from './ServerApi.ts';
+import { RequestHitData, Vector3 as commonVector3 } from '@ante/common';
 import {
   WorldSimulation,
   BaseEnemyManager,
@@ -68,18 +69,21 @@ export class ServerGameController {
         ]);
       }
     };
-    this.networkManager.onPlayerLeave = (id) => this.removePlayerHitbox(id);
-    this.networkManager.onPlayerMove = (id, pos, rot) => this.updatePlayerHitbox(id, pos, rot);
-    this.networkManager.onFireRequest = (id, origin, dir) => this.processFireEvent(id, origin, dir);
-    this.networkManager.onHitRequest = (shooterId, data) => {
+    this.networkManager.onPlayerLeave = (id: string) => this.removePlayerHitbox(id);
+    this.networkManager.onPlayerMove = (id: string, pos: commonVector3, rot: commonVector3) =>
+      this.updatePlayerHitbox(id, pos, rot);
+    this.networkManager.onFireRequest = (id, origin: commonVector3, dir: commonVector3) =>
+      this.processFireEvent(id, origin, dir);
+    this.networkManager.onHitRequest = (shooterId: string, data: RequestHitData) => {
       console.log(
-        `[Server] Trusted Hit: ${shooterId} hit ${data.targetId} (${data.hitPart}) for ${data.damage} dmg`
+        `[Server] Trusted Hit: ${shooterId} hit ${data.targetId} (${data.part}) for ${data.damage} dmg`
       );
       this.networkManager.broadcastHit({
         targetId: data.targetId,
         damage: data.damage,
         attackerId: shooterId,
-        hitPart: data.hitPart,
+        part: data.part,
+        newHealth: 0, // Placeholder
       });
     };
 
@@ -119,7 +123,7 @@ export class ServerGameController {
   }
 
   // [신규] 플레이어 캡슐 생성
-  private createPlayerHitbox(id: string) {
+  private createPlayerHitbox(id: string): void {
     if (this.playerMeshes.has(id)) return;
 
     // 높이 2m, 지름 1m 캡슐 (일반적인 FPS 캐릭터 크기)
@@ -139,7 +143,7 @@ export class ServerGameController {
   }
 
   // [신규] 플레이어 이동 동기화
-  private updatePlayerHitbox(id: string, pos: any, rot: any) {
+  private updatePlayerHitbox(id: string, pos: commonVector3, rot: commonVector3): void {
     const hitbox = this.playerMeshes.get(id);
     if (hitbox) {
       // 서버의 캡슐을 클라이언트 위치로 순간이동 (추후 보간 적용 가능)
@@ -150,7 +154,7 @@ export class ServerGameController {
   }
 
   // [신규] 플레이어 퇴장 처리
-  private removePlayerHitbox(id: string) {
+  private removePlayerHitbox(id: string): void {
     const hitbox = this.playerMeshes.get(id);
     if (hitbox) {
       hitbox.dispose();
@@ -161,10 +165,10 @@ export class ServerGameController {
 
   public processFireEvent(
     playerId: string,
-    _origin: any,
-    _direction: any,
+    _origin: commonVector3,
+    _direction: commonVector3,
     _weaponIdOverride?: string
-  ) {
+  ): void {
     // 클라이언트 주도 방식에서는 서버에서 물리 연산(Raycast)을 수행하지 않습니다.
     // 단순히 발사 이벤트가 발생했음을 로그에 남기거나, 필요한 경우 비주얼 처리를 위해 브로드캐스트할 수 있습니다.
     console.log(`[Server] Fire Event: ${playerId}`);

@@ -168,7 +168,7 @@ export abstract class BaseWeapon implements IWeapon {
     return true;
   }
 
-  public updateStats(stats: any): void {
+  public updateStats(stats: Partial<Record<string, any>>): void {
     if (stats.damage !== undefined) this.damage = stats.damage;
     if (stats.range !== undefined) this.range = stats.range;
     console.log(`[BaseWeapon] ${this.name} stats updated from server`);

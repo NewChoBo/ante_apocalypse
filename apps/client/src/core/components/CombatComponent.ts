@@ -68,7 +68,7 @@ export class CombatComponent extends BaseComponent {
     this.inventory.update(deltaTime);
   }
 
-  public getCurrentWeapon() {
+  public getCurrentWeapon(): IWeapon | null {
     return this.inventory.currentWeapon;
   }
 
