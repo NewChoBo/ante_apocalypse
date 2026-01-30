@@ -1,10 +1,10 @@
 import { Mesh, MeshBuilder, Scene, Vector3 } from '@babylonjs/core';
 import { Logger } from '@ante/common';
-import { BasePawn } from '@ante/game-core';
+import { BasePawn, IEnemyPawn } from '@ante/game-core';
 
 const logger = new Logger('ServerEnemyPawn');
 
-export class ServerEnemyPawn extends BasePawn {
+export class ServerEnemyPawn extends BasePawn implements IEnemyPawn {
   public override mesh: Mesh;
   public headBox: Mesh;
   public override type = 'enemy';
@@ -65,6 +65,18 @@ export class ServerEnemyPawn extends BasePawn {
     this.isDead = true;
     this.health = 0;
     logger.info(`ServerEnemyPawn ${this.id} died.`);
+  }
+
+  public lookAt(targetPoint: Vector3): void {
+    this.mesh.lookAt(targetPoint);
+  }
+
+  public move(direction: Vector3, speed: number, deltaTime: number): void {
+    const moveVec = direction.scale(speed * deltaTime);
+    // Simple position update for server, or moveWithCollisions if needed
+    // this.mesh.moveWithCollisions(moveVec);
+    // Since NullEngine collisions can be tricky without physics engine, direct move is safer for basic AI logic unless obstacles are critical.
+    this.mesh.position.addInPlace(moveVec);
   }
 
   public override dispose() {

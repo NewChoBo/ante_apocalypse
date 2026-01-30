@@ -31,7 +31,11 @@ class ServerEnemyManager extends BaseEnemyManager {
   private enemyPawns: Map<string, ServerEnemyPawn> = new Map();
   private scene: Scene;
 
-  constructor(authority: ServerNetworkManager, scene: Scene) {
+  constructor(
+    authority: ServerNetworkManager,
+    scene: Scene,
+    private getPlayers: () => Map<string, ServerPlayerPawn>
+  ) {
     super(authority);
     this.scene = scene;
   }
@@ -46,11 +50,21 @@ class ServerEnemyManager extends BaseEnemyManager {
       new Vector3(position.x, position.y, position.z)
     );
     this.enemyPawns.set(id, pawn);
+
+    // [New] Register AI
+    // Simple logic: Target the first available player
+    const players = this.getPlayers();
+    const target = players.values().next().value;
+    this.onEnemySpawned(id, pawn, target);
     return true;
   }
 
   public getEnemyMesh(id: string): AbstractMesh | undefined {
     return this.enemyPawns.get(id)?.mesh;
+  }
+
+  protected getEnemyPawn(id: string): ServerEnemyPawn | undefined {
+    return this.enemyPawns.get(id);
   }
 }
 class ServerPickupManager extends BasePickupManager {}
@@ -121,7 +135,11 @@ export class ServerGameController {
     this.scene = new Scene(this.engine);
 
     // [신규] 시뮬레이션 엔진 초기화
-    this.enemyManager = new ServerEnemyManager(this.networkManager, this.scene);
+    this.enemyManager = new ServerEnemyManager(
+      this.networkManager,
+      this.scene,
+      () => this.playerPawns
+    );
     this.targetSpawner = new ServerTargetSpawner(this.networkManager, this.scene); // Store ref
 
     this.simulation = new WorldSimulation(

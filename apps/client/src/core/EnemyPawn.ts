@@ -11,13 +11,14 @@ import {
   ShadowGenerator,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
+import { IEnemyPawn } from '@ante/game-core';
 import { AssetLoader } from './AssetLoader';
 import { DynamicTexture } from '@babylonjs/core';
 import { Logger } from '@ante/common';
 
 const logger = new Logger('EnemyPawn');
 
-export class EnemyPawn extends BasePawn {
+export class EnemyPawn extends BasePawn implements IEnemyPawn {
   public mesh: Mesh;
   public isDead = false;
   private _lastPosition: Vector3 = new Vector3();

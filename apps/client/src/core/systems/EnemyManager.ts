@@ -1,8 +1,8 @@
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
 import { EnemyPawn } from '../EnemyPawn';
-import { AIController } from '../controllers/AIController';
 import { PlayerPawn } from '../PlayerPawn';
 import { NetworkManager } from './NetworkManager';
+import { BaseEnemyManager } from '@ante/game-core';
 import { EventCode } from '@ante/common';
 import { WorldEntityManager } from './WorldEntityManager';
 import { EnemyState } from '@ante/common';
@@ -11,34 +11,26 @@ import { EnemyState } from '@ante/common';
  * 적(Enemy) 실체의 생성 및 AI 업데이트를 담당합니다.
  * 실제 피격 처리는 WorldEntityManager에서 수행됩니다.
  */
-export class EnemyManager {
+export class EnemyManager extends BaseEnemyManager {
   private scene: Scene;
   private shadowGenerator: ShadowGenerator;
   private enemies: Map<string, EnemyPawn> = new Map();
-  private controllers: Map<string, AIController> = new Map();
   private networkManager: NetworkManager;
   private worldManager: WorldEntityManager;
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
+    const netManager = NetworkManager.getInstance();
+    super(netManager);
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
-    this.networkManager = NetworkManager.getInstance();
+    this.networkManager = netManager;
     this.worldManager = WorldEntityManager.getInstance();
     this.setupNetworkListeners();
   }
 
   private setupNetworkListeners(): void {
     this.networkManager.onEnemyUpdated.add((data) => {
-      if (!this.networkManager.isMasterClient()) {
-        const enemy = this.enemies.get(data.id);
-        if (enemy) {
-          enemy.position.set(data.position.x, data.position.y, data.position.z);
-          enemy.mesh.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
-          if (data.isMoving !== undefined) {
-            enemy.isMoving = data.isMoving;
-          }
-        }
-      }
+      this.processEnemyMove(data);
     });
 
     // onEnemyHit is now handled by WorldEntityManager
@@ -75,18 +67,13 @@ export class EnemyManager {
     // WorldManager에 등록하여 전역 피격 및 관리가 가능하게 함
     this.worldManager.registerEntity(enemy);
 
-    if (this.networkManager.isMasterClient()) {
-      if (target) {
-        const controller = new AIController(`ai_${id}`, enemy, target);
-        this.controllers.set(id, controller);
-      }
-    }
+    this.onEnemySpawned(id, enemy, target);
 
     return enemy;
   }
 
   public update(deltaTime: number): void {
-    this.controllers.forEach((c) => c.tick(deltaTime));
+    super.update(deltaTime);
 
     this.enemies.forEach((enemy, id) => {
       // 사망 혹은 제거 체크 (Visual only)
@@ -94,8 +81,7 @@ export class EnemyManager {
         // 제거 처리
         this.worldManager.removeEntity(id);
         this.enemies.delete(id);
-        this.controllers.get(id)?.dispose();
-        this.controllers.delete(id);
+        this.unregisterAI(id);
       }
     });
   }
@@ -136,9 +122,10 @@ export class EnemyManager {
   }
 
   public dispose(): void {
-    this.controllers.forEach((c) => c.dispose());
-    // Entities are disposed via worldManager.clear or individual removeEntity calls
     this.enemies.clear();
-    this.controllers.clear();
+  }
+
+  protected getEnemyPawn(id: string): EnemyPawn | undefined {
+    return this.enemies.get(id);
   }
 }

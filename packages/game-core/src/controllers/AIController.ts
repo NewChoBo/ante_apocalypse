@@ -1,52 +1,42 @@
-import { BaseController } from './BaseController';
-import { EnemyPawn } from '../EnemyPawn';
-import { PlayerPawn } from '../PlayerPawn';
-import { NetworkManager } from '../systems/NetworkManager';
-import { EventCode } from '@ante/common';
-import { WeaponRegistry } from '@ante/game-core';
 import { Vector3 } from '@babylonjs/core';
-import { Logger } from '@ante/common';
+import { IEnemyPawn } from '../types/IEnemyPawn.js';
+import { INetworkAuthority } from '../network/INetworkAuthority.js';
+import { EventCode } from '@ante/common';
+import { WeaponRegistry } from '../weapons/WeaponRegistry.js';
 
-const logger = new Logger('AIController');
-
-export class AIController extends BaseController {
+export class AIController {
   private updateRate = 0.1; // 10 times per sec
   private timeSinceLastUpdate = 0;
-  private targetPlayer: PlayerPawn | null = null;
+
+  private target: { position: Vector3 } | null = null;
   private detectionRange = 30;
   private attackRange = 15;
   private meleeAttackRange = 2.5;
   private attackCooldown = 1.0;
   private lastAttackTime = 0;
-  private damage = 10;
   private moveSpeed = 3.0;
 
-  private enemyPawn: EnemyPawn | null = null;
+  private enemyPawn: IEnemyPawn | null = null;
+  private authority: INetworkAuthority;
 
-  constructor(id: string, pawn: EnemyPawn, target: PlayerPawn) {
-    super(id);
-    this.possess(pawn);
-    this.targetPlayer = target;
+  constructor(
+    public readonly id: string,
+    pawn: IEnemyPawn,
+    target: { position: Vector3 },
+    authority: INetworkAuthority
+  ) {
+    this.enemyPawn = pawn;
+    this.target = target;
+    this.authority = authority;
 
-    // [Authoritative Stats Sync] - Direct from monorepo config
+    // [Authoritative Stats Sync]
     if (WeaponRegistry['Enemy_Melee']) {
-      this.damage = WeaponRegistry['Enemy_Melee'].damage;
-      logger.log(`Damage set to ${this.damage} from shared registry`);
+      // this.damage = WeaponRegistry['Enemy_Melee'].damage;
     }
-  }
-
-  protected onPossess(pawn: any): void {
-    if (pawn instanceof EnemyPawn) {
-      this.enemyPawn = pawn;
-    }
-  }
-
-  protected onUnpossess(_pawn: any): void {
-    this.enemyPawn = null;
   }
 
   public tick(deltaTime: number): void {
-    if (!this.enemyPawn || !this.targetPlayer || this.enemyPawn.isDead) {
+    if (!this.enemyPawn || !this.target || this.enemyPawn.isDead) {
       if (this.enemyPawn?.isDead) {
         this.dispose();
       }
@@ -71,7 +61,7 @@ export class AIController extends BaseController {
 
   private act(deltaTime: number): void {
     const enemy = this.enemyPawn;
-    const target = this.targetPlayer;
+    const target = this.target;
     if (!enemy || !target) return;
 
     const diff = target.position.subtract(enemy.position);
@@ -98,13 +88,17 @@ export class AIController extends BaseController {
         const muzzlePos = enemy.position.add(new Vector3(0, 0.5, 0));
         const dir = target.position.subtract(muzzlePos).normalize();
 
-        NetworkManager.getInstance().sendEvent(EventCode.FIRE, {
-          weaponId: 'Enemy_Melee',
-          muzzleTransform: {
-            position: { x: muzzlePos.x, y: muzzlePos.y, z: muzzlePos.z },
-            direction: { x: dir.x, y: dir.y, z: dir.z },
+        this.authority.sendEvent(
+          EventCode.FIRE,
+          {
+            weaponId: 'Enemy_Melee',
+            muzzleTransform: {
+              position: { x: muzzlePos.x, y: muzzlePos.y, z: muzzlePos.z },
+              direction: { x: dir.x, y: dir.y, z: dir.z },
+            },
           },
-        });
+          true
+        ); // reliable
 
         this.lastAttackTime = now;
       }
@@ -117,6 +111,7 @@ export class AIController extends BaseController {
   }
 
   public dispose(): void {
-    // cleanup
+    this.enemyPawn = null;
+    this.target = null;
   }
 }
