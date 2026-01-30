@@ -1,19 +1,24 @@
 import { Logger } from '@ante/common';
-import { ServerNetworkManager } from './ServerNetworkManager';
-import { ServerApi } from './ServerApi';
-import { ServerGameInstance } from './ServerGameInstance';
+import { ServerNetworkAuthority, LogicalServer } from '@ante/game-core';
+import { ServerApi } from './ServerApi.js';
+import { NodeAssetLoader } from './NodeAssetLoader.js';
 
 const logger = new Logger('ServerApp');
 
 export class ServerApp {
-  private networkManager: ServerNetworkManager;
+  private networkManager: ServerNetworkAuthority;
   private api: ServerApi;
-  private gameInstance: ServerGameInstance;
+  private gameInstance: LogicalServer;
+  private assetLoader: NodeAssetLoader;
 
   constructor() {
-    this.networkManager = new ServerNetworkManager();
+    const appId = process.env.VITE_PHOTON_APP_ID || '';
+    const appVersion = process.env.VITE_PHOTON_APP_VERSION || '1.0.0';
+
+    this.networkManager = new ServerNetworkAuthority(appId, appVersion);
     this.api = new ServerApi(this.networkManager);
-    this.gameInstance = new ServerGameInstance(this.networkManager);
+    this.assetLoader = new NodeAssetLoader();
+    this.gameInstance = new LogicalServer(this.networkManager, this.assetLoader);
   }
 
   public async start(): Promise<void> {

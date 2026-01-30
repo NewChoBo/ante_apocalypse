@@ -1,6 +1,6 @@
 import { Mesh, MeshBuilder, Scene, Vector3 } from '@babylonjs/core';
 import { Logger } from '@ante/common';
-import { BasePawn } from '@ante/game-core';
+import { BasePawn } from '../../simulation/BasePawn.js';
 
 const logger = new Logger('ServerTargetPawn');
 

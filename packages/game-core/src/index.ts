@@ -18,4 +18,13 @@ export * from './simulation/BasePawn.js';
 export * from './weapons/WeaponRegistry.js';
 
 export * from './rules/IGameRule.js';
+export * from './rules/IGameRule.js';
 export * from './rules/WaveSurvivalRule.js';
+
+// Server-side (Isomorphic) logic
+export * from './server/IServerAssetLoader.js';
+export * from './server/LogicalServer.js';
+export * from './server/ServerNetworkAuthority.js';
+export * from './server/pawns/ServerPlayerPawn.js';
+export * from './server/pawns/ServerEnemyPawn.js';
+export * from './server/pawns/ServerTargetPawn.js';

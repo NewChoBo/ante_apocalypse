@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { ServerNetworkManager } from './ServerNetworkManager.ts';
+import { ServerNetworkAuthority } from '@ante/game-core';
 import { WeaponRegistry } from '@ante/game-core';
 import { Logger } from '@ante/common';
 
@@ -10,9 +10,9 @@ export class ServerApi {
   private app: express.Application;
   private port = 3000;
   private server: any; // http.Server
-  private networkManager: ServerNetworkManager;
+  private networkManager: ServerNetworkAuthority;
 
-  constructor(networkManager: ServerNetworkManager) {
+  constructor(networkManager: ServerNetworkAuthority) {
     this.networkManager = networkManager;
     this.app = express();
     this.app.use(cors());

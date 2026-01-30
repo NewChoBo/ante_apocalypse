@@ -4,14 +4,12 @@ import {
   Scene,
   Vector3,
   AbstractMesh,
-  SceneLoader,
   Skeleton,
   AnimationPropertiesOverride,
 } from '@babylonjs/core';
-import * as path from 'path';
-import * as fs from 'fs';
 import { Logger } from '@ante/common';
-import { BasePawn } from '@ante/game-core';
+import { BasePawn } from '../../simulation/BasePawn.js';
+import { IServerAssetLoader } from '../IServerAssetLoader.js';
 
 const logger = new Logger('ServerPlayerPawn');
 
@@ -22,7 +20,12 @@ export class ServerPlayerPawn extends BasePawn {
   public headBox: Mesh | null = null;
   public override type = 'player';
 
-  constructor(id: string, scene: Scene, position: Vector3) {
+  constructor(
+    id: string,
+    scene: Scene,
+    position: Vector3,
+    private assetLoader: IServerAssetLoader
+  ) {
     super(scene);
     this.id = id;
 
@@ -42,33 +45,12 @@ export class ServerPlayerPawn extends BasePawn {
 
   private async loadModel(scene: Scene): Promise<void> {
     try {
-      // Determine model directory based on CWD
-      const cwd = process.cwd();
-      let modelDir = '';
-      if (cwd.endsWith('server') || cwd.endsWith('server\\')) {
-        modelDir = path.join(cwd, 'assets/models/');
-      } else {
-        modelDir = path.join(cwd, 'apps/server/assets/models/');
-      }
-      const modelFile = 'dummy3.babylon';
-      const fullPath = path.join(modelDir, modelFile);
+      logger.info(`Loading model via AssetLoader for ${this.id}`);
 
-      logger.info(`Loading model via fs: ${fullPath}`);
+      const result = await this.assetLoader.loadModel(scene, 'dummy3.babylon');
 
-      if (!fs.existsSync(fullPath)) {
-        logger.error(`File DOES NOT EXIST at: ${fullPath}`);
-        return;
-      }
-
-      // Read file directly to bypass xhr2/NetworkError issues
-      const fileData = fs.readFileSync(fullPath, { encoding: 'base64' });
-      const dataUrl = 'data:;base64,' + fileData;
-
-      // Import from data string
-      // rootUrl is the data string, fileName is empty
-      const result = await SceneLoader.ImportMeshAsync('', dataUrl, '', scene);
       logger.info(
-        `ImportMeshAsync finished. Meshes: ${result.meshes.length}, Skeletons: ${result.skeletons.length}`
+        `AssetLoader finished. Meshes: ${result.meshes.length}, Skeletons: ${result.skeletons.length}`
       );
 
       this.visualMesh = result.meshes[0]; // Assuming root is 0, or we check common parent

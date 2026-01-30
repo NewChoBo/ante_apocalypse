@@ -1,3 +1,5 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 import Photon from 'photon-realtime';
 import {
   EventCode,
@@ -11,15 +13,17 @@ import {
   InitialStatePayload,
   SyncWeaponPayload,
 } from '@ante/common';
-import { INetworkAuthority, WorldEntityManager, NetworkDispatcher } from '@ante/game-core';
+import { INetworkAuthority } from '../network/INetworkAuthority.js';
+import { WorldEntityManager } from '../simulation/WorldEntityManager.js';
+import { NetworkDispatcher } from '../network/NetworkDispatcher.js';
 import { Logger } from '@ante/common';
 
-const logger = new Logger('ServerNetwork');
+const logger = new Logger('ServerNetworkAuthority');
 
-export class ServerNetworkManager implements INetworkAuthority {
+export class ServerNetworkAuthority implements INetworkAuthority {
   private client: any; // Photon.LoadBalancing.LoadBalancingClient
-  private appId: string = process.env.VITE_PHOTON_APP_ID || '';
-  private appVersion: string = process.env.VITE_PHOTON_APP_VERSION || '1.0.0';
+  private appId: string;
+  private appVersion: string;
 
   private entityManager: WorldEntityManager = WorldEntityManager.getInstance();
   private dispatcher: NetworkDispatcher = new NetworkDispatcher();
@@ -51,7 +55,11 @@ export class ServerNetworkManager implements INetworkAuthority {
       receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
     });
   }
-  constructor() {
+
+  constructor(appId: string, appVersion: string) {
+    this.appId = appId;
+    this.appVersion = appVersion;
+
     // LoadBalancingClient 생성
     this.client = new (Photon as any).LoadBalancing.LoadBalancingClient(
       (Photon as any).ConnectionProtocol.Wss,
@@ -179,9 +187,9 @@ export class ServerNetworkManager implements INetworkAuthority {
   }
 
   // [수정] 연결이 완료될 때까지 기다리는 Promise 반환
-  public connect(): Promise<void> {
+  public connect(region: string = 'kr'): Promise<void> {
     logger.info('Connecting to Photon...');
-    this.client.connectToRegionMaster('kr');
+    this.client.connectToRegionMaster(region);
 
     return new Promise((resolve) => {
       this.connectionResolver = resolve;

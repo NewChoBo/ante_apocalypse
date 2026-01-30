@@ -6,16 +6,22 @@ import {
   ScrollViewer,
   Control,
   Button,
+  Checkbox,
 } from '@babylonjs/gui';
 import { NetworkManager } from '../core/systems/NetworkManager';
 import { UIManager, UIScreen } from './UIManager';
 import { RoomInfo } from '@ante/common';
+import { LocalServerManager } from '../core/server/LocalServerManager';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('LobbyUI');
 
 export class LobbyUI {
   private container: Container;
   private roomListPanel: StackPanel;
   private networkManager: NetworkManager;
   private uiManager: UIManager;
+  private hostLocalCheckbox: Checkbox | null = null;
 
   // Visual Constants from UIManager (for consistency)
   private readonly PRIMARY_COLOR = '#ffc400';
@@ -109,6 +115,30 @@ export class LobbyUI {
 
     bottomControls.addControl(refreshBtn);
 
+    // [New] Host Local Checkbox Panel
+    const hostPanel = new StackPanel();
+    hostPanel.isVertical = false;
+    hostPanel.width = '200px';
+    hostPanel.paddingLeft = '20px';
+    bottomControls.addControl(hostPanel);
+
+    this.hostLocalCheckbox = new Checkbox();
+    this.hostLocalCheckbox.width = '20px';
+    this.hostLocalCheckbox.height = '20px';
+    this.hostLocalCheckbox.isChecked = true; // Default to true for testing
+    this.hostLocalCheckbox.color = this.PRIMARY_COLOR;
+    hostPanel.addControl(this.hostLocalCheckbox);
+
+    const hostLabel = new TextBlock();
+    hostLabel.text = 'HOST LOCALLY';
+    hostLabel.color = 'white';
+    hostLabel.fontSize = 14;
+    hostLabel.fontFamily = this.FONT_MONO;
+    hostLabel.paddingLeft = '10px';
+    hostLabel.width = '150px';
+    hostLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
+    hostPanel.addControl(hostLabel);
+
     // Create Room Button
     const createBtn = this.createButton('CREATE_SQUAD', '150px');
     createBtn.paddingLeft = '20px';
@@ -117,8 +147,16 @@ export class LobbyUI {
       const mapId = this.uiManager.getSelectedMap();
       const roomName = `OPS_${playerName}_${Math.floor(Math.random() * 1000)}`;
 
-      // Client-side Room Creation
-      await this.networkManager.createRoom(roomName, mapId);
+      if (this.hostLocalCheckbox?.isChecked) {
+        logger.info('Creating Local Server Session...');
+        await LocalServerManager.getInstance().startSession(roomName, mapId);
+        // Wait briefly for Photon to register the room (if needed)
+        // Then join it as a client
+        await this.networkManager.joinRoom(roomName);
+      } else {
+        // Client-side Room Creation (Dedicated Logic or Peer-to-Peer without LogicalServer)
+        await this.networkManager.createRoom(roomName, mapId);
+      }
     });
     bottomControls.addControl(createBtn);
 
@@ -128,7 +166,10 @@ export class LobbyUI {
     backBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_RIGHT;
     backBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
     backBtn.top = '-40px';
-    backBtn.onPointerUpObservable.add(() => this.uiManager.showScreen(UIScreen.MAIN_MENU));
+    backBtn.onPointerUpObservable.add(() => {
+      LocalServerManager.getInstance().stopSession(); // Ensure local server stops if we leave lobby
+      this.uiManager.showScreen(UIScreen.MAIN_MENU);
+    });
     content.addControl(backBtn);
 
     return container;
