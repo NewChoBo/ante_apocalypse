@@ -70,6 +70,15 @@ export class ServerNetworkManager implements INetworkAuthority {
     this.client.onActorJoin = (actor: any) => {
       const id = actor.actorNr.toString();
       const name = actor.name || 'Anonymous';
+
+      // [서버 본인 제외] 서버(방장 더미)는 플레이어 목록 및 히트박스 생성에서 제외
+      if (actor.actorNr === this.client.myActor().actorNr) {
+        console.log(
+          `[ServerNetwork] Server actor joined (ID: ${id}). Skipping character creation.`
+        );
+        return;
+      }
+
       console.log(`[ServerNetwork] Player Joined: ${id} (${name})`);
 
       if (!this.playerStates.has(id)) {
@@ -132,6 +141,9 @@ export class ServerNetworkManager implements INetworkAuthority {
         break;
 
       case EventCode.MOVE: {
+        // [서버 본인 제외 전사적용]
+        if (senderId === this.client.myActor().actorNr.toString()) return;
+
         if (!this.playerStates.has(senderId)) {
           // 플레이어 최초 발견 시에도 Hitbox 생성 요청
           if (this.onPlayerJoin) this.onPlayerJoin(senderId);
