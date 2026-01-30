@@ -9,6 +9,7 @@ const logger = new Logger('ServerApi');
 export class ServerApi {
   private app: express.Application;
   private port = 3000;
+  private server: any; // http.Server
   private networkManager: ServerNetworkManager;
 
   constructor(networkManager: ServerNetworkManager) {
@@ -55,8 +56,15 @@ export class ServerApi {
   }
 
   public start(): void {
-    this.app.listen(this.port, () => {
+    this.server = this.app.listen(this.port, () => {
       logger.info(`Listening on port ${this.port}`);
     });
+  }
+
+  public stop(): void {
+    if (this.server) {
+      this.server.close();
+      logger.info('ServerApi stopped.');
+    }
   }
 }

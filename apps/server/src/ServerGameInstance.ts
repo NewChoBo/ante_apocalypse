@@ -12,7 +12,6 @@ import {
   AbstractMesh,
 } from '@babylonjs/core';
 import { ServerNetworkManager } from './ServerNetworkManager.ts';
-import { ServerApi } from './ServerApi.ts';
 import { RequestHitData, Vector3 as commonVector3, Logger, EventCode } from '@ante/common';
 import {
   WorldSimulation,
@@ -111,11 +110,11 @@ class ServerTargetSpawner extends BaseTargetSpawner {
   }
 }
 
-const logger = new Logger('ServerGameController');
+const logger = new Logger('ServerGameInstance');
 
-export class ServerGameController {
+export class ServerGameInstance {
   private networkManager: ServerNetworkManager;
-  private api: ServerApi;
+  // private api: ServerApi; // Moved to ServerApp
   private isRunning = false;
 
   private engine: NullEngine;
@@ -127,9 +126,9 @@ export class ServerGameController {
   // [추가] 플레이어 ID와 물리 메쉬(Hitbox) 매핑
   private playerPawns: Map<string, ServerPlayerPawn> = new Map();
 
-  constructor() {
-    this.networkManager = new ServerNetworkManager();
-    this.api = new ServerApi(this.networkManager);
+  constructor(networkManager: ServerNetworkManager) {
+    this.networkManager = networkManager;
+    // this.api = new ServerApi(this.networkManager); // Moved to ServerApp
 
     this.engine = new NullEngine();
     this.scene = new Scene(this.engine);
@@ -260,10 +259,10 @@ export class ServerGameController {
     logger.info('Physics World Initialized');
   }
 
-  public async start(): Promise<void> {
-    logger.info('Starting...');
-    await this.networkManager.connect();
-    this.api.start();
+  public start(): void {
+    if (this.isRunning) return;
+    logger.info('Starting Game Simulation...');
+    // Network connection and API start moved to ServerApp
     this.isRunning = true;
 
     let lastTickTime = performance.now();
@@ -291,12 +290,7 @@ export class ServerGameController {
       }
     });
 
-    setTimeout(() => {
-      logger.info('=== Creating Fixed Room: TEST_ROOM ===');
-      this.networkManager
-        .createGameRoom('TEST_ROOM', 'training_ground')
-        .catch((e) => logger.error('Room creation failed:', e));
-    }, 1000);
+    // Room creation moved to ServerApp
   }
 
   // [신규] 플레이어 폰 생성 (Mesh Load)
@@ -350,6 +344,6 @@ export class ServerGameController {
   public stop(): void {
     this.isRunning = false;
     this.engine.dispose();
-    this.networkManager.disconnect();
+    // this.networkManager.disconnect(); // Managed by ServerApp
   }
 }

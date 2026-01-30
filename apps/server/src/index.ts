@@ -8,14 +8,14 @@ import * as xhr2 from 'xhr2';
 (global as any).XMLHttpRequest = (xhr2 as any).default || xhr2;
 
 import { Logger } from '@ante/common';
-import { ServerGameController } from './ServerGameController.ts';
+import { ServerApp } from './ServerApp.ts';
 
 const logger = new Logger('Server');
 
 logger.info('Initializing Headless Game Server...');
 
-const server = new ServerGameController();
-server.start().catch((e) => {
+const app = new ServerApp();
+app.start().catch((e) => {
   logger.error('Fatal Error:', e);
   process.exit(1);
 });
