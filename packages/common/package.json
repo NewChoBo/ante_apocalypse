@@ -1,0 +1,13 @@
+{
+  "name": "@ante/common",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "eslint src --fix",
+    "format": "prettier --write src",
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}
