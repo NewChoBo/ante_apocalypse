@@ -12,26 +12,17 @@ import {
   MovePayload,
   InitialStatePayload,
   SyncWeaponPayload,
+  Logger,
 } from '@ante/common';
-import { INetworkAuthority } from '../network/INetworkAuthority.js';
 import { WorldEntityManager } from '../simulation/WorldEntityManager.js';
-import { NetworkDispatcher } from '../network/NetworkDispatcher.js';
-import { Logger } from '@ante/common';
+import { BasePhotonClient } from '../network/BasePhotonClient.js';
 
 const logger = new Logger('ServerNetworkAuthority');
 
-export class ServerNetworkAuthority implements INetworkAuthority {
-  private client: any; // Photon.LoadBalancing.LoadBalancingClient
-  private appId: string;
-  private appVersion: string;
-
+export class ServerNetworkAuthority extends BasePhotonClient {
   private entityManager: WorldEntityManager = WorldEntityManager.getInstance();
-  private dispatcher: NetworkDispatcher = new NetworkDispatcher();
 
-  // [추가] 연결 대기용 Promise Resolver
-  private connectionResolver: (() => void) | null = null;
-
-  // [추가] 외부로 내보낼 콜백 함수들
+  // External callbacks
   public onPlayerJoin?: (id: string) => void;
   public onPlayerLeave?: (id: string) => void;
   public onPlayerMove?: (id: string, pos: Vector3, rot: Vector3) => void;
@@ -46,29 +37,19 @@ export class ServerNetworkAuthority implements INetworkAuthority {
     return true; // The server is always the authority
   }
 
-  public getSocketId(): string | undefined {
+  public override getSocketId(): string | undefined {
     return 'server';
   }
 
-  public sendEvent(code: number, data: unknown, _reliable: boolean = true): void {
-    this.client.raiseEvent(code, data, {
-      receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
-    });
+  public override sendEvent(code: number, data: unknown, _reliable: boolean = true): void {
+    this.sendEventToAll(code, data);
   }
 
   constructor(appId: string, appVersion: string) {
-    this.appId = appId;
-    this.appVersion = appVersion;
-
-    // LoadBalancingClient 생성
-    this.client = new (Photon as any).LoadBalancing.LoadBalancingClient(
-      (Photon as any).ConnectionProtocol.Wss,
-      this.appId,
-      this.appVersion
-    );
+    super(appId, appVersion);
 
     this.setupDispatcher();
-    this.setupListeners();
+    this.setupServerCallbacks();
   }
 
   private setupDispatcher(): void {
@@ -131,33 +112,10 @@ export class ServerNetworkAuthority implements INetworkAuthority {
     });
   }
 
-  private setupListeners(): void {
-    this.client.onStateChange = (state: number) => {
-      logger.info(`State Changed: ${state}`);
-      const States = (Photon as any).LoadBalancing.LoadBalancingClient.State;
-
-      // [핵심] 마스터 서버 연결 혹은 로비 진입 시점에 Promise 해결(Resolve)
-      if (state === States.JoinedLobby || state === States.ConnectedToMaster) {
-        if (this.connectionResolver) {
-          logger.info('Connected & Ready.');
-          this.connectionResolver();
-          this.connectionResolver = null;
-        }
-      }
-    };
-
-    this.client.onEvent = (code: number, content: unknown, actorNr: number) => {
-      this.dispatcher.dispatch(code, content, actorNr.toString());
-    };
-
-    this.client.onActorJoin = (actor: any) => {
-      const id = actor.actorNr.toString();
-      const name = actor.name || 'Anonymous';
-
-      // [서버 본인 제외] 서버(방장 더미)는 플레이어 목록 및 히트박스 생성에서 제외
-      if (actor.actorNr === this.client.myActor().actorNr) {
-        return;
-      }
+  private setupServerCallbacks(): void {
+    // Hook into base class callbacks
+    this.onActorJoin = (actorNr: number, name: string) => {
+      const id = actorNr.toString();
 
       logger.info(`Player Joined: ${id} (${name})`);
 
@@ -174,26 +132,15 @@ export class ServerNetworkAuthority implements INetworkAuthority {
         this.entityManager.register(state as any);
       }
 
-      // [연결] 컨트롤러에게 알림
       if (this.onPlayerJoin) this.onPlayerJoin(id);
     };
 
-    this.client.onActorLeave = (actor: any) => {
-      const id = actor.actorNr.toString();
+    this.onActorLeave = (actorNr: number) => {
+      const id = actorNr.toString();
       logger.info(`Player Left: ${id}`);
       this.entityManager.unregister(id);
       if (this.onPlayerLeave) this.onPlayerLeave(id);
     };
-  }
-
-  // [수정] 연결이 완료될 때까지 기다리는 Promise 반환
-  public connect(region: string = 'kr'): Promise<void> {
-    logger.info('Connecting to Photon...');
-    this.client.connectToRegionMaster(region);
-
-    return new Promise((resolve) => {
-      this.connectionResolver = resolve;
-    });
   }
 
   public async createGameRoom(name?: string, mapId?: string): Promise<void> {
@@ -234,9 +181,7 @@ export class ServerNetworkAuthority implements INetworkAuthority {
       targets: [],
     };
 
-    this.client.raiseEvent(EventCode.INITIAL_STATE, payload, {
-      targetActors: [parseInt(targetId)],
-    });
+    this.sendEventToActor(EventCode.INITIAL_STATE, payload, parseInt(targetId));
   }
 
   public broadcastState(): void {
@@ -247,17 +192,12 @@ export class ServerNetworkAuthority implements INetworkAuthority {
       players: players,
       enemies: [],
       targets: [],
-      // weaponConfigs: WeaponRegistry,
     };
 
-    this.client.raiseEvent(EventCode.INITIAL_STATE, payload, {
-      receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
-    });
+    this.sendEventToAll(EventCode.INITIAL_STATE, payload);
   }
 
-  // [신규] 피격 결과 방송 (Broadcasting)
   public broadcastHit(hitData: HitEventData, code: number = EventCode.HIT): void {
-    // 서버측 상태 업데이트
     const targetState = this.getPlayerState(hitData.targetId);
     if (targetState) {
       targetState.health = hitData.newHealth;
@@ -265,21 +205,14 @@ export class ServerNetworkAuthority implements INetworkAuthority {
         `Player ${hitData.targetId} Health: ${targetState.health} (Part: ${hitData.part})`
       );
 
-      // 피격 정보 방송 (상대 코드 사용)
-      this.client.raiseEvent(code, hitData, {
-        receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
-      });
+      this.sendEventToAll(code, hitData);
 
-      // 사망 처리
       if (targetState.health <= 0) {
         this.broadcastDeath(hitData.targetId, hitData.attackerId);
       }
     } else {
-      // [신규] 플레이어가 아닌 대상(에너미, 타겟 등)에 대한 히트도 브로드캐스트
       logger.info(`Non-player Hit Broadcasted: ${hitData.targetId} with Code ${code}`);
-      this.client.raiseEvent(code, hitData, {
-        receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
-      });
+      this.sendEventToAll(code, hitData);
     }
   }
 
@@ -289,12 +222,6 @@ export class ServerNetworkAuthority implements INetworkAuthority {
       targetId,
       attackerId,
     };
-    this.client.raiseEvent(EventCode.PLAYER_DEATH, payload, {
-      receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
-    });
-  }
-
-  public disconnect(): void {
-    this.client.disconnect();
+    this.sendEventToAll(EventCode.PLAYER_DEATH, payload);
   }
 }

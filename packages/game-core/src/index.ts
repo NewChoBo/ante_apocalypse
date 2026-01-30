@@ -3,6 +3,7 @@ export * from './controllers/AIController.js';
 export * from './types/IWorldEntity.js';
 export * from './types/ITickable.js';
 export * from './network/INetworkAuthority.js';
+export * from './network/BasePhotonClient.js';
 export * from './systems/BaseEnemyManager.js';
 export * from './systems/BasePickupManager.js';
 export * from './systems/BaseTargetSpawner.js';
