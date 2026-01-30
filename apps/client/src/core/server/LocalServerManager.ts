@@ -19,13 +19,33 @@ export class LocalServerManager {
     return LocalServerManager.instance;
   }
 
+  public async takeover(roomName: string): Promise<void> {
+    if (this.isRunning) {
+      logger.warn('Local Server is already running (Takeover ignored).');
+      return;
+    }
+
+    logger.info(`Taking over Host Duties for Room: ${roomName}`);
+
+    // Pass 'true' to skip Room Creation and just Join
+    await this.internalStart(roomName, true);
+  }
+
   public async startSession(roomName: string, mapId: string): Promise<void> {
+    await this.internalStart(roomName, false, mapId);
+  }
+
+  private async internalStart(
+    roomName: string,
+    isTakeover: boolean,
+    mapId?: string
+  ): Promise<void> {
     if (this.isRunning) {
       logger.warn('Local Server is already running.');
       return;
     }
 
-    logger.info(`Starting Local Server Session... Room: ${roomName}`);
+    logger.info(`Starting Local Server Session... Room: ${roomName} (Takeover: ${isTakeover})`);
 
     try {
       // 1. Initialize Network Authority (Server Connection)
@@ -39,8 +59,16 @@ export class LocalServerManager {
       this.networkAuthority = new ServerNetworkAuthority(appId, appVersion);
       await this.networkAuthority.connect();
 
-      // 2. Create Room (Authoritative Create)
-      await this.networkAuthority.createGameRoom(roomName, mapId);
+      // 2. Create OR Join Room
+      if (isTakeover) {
+        // Just join the existing room as a Server Peer
+        // Note: We might need to handle 'Server' naming collision if old server is ghosting.
+        // ServerNetworkAuthority handles naming usually?
+        await this.networkAuthority.joinGameRoom(roomName);
+      } else {
+        if (!mapId) throw new Error('MapID required for new session');
+        await this.networkAuthority.createGameRoom(roomName, mapId);
+      }
 
       // 3. Initialize Logical Server
       const assetLoader = new BrowserAssetLoader();
@@ -50,7 +78,7 @@ export class LocalServerManager {
       this.logicalServer.start();
 
       this.isRunning = true;
-      logger.info('Local Server Session Started.');
+      logger.info('Local Server Session Started (Takeover Complete).');
     } catch (e) {
       logger.error('Failed to start Local Server Session:', e);
       this.stopSession();

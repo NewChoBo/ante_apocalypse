@@ -23,5 +23,6 @@ export interface INetworkProvider {
   onEvent?: (code: number, data: any, senderId: string) => void;
   onPlayerJoined?: (user: PlayerInfo) => void;
   onPlayerLeft?: (userId: string) => void;
+  onMasterClientSwitched?: (newMasterId: string) => void;
   onRoomListUpdated?: (rooms: RoomInfo[]) => void;
 }

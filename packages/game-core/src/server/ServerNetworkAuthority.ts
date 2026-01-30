@@ -216,6 +216,15 @@ export class ServerNetworkAuthority implements INetworkAuthority {
     this.client.createRoom(roomName, roomOptions);
   }
 
+  public async joinGameRoom(name: string): Promise<void> {
+    if (!this.client.isConnectedToMaster() && !this.client.isInLobby()) {
+      logger.error('Cannot join room: Not connected.');
+      throw new Error('Server disconnected from Photon.');
+    }
+    logger.info(`Joining Room: ${name}`);
+    this.client.joinRoom(name);
+  }
+
   private sendInitialState(targetId: string): void {
     logger.info(`Sending Initial State to ${targetId}`);
     const players = this.entityManager.getAllEntities() as unknown as PlayerState[];

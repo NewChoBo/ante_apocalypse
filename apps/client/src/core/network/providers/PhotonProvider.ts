@@ -17,6 +17,7 @@ export class PhotonProvider implements INetworkProvider {
   public onEvent?: (code: number, data: any, senderId: string) => void;
   public onPlayerJoined?: (user: PlayerInfo) => void;
   public onPlayerLeft?: (userId: string) => void;
+  public onMasterClientSwitched?: (newMasterId: string) => void;
 
   constructor() {
     // browser 환경에서 require('ws') 에러 방지를 위해 WebSocket 구현체 재설정
@@ -85,6 +86,20 @@ export class PhotonProvider implements INetworkProvider {
     this.client.onActorLeave = (actor: any) => {
       logger.info(`Actor Left: ${actor.actorNr}`);
       this.onPlayerLeft?.(actor.actorNr.toString());
+
+      // Check if we became the new Master Client
+      if (this.isMasterClient()) {
+        const myId = this.getLocalPlayerId();
+        if (myId) {
+          // We verify if we werent already master before?
+          // Usually onActorLeave happens, then masterId is updated.
+          // Ideally we tracked previousMasterId. But simply enforcing "If I am master now, and someone left" logic:
+          // The problem is recognizing if *I just became* master.
+          // But for "Hot Takeover", if I am master, I should ensure Server is running.
+          // The NetworkManager can handle the "idempotency" (if already running, do nothing).
+          this.onMasterClientSwitched?.(myId);
+        }
+      }
     };
 
     this.client.onError = (errorCode: number, errorMsg: string) => {

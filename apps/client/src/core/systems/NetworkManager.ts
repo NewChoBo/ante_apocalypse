@@ -226,6 +226,25 @@ export class NetworkManager implements INetworkAuthority {
       this.onEvent.notifyObservers({ code, data, senderId });
       this.dispatcher.dispatch(code, data, senderId);
     };
+
+    this.provider.onMasterClientSwitched = (newMasterId: string) => {
+      const myId = this.getSocketId();
+      // Let's rely on provider exposing it or infer it.
+      // For now, let's use a method to get room name.
+
+      if (myId === newMasterId) {
+        // accessing room name from provider might be needed.
+        // Im implementing a helper in NetworkManager first or just casting provider
+        const roomName = (this.provider as any).client?.myRoom()?.name;
+
+        if (roomName) {
+          console.log(`!!! I AM THE NEW HOST !!! - Triggering Takeover for Room: ${roomName}`);
+          import('../server/LocalServerManager').then(({ LocalServerManager }) => {
+            LocalServerManager.getInstance().takeover(roomName);
+          });
+        }
+      }
+    };
   }
 
   public connect(userId: string): void {
