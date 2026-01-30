@@ -87,6 +87,8 @@ export interface RequestHitData {
   damage: number;
   part?: string;
   weaponId: string;
+  origin: Vector3;
+  direction: Vector3;
 }
 
 export interface EnemyState {

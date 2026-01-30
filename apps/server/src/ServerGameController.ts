@@ -1,3 +1,8 @@
+// Polyfill for Babylon.js Server-side
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+global.XMLHttpRequest = require('xhr2').XMLHttpRequest;
+
 import {
   NullEngine,
   Scene,
@@ -14,12 +19,82 @@ import {
   BaseEnemyManager,
   BasePickupManager,
   BaseTargetSpawner,
+  HitScanSystem,
 } from '@ante/game-core';
+import { ServerEnemyPawn } from './core/ServerEnemyPawn.ts';
+import { ServerTargetPawn } from './core/ServerTargetPawn.ts';
+import { ServerPlayerPawn } from './core/ServerPlayerPawn.ts';
 
-// Server-side concrete implementations (can be simple wrappers or extensions if needed)
-class ServerEnemyManager extends BaseEnemyManager {}
+// Server-side concrete implementations
+class ServerEnemyManager extends BaseEnemyManager {
+  private enemyPawns: Map<string, ServerEnemyPawn> = new Map();
+  private scene: Scene;
+
+  constructor(authority: ServerNetworkManager, scene: Scene) {
+    super(authority);
+    this.scene = scene;
+  }
+
+  public override requestSpawnEnemy(id: string, position: commonVector3): boolean {
+    if (!super.requestSpawnEnemy(id, new Vector3(position.x, position.y, position.z))) return false;
+
+    // Create server-side representation
+    const pawn = new ServerEnemyPawn(
+      id,
+      this.scene,
+      new Vector3(position.x, position.y, position.z)
+    );
+    this.enemyPawns.set(id, pawn);
+    return true;
+  }
+
+  public getEnemyMesh(id: string): AbstractMesh | undefined {
+    return this.enemyPawns.get(id)?.mesh;
+  }
+}
 class ServerPickupManager extends BasePickupManager {}
-class ServerTargetSpawner extends BaseTargetSpawner {}
+
+class ServerTargetSpawner extends BaseTargetSpawner {
+  private targetPawns: Map<string, ServerTargetPawn> = new Map();
+  private scene: Scene;
+
+  constructor(authority: ServerNetworkManager, scene: Scene) {
+    super(authority);
+    this.scene = scene;
+  }
+
+  public override broadcastTargetSpawn(
+    id: string,
+    type: string,
+    position: commonVector3,
+    isMoving: boolean
+  ): void {
+    super.broadcastTargetSpawn(id, type, new Vector3(position.x, position.y, position.z), isMoving);
+
+    // Create server-side mesh for raycast
+    // Fix: Convert commonVector3 (interface) to Babylon Vector3 (class)
+    const pawn = new ServerTargetPawn(
+      id,
+      this.scene,
+      new Vector3(position.x, position.y, position.z)
+    );
+    this.targetPawns.set(id, pawn);
+  }
+
+  public override broadcastTargetDestroy(targetId: string): void {
+    super.broadcastTargetDestroy(targetId);
+
+    const pawn = this.targetPawns.get(targetId);
+    if (pawn) {
+      pawn.dispose();
+      this.targetPawns.delete(targetId);
+    }
+  }
+
+  public getTargetMesh(id: string): AbstractMesh | undefined {
+    return this.targetPawns.get(id)?.mesh;
+  }
+}
 
 export class ServerGameController {
   private networkManager: ServerNetworkManager;
@@ -29,9 +104,11 @@ export class ServerGameController {
   private engine: NullEngine;
   private scene: Scene;
   private simulation: WorldSimulation;
+  private enemyManager: ServerEnemyManager;
+  private targetSpawner: ServerTargetSpawner;
 
   // [추가] 플레이어 ID와 물리 메쉬(Hitbox) 매핑
-  private playerMeshes: Map<string, AbstractMesh> = new Map();
+  private playerPawns: Map<string, ServerPlayerPawn> = new Map();
 
   constructor() {
     this.networkManager = new ServerNetworkManager();
@@ -41,10 +118,13 @@ export class ServerGameController {
     this.scene = new Scene(this.engine);
 
     // [신규] 시뮬레이션 엔진 초기화
+    this.enemyManager = new ServerEnemyManager(this.networkManager, this.scene);
+    this.targetSpawner = new ServerTargetSpawner(this.networkManager, this.scene); // Store ref
+
     this.simulation = new WorldSimulation(
-      new ServerEnemyManager(this.networkManager),
+      this.enemyManager,
       new ServerPickupManager(this.networkManager),
-      new ServerTargetSpawner(this.networkManager),
+      this.targetSpawner,
       this.networkManager
     );
 
@@ -59,9 +139,9 @@ export class ServerGameController {
 
     // [추가] 네트워크 이벤트 연결
     this.networkManager.onPlayerJoin = (id) => {
-      this.createPlayerHitbox(id);
+      this.createPlayerPawn(id);
       // 첫 플레이어가 입장하면 게임 레이아웃 생성
-      if (this.playerMeshes.size === 1) {
+      if (this.playerPawns.size === 1) {
         this.simulation.targets.spawnInitialTargets();
         this.simulation.enemies.spawnEnemiesAt([
           [5, 0, 5],
@@ -69,22 +149,117 @@ export class ServerGameController {
         ]);
       }
     };
-    this.networkManager.onPlayerLeave = (id: string) => this.removePlayerHitbox(id);
+    this.networkManager.onPlayerLeave = (id: string) => this.removePlayerPawn(id);
     this.networkManager.onPlayerMove = (id: string, pos: commonVector3, rot: commonVector3) =>
-      this.updatePlayerHitbox(id, pos, rot);
+      this.updatePlayerPawn(id, pos, rot);
     this.networkManager.onFireRequest = (id, origin: commonVector3, dir: commonVector3) =>
       this.processFireEvent(id, origin, dir);
     this.networkManager.onHitRequest = (shooterId: string, data: RequestHitData) => {
-      console.log(
-        `[Server] Trusted Hit: ${shooterId} hit ${data.targetId} (${data.part}) for ${data.damage} dmg`
-      );
-      this.networkManager.broadcastHit({
-        targetId: data.targetId,
-        damage: data.damage,
-        attackerId: shooterId,
-        part: data.part,
-        newHealth: 0, // Placeholder
-      });
+      // 1. Validate Hit using Server Raycast
+      let isValidHit = false;
+      let finalDamage = data.damage;
+
+      console.log(`[Server] Validating Hit from ${shooterId} on ${data.targetId}`);
+
+      // Ignore ground hits or undefined targets for now
+      if (!data.targetId || data.targetId === 'ground') {
+        console.log('[Server] Ignoring hit on ground/undefined');
+        return;
+      }
+
+      if (data.origin && data.direction) {
+        const rayOrigin = new Vector3(data.origin.x, data.origin.y, data.origin.z);
+        const rayDirection = new Vector3(data.direction.x, data.direction.y, data.direction.z);
+
+        // 1. Force Update World Matrix for the target to ensure accurate raycast
+        // Find the target mesh first to update it
+        const specificTargetMesh =
+          this.enemyManager.getEnemyMesh(data.targetId) ||
+          this.targetSpawner.getTargetMesh(data.targetId) ||
+          this.playerPawns.get(data.targetId)?.mesh;
+
+        if (specificTargetMesh) {
+          // Force computation of world matrix for the root and its children (hitboxes)
+          specificTargetMesh.computeWorldMatrix(true);
+          specificTargetMesh
+            .getChildMeshes(false)
+            .forEach((child) => child.computeWorldMatrix(true));
+        }
+
+        // Raycast against all meshes (enemies, players, obstacles)
+        // Note: For now, we only have enemy hitboxes and player hitboxes in the scene
+        const result = HitScanSystem.doRaycast(
+          this.scene,
+          rayOrigin,
+          rayDirection, // Direction
+          100, // Range
+          (mesh) => {
+            return mesh.metadata?.id === data.targetId;
+          }
+        );
+
+        if (result.hit && result.pickedMesh) {
+          const hitId = result.pickedMesh.metadata?.id;
+          const hitPart = result.pickedMesh.metadata?.bodyPart || 'body';
+
+          if (hitId === data.targetId) {
+            isValidHit = true;
+            console.log(`[Server] Hit Verified! Part: ${hitPart}`);
+
+            // Optional: Recalculate damage based on server-side body part
+            // finalDamage = calculateDamage(...)
+          } else {
+            console.warn(`[Server] Hit Invalid: Ray hit ${hitId} instead of ${data.targetId}`);
+          }
+        } else {
+          console.warn(`[Server] Hit Invalid: Ray hit nothing.`);
+          console.log(
+            `[Debug] Ray Origin: ${rayOrigin.toString()}, Dir: ${rayDirection.toString()}`
+          );
+
+          // Debug target position
+          const targetMesh =
+            this.enemyManager.getEnemyMesh(data.targetId) ||
+            this.targetSpawner.getTargetMesh(data.targetId) ||
+            this.enemyManager.getEnemyMesh(data.targetId) ||
+            this.targetSpawner.getTargetMesh(data.targetId) ||
+            this.playerPawns.get(data.targetId)?.mesh;
+          if (targetMesh) {
+            console.log(
+              `[Debug] Target ${data.targetId} Pos: ${targetMesh.absolutePosition.toString()}`
+            );
+            console.log(
+              `[Debug] Target ${data.targetId} Bounds: ${targetMesh.getBoundingInfo().boundingBox.minimumWorld} ~ ${targetMesh.getBoundingInfo().boundingBox.maximumWorld}`
+            );
+          } else {
+            console.log(`[Debug] Target ${data.targetId} NOT FOUND`);
+          }
+        }
+      } else {
+        // Fallback for old clients or missing data (allow or reject based on policy)
+        console.warn(`[Server] Hit Request missing origin/direction. Allowing for legacy support.`);
+        isValidHit = true;
+      }
+
+      if (isValidHit) {
+        // Calculate new health based on server state
+        const targetState = this.networkManager.getPlayerState(data.targetId);
+        let newHealth = 0;
+        if (targetState) {
+          newHealth = Math.max(0, targetState.health - finalDamage);
+        }
+
+        console.log(
+          `[Server] Processing Hit: ${shooterId} hit ${data.targetId} (${data.part}) for ${finalDamage} dmg. NewHealth: ${newHealth}`
+        );
+        this.networkManager.broadcastHit({
+          targetId: data.targetId,
+          damage: finalDamage,
+          attackerId: shooterId,
+          part: data.part,
+          newHealth: newHealth,
+        });
+      }
     };
 
     console.log('[ServerGameController] Physics World Initialized');
@@ -122,44 +297,40 @@ export class ServerGameController {
     }, 1000);
   }
 
-  // [신규] 플레이어 캡슐 생성
-  private createPlayerHitbox(id: string): void {
-    if (this.playerMeshes.has(id)) return;
+  // [신규] 플레이어 폰 생성 (Mesh Load)
+  private createPlayerPawn(id: string): void {
+    if (this.playerPawns.has(id)) return;
 
-    // 높이 2m, 지름 1m 캡슐 (일반적인 FPS 캐릭터 크기)
-    const hitbox = MeshBuilder.CreateCapsule(
-      'Player_' + id,
-      { height: 2, radius: 0.5 },
-      this.scene
-    );
-    hitbox.position.y = 1; // 발이 바닥에 닿게 보정
-    hitbox.checkCollisions = true; // 충돌 처리 활성화
-
-    // 사격 판정을 위한 메타데이터
-    hitbox.metadata = { isPlayer: true, id: id };
-
-    this.playerMeshes.set(id, hitbox);
-    console.log(`[Server] Created Hitbox for Player: ${id}`);
+    // Use ServerPlayerPawn which loads the mesh
+    const pawn = new ServerPlayerPawn(id, this.scene, new Vector3(0, 1.75, 0));
+    this.playerPawns.set(id, pawn);
   }
 
   // [신규] 플레이어 이동 동기화
-  private updatePlayerHitbox(id: string, pos: commonVector3, rot: commonVector3): void {
-    const hitbox = this.playerMeshes.get(id);
-    if (hitbox) {
-      // 서버의 캡슐을 클라이언트 위치로 순간이동 (추후 보간 적용 가능)
-      hitbox.position.set(pos.x, pos.y, pos.z);
+  private updatePlayerPawn(id: string, pos: commonVector3, rot: commonVector3): void {
+    const pawn = this.playerPawns.get(id);
+    if (pawn && pawn.mesh) {
+      // 서버의 캡슐을 클라이언트 위치로 순간이동
+      // Client sends Head Position (Y=1.75).
+      // ServerPlayerPawn Root is at Head Level (1.75).
+      // Visual is offset by -1.75 inside ServerPlayerPawn.
+      // So we DO NOT need to subtract 0.75 anymore if we use the same structure!
+      // If client says "I am at 1.75", and we set Root to 1.75:
+      // Root is at 1.75. Visual is at 0.0. Perfect.
+      pawn.mesh.position.set(pos.x, pos.y, pos.z);
+
       // 회전은 보통 Y축(Heading)만 중요
-      if (rot) hitbox.rotation.set(rot.x, rot.y, rot.z);
+      if (rot) pawn.mesh.rotation.set(rot.x, rot.y, rot.z);
     }
   }
 
   // [신규] 플레이어 퇴장 처리
-  private removePlayerHitbox(id: string): void {
-    const hitbox = this.playerMeshes.get(id);
-    if (hitbox) {
-      hitbox.dispose();
-      this.playerMeshes.delete(id);
-      console.log(`[Server] Removed Hitbox for Player: ${id}`);
+  private removePlayerPawn(id: string): void {
+    const pawn = this.playerPawns.get(id);
+    if (pawn) {
+      pawn.dispose();
+      this.playerPawns.delete(id);
+      console.log(`[Server] Removed Pawn for Player: ${id}`);
     }
   }
 

@@ -249,6 +249,8 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
         damage: finalDamage,
         weaponId: this.name,
         part: part,
+        origin: { x: rayOrigin.x, y: rayOrigin.y, z: rayOrigin.z },
+        direction: { x: direction.x, y: direction.y, z: direction.z },
       });
 
       // 3. 통합 히트 프로세싱 (로컬 연출 등)
