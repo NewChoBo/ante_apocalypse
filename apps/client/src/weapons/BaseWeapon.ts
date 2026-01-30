@@ -95,7 +95,7 @@ export abstract class BaseWeapon implements IWeapon {
     // 애니메이션이 끝날 때까지 대기하는 프로미스를 반환할 수도 있지만,
     // 여기서는 간단히 상태만 변경하고 update에서 처리합니다.
     return new Promise((resolve) => {
-      const check = () => {
+      const check = (): void => {
         if (this.animProgress <= 0) {
           this.animState = 'idle';
           resolve();
@@ -168,10 +168,9 @@ export abstract class BaseWeapon implements IWeapon {
     return true;
   }
 
-  public updateStats(stats: Partial<Record<string, any>>): void {
-    if (stats.damage !== undefined) this.damage = stats.damage;
-    if (stats.range !== undefined) this.range = stats.range;
-    console.log(`[BaseWeapon] ${this.name} stats updated from server`);
+  public updateStats(stats: Partial<Record<string, unknown>>): void {
+    if (stats.damage !== undefined) this.damage = stats.damage as number;
+    if (stats.range !== undefined) this.range = stats.range as number;
   }
 
   public dispose(): void {

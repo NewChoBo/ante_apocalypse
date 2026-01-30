@@ -30,27 +30,29 @@ export class WorldEntityManager extends BaseEntityManager {
 
   private setupNetworkListeners(): void {
     // 1. 타겟 피격 동기화
-    this.networkManager.onTargetHit.add((data) => {
-      this.processHit(data.targetId, data.damage, data.part);
-    });
+    this.networkManager.onTargetHit.add(
+      (data: { targetId: string; damage: number; part: string }): void => {
+        this.processHit(data.targetId, data.damage, data.part);
+      }
+    );
 
     // 2. 적 피격 동기화
-    this.networkManager.onEnemyHit.add((data) => {
+    this.networkManager.onEnemyHit.add((data: { id: string; damage: number }): void => {
       this.processHit(data.id, data.damage, 'body');
     });
 
     // 3. 타겟 파괴 동기화
-    this.networkManager.onTargetDestroy.add((data) => {
+    this.networkManager.onTargetDestroy.add((data: { targetId: string }): void => {
       this.removeEntity(data.targetId);
     });
 
     // 4. 적 파괴 동기화
-    this.networkManager.onEnemyDestroyed.add((data) => {
+    this.networkManager.onEnemyDestroyed.add((data: { id: string }): void => {
       this.removeEntity(data.id);
     });
 
     // 5. 아이템 파괴 동기화
-    this.networkManager.onPickupDestroyed.add((data) => {
+    this.networkManager.onPickupDestroyed.add((data: { id: string }): void => {
       this.removeEntity(data.id);
     });
   }
@@ -65,9 +67,6 @@ export class WorldEntityManager extends BaseEntityManager {
   public override unregister(id: string): void {
     const entity = this.getEntity(id);
     if (entity) {
-      console.log(
-        `[WorldEntityManager] Attempting to remove entity: ${id}, isDead: ${entity.isDead}`
-      );
       if (!entity.isDead) {
         entity.die();
       }
@@ -75,9 +74,6 @@ export class WorldEntityManager extends BaseEntityManager {
       entity.dispose();
       super.unregister(id);
       this.onEntityRemoved.notifyObservers(id);
-      console.log(`[WorldEntityManager] Entity successfully removed: ${id}`);
-    } else {
-      console.warn(`[WorldEntityManager] Tried to remove non-existent entity: ${id}`);
     }
   }
 

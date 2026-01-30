@@ -117,8 +117,7 @@ export class Rifle extends Firearm {
       });
 
       this.setIdleState();
-    } catch (e) {
-      console.error('Failed to instantiate Rifle model:', e);
+    } catch {
       // 실패 시 폴백
       this.weaponMesh = MeshBuilder.CreateBox('rifle_fallback', { size: 0.1 }, this.scene);
       this.weaponMesh.parent = this.camera;

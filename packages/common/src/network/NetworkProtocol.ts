@@ -36,7 +36,7 @@ export interface RoomInfo {
   playerCount: number;
   maxPlayers: number;
   isOpen: boolean;
-  customProperties?: any;
+  customProperties?: Record<string, unknown>;
 }
 
 export interface PlayerInfo {
@@ -89,11 +89,19 @@ export interface RequestHitData {
   weaponId: string;
 }
 
+export interface EnemyState {
+  id: string;
+  position: Vector3;
+  rotation: Vector3;
+  health: number;
+  isDead: boolean;
+}
+
 export interface InitialStatePayload {
   players: PlayerState[];
-  enemies: any[]; // To be typed later if needed
-  targets?: any[];
-  weaponConfigs?: Record<string, any>;
+  enemies: EnemyState[];
+  targets?: SpawnTargetPayload[];
+  weaponConfigs?: Record<string, unknown>;
 }
 
 export interface SyncWeaponPayload {

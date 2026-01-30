@@ -67,25 +67,25 @@ export class MultiplayerSystem {
   }
 
   private setupListeners(): void {
-    this.networkManager.onPlayersList.add((players) => {
-      players.forEach((p) => {
+    this.networkManager.onPlayersList.add((players: PlayerState[]): void => {
+      players.forEach((p: PlayerState): void => {
         if (p.id !== this.networkManager.getSocketId()) {
           this.spawnRemotePlayer(p);
         }
       });
     });
 
-    this.networkManager.onInitialStateReceived.add((data) => {
+    this.networkManager.onInitialStateReceived.add((data: { players: PlayerState[] }): void => {
       this.applyPlayerStates(data.players);
     });
 
-    this.networkManager.onPlayerJoined.add((player) => {
+    this.networkManager.onPlayerJoined.add((player: PlayerState): void => {
       if (player.id !== this.networkManager.getSocketId()) {
         this.spawnRemotePlayer(player);
       }
     });
 
-    this.networkManager.onPlayerUpdated.add((player) => {
+    this.networkManager.onPlayerUpdated.add((player: PlayerState): void => {
       const remote = this.remotePlayers.get(player.id);
       if (remote) {
         remote.updateNetworkState(player.position, player.rotation);
@@ -95,11 +95,10 @@ export class MultiplayerSystem {
       }
     });
 
-    this.networkManager.onPlayerLeft.add((id) => {
+    this.networkManager.onPlayerLeft.add((id: string): void => {
       const remote = this.remotePlayers.get(id);
       if (remote) {
-        WorldEntityManager.getInstance().removeEntity(id);
-        remote.dispose();
+        WorldEntityManager.getInstance().unregister(id);
         this.remotePlayers.delete(id);
       }
     });
@@ -135,10 +134,6 @@ export class MultiplayerSystem {
     if (this.remotePlayers.has(player.id)) return;
 
     const name = player.name || 'Anonymous';
-    console.log(
-      `[Multiplayer] Spawning remote player: ${player.id} (${name}) at ${player.position.x}, ${player.position.y}, ${player.position.z}`
-    );
-
     const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, name);
     remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
     this.remotePlayers.set(player.id, remote);

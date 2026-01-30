@@ -78,7 +78,6 @@ export class StaticTarget extends BaseTarget {
   }
 
   public onDestroy(): void {
-    console.log(`[StaticTarget] onDestroy called for ${this.id}`);
     this.playDestroyAnimation();
   }
 
@@ -104,7 +103,6 @@ export class StaticTarget extends BaseTarget {
 
     this.mesh.animations = [scaleAnim];
     this.scene.beginAnimation(this.mesh, 0, 20, false, 1, () => {
-      console.log(`[StaticTarget] Animation ended, disposing mesh for ${this.id}`);
       this.mesh.dispose();
     });
   }

@@ -126,15 +126,13 @@ export class LobbyUI {
 
         const result = await response.json();
         if (result.success) {
-          console.log(`[Lobby] Dedicated Server created room: ${result.roomName}`);
           // Join the room created by the server
           this.networkManager.joinRoom(result.roomName);
         } else {
-          console.error('[Lobby] Failed to request room creation:', result.error);
+          // Handle failure (e.g., show message in UI)
         }
-      } catch (error) {
-        console.error('[Lobby] Error connecting to Dedicated Server API:', error);
-        // Fallback or alert user
+      } catch {
+        // Handle network error
       }
     });
     bottomControls.addControl(createBtn);
@@ -162,7 +160,7 @@ export class LobbyUI {
 
     // Initial fetch from cache
     this.updateRoomList(this.networkManager.getRoomList());
-    this.handleStateChange(this.networkManager.currentState as any); // Use current state
+    this.handleStateChange(this.networkManager.currentState); // Use current state
   }
 
   private handleStateChange(state: string): void {
@@ -249,7 +247,7 @@ export class LobbyUI {
     stack.addControl(name);
 
     // Map Info
-    const mapId = room.customProperties?.mapId || 'UNKNOWN_ZONE';
+    const mapId = (room.customProperties?.mapId as string) || 'UNKNOWN_ZONE';
     const map = new TextBlock();
     map.text = `ZONE: ${mapId.toUpperCase()}`;
     map.color = this.PRIMARY_COLOR;
@@ -294,11 +292,11 @@ export class LobbyUI {
     btn.fontSize = 16;
     btn.fontWeight = '700';
 
-    btn.onPointerEnterObservable.add(() => {
+    btn.onPointerEnterObservable.add((): void => {
       btn.background = this.PRIMARY_COLOR;
       btn.color = 'black';
     });
-    btn.onPointerOutObservable.add(() => {
+    btn.onPointerOutObservable.add((): void => {
       btn.background = 'transparent';
       btn.color = this.PRIMARY_COLOR;
     });

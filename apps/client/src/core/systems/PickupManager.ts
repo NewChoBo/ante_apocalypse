@@ -35,11 +35,17 @@ export class PickupManager implements ITickable {
     this.networkManager = NetworkManager.getInstance();
 
     // Networking
-    this.networkManager.onEvent.add((event) => {
+    this.networkManager.onEvent.add((event: { code: number; data: unknown }): void => {
       if (event.code === EventCode.SPAWN_PICKUP) {
-        this.handleSpawnEvent(event.data);
+        this.handleSpawnEvent(
+          event.data as {
+            id: string;
+            position: { x: number; y: number; z: number };
+            type: PickupType;
+          }
+        );
       } else if (event.code === EventCode.DESTROY_PICKUP) {
-        this.handleDestroyEvent(event.data);
+        this.handleDestroyEvent(event.data as { id: string });
       }
     });
 
@@ -47,13 +53,17 @@ export class PickupManager implements ITickable {
     TickManager.getInstance().register(this);
   }
 
-  private handleSpawnEvent(data: any): void {
+  private handleSpawnEvent(data: {
+    id: string;
+    position: { x: number; y: number; z: number };
+    type: PickupType;
+  }): void {
     if (this.pickups.has(data.id)) return;
     const pos = new Vector3(data.position.x, data.position.y, data.position.z);
     this.spawnPickup(pos, data.type, data.id); // Broadcast parameter removed
   }
 
-  private handleDestroyEvent(data: any): void {
+  private handleDestroyEvent(data: { id: string }): void {
     const pickup = this.pickups.get(data.id);
     if (pickup) {
       pickup.collect();
@@ -65,7 +75,9 @@ export class PickupManager implements ITickable {
     if (!this.scene) return;
 
     const pickup = new PickupActor(this.scene, position, type);
-    (pickup as any).networkId = id;
+    // Use a temporary object or a separate map if we really need to store networkId on the actor itself
+    // For now, let's just use the map in PickupManager
+    // (pickup as any).networkId = id;
 
     this.pickups.set(id, pickup);
   }
@@ -91,7 +103,6 @@ export class PickupManager implements ITickable {
       const collectionRange = 3.0; // 더 넓은 범위
 
       if (distSq < collectionRange * collectionRange) {
-        console.log(`[PickupManager] Inside collection range. distSq: ${distSq.toFixed(2)}`);
         this.handleCollection(pickup, id);
       }
     }); // End forEach
@@ -138,10 +149,7 @@ export class PickupManager implements ITickable {
 
       pickup.collect();
       this.pickups.delete(id);
-
-      console.log(`[PickupManager] Stored ${pickup.type} in bag`);
-    } catch (e) {
-      console.error(`[PickupManager] Error storing ${pickup.type}:`, e);
+    } catch {
       // 에러가 나더라도 일단 박스는 제거 (무한 에러 방지)
       pickup.collect();
       this.pickups.delete(id);

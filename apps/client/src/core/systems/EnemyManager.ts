@@ -5,6 +5,7 @@ import { PlayerPawn } from '../PlayerPawn';
 import { NetworkManager } from './NetworkManager';
 import { EventCode } from '@ante/common';
 import { WorldEntityManager } from './WorldEntityManager';
+import { EnemyState } from '@ante/common';
 
 /**
  * 적(Enemy) 실체의 생성 및 AI 업데이트를 담당합니다.
@@ -44,22 +45,22 @@ export class EnemyManager {
 
     this.networkManager.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
 
-    this.networkManager.onEvent.add((event) => {
+    this.networkManager.onEvent.add((event: { code: number; data: unknown }): void => {
       if (event.code === EventCode.SPAWN_ENEMY) {
-        this.handleSpawnEnemy(event.data);
+        this.handleSpawnEnemy(event.data as EnemyState);
       } else if (event.code === EventCode.DESTROY_ENEMY) {
-        this.handleDestroyEnemy(event.data);
+        this.handleDestroyEnemy(event.data as { id: string });
       }
     });
   }
 
-  private handleSpawnEnemy(data: any): void {
+  private handleSpawnEnemy(data: EnemyState): void {
     if (this.enemies.has(data.id)) return;
     const position = new Vector3(data.position.x, data.position.y, data.position.z);
     this.createEnemy(data.id, position);
   }
 
-  private handleDestroyEnemy(data: any): void {
+  private handleDestroyEnemy(data: { id: string }): void {
     const enemy = this.enemies.get(data.id);
     if (enemy) {
       this.worldManager.removeEntity(data.id);
@@ -99,8 +100,8 @@ export class EnemyManager {
     });
   }
 
-  public getEnemyStates(): any[] {
-    const states: any[] = [];
+  public getEnemyStates(): EnemyState[] {
+    const states: EnemyState[] = [];
     this.enemies.forEach((enemy, id) => {
       states.push({
         id,
@@ -117,8 +118,8 @@ export class EnemyManager {
     return states;
   }
 
-  public applyEnemyStates(states: any[]): void {
-    states.forEach((state) => {
+  public applyEnemyStates(states: EnemyState[]): void {
+    states.forEach((state: EnemyState): void => {
       const enemy = this.enemies.get(state.id);
       if (enemy) {
         enemy.position.set(state.position.x, state.position.y, state.position.z);

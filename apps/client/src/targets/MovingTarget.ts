@@ -99,7 +99,6 @@ export class MovingTarget extends BaseTarget {
   }
 
   public onDestroy(): void {
-    console.log(`[MovingTarget] onDestroy called for ${this.id}`);
     this.playDestroyAnimation();
   }
 
@@ -125,7 +124,6 @@ export class MovingTarget extends BaseTarget {
 
     this.mesh.animations = [scaleAnim];
     this.scene.beginAnimation(this.mesh, 0, 20, false, 1, () => {
-      console.log(`[MovingTarget] Animation ended, disposing mesh for ${this.id}`);
       this.mesh.dispose();
     });
   }

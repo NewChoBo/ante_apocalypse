@@ -240,7 +240,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
         finalDamage = DamageSystem.calculateDamage(this.damage, part, pawn.damageProfile);
 
         if (finalDamage > this.damage) {
-          console.log(`[Firearm] Critical Hit! Part: ${part}, Final Damage: ${finalDamage}`);
+          // Critical Hit!
         }
       }
 
@@ -313,21 +313,18 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     }
   }
 
-  public override updateStats(stats: any): void {
+  public override updateStats(stats: Partial<Record<string, unknown>>): void {
     const isInitialSync = this.magazineSize === 0;
 
     super.updateStats(stats);
-    if (stats.magazineSize !== undefined) this.magazineSize = stats.magazineSize;
-    if (stats.fireRate !== undefined) this.fireRate = stats.fireRate;
-    if (stats.reloadTime !== undefined) this.reloadTime = stats.reloadTime;
+    if (stats.magazineSize !== undefined) this.magazineSize = stats.magazineSize as number;
+    if (stats.fireRate !== undefined) this.fireRate = stats.fireRate as number;
+    if (stats.reloadTime !== undefined) this.reloadTime = stats.reloadTime as number;
 
     // [신규] 최초 동기화 시 탄약 자동 지급
     if (isInitialSync && this.magazineSize > 0) {
       this.currentAmmo = this.magazineSize;
       this.reserveAmmo = this.magazineSize * 5; // 소총 등 연사 무기를 위해 넉넉히 지급
-      console.log(
-        `[Firearm] ${this.name} initialized with ${this.currentAmmo} / ${this.reserveAmmo} ammo`
-      );
     }
 
     // 탄약 관련 상태 동기화 (탄창 크기 변경 시 필요할 수 있음)

@@ -1,5 +1,5 @@
-import { inventoryStore } from '../../core/store/GameStore';
-import { getItemMetadata } from '../../core/items/ItemDatabase';
+import { inventoryStore, InventoryState } from '../../core/store/GameStore';
+import { getItemMetadata, ItemMetadata } from '../../core/items/ItemDatabase';
 import {
   AdvancedDynamicTexture,
   Rectangle,
@@ -10,7 +10,7 @@ import {
   Button,
   StackPanel,
 } from '@babylonjs/gui';
-import { Observer } from '@babylonjs/core';
+import { Observer, Scene } from '@babylonjs/core';
 import { UIManager } from '../UIManager';
 import { UI_CONFIG, InventoryCallbacks } from './Config';
 import { InventoryTooltip } from './Tooltip';
@@ -30,7 +30,7 @@ export class InventoryUI {
   private selectedSlotIndex = 0;
 
   private unsub: (() => void) | null = null;
-  private pointerObserver: Observer<any> | null = null;
+  private pointerObserver: Observer<Scene> | null = null;
 
   constructor(callbacks: InventoryCallbacks) {
     this.callbacks = callbacks;
@@ -99,7 +99,7 @@ export class InventoryUI {
     header.top = '10px';
     parent.addControl(header);
 
-    const createText = (text: string, color: string, size: number, width: string) => {
+    const createText = (text: string, color: string, size: number, width: string): TextBlock => {
       const tb = new TextBlock('txt', text);
       tb.color = color;
       tb.fontSize = size;
@@ -179,7 +179,7 @@ export class InventoryUI {
     this.renderBagSlots(state);
   }
 
-  private renderEquipmentSlots(state: any): void {
+  private renderEquipmentSlots(state: InventoryState): void {
     state.weaponSlots.forEach((weaponId: string | null, index: number) => {
       const isSelected = this.selectedSlotIndex === index;
       const slotBtn = this.createBaseSlot(`equipSlot_${index}`, UI_CONFIG.colors.bgEquip, true);
@@ -225,7 +225,7 @@ export class InventoryUI {
     });
   }
 
-  private renderBagSlots(state: any): void {
+  private renderBagSlots(state: InventoryState): void {
     const BAG_COLS = 4;
     for (let i = 0; i < state.maxBagSlots; i++) {
       const item = state.bagItems[i];
@@ -267,8 +267,8 @@ export class InventoryUI {
 
   private attachSlotInteraction(
     btn: Button,
-    onUp: (info: any) => void,
-    meta: any,
+    onUp: (info: { x: number; y: number; buttonIndex: number }) => void,
+    meta: ItemMetadata | null | undefined,
     isSelected: boolean = false
   ): void {
     btn.onPointerUpObservable.add(onUp);

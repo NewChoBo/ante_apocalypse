@@ -52,11 +52,9 @@ export abstract class BaseTarget implements IWorldEntity {
     // Note: WorldEntityManager handles part multipliers now.
     // This method just applies the final amount.
     this.health -= amount;
-    console.log(`[BaseTarget] ${this.id} took ${amount} damage. Current health: ${this.health}`);
     this.onHit(amount, hitPoint);
 
     if (this.health <= 0) {
-      console.log(`[BaseTarget] Health reached zero for ${this.id}. Calling die().`);
       this.health = 0;
       this.die(); // Call die() which handles isActive=false and onDestroy
 

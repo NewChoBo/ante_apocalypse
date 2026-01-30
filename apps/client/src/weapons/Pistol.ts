@@ -80,8 +80,6 @@ export class Pistol extends Firearm {
       // 초기 가시성 설정 (현재 활성화 상태 따름)
       this.weaponMesh.setEnabled(this.isActive);
 
-      console.log(`Pistol Instantiated. Scale: ${scaleFactor}`);
-
       // 재질 오버라이드 (그림자 등)
       // Pistol uses default color (no override), but ensuring shadow props
       const allMeshes = this.weaponMesh.getChildMeshes(false);
@@ -93,9 +91,8 @@ export class Pistol extends Firearm {
       });
 
       this.setIdleState();
-    } catch (e) {
-      console.error('Failed to instantiate Pistol model:', e);
-      // 실패 시 폴백 (기본 박스)
+    } catch {
+      // 실패 시 폴백
       this.weaponMesh = MeshBuilder.CreateBox('pistol_fallback', { size: 0.1 }, this.scene);
       this.weaponMesh.parent = this.camera;
       this.weaponMesh.position = new Vector3(0.35, -0.25, 0.45);

@@ -94,7 +94,6 @@ export class HumanoidTarget extends BaseTarget {
   }
 
   public onDestroy(): void {
-    console.log(`[HumanoidTarget] onDestroy called for ${this.id}`);
     this.playDestroyAnimation();
   }
 
@@ -118,7 +117,6 @@ export class HumanoidTarget extends BaseTarget {
 
     this.mesh.animations = [scaleAnim];
     this.scene.beginAnimation(this.mesh, 0, 20, false, 1, () => {
-      console.log(`[HumanoidTarget] Animation ended, disposing mesh for ${this.id}`);
       this.mesh.dispose();
     });
   }

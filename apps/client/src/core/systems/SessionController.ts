@@ -13,7 +13,7 @@ import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
 import { WorldEntityManager } from './WorldEntityManager';
 import { EnemyManager } from './EnemyManager';
-import { EventCode } from '@ante/common';
+import { EventCode, InitialStatePayload, SpawnTargetPayload } from '@ante/common';
 import { GameObservables } from '../events/GameObservables';
 import { AssetLoader } from '../AssetLoader';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
@@ -73,7 +73,7 @@ export class SessionController {
 
     PickupManager.getInstance().initialize(this.scene, this.playerPawn!);
 
-    GameObservables.itemCollection.add(() => {
+    GameObservables.itemCollection.add((): void => {
       const swipeSound = AssetLoader.getInstance().getSound('swipe');
       swipeSound?.play();
     });
@@ -83,13 +83,13 @@ export class SessionController {
     const combatComp = new CombatComponent(this.playerPawn!, this.scene);
     this.playerPawn!.addComponent(combatComp);
 
-    this.healthUnsub = playerHealthStore.subscribe((health) => {
+    this.healthUnsub = playerHealthStore.subscribe((health: number): void => {
       if (health <= 0) {
         GameObservables.playerDied.notifyObservers(null);
       }
     });
 
-    combatComp.onWeaponChanged((newWeapon) => {
+    combatComp.onWeaponChanged((newWeapon: { name: string }): void => {
       this.syncInventoryStore();
       if (this.multiplayerSystem) {
         NetworkManager.getInstance().syncWeapon(newWeapon.name);
@@ -99,7 +99,7 @@ export class SessionController {
 
   private setupInventory(): void {
     this.inventoryUI = new InventoryUI({
-      onEquipWeapon: (slot, weaponId) => {
+      onEquipWeapon: (slot: number, weaponId: string | null): void => {
         const state = inventoryStore.get();
         const slots = [...state.weaponSlots];
         slots[slot] = weaponId;
@@ -110,13 +110,13 @@ export class SessionController {
           combat?.equipWeapon(weaponId);
         }
       },
-      onUseItem: (itemId) => {
+      onUseItem: (itemId: string): void => {
         if (this.playerPawn) {
           InventoryManager.useItem(itemId, this.playerPawn);
           this.syncInventoryStore();
         }
       },
-      onDropItem: (itemId) => {
+      onDropItem: (itemId: string): void => {
         if (!this.playerPawn) return;
         const state = inventoryStore.get();
         const bag = [...state.bagItems];
@@ -132,8 +132,7 @@ export class SessionController {
           inventoryStore.setKey('bagItems', bag);
 
           // Dropping items should be handled by authority (server/simulation)
-          const dropPos = this.playerPawn.mesh.position.clone();
-          console.log(`[Session] Dropped item: ${item.id} at ${dropPos}`);
+          // const dropPos = this.playerPawn.mesh.position.clone();
         }
       },
     });
@@ -161,11 +160,9 @@ export class SessionController {
 
     // Initial State Sync Logic
     // [Client Side] Always request state, never provide it (Server Authority)
-    console.log('[Session] Requesting initial state from Server...');
     network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
 
-    network.onInitialStateReceived.add((data) => {
-      console.log('[Session] Received initial state sync');
+    network.onInitialStateReceived.add((data: InitialStatePayload): void => {
       if (this.enemyManager) {
         this.enemyManager.applyEnemyStates(data.enemies);
       }
@@ -173,7 +170,7 @@ export class SessionController {
         this.multiplayerSystem.applyPlayerStates(data.players);
       }
       if (data.targets && this.targetSpawner) {
-        data.targets.forEach((t: any) => {
+        data.targets.forEach((t: SpawnTargetPayload): void => {
           this.targetSpawner!.spawnTarget(
             new Vector3(t.position.x, t.position.y, t.position.z),
             t.isMoving,

@@ -23,8 +23,12 @@ export class HUD {
   private curAmmoUnsub: (() => void) | null = null;
   private scoreUnsub: (() => void) | null = null;
   private healthUnsub: (() => void) | null = null;
-  private weaponFireObserver: Observer<any> | null = null;
-  private expandTimeout: any;
+  private weaponFireObserver: Observer<{
+    weaponId: string;
+    ammoRemaining: number;
+    fireType: 'firearm' | 'melee';
+  }> | null = null;
+  private expandTimeout: ReturnType<typeof setTimeout> | undefined;
   private previousHealth: number = 100;
 
   constructor() {

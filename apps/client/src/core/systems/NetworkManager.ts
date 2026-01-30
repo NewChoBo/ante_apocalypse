@@ -126,7 +126,7 @@ export class NetworkManager implements INetworkAuthority {
             new Vector3(data.position.x, data.position.y, data.position.z)
           );
           if (dist > 2.0) {
-            console.warn('서버와의 위치 불일치 감지! 위치 보정됨.');
+            // 서버와의 위치 불일치 감지! 위치 보정 필요시 여기에 로직 추가
           }
         } else {
           player.position = { x: data.position.x, y: data.position.y, z: data.position.z };
@@ -156,17 +156,19 @@ export class NetworkManager implements INetworkAuthority {
       this.onTargetSpawn.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.REQ_INITIAL_STATE, (_data: any, senderId: string) => {
-      this.onInitialStateRequested.notifyObservers({ senderId });
-    });
+    this.dispatcher.register(
+      EventCode.REQ_INITIAL_STATE,
+      (_data: unknown, senderId: string): void => {
+        this.onInitialStateRequested.notifyObservers({ senderId });
+      }
+    );
 
     this.dispatcher.register(EventCode.INITIAL_STATE, (data: InitialStatePayload) => {
       if (data.players && Array.isArray(data.players)) {
-        data.players.forEach((_p: PlayerState) => {
+        data.players.forEach((_p: PlayerState): void => {
           // WorldEntityManager handles storage, but we still need to know if it's a PlayerState
           // In a full refactor, RemotePlayerPawn would be added to WorldEntityManager
         });
-        console.log(`[NetworkManager] Synced ${data.players.length} players from Initial State`);
       }
 
       this.onInitialStateReceived.notifyObservers({
@@ -179,18 +181,15 @@ export class NetworkManager implements INetworkAuthority {
   }
 
   private setupProviderListeners(): void {
-    this.provider.onStateChanged = (state) => {
-      console.log(`[NetworkManager] Network state changed: ${this.currentState} -> ${state}`);
+    this.provider.onStateChanged = (state: NetworkState): void => {
       this.currentState = state;
       this.onStateChanged.notifyObservers(state);
 
       // Auto-reconnect logic
       if (state === NetworkState.Disconnected || state === NetworkState.Error) {
         const userId = localStorage.getItem('playerName') || 'COMMANDER';
-        console.warn(`[NetworkManager] Disconnected. Attempting auto-reconnect for ${userId}...`);
-
         // Reconnect after a delay to avoid spamming
-        setTimeout(() => {
+        setTimeout((): void => {
           if (
             this.currentState === NetworkState.Disconnected ||
             this.currentState === NetworkState.Error
@@ -201,12 +200,12 @@ export class NetworkManager implements INetworkAuthority {
       }
     };
 
-    this.provider.onRoomListUpdated = (rooms) => {
+    this.provider.onRoomListUpdated = (rooms: RoomInfo[]): void => {
       this.lastRoomList = rooms;
       this.onRoomListUpdated.notifyObservers(rooms);
     };
 
-    this.provider.onPlayerJoined = (user) => {
+    this.provider.onPlayerJoined = (user: { userId: string; name?: string }): void => {
       // NOTE: BasePawn-based registration should happen in MultiplayerSystem
       this.onPlayerJoined.notifyObservers({
         id: user.userId,
@@ -223,7 +222,7 @@ export class NetworkManager implements INetworkAuthority {
       this.onPlayerLeft.notifyObservers(id);
     };
 
-    this.provider.onEvent = (code, data, senderId) => {
+    this.provider.onEvent = (code: number, data: unknown, senderId: string): void => {
       this.onEvent.notifyObservers({ code, data, senderId });
       this.dispatcher.dispatch(code, data, senderId);
     };
@@ -238,8 +237,8 @@ export class NetworkManager implements INetworkAuthority {
       return;
     }
 
-    this.provider.connect(userId).catch((e) => {
-      console.error('[NetworkManager] Connect failed:', e);
+    this.provider.connect(userId).catch((_e): void => {
+      // Connection failure handled via onStateChanged
     });
   }
 
@@ -248,7 +247,6 @@ export class NetworkManager implements INetworkAuthority {
       this.currentState !== NetworkState.InLobby &&
       this.currentState !== NetworkState.ConnectedToMaster
     ) {
-      console.warn(`[NetworkManager] Cannot join room: Invalid state ${this.currentState}`);
       return false;
     }
     return this.provider.joinRoom(name);
@@ -330,7 +328,7 @@ export class NetworkManager implements INetworkAuthority {
     this.provider.sendEvent(EventCode.REQUEST_HIT, hitData, true);
   }
 
-  public sendEvent(code: number, data: any, reliable: boolean = true): void {
+  public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
     this.provider.sendEvent(code, data, reliable);
   }
 
@@ -343,7 +341,6 @@ export class NetworkManager implements INetworkAuthority {
   }
 
   public refreshRoomList(): void {
-    console.log('[NetworkManager] Requesting room list refresh...');
     this.provider.refreshRoomList?.();
   }
 
