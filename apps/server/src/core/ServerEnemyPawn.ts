@@ -1,4 +1,7 @@
 import { Mesh, MeshBuilder, Scene, Vector3 } from '@babylonjs/core';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('ServerEnemyPawn');
 
 export class ServerEnemyPawn {
   public mesh: Mesh;
@@ -42,7 +45,7 @@ export class ServerEnemyPawn {
     this.headBox.isPickable = true;
     this.headBox.metadata = { type: 'enemy', id: this.id, bodyPart: 'head', pawn: this };
 
-    console.log(`[Server] Created Enemy Pawn ${id} at ${position}`);
+    logger.info(`Created Enemy Pawn ${id} at ${position}`);
   }
 
   public dispose() {

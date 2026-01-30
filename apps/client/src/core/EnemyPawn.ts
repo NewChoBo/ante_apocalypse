@@ -13,6 +13,9 @@ import {
 import { BasePawn } from './BasePawn';
 import { AssetLoader } from './AssetLoader';
 import { DynamicTexture } from '@babylonjs/core';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('EnemyPawn');
 
 export class EnemyPawn extends BasePawn {
   public mesh: Mesh;
@@ -154,16 +157,16 @@ export class EnemyPawn extends BasePawn {
 
           const transformNode = headBone.getTransformNode();
           if (transformNode) {
-            console.log('[EnemyPawn] Attaching headBox to TransformNode'); // eslint-disable-line no-console
+            logger.info('Attaching headBox to TransformNode');
             headBox.parent = transformNode;
             headBox.position = Vector3.Zero();
             headBox.rotation = Vector3.Zero();
           } else {
-            console.log('[EnemyPawn] Attaching headBox using attachToBone'); // eslint-disable-line no-console
+            logger.info('Attaching headBox using attachToBone');
             try {
               headBox.attachToBone(headBone, this.visualMesh);
             } catch (e) {
-              console.error('[EnemyPawn] Failed to attach to bone', e); // eslint-disable-line no-console
+              logger.error(`Failed to attach to bone: ${e}`);
             }
           }
 
@@ -173,7 +176,7 @@ export class EnemyPawn extends BasePawn {
 
           // Removed redundant parenting to visualMesh
         } else {
-          console.warn('[EnemyPawn] Head bone not found in skeleton');
+          logger.warn('Head bone not found in skeleton');
         }
       }
 
@@ -183,7 +186,7 @@ export class EnemyPawn extends BasePawn {
         this.placeholderMesh = null;
       }
     } catch (e) {
-      console.error('Failed to load enemy model:', e);
+      logger.error(`Failed to load enemy model: ${e}`);
       // Fallback visualization
       this.mesh.isVisible = true;
       const mat = new StandardMaterial('errMat', this.scene);
@@ -257,7 +260,7 @@ export class EnemyPawn extends BasePawn {
   public die(): void {
     if (this.isDead) return;
     this.isDead = true;
-    console.log('Enemy Died');
+    logger.info('Died');
 
     // Item drop is now handled by the authority (server/simulation)
 

@@ -1,4 +1,7 @@
 import { Mesh, MeshBuilder, Scene, Vector3 } from '@babylonjs/core';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('ServerTargetPawn');
 
 export class ServerTargetPawn {
   public mesh: Mesh;
@@ -23,7 +26,7 @@ export class ServerTargetPawn {
       type: 'target',
     };
 
-    console.log(`[Server] Created Target Pawn ${id} at ${position}`);
+    logger.info(`Created Target Pawn ${id} at ${position}`);
   }
 
   public dispose() {

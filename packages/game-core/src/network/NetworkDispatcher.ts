@@ -1,3 +1,7 @@
+import { Logger } from '@ante/common';
+
+const logger = new Logger('NetworkDispatcher');
+
 export type NetworkHandler<T = any> = (data: T, senderId: string) => void;
 
 /**
@@ -34,7 +38,7 @@ export class NetworkDispatcher {
         try {
           handler(data, senderId);
         } catch (error) {
-          console.error(`[NetworkDispatcher] Error in handler for event ${code}:`, error);
+          logger.error(`Error in handler for event ${code}:`, error);
         }
       });
     }

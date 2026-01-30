@@ -8,6 +8,9 @@ import {
   Mesh,
   Texture,
 } from '@babylonjs/core';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('LevelLoader');
 import diffUrl from '../../assets/textures/ground_crackedMud_baseColor.png?url';
 import normUrl from '../../assets/textures/ground_crackedMud_normal.png?url';
 
@@ -51,7 +54,7 @@ export class LevelLoader {
       this.buildLevel(data);
       return data;
     } catch (e) {
-      console.error('LevelLoader error:', e);
+      logger.error(`Failed to load level: ${e}`);
       return null;
     }
   }
@@ -60,7 +63,7 @@ export class LevelLoader {
     try {
       this.buildLevel(data);
     } catch (e) {
-      console.error('LevelLoader error:', e);
+      logger.error(`Failed to load level data: ${e}`);
     }
   }
 

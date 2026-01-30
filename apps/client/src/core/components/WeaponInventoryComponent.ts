@@ -6,6 +6,9 @@ import { Rifle } from '../../weapons/Rifle';
 import { Knife } from '../../weapons/Knife';
 import { Bat } from '../../weapons/Bat';
 import { WeaponRegistry } from '@ante/game-core';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('WeaponInventory');
 
 /**
  * 캐릭터가 보유한 무기들을 관리하고 교체 로직을 담당하는 컴포넌트.
@@ -31,7 +34,7 @@ export class WeaponInventoryComponent {
     ];
 
     // [Authoritative Weapon Stats Sync] - Directly from shared config in monorepo
-    console.log('[WeaponInventory] Applying authoritative weapon configs from shared registry');
+    logger.info('Applying authoritative weapon configs from shared registry');
     this.weapons.forEach((w) => {
       if (WeaponRegistry[w.name]) {
         w.updateStats(WeaponRegistry[w.name]);

@@ -10,6 +10,9 @@ import {
 } from '@babylonjs/core';
 import * as path from 'path';
 import * as fs from 'fs';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('ServerPlayerPawn');
 
 export class ServerPlayerPawn {
   public mesh: Mesh;
@@ -29,7 +32,7 @@ export class ServerPlayerPawn {
     this.mesh.isPickable = true;
     this.mesh.metadata = { type: 'player', id: this.id, pawn: this };
 
-    console.log(`[Server] Created ServerPlayerPawn for ${id}`);
+    logger.info(`Created ServerPlayerPawn for ${id}`);
 
     // 2. Load Model
     this.loadModel(scene);
@@ -48,10 +51,10 @@ export class ServerPlayerPawn {
       const modelFile = 'dummy3.babylon';
       const fullPath = path.join(modelDir, modelFile);
 
-      console.log(`[Server] Loading model via fs: ${fullPath}`);
+      logger.info(`Loading model via fs: ${fullPath}`);
 
       if (!fs.existsSync(fullPath)) {
-        console.error(`[Server] File DOES NOT EXIST at: ${fullPath}`);
+        logger.error(`File DOES NOT EXIST at: ${fullPath}`);
         return;
       }
 
@@ -62,18 +65,18 @@ export class ServerPlayerPawn {
       // Import from data string
       // rootUrl is the data string, fileName is empty
       const result = await SceneLoader.ImportMeshAsync('', dataUrl, '', scene);
-      console.log(
-        `[Server] ImportMeshAsync finished. Meshes: ${result.meshes.length}, Skeletons: ${result.skeletons.length}`
+      logger.info(
+        `ImportMeshAsync finished. Meshes: ${result.meshes.length}, Skeletons: ${result.skeletons.length}`
       );
 
       this.visualMesh = result.meshes[0]; // Assuming root is 0, or we check common parent
       // In RemotePlayerPawn: entries.rootNodes[0]
       // ImportMeshAsync returns all meshes. dummy3 usually has a __root__ node.
       if (!this.visualMesh) {
-        console.error(`[Server] No visual mesh found in loaded model!`);
+        logger.error(`No visual mesh found in loaded model!`);
         return;
       }
-      console.log(`[Server] Visual Root Name: ${this.visualMesh.name}`);
+      logger.info(`Visual Root Name: ${this.visualMesh.name}`);
 
       this.visualMesh.parent = this.mesh;
 
@@ -108,10 +111,10 @@ export class ServerPlayerPawn {
         // Ensure Idle animation is playing so bones are in correct place
         const idleRange = this.skeleton.getAnimationRange('YBot_Idle');
         if (idleRange) {
-          console.log(`[Server] Playing Idle Animation for ${this.id}`);
+          logger.info(`Playing Idle Animation for ${this.id}`);
           scene.beginAnimation(this.skeleton, idleRange.from, idleRange.to, true);
         } else {
-          console.warn(`[Server] YBot_Idle not found! Playing default 0-100`);
+          logger.warn(`YBot_Idle not found! Playing default 0-100`);
           scene.beginAnimation(this.skeleton, 0, 89, true);
         }
 
@@ -131,9 +134,9 @@ export class ServerPlayerPawn {
         }
       }
 
-      console.log(`[Server] Model loaded successfully for ${this.id}`);
+      logger.info(`Model loaded successfully for ${this.id}`);
     } catch (e) {
-      console.error(`[Server] Failed to load model for ${this.id}:`, e);
+      logger.error(`Failed to load model for ${this.id}:`, e);
     }
   }
 

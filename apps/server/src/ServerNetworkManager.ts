@@ -12,6 +12,9 @@ import {
   SyncWeaponPayload,
 } from '@ante/common';
 import { INetworkAuthority, WorldEntityManager, NetworkDispatcher } from '@ante/game-core';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('ServerNetwork');
 
 export class ServerNetworkManager implements INetworkAuthority {
   private client: any; // Photon.LoadBalancing.LoadBalancingClient
@@ -122,13 +125,13 @@ export class ServerNetworkManager implements INetworkAuthority {
 
   private setupListeners(): void {
     this.client.onStateChange = (state: number) => {
-      console.log(`[ServerNetwork] State Changed: ${state}`);
+      logger.info(`State Changed: ${state}`);
       const States = (Photon as any).LoadBalancing.LoadBalancingClient.State;
 
       // [핵심] 마스터 서버 연결 혹은 로비 진입 시점에 Promise 해결(Resolve)
       if (state === States.JoinedLobby || state === States.ConnectedToMaster) {
         if (this.connectionResolver) {
-          console.log('[ServerNetwork] Connected & Ready.');
+          logger.info('Connected & Ready.');
           this.connectionResolver();
           this.connectionResolver = null;
         }
@@ -148,7 +151,7 @@ export class ServerNetworkManager implements INetworkAuthority {
         return;
       }
 
-      console.log(`[ServerNetwork] Player Joined: ${id} (${name})`);
+      logger.info(`Player Joined: ${id} (${name})`);
 
       if (!this.entityManager.getEntity(id)) {
         const state: PlayerState = {
@@ -169,7 +172,7 @@ export class ServerNetworkManager implements INetworkAuthority {
 
     this.client.onActorLeave = (actor: any) => {
       const id = actor.actorNr.toString();
-      console.log(`[ServerNetwork] Player Left: ${id}`);
+      logger.info(`Player Left: ${id}`);
       this.entityManager.unregister(id);
       if (this.onPlayerLeave) this.onPlayerLeave(id);
     };
@@ -177,7 +180,7 @@ export class ServerNetworkManager implements INetworkAuthority {
 
   // [수정] 연결이 완료될 때까지 기다리는 Promise 반환
   public connect(): Promise<void> {
-    console.log('[ServerNetwork] Connecting to Photon...');
+    logger.info('Connecting to Photon...');
     this.client.connectToRegionMaster('kr');
 
     return new Promise((resolve) => {
@@ -188,7 +191,7 @@ export class ServerNetworkManager implements INetworkAuthority {
   public async createGameRoom(name?: string, mapId?: string): Promise<void> {
     // 안전장치: 연결 끊김 상태 확인
     if (!this.client.isConnectedToMaster() && !this.client.isInLobby()) {
-      console.error('[ServerNetwork] Cannot create room: Not connected.');
+      logger.error('Cannot create room: Not connected.');
       throw new Error('Server disconnected from Photon.');
     }
 
@@ -201,12 +204,12 @@ export class ServerNetworkManager implements INetworkAuthority {
       propsListedInLobby: ['mapId'],
     };
 
-    console.log(`[ServerNetwork] Creating Room: ${roomName} (Map: ${mapId})`);
+    logger.info(`Creating Room: ${roomName} (Map: ${mapId})`);
     this.client.createRoom(roomName, roomOptions);
   }
 
   private sendInitialState(targetId: string): void {
-    console.log(`[ServerNetwork] Sending Initial State to ${targetId}`);
+    logger.info(`Sending Initial State to ${targetId}`);
     const players = this.entityManager.getAllEntities() as unknown as PlayerState[];
     const payload: InitialStatePayload = {
       players,
@@ -241,8 +244,8 @@ export class ServerNetworkManager implements INetworkAuthority {
     const targetState = this.getPlayerState(hitData.targetId);
     if (targetState) {
       targetState.health = hitData.newHealth;
-      console.log(
-        `[ServerNetwork] Player ${hitData.targetId} Health: ${targetState.health} (Part: ${hitData.part})`
+      logger.info(
+        `Player ${hitData.targetId} Health: ${targetState.health} (Part: ${hitData.part})`
       );
 
       // 피격 정보 방송 (상태 포함)
@@ -256,7 +259,7 @@ export class ServerNetworkManager implements INetworkAuthority {
       }
     } else {
       // [신규] 플레이어가 아닌 대상(에너미, 타겟 등)에 대한 히트도 브로드캐스트
-      console.log(`[ServerNetwork] Non-player Hit Broadcasted: ${hitData.targetId}`);
+      logger.info(`Non-player Hit Broadcasted: ${hitData.targetId}`);
       this.client.raiseEvent(EventCode.HIT, hitData, {
         receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
       });
@@ -264,7 +267,7 @@ export class ServerNetworkManager implements INetworkAuthority {
   }
 
   public broadcastDeath(targetId: string, attackerId: string): void {
-    console.log(`[ServerNetwork] 💀 Player ${targetId} was killed by ${attackerId}`);
+    logger.info(`💀 Player ${targetId} was killed by ${attackerId}`);
     const payload: DeathEventData = {
       targetId,
       attackerId,

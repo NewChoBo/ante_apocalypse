@@ -1,4 +1,7 @@
 import { IWorldEntity } from '../types/IWorldEntity.js';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('WorldEntityManager');
 
 /**
  * 전역 엔티티 관리자.
@@ -12,7 +15,7 @@ export class WorldEntityManager {
    */
   public register(entity: IWorldEntity): void {
     if (this.entities.has(entity.id)) {
-      console.warn(`[WorldEntityManager] Entity with ID ${entity.id} already exists. Overwriting.`);
+      logger.warn(`Entity with ID ${entity.id} already exists. Overwriting.`);
     }
     this.entities.set(entity.id, entity);
   }

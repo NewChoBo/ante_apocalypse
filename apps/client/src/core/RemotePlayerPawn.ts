@@ -15,6 +15,9 @@ import {
 import { BasePawn } from './BasePawn';
 import { AssetLoader } from './AssetLoader';
 import { ParticleSystem, Texture } from '@babylonjs/core';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('RemotePlayerPawn');
 
 /**
  * 다른 네트워크 플레이어를 나타내는 Pawn.
@@ -108,7 +111,7 @@ export class RemotePlayerPawn extends BasePawn {
     mat.backFaceCulling = false;
     plane.material = mat;
     this._nameLabel = plane;
-    console.log(`[RemotePlayer] Created name label for ${name}`);
+    logger.info(`Created name label for ${name}`);
   }
 
   private createHealthBar(scene: Scene): void {
@@ -237,7 +240,7 @@ export class RemotePlayerPawn extends BasePawn {
         }
       }
     } catch (e) {
-      console.error('Failed to load remote player model:', e);
+      logger.error(`Failed to load remote player model: ${e}`);
     }
   }
 
@@ -287,7 +290,7 @@ export class RemotePlayerPawn extends BasePawn {
 
       this.shadowGenerator.addShadowCaster(this.weaponMesh, true);
     } catch (e) {
-      console.error('Failed to load remote weapon model:', e);
+      logger.error(`Failed to load remote weapon model: ${e}`);
     }
   }
 
@@ -354,7 +357,7 @@ export class RemotePlayerPawn extends BasePawn {
     _hitPoint?: Vector3
   ): void {
     if (this.isDead) return;
-    console.log(`Remote player ${this.id} hit for ${amount} damage.`);
+    logger.info(`Hit for ${amount} damage.`);
     // Note: Actual health sync comes from NetworkManager/MultiplayerSystem updates
     // But if we want local prediction or visual feedback:
     this.updateHealthBar(this.health - amount); // Prediction
@@ -368,7 +371,7 @@ export class RemotePlayerPawn extends BasePawn {
   public die(): void {
     if (this.isDead) return;
     this.isDead = true;
-    console.log(`Remote player ${this.id} died.`);
+    logger.info(`Died.`);
 
     // Disable collider
     this.mesh.checkCollisions = false;

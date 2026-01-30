@@ -1,6 +1,9 @@
 import { inventoryStore, BagItem } from '../store/GameStore';
 import { getItemMetadata } from '../items/ItemDatabase';
 import type { PlayerPawn } from '../PlayerPawn';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('InventoryManager');
 
 export class InventoryManager {
   /**
@@ -40,7 +43,7 @@ export class InventoryManager {
     }
 
     if (state.bagItems.length >= state.maxBagSlots) {
-      console.warn('Inventory full');
+      logger.warn('Inventory full');
       return false;
     }
 
@@ -69,7 +72,7 @@ export class InventoryManager {
 
     // 사용 로직 (소모품인 경우 효과 적용)
     if (meta.type === 'consumable') {
-      console.log(`Using consumable: ${item.name}`);
+      logger.info(`Using consumable: ${item.name}`);
 
       if (meta.onUse) {
         meta.onUse(player);
@@ -87,7 +90,7 @@ export class InventoryManager {
     } else if (meta.type === 'weapon') {
       // 무기인 경우 장착 로직 (이미 장착되어있지 않은 경우)
       // 이 로직은 보통 UI 콜백이나 Controller에서 호출될 것을 예상
-      console.log(`Weapon selected: ${item.name}`);
+      logger.info(`Weapon selected: ${item.name}`);
     }
   }
 

@@ -1,4 +1,7 @@
 import { atom, map, WritableAtom, MapStore } from 'nanostores';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('GameStore');
 
 declare global {
   interface Window {
@@ -14,11 +17,11 @@ declare global {
 
 function initStores() {
   if (window.__GAME_STORES__) {
-    console.log('[GameStore] Reusing existing global stores (Singleton)');
+    logger.log('Reusing existing global stores (Singleton)');
     return window.__GAME_STORES__;
   }
 
-  console.log('[GameStore] Initializing new global stores');
+  logger.log('Initializing new global stores');
   const stores = {
     scoreStore: atom<number>(0),
     gameStateStore: atom<'READY' | 'PLAYING' | 'GAME_OVER'>('READY'),

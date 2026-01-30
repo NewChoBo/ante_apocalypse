@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import { ServerNetworkManager } from './ServerNetworkManager.ts';
 import { WeaponRegistry } from '@ante/game-core';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('ServerApi');
 
 export class ServerApi {
   private app: express.Application;
@@ -22,7 +25,7 @@ export class ServerApi {
       const { mapId, playerName } = req.body;
       const roomName = `SQUAD_${playerName?.toUpperCase() || 'UNKNOWN'}_${Math.floor(Math.random() * 1000)}`;
 
-      console.log(`[ServerApi] Room creation requested: ${roomName} (${mapId})`);
+      logger.info(`Room creation requested: ${roomName} (${mapId})`);
 
       try {
         await this.networkManager.createGameRoom(roomName, mapId);
@@ -53,7 +56,7 @@ export class ServerApi {
 
   public start(): void {
     this.app.listen(this.port, () => {
-      console.log(`[ServerApi] Listening on port ${this.port}`);
+      logger.info(`Listening on port ${this.port}`);
     });
   }
 }

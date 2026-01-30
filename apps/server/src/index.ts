@@ -7,12 +7,15 @@ import * as xhr2 from 'xhr2';
 (global as any).WebSocket = WebSocket as any;
 (global as any).XMLHttpRequest = (xhr2 as any).default || xhr2;
 
+import { Logger } from '@ante/common';
 import { ServerGameController } from './ServerGameController.ts';
 
-console.log('[Server] Initializing Headless Game Server...');
+const logger = new Logger('Server');
+
+logger.info('Initializing Headless Game Server...');
 
 const server = new ServerGameController();
 server.start().catch((e) => {
-  console.error('[Server] Fatal Error:', e);
+  logger.error('Fatal Error:', e);
   process.exit(1);
 });

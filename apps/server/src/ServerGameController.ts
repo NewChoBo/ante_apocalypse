@@ -13,7 +13,7 @@ import {
 } from '@babylonjs/core';
 import { ServerNetworkManager } from './ServerNetworkManager.ts';
 import { ServerApi } from './ServerApi.ts';
-import { RequestHitData, Vector3 as commonVector3 } from '@ante/common';
+import { RequestHitData, Vector3 as commonVector3, Logger } from '@ante/common';
 import {
   WorldSimulation,
   BaseEnemyManager,
@@ -96,6 +96,8 @@ class ServerTargetSpawner extends BaseTargetSpawner {
   }
 }
 
+const logger = new Logger('ServerGameController');
+
 export class ServerGameController {
   private networkManager: ServerNetworkManager;
   private api: ServerApi;
@@ -131,7 +133,7 @@ export class ServerGameController {
     // [추가된 부분] 서버용 더미 카메라 생성
     // 서버는 화면을 그리지 않지만, 씬 구동을 위해 카메라가 필수입니다.
     const camera = new ArcRotateCamera('ServerCamera', 0, 0, 10, Vector3.Zero(), this.scene);
-    console.log('Camera was created...', camera);
+    logger.info('Camera was created...', camera);
 
     // 기본 바닥 생성
     const ground = MeshBuilder.CreateGround('ground', { width: 100, height: 100 }, this.scene);
@@ -159,11 +161,11 @@ export class ServerGameController {
       let isValidHit = false;
       let finalDamage = data.damage;
 
-      console.log(`[Server] Validating Hit from ${shooterId} on ${data.targetId}`);
+      logger.info(`Validating Hit from ${shooterId} on ${data.targetId}`);
 
       // Ignore ground hits or undefined targets for now
       if (!data.targetId || data.targetId === 'ground') {
-        console.log('[Server] Ignoring hit on ground/undefined');
+        // logger.debug('[Server] Ignoring hit on ground/undefined');
         return;
       }
 
@@ -204,7 +206,7 @@ export class ServerGameController {
 
           if (hitId === data.targetId) {
             isValidHit = true;
-            console.log(`[Server] Hit Verified! Part: ${hitPart}`);
+            logger.info(`Hit Verified! Part: ${hitPart}`);
             // Optional: Recalculate damage based on server-side body part
           }
         }
@@ -221,8 +223,8 @@ export class ServerGameController {
           newHealth = Math.max(0, targetState.health - finalDamage);
         }
 
-        console.log(
-          `[Server] Processing Hit: ${shooterId} hit ${data.targetId} (${data.part}) for ${finalDamage} dmg. NewHealth: ${newHealth}`
+        logger.info(
+          `Processing Hit: ${shooterId} hit ${data.targetId} (${data.part}) for ${finalDamage} dmg. NewHealth: ${newHealth}`
         );
         this.networkManager.broadcastHit({
           targetId: data.targetId,
@@ -234,11 +236,11 @@ export class ServerGameController {
       }
     };
 
-    console.log('[ServerGameController] Physics World Initialized');
+    logger.info('Physics World Initialized');
   }
 
   public async start(): Promise<void> {
-    console.log('[ServerGameController] Starting...');
+    logger.info('Starting...');
     await this.networkManager.connect();
     this.api.start();
     this.isRunning = true;
@@ -262,10 +264,10 @@ export class ServerGameController {
     });
 
     setTimeout(() => {
-      console.log('=== [Server] Creating Fixed Room: TEST_ROOM ==='); // 이 로그가 떠야 함
+      logger.info('=== Creating Fixed Room: TEST_ROOM ===');
       this.networkManager
         .createGameRoom('TEST_ROOM', 'training_ground')
-        .catch((e) => console.error('Room creation failed:', e));
+        .catch((e) => logger.error('Room creation failed:', e));
     }, 1000);
   }
 
@@ -302,7 +304,7 @@ export class ServerGameController {
     if (pawn) {
       pawn.dispose();
       this.playerPawns.delete(id);
-      console.log(`[Server] Removed Pawn for Player: ${id}`);
+      logger.info(`Removed Pawn for Player: ${id}`);
     }
   }
 
@@ -314,7 +316,7 @@ export class ServerGameController {
   ): void {
     // 클라이언트 주도 방식에서는 서버에서 물리 연산(Raycast)을 수행하지 않습니다.
     // 단순히 발사 이벤트가 발생했음을 로그에 남기거나, 필요한 경우 비주얼 처리를 위해 브로드캐스트할 수 있습니다.
-    console.log(`[Server] Fire Event: ${playerId}`);
+    logger.debug(`Fire Event from: ${playerId}`);
   }
 
   public stop(): void {

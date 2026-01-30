@@ -1,5 +1,8 @@
 import { Mesh, Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('PlayerPawn');
 import { CharacterMovementComponent } from './components/CharacterMovementComponent';
 import { CameraComponent } from './components/CameraComponent';
 import { CombatComponent } from './components/CombatComponent';
@@ -100,7 +103,7 @@ export class PlayerPawn extends BasePawn {
     this.health = Math.max(0, this.health - amount);
     playerHealthStore.set(this.health);
 
-    console.log(`Player took ${amount} damage. Health: ${this.health}`);
+    logger.info(`Took ${amount} damage. Health: ${this.health}`);
 
     if (this.health <= 0) {
       this.die();
@@ -111,7 +114,7 @@ export class PlayerPawn extends BasePawn {
     if (this.health <= 0) return;
     this.health = Math.min(100, this.health + amount);
     playerHealthStore.set(this.health);
-    console.log(`Player healed ${amount}. Health: ${this.health}`);
+    logger.info(`Healed ${amount}. Health: ${this.health}`);
   }
 
   public addAmmo(amount: number): void {
@@ -123,7 +126,7 @@ export class PlayerPawn extends BasePawn {
 
   public die(): void {
     this.isDead = true;
-    console.log('Player Died');
+    logger.info('Died');
     // TODO: Handle Game Over logic (UI, Respawn, etc.)
   }
 }

@@ -11,7 +11,9 @@ import {
 import { Scene, Observable } from '@babylonjs/core';
 import { LobbyUI } from './LobbyUI';
 import { NetworkManager } from '../core/systems/NetworkManager';
-import { NetworkState } from '@ante/common';
+import { NetworkState, Logger } from '@ante/common';
+
+const logger = new Logger('UIManager');
 
 type TacticalButton = Button & { _updateStyles?: () => void };
 
@@ -404,12 +406,12 @@ export class UIManager {
         if (promise && promise.catch) {
           promise.catch((e: Error) => {
             if (e.name !== 'SecurityError') {
-              console.warn('PointerLock request failed:', e);
+              logger.warn(`PointerLock request failed: ${e.message}`);
             }
           });
         }
-      } catch (e) {
-        console.warn('PointerLock request failed (sync):', e);
+      } catch (e: any) {
+        logger.warn(`PointerLock request failed (sync): ${e.message}`);
       }
     }
   }

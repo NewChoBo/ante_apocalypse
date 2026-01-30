@@ -9,7 +9,9 @@ import { PickupManager } from './systems/PickupManager';
 import { UIManager, UIScreen } from '../ui/UIManager';
 import { SceneManager } from './systems/SceneManager';
 import { SessionController } from './systems/SessionController';
-import { NetworkState } from '@ante/common';
+import { NetworkState, Logger } from '@ante/common';
+
+const logger = new Logger('Game');
 import { NetworkManager } from './systems/NetworkManager';
 
 import trainingGroundData from '../assets/levels/training_ground.json';
@@ -123,11 +125,11 @@ export class Game {
 
   private handleNetworkStateChange(state: NetworkState): void {
     if (state === NetworkState.InRoom && !this.isRunning) {
-      console.log('[Game] Joined room, starting multiplayer game...');
+      logger.info('Joined room, starting multiplayer game...');
       this.start();
     } else if (state === NetworkState.Error || state === NetworkState.Disconnected) {
       if (this.isRunning) {
-        console.warn(`[Game] Network failure detected (State: ${state}). Returning to menu.`);
+        logger.warn(`Network failure detected (State: ${state}). Returning to menu.`);
         this.quitToMenu();
         this.uiManager.showNotification('COMMUNICATION_LINK_LOST:_REVERTING_TO_STAGING');
       }
@@ -142,7 +144,7 @@ export class Game {
     const syncedMap = NetworkManager.getInstance().getMapId();
     if (syncedMap) {
       mapKey = syncedMap;
-      console.log(`[Game] Using synchronized map: ${mapKey}`);
+      logger.info(`Using synchronized map: ${mapKey}`);
     }
     const levelData = LEVELS[mapKey] || LEVELS['training_ground'];
 
@@ -159,7 +161,7 @@ export class Game {
     try {
       await AssetLoader.getInstance().load(scene);
     } catch (e) {
-      console.error('Failed to preload assets:', e);
+      logger.error('Failed to preload assets:', e);
     }
 
     this.sessionController = new SessionController(scene, this.canvas, shadowGenerator);

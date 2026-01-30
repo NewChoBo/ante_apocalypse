@@ -5,6 +5,9 @@ import { NetworkManager } from '../systems/NetworkManager';
 import { EventCode } from '@ante/common';
 import { WeaponRegistry } from '@ante/game-core';
 import { Vector3 } from '@babylonjs/core';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('AIController');
 
 export class AIController extends BaseController {
   private updateRate = 0.1; // 10 times per sec
@@ -28,7 +31,7 @@ export class AIController extends BaseController {
     // [Authoritative Stats Sync] - Direct from monorepo config
     if (WeaponRegistry['Enemy_Melee']) {
       this.damage = WeaponRegistry['Enemy_Melee'].damage;
-      console.log(`[AIController] Damage set to ${this.damage} from shared registry`);
+      logger.log(`Damage set to ${this.damage} from shared registry`);
     }
   }
 
