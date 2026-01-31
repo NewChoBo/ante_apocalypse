@@ -6,24 +6,23 @@ import {
   StandardMaterial,
   Color3,
 } from '@babylonjs/core';
-import { BaseWeapon } from './BaseWeapon';
+import { Firearm as CoreFirearm } from '@ante/game-core';
 import { GameObservables } from '../core/events/GameObservables';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon';
 import { NetworkManager } from '../core/systems/NetworkManager';
 import { HitScanSystem, DamageSystem } from '@ante/game-core';
+import { ClientWeaponMixin } from './ClientWeaponMixin';
+
+// Apply Mixin to CoreFirearm
+// @ts-ignore - Mixin complex type
+class VisualFirearm extends ClientWeaponMixin(CoreFirearm) {}
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
  * 탄약 관리, 재장전, 레이캐스트 사격 로직을 포함합니다.
  */
-export abstract class Firearm extends BaseWeapon implements IFirearm {
-  public currentAmmo: number;
-  public abstract magazineSize: number;
-  public reserveAmmo: number;
-
-  public abstract fireRate: number;
-  public abstract reloadTime: number;
+export abstract class Firearm extends VisualFirearm implements IFirearm {
   public abstract firingMode: 'semi' | 'auto';
   public abstract recoilForce: number;
 
@@ -37,8 +36,6 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
 
   protected applyRecoilCallback?: (force: number) => void;
 
-  protected isReloading = false;
-  protected lastFireTime = 0;
   protected isFiring = false;
   protected muzzleOffset = new Vector3(0, 0.1, 0.5);
 
@@ -50,9 +47,28 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     onScore?: (points: number) => void,
     applyRecoil?: (force: number) => void
   ) {
-    super(scene, camera, onScore);
+    // Pass dummy stats to core, subclasses should initialize proper stats or we update them here
+    super('firearm', 'local_player', {
+      name: 'Firearm',
+      damage: 0,
+      range: 100,
+      magazineSize: 0,
+      fireRate: 0.1,
+      reloadTime: 1.0,
+    });
+
+    // Mixin Init
+    this.initVisuals(scene, camera, onScore);
+
+    // Manual setup for client-side legacy compatibility (until subclasses fully move to stats)
     this.currentAmmo = initialAmmo;
     this.reserveAmmo = reserveAmmo;
+
+    // BaseWeapon props
+    this.scene = scene;
+    this.camera = camera;
+    this.onScoreCallback = onScore || null;
+
     this.applyRecoilCallback = applyRecoil;
   }
 
@@ -82,18 +98,14 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
   }
 
   public fire(): boolean {
-    if (this.isReloading) return false;
+    // Core logic check (ammo, fire rate, reload state)
+    // Note: Mixin 'fire' is not defined, we must implement it here or rely on Core's fireLogic
+    // Core has 'fireLogic', 'canFire'
+    if (!super.canFire) return false;
 
-    const now = performance.now() / 1000;
-    if (now - this.lastFireTime < this.fireRate) return false;
+    // Execute logic (ammo decrement)
+    if (!super.fireLogic()) return false;
 
-    if (this.currentAmmo <= 0) {
-      this.reload();
-      return false;
-    }
-
-    this.currentAmmo--;
-    this.lastFireTime = now;
     this.onFire();
 
     // 발사 이벤트 발행
@@ -147,28 +159,30 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
       return;
     }
 
-    this.isReloading = true;
+    // Start Core Reload (sets isReloading = true)
+    super.reload();
+
     this.isFiring = false;
     this.onReloadStart();
     this.ejectMagazine();
 
-    setTimeout(() => {
-      const needed = this.magazineSize - this.currentAmmo;
-      const amount = Math.min(needed, this.reserveAmmo);
+    // Core handles the timer in tick(), but we can also hook into that or just keep visual logic here.
+    // However, Core 'reloadLogic' is called when timer finishes.
+    // We should override 'reloadLogic' to add our visual callbacks.
+  }
 
-      this.currentAmmo += amount;
-      this.reserveAmmo -= amount;
-      this.isReloading = false;
+  public override reloadLogic(): void {
+    super.reloadLogic(); // Actual ammo transfer
 
-      this.onReloadEnd();
+    this.onReloadEnd();
 
-      if (this.isActive) {
-        this.updateAmmoStore();
-      }
-    }, this.reloadTime * 1000);
+    if (this.isActive) {
+      this.updateAmmoStore();
+    }
   }
 
   public update(deltaTime: number): void {
+    super.tick(deltaTime); // Update Core logic (reload timer)
     this.updateAnimations(deltaTime);
 
     // 장전 중 연출 (기울기)
@@ -177,6 +191,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
       this.weaponMesh.rotation.z += (targetZ - this.weaponMesh.rotation.z) * deltaTime * 10;
     }
 
+    // Auto-fire logic
     if (this.isFiring && this.firingMode === 'auto') {
       this.fire();
     }
@@ -319,14 +334,21 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     const isInitialSync = this.magazineSize === 0;
 
     super.updateStats(stats);
-    if (stats.magazineSize !== undefined) this.magazineSize = stats.magazineSize as number;
-    if (stats.fireRate !== undefined) this.fireRate = stats.fireRate as number;
-    if (stats.reloadTime !== undefined) this.reloadTime = stats.reloadTime as number;
+    // Overriding getters from Core? No, we should update internal state or the Core stats obj
+    // But Core props are getters reading from this.stats.
+    // So update this.stats if possible.
+    // Core BaseWeapon has public stats: WeaponStats.
+
+    if (stats.damage !== undefined) this.stats.damage = stats.damage as number;
+    if (stats.range !== undefined) this.stats.range = stats.range as number;
+    if (stats.magazineSize !== undefined) this.stats.magazineSize = stats.magazineSize as number;
+    if (stats.fireRate !== undefined) this.stats.fireRate = stats.fireRate as number;
+    if (stats.reloadTime !== undefined) this.stats.reloadTime = stats.reloadTime as number;
 
     // [신규] 최초 동기화 시 탄약 자동 지급
-    if (isInitialSync && this.magazineSize > 0) {
-      this.currentAmmo = this.magazineSize;
-      this.reserveAmmo = this.magazineSize * 5; // 소총 등 연사 무기를 위해 넉넉히 지급
+    if (isInitialSync && (this.stats.magazineSize || 0) > 0) {
+      this.currentAmmo = this.stats.magazineSize!;
+      this.reserveAmmo = this.stats.magazineSize! * 5; // 소총 등 연사 무기를 위해 넉넉히 지급
     }
 
     // 탄약 관련 상태 동기화 (탄창 크기 변경 시 필요할 수 있음)
@@ -335,6 +357,7 @@ export abstract class Firearm extends BaseWeapon implements IFirearm {
     }
   }
 
+  // override dispose from Mixin and Core
   public dispose(): void {
     super.dispose();
   }
