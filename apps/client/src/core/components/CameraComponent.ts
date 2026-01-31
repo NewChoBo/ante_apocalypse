@@ -26,8 +26,12 @@ export class CameraComponent extends BaseComponent {
   private currentRecoilOffset = 0;
   private targetRecoilOffset = 0;
 
+  private isDetached = false;
+  private initialHeight = 0;
+
   constructor(owner: BasePawn, scene: Scene, initialHeight: number = 0) {
     super(owner, scene);
+    this.initialHeight = initialHeight;
 
     this.camera = new UniversalCamera('pawnCamera', Vector3.Zero(), scene);
     this.camera.parent = this.owner.mesh;
@@ -44,10 +48,41 @@ export class CameraComponent extends BaseComponent {
     });
   }
 
+  public detach(): void {
+    if (this.isDetached) return;
+    this.isDetached = true;
+
+    // Get current world position and rotation before detaching
+    this.camera.computeWorldMatrix();
+    const worldPos = this.camera.position.add(this.owner.mesh.getAbsolutePosition());
+
+    // For rotation, we can use the world matrix or just combine mesh + camera rotation
+    const worldYaw = this.owner.mesh.rotation.y;
+    const worldPitch = this.camera.rotation.x;
+
+    this.camera.parent = null;
+    this.camera.position.copyFrom(worldPos);
+    this.camera.rotation.set(worldPitch, worldYaw, 0);
+  }
+
+  public attach(): void {
+    if (!this.isDetached) return;
+    this.isDetached = false;
+
+    this.camera.parent = this.owner.mesh;
+    this.camera.position.set(0, this.initialHeight, 0);
+    this.camera.rotation.set(0, 0, 0);
+  }
+
   /** 마우스 델타값에 기반해 회전 처리 */
   public handleRotation(delta: RotationInput): void {
-    // 1. 몸체 회전 (Yaw - Y축)
-    this.owner.mesh.rotation.y += delta.x * this.mouseSensitivity;
+    if (this.isDetached) {
+      // Independent camera rotation
+      this.camera.rotation.y += delta.x * this.mouseSensitivity;
+    } else {
+      // 1. 몸체 회전 (Yaw - Y축)
+      this.owner.mesh.rotation.y += delta.x * this.mouseSensitivity;
+    }
 
     // 2. 카메라 회전 (Pitch - X축)
     this.camera.rotation.x += delta.y * this.mouseSensitivity;

@@ -1,4 +1,10 @@
-import { Mesh, Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
+import {
+  Mesh,
+  Scene,
+  UniversalCamera,
+  Vector3,
+  Animation as BabylonAnimation,
+} from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { Logger } from '@ante/common';
 
@@ -6,6 +12,8 @@ const logger = new Logger('PlayerPawn');
 import { CharacterMovementComponent } from './components/CharacterMovementComponent';
 import { CameraComponent } from './components/CameraComponent';
 import { CombatComponent } from './components/CombatComponent';
+import { AssetLoader } from './AssetLoader';
+import { HealthBarComponent } from './components/HealthBarComponent';
 
 export interface InputState {
   forward: boolean;
@@ -45,18 +53,18 @@ export class PlayerPawn extends BasePawn {
     // 초기 체력 동기화
     playerHealthStore.set(this.health);
 
-    // 단순한 히트박스 또는 투명 메쉬 (Pawn의 실체)
+    // Root mesh is at ground level (feet)
     this.mesh = Mesh.CreateBox('playerPawn', 0.5, scene);
-    this.mesh.isVisible = false; // 1인칭에서는 자신의 몸이 안보이게 함
-    this.mesh.position.set(0, 1.75, -5);
+    this.mesh.isVisible = false;
+    this.mesh.position.set(0, 0, -5); // Grounded initial position
 
-    // 물리 충돌 설정
+    // 물리 충돌 설정 (루트가 지면이므로 ellipsoidOffset 조정)
     this.mesh.checkCollisions = true;
-    this.mesh.ellipsoid = new Vector3(0.4, 0.875, 0.4); // 캐릭터의 충돌 볼륨 (높이 1.75m)
-    this.mesh.ellipsoidOffset = new Vector3(0, -0.875, 0); // 메쉬(눈높이)가 상단에 위치하도록 오프셋 설정
+    this.mesh.ellipsoid = new Vector3(0.4, 0.875, 0.4);
+    this.mesh.ellipsoidOffset = new Vector3(0, 0.875, 0); // 콜라이더 중심이 지면 위 0.875m
 
-    // 카메라 컴포넌트 추가 (오프셋 0: 메쉬 위치가 눈 높이임)
-    this.cameraComponent = new CameraComponent(this, scene, 0);
+    // 카메라 컴포넌트 추가 (눈높이: 지면 + 1.75m)
+    this.cameraComponent = new CameraComponent(this, scene, 1.75);
     this.addComponent(this.cameraComponent);
 
     // 이동 컴포넌트 추가
@@ -124,9 +132,105 @@ export class PlayerPawn extends BasePawn {
     }
   }
 
+  private corpseMesh: Mesh | null = null;
+  private corpseHealthBar: HealthBarComponent | null = null;
+
   public die(): void {
+    if (this.isDead) return;
     this.isDead = true;
-    logger.info('Died');
-    // TODO: Handle Game Over logic (UI, Respawn, etc.)
+    this.mesh.checkCollisions = false; // Disable collisions for ghost mode
+
+    // 1. Create Corpse
+    this.createCorpse();
+
+    // 2. Hide local visuals and detach camera
+    this.cameraComponent.detach();
+    // Hide actual model child meshes
+    this.mesh.getChildMeshes().forEach((m) => {
+      // Don't hide the camera if it was somehow a mesh child,
+      // but usually it's not.
+      // We only want to hide the character models.
+      if (m.name.includes('Character') || m.name.includes('Model') || m.id.includes('Character')) {
+        m.setEnabled(false);
+      }
+    });
+
+    // 3. Hide weapons on death
+    const combat = this.getComponent(CombatComponent) as CombatComponent;
+    if (combat) {
+      combat.getCurrentWeapon()?.hide();
+    }
+
+    logger.info('Died - Entering Ghost Mode');
+  }
+
+  private createCorpse(): void {
+    try {
+      const entries = AssetLoader.getInstance().instantiateMesh('enemy', 'corpse_local');
+      if (!entries) return;
+
+      this.corpseMesh = entries.rootNodes[0] as Mesh;
+      this.corpseMesh.position.copyFrom(this.mesh.position);
+      this.corpseMesh.rotation.copyFrom(this.mesh.rotation);
+
+      // Add a 0-health bar to the corpse
+      this.corpseHealthBar = new HealthBarComponent({ mesh: this.corpseMesh }, this.scene, {
+        style: 'player',
+        width: 1.0,
+        height: 0.15,
+        yOffset: 2.1,
+      });
+      this.corpseHealthBar.updateHealth(0);
+
+      // Simple death animation for the corpse
+      const deathAnim = new BabylonAnimation(
+        'deathAnim',
+        'rotation.x',
+        30,
+        BabylonAnimation.ANIMATIONTYPE_FLOAT,
+        BabylonAnimation.ANIMATIONLOOPMODE_CONSTANT
+      );
+      deathAnim.setKeys([
+        { frame: 0, value: this.corpseMesh.rotation.x },
+        { frame: 30, value: this.corpseMesh.rotation.x - Math.PI / 2 },
+      ]);
+      this.corpseMesh.animations.push(deathAnim);
+      this.scene.beginAnimation(this.corpseMesh, 0, 30, false);
+    } catch (e) {
+      logger.error('Failed to create corpse mesh', e);
+    }
+  }
+
+  public respawn(position: Vector3): void {
+    this.isDead = false;
+    this.health = 100;
+    this.mesh.position.copyFrom(position);
+    this.mesh.rotation.x = 0; // Ensure upright
+    this.mesh.checkCollisions = true; // Restore collisions
+
+    // 1. Cleanup Corpse
+    if (this.corpseMesh) {
+      this.corpseMesh.dispose();
+      this.corpseMesh = null;
+    }
+    if (this.corpseHealthBar) {
+      this.corpseHealthBar.dispose();
+      this.corpseHealthBar = null;
+    }
+
+    // 2. Restore local visuals and attach camera
+    this.cameraComponent.attach();
+    this.mesh.getChildMeshes().forEach((m) => {
+      m.setEnabled(true);
+    });
+
+    // 3. Show weapons on respawn
+    const combat = this.getComponent(CombatComponent) as CombatComponent;
+    if (combat) {
+      combat.getCurrentWeapon()?.show();
+    }
+
+    playerHealthStore.set(100);
+    logger.info('Respawned');
   }
 }

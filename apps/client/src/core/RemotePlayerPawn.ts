@@ -59,7 +59,7 @@ export class RemotePlayerPawn extends CharacterPawn {
 
     // Override mesh setup for remote player
     this.mesh.name = 'remotePlayerRoot_' + id;
-    this.mesh.position.set(0, 1.75, 0);
+    this.mesh.position.copyFrom(config.position); // Ground level (0.0)
     this.mesh.rotationQuaternion = null;
     this.mesh.metadata = {
       type: 'remote_player',
@@ -80,7 +80,7 @@ export class RemotePlayerPawn extends CharacterPawn {
 
   private createNameLabel(scene: Scene, name: string): void {
     const plane = MeshBuilder.CreatePlane('nameLabel_' + this.id, { width: 2, height: 0.5 }, scene);
-    plane.position.y = 0.4;
+    plane.position.y = 2.3; // Above head level (Ground pivot 0.0 + ~2.3m)
     plane.parent = this.mesh;
     plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
 
@@ -113,18 +113,15 @@ export class RemotePlayerPawn extends CharacterPawn {
   }
 
   public override tick(deltaTime: number): void {
-    // Update interpolation first
+    // 1. Update interpolation (this updates this.mesh.position)
     this.interpolation.update(deltaTime);
     this.isMoving = this.interpolation.isMoving;
 
-    // Update head pitch
+    // 2. Call super.tick which handles velocity-based animation and component updates
+    super.tick(deltaTime);
+
+    // 3. Update extra remote-only features
     this.animationComponent.setHeadPitch(this.interpolation.getTargetPitch());
-
-    // Update animations based on movement
-    this.animationComponent.updateByMovementState(this.isMoving);
-
-    // Update all other components
-    this.updateComponents(deltaTime);
   }
 
   public override takeDamage(
@@ -167,6 +164,20 @@ export class RemotePlayerPawn extends CharacterPawn {
     ]);
     this.mesh.animations.push(deathAnim);
     this.scene.beginAnimation(this.mesh, 0, 30, false);
+  }
+
+  public respawn(position: Vector3): void {
+    this.isDead = false;
+    this.health = 100;
+    this.mesh.position.copyFrom(position);
+    this.mesh.rotation.x = 0; // Reset death tilt
+
+    this.mesh.checkCollisions = true;
+    this.mesh.isPickable = true;
+
+    this.updateHealth(100);
+    this.animationComponent.playAnimation('idle'); // Ensure it's not in death pose
+    logger.info(`Respawned.`);
   }
 
   // Weapon handling
@@ -218,18 +229,27 @@ export class RemotePlayerPawn extends CharacterPawn {
 
   // Fire effect
   public fire(
-    _weaponId: string,
-    _muzzleData?: {
+    weaponId: string,
+    muzzleData?: {
       position: { x: number; y: number; z: number };
       direction: { x: number; y: number; z: number };
     }
   ): void {
+    logger.debug(`Firing weapon: ${weaponId}`);
     this.muzzleFlash.playFireSound();
 
-    let flashPos = this.mesh.position.clone().add(new Vector3(0, 1.5, 0.5));
-    if (this.weaponMesh) {
-      const matrix = this.weaponMesh.computeWorldMatrix(true);
-      flashPos = Vector3.TransformCoordinates(new Vector3(0, 0.2, 0), matrix);
+    let flashPos: Vector3;
+
+    if (muzzleData) {
+      // Use networked muzzle position
+      flashPos = new Vector3(muzzleData.position.x, muzzleData.position.y, muzzleData.position.z);
+    } else {
+      // Fallback to local approximation (Eye level is ~1.5m above ground for effects)
+      flashPos = this.mesh.position.clone().add(new Vector3(0, 1.5, 0.5));
+      if (this.weaponMesh) {
+        const matrix = this.weaponMesh.computeWorldMatrix(true);
+        flashPos = Vector3.TransformCoordinates(new Vector3(0, 0.2, 0), matrix);
+      }
     }
 
     this.muzzleFlash.createFlash(flashPos);

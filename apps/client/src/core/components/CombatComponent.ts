@@ -40,7 +40,7 @@ export class CombatComponent extends BaseComponent {
     this.inventory.onWeaponChanged.add((newWeapon) => this.hudSync.syncAmmo(newWeapon));
 
     // 2. 입력 처리 초기화
-    this.input = new WeaponInputComponent(this.inventory);
+    this.input = new WeaponInputComponent(this.inventory, owner);
 
     // 초기 HUD 동기화
     this.hudSync.syncAmmo(this.inventory.currentWeapon);
@@ -61,10 +61,12 @@ export class CombatComponent extends BaseComponent {
   }
 
   public setAiming(isAiming: boolean): void {
+    if (this.owner.isDead) return;
     this.input.setAiming(isAiming);
   }
 
   public update(deltaTime: number): void {
+    if (this.owner.isDead) return;
     this.inventory.update(deltaTime);
   }
 

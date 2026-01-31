@@ -10,7 +10,7 @@ import {
 import { BasePawn } from './BasePawn';
 import { Logger } from '@ante/common';
 import { HealthBarComponent } from './components/HealthBarComponent';
-import { SkeletonAnimationComponent } from './components/SkeletonAnimationComponent';
+import { SkeletonAnimationComponent } from '@ante/game-core';
 import { CharacterModelLoader } from './components/CharacterModelLoader';
 
 const logger = new Logger('CharacterPawn');
@@ -57,13 +57,15 @@ export abstract class CharacterPawn extends BasePawn {
     };
 
     // Create root collider (invisible)
+    // Root mesh is now at ground level (feet).
     this.mesh = MeshBuilder.CreateBox(
       `${config.type}Root`,
       { width: 0.5, height: 2, depth: 0.5 },
       scene
     );
-    this.mesh.position.copyFrom(config.position);
-    this.mesh.position.y += 1.0;
+    this.mesh.setPivotPoint(new Vector3(0, -1, 0));
+    this.mesh.position.copyFrom(config.position); // Ground pivot
+
     this.mesh.checkCollisions = true;
     this.mesh.isVisible = false;
     this.mesh.metadata = { type: config.type, pawn: this };
@@ -74,7 +76,7 @@ export abstract class CharacterPawn extends BasePawn {
         style: config.healthBarStyle ?? config.type,
         width: 1.0,
         height: 0.15,
-        yOffset: 2.0,
+        yOffset: 2.1, // Adjusted height above ground (0.1m above head)
       });
       this.addComponent(this.healthBarComponent);
     }
@@ -106,20 +108,34 @@ export abstract class CharacterPawn extends BasePawn {
   }
 
   public tick(deltaTime: number): void {
+    const prevPosition = this.mesh.position.clone();
+
     this.updateComponents(deltaTime);
-    // Update animation based on movement state
-    this.animationComponent.updateByMovementState(this.isMoving);
+
+    const currentPosition = this.mesh.position;
+    const velocity = currentPosition.subtract(prevPosition).scale(1 / deltaTime);
+
+    // Update animation based on velocity
+    if (this.animationComponent) {
+      this.animationComponent.updateAnimationByVelocity(velocity);
+    }
   }
 
-  public takeDamage(
+  public override takeDamage(
     amount: number,
     _attackerId?: string,
     _part?: string,
     _hitPoint?: Vector3
   ): void {
-    if (this.isDead) return;
+    super.takeDamage(amount, _attackerId, _part, _hitPoint);
+  }
 
-    this.health -= amount;
+  protected override onTakeDamage(
+    _amount: number,
+    _attackerId?: string,
+    _part?: string,
+    _hitPoint?: Vector3
+  ): void {
     this.healthBarComponent?.updateHealth(this.health);
 
     // Hit flash effect (fallback box)
@@ -131,15 +147,9 @@ export abstract class CharacterPawn extends BasePawn {
         }
       }, 100);
     }
-
-    if (this.health <= 0) {
-      this.die();
-    }
   }
 
-  public die(): void {
-    if (this.isDead) return;
-    this.isDead = true;
+  protected override onDeath(): void {
     logger.info(`${this.config.type} died`);
     this.mesh.setEnabled(false);
   }

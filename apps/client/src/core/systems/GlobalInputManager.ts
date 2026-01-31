@@ -13,6 +13,8 @@ export class GlobalInputManager {
   private playerController: PlayerController | null = null;
   private inventoryUI: InventoryUI | null = null;
 
+  private isInitialized = false;
+
   private constructor() {}
 
   public static getInstance(): GlobalInputManager {
@@ -35,7 +37,10 @@ export class GlobalInputManager {
     this.playerController = playerController;
     this.inventoryUI = inventoryUI;
 
-    window.addEventListener('keydown', this.handleKeyDown);
+    if (!this.isInitialized) {
+      window.addEventListener('keydown', this.handleKeyDown);
+      this.isInitialized = true;
+    }
   }
 
   private handleKeyDown = (e: KeyboardEvent): void => {

@@ -1,4 +1,4 @@
-import { BasePickupManager } from '@ante/game-core';
+import { BasePickupManager, IPickup } from '@ante/game-core';
 import { Scene, Vector3 } from '@babylonjs/core';
 import { PickupActor, PickupType } from '../entities/PickupActor';
 import { PlayerPawn } from '../PlayerPawn';
@@ -13,7 +13,6 @@ export class PickupManager extends BasePickupManager implements ITickable {
   private static instance: PickupManager;
   private scene: Scene | null = null;
   private player: PlayerPawn | null = null;
-  private pickups: Map<string, PickupActor> = new Map();
   public readonly priority = 30;
   private networkManager: NetworkManager;
 
@@ -63,33 +62,30 @@ export class PickupManager extends BasePickupManager implements ITickable {
   }): void {
     if (this.pickups.has(data.id)) return;
     const pos = new Vector3(data.position.x, data.position.y, data.position.z);
-    this.spawnPickup(pos, data.type, data.id); // Broadcast parameter removed
+    this.spawnPickup(pos, data.type, data.id); // Base method call (which calls createPickup)
   }
 
   private handleDestroyEvent(data: { id: string }): void {
-    const pickup = this.pickups.get(data.id);
+    const pickup = this.pickups.get(data.id) as PickupActor;
     if (pickup) {
       pickup.collect();
       this.pickups.delete(data.id);
     }
   }
 
-  public spawnPickup(position: Vector3, type: PickupType, id: string): void {
-    if (!this.scene) return;
-
-    const pickup = new PickupActor(this.scene, position, type);
-    // Use a temporary object or a separate map if we really need to store networkId on the actor itself
-    // For now, let's just use the map in PickupManager
-    // (pickup as any).networkId = id;
-
-    this.pickups.set(id, pickup);
+  protected createPickup(id: string, type: string, position: Vector3): IPickup {
+    if (!this.scene) throw new Error('Scene not initialized');
+    const pickup = new PickupActor(this.scene, position, type as PickupType);
+    pickup.id = id;
+    return pickup;
   }
 
   public tick(deltaTime: number): void {
     const player = this.player;
     if (!player) return;
 
-    this.pickups.forEach((pickup, id) => {
+    this.pickups.forEach((p, id) => {
+      const pickup = p as PickupActor;
       pickup.update(deltaTime);
 
       if (pickup.destroyed) {
@@ -189,7 +185,7 @@ export class PickupManager extends BasePickupManager implements ITickable {
   // [Override] Logic for Master Client
   public override requestSpawnPickup(id: string, type: string, position: Vector3): void {
     super.requestSpawnPickup(id, type, position); // Broadcast to Others
-    this.spawnPickup(position, type as PickupType, id); // Spawn Locally
+    this.spawnPickup(position, type as PickupType, id); // Spawn Locally via Base method
   }
 
   public override requestDestroyPickup(id: string): void {

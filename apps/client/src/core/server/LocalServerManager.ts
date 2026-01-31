@@ -1,6 +1,7 @@
 import { LogicalServer, ServerNetworkAuthority } from '@ante/game-core';
 import { BrowserAssetLoader } from './BrowserAssetLoader';
 import { Logger } from '@ante/common';
+import { NetworkManager } from '../systems/NetworkManager';
 
 const logger = new Logger('LocalServerManager');
 
@@ -31,14 +32,15 @@ export class LocalServerManager {
     await this.internalStart(roomName, true);
   }
 
-  public async startSession(roomName: string, mapId: string): Promise<void> {
-    await this.internalStart(roomName, false, mapId);
+  public async startSession(roomName: string, mapId: string, gameMode: string): Promise<void> {
+    await this.internalStart(roomName, false, mapId, gameMode);
   }
 
   private async internalStart(
     roomName: string,
     isTakeover: boolean,
-    mapId?: string
+    mapId?: string,
+    gameMode?: string
   ): Promise<void> {
     if (this.isRunning) {
       logger.warn('Local Server is already running.');
@@ -72,10 +74,16 @@ export class LocalServerManager {
 
       // 3. Initialize Logical Server
       const assetLoader = new BrowserAssetLoader();
-      this.logicalServer = new LogicalServer(this.networkAuthority, assetLoader);
+      this.logicalServer = new LogicalServer(this.networkAuthority, assetLoader, {
+        isTakeover,
+        gameMode,
+      });
 
       // 4. Start Simulation
       this.logicalServer.start();
+
+      // [New] Register with NetworkManager for Short-circuiting
+      NetworkManager.getInstance().setLocalServer(this.logicalServer);
 
       this.isRunning = true;
       logger.info('Local Server Session Started (Takeover Complete).');
@@ -90,6 +98,8 @@ export class LocalServerManager {
     if (this.logicalServer) {
       this.logicalServer.stop();
       this.logicalServer = null;
+      // [New] Unregister from NetworkManager
+      NetworkManager.getInstance().setLocalServer(null);
     }
     if (this.networkAuthority) {
       this.networkAuthority.disconnect();

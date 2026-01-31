@@ -26,8 +26,11 @@ export class ServerNetworkAuthority extends BasePhotonClient {
   public onPlayerJoin?: (id: string) => void;
   public onPlayerLeave?: (id: string) => void;
   public onPlayerMove?: (id: string, pos: Vector3, rot: Vector3) => void;
+
   public onFireRequest?: (id: string, origin: Vector3, dir: Vector3, weaponId?: string) => void;
+  public onReloadRequest?: (playerId: string, weaponId: string) => void;
   public onHitRequest?: (shooterId: string, data: RequestHitData) => void;
+  public onPlayerDeath?: (targetId: string, attackerId: string) => void;
 
   public getPlayerState(id: string): PlayerState | undefined {
     return this.entityManager.getEntity(id) as unknown as PlayerState;
@@ -104,6 +107,17 @@ export class ServerNetworkAuthority extends BasePhotonClient {
         );
       }
     });
+
+    this.dispatcher.register(
+      EventCode.RELOAD,
+      (data: { playerId: string; weaponId: string }, senderId: string) => {
+        // Security check
+        if (data.playerId !== senderId) return;
+        if (this.onReloadRequest) {
+          this.onReloadRequest(data.playerId, data.weaponId);
+        }
+      }
+    );
 
     this.dispatcher.register(EventCode.REQUEST_HIT, (data: RequestHitData, senderId: string) => {
       if (this.onHitRequest) {
@@ -208,14 +222,16 @@ export class ServerNetworkAuthority extends BasePhotonClient {
   public broadcastHit(hitData: HitEventData, code: number = EventCode.HIT): void {
     const targetState = this.getPlayerState(hitData.targetId);
     if (targetState) {
+      const wasAlive = targetState.health > 0;
       targetState.health = hitData.newHealth;
+
       logger.info(
         `Player ${hitData.targetId} Health: ${targetState.health} (Part: ${hitData.part})`
       );
 
       this.sendEventToAll(code, hitData);
 
-      if (targetState.health <= 0) {
+      if (wasAlive && targetState.health <= 0) {
         this.broadcastDeath(hitData.targetId, hitData.attackerId);
       }
     } else {
@@ -231,5 +247,29 @@ export class ServerNetworkAuthority extends BasePhotonClient {
       attackerId,
     };
     this.sendEventToAll(EventCode.PLAYER_DEATH, payload);
+
+    if (this.onPlayerDeath) {
+      this.onPlayerDeath(targetId, attackerId);
+    }
+  }
+
+  public broadcastRespawn(playerId: string, position: Vector3): void {
+    const state = this.getPlayerState(playerId);
+    if (state) {
+      state.health = 100;
+      state.position = position;
+    }
+
+    this.sendEventToAll(EventCode.RESPAWN, {
+      playerId,
+      position,
+    });
+  }
+
+  public broadcastReload(playerId: string, weaponId: string): void {
+    this.sendEventToAll(EventCode.RELOAD, {
+      playerId,
+      weaponId,
+    });
   }
 }

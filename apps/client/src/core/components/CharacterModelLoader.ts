@@ -10,7 +10,7 @@ import {
   AbstractMesh,
   ShadowGenerator,
 } from '@babylonjs/core';
-import { BaseComponent, IPawnCore } from '@ante/game-core';
+import { BaseComponent, IPawnCore, MeshUtils } from '@ante/game-core';
 import { AssetLoader } from '../AssetLoader';
 import { Logger } from '@ante/common';
 
@@ -61,7 +61,7 @@ export class CharacterModelLoader extends BaseComponent {
       { height: 1.8, diameter: 0.5 },
       this.scene
     );
-    this.placeholderMesh.position = new Vector3(0, 0, 0);
+    this.placeholderMesh.position = new Vector3(0, 0.9, 0); // Center of 1.8m cylinders
     this.placeholderMesh.parent = this.charOwner.mesh;
 
     const mat = new StandardMaterial('placeholderMat', this.scene);
@@ -109,7 +109,10 @@ export class CharacterModelLoader extends BaseComponent {
 
       // Parent to root collider
       this.visualMesh.parent = this.charOwner.mesh;
-      this.visualMesh.position = new Vector3(0, -1.0, 0);
+
+      // Pivot is now standardized at ground level (0.0).
+      // Visual mesh should be grounded.
+      this.visualMesh.position = Vector3.Zero();
       this.visualMesh.rotation = Vector3.Zero();
 
       // Shadow setup
@@ -162,30 +165,11 @@ export class CharacterModelLoader extends BaseComponent {
   private createHeadHitbox(): void {
     if (!this.skeleton || !this.visualMesh) return;
 
-    const headBone = this.skeleton.bones.find((b) => b.name.toLowerCase().includes('head'));
-    if (!headBone) {
-      logger.warn('Head bone not found in skeleton');
-      return;
-    }
-
-    const headBox = MeshBuilder.CreateBox('headBox', { size: 0.25 }, this.scene);
-    const transformNode = headBone.getTransformNode();
-
-    if (transformNode) {
-      headBox.parent = transformNode;
-      headBox.position = Vector3.Zero();
-      headBox.rotation = Vector3.Zero();
-    } else {
-      try {
-        headBox.attachToBone(headBone, this.visualMesh);
-      } catch (e) {
-        logger.error(`Failed to attach to bone: ${e}`);
-      }
-    }
-
-    headBox.visibility = 0;
-    headBox.isPickable = true;
-    headBox.metadata = { type: this.config.entityType, pawn: this.charOwner, bodyPart: 'head' };
+    MeshUtils.createHeadHitbox(this.scene, this.skeleton, this.visualMesh, {
+      id: this.charOwner.id,
+      type: this.config.entityType,
+      pawn: this.charOwner,
+    });
   }
 
   private showFallbackVisual(): void {

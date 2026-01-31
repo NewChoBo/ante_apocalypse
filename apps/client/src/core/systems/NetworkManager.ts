@@ -1,7 +1,7 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { INetworkProvider } from '../network/INetworkProvider';
 import { PhotonProvider } from '../network/providers/PhotonProvider';
-import { INetworkAuthority, NetworkDispatcher } from '@ante/game-core';
+import { INetworkAuthority, NetworkDispatcher, LogicalServer } from '@ante/game-core';
 import {
   RoomInfo,
   NetworkState,
@@ -21,6 +21,8 @@ import {
   MovePayload,
   EnemyDestroyPayload,
   PickupDestroyPayload,
+  RespawnEventData,
+  GameEndEventData,
   Logger,
 } from '@ante/common';
 import { ConnectionManager } from '../network/ConnectionManager';
@@ -42,6 +44,7 @@ export class NetworkManager implements INetworkAuthority {
   private playerStateManager: PlayerStateManager;
   private roomManager: RoomManager;
   private dispatcher: NetworkDispatcher = new NetworkDispatcher();
+  private localServer: LogicalServer | null = null;
 
   // Player Observables (delegated from PlayerStateManager)
   public get onPlayerJoined(): Observable<PlayerState> {
@@ -70,8 +73,11 @@ export class NetworkManager implements INetworkAuthority {
   // Game Events (kept in NetworkManager for now)
   public onPlayersList = new Observable<PlayerState[]>();
   public onPlayerFired = new Observable<FireEventData>();
+  public onPlayerReloaded = new Observable<{ playerId: string; weaponId: string }>();
   public onPlayerHit = new Observable<HitEventData>();
   public onPlayerDied = new Observable<DeathEventData>();
+  public onPlayerRespawn = new Observable<RespawnEventData>();
+  public onGameEnd = new Observable<GameEndEventData>();
 
   // Enemy Synchronization
   public onEnemyUpdated = new Observable<EnemyMovePayload>();
@@ -106,12 +112,22 @@ export class NetworkManager implements INetworkAuthority {
   public clearObservers(): void {
     this.onPlayersList.clear();
     this.onPlayerFired.clear();
+    this.onPlayerReloaded.clear();
     this.onPlayerHit.clear();
     this.onPlayerDied.clear();
     this.onEnemyUpdated.clear();
     this.onEnemyHit.clear();
     this.onEnemyDestroyed.clear();
     this.onPickupDestroyed.clear();
+    this.onPlayerRespawn.clear();
+    this.onGameEnd.clear();
+    this.onInitialStateReceived.clear();
+    this.onInitialStateRequested.clear();
+    this.onTargetHit.clear();
+    this.onTargetDestroy.clear();
+    this.onTargetSpawn.clear();
+    // this.onPlayersList.clear(); - Already cleared above
+
     this.playerStateManager.clearObservers();
   }
 
@@ -120,6 +136,11 @@ export class NetworkManager implements INetworkAuthority {
       NetworkManager.instance = new NetworkManager();
     }
     return NetworkManager.instance;
+  }
+
+  public setLocalServer(server: LogicalServer | null): void {
+    this.localServer = server;
+    logger.info(`LocalServer ${server ? 'registered' : 'unregistered'} in NetworkManager`);
   }
 
   private setupDispatcher(): void {
@@ -180,8 +201,20 @@ export class NetworkManager implements INetworkAuthority {
       this.onPlayerDied.notifyObservers(data);
     });
 
+    this.dispatcher.register(EventCode.RESPAWN, (data: RespawnEventData) => {
+      this.onPlayerRespawn.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.GAME_END, (data: GameEndEventData) => {
+      this.onGameEnd.notifyObservers(data);
+    });
+
     this.dispatcher.register(EventCode.TARGET_DESTROY, (data: TargetDestroyPayload) => {
       this.onTargetDestroy.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.RELOAD, (data: { playerId: string; weaponId: string }) => {
+      this.onPlayerReloaded.notifyObservers(data);
     });
 
     this.dispatcher.register(EventCode.SPAWN_TARGET, (data: SpawnTargetPayload) => {
@@ -312,7 +345,13 @@ export class NetworkManager implements INetworkAuthority {
     const myId = this.getSocketId();
     if (myId) {
       const payload = this.playerStateManager.createMovePayload(myId, data.position, data.rotation);
-      this.provider.sendEvent(EventCode.MOVE, payload, false);
+
+      // Short-circuit for Master Client
+      if (this.isMasterClient() && this.localServer) {
+        this.localServer.updatePlayerPawn(myId, data.position, data.rotation);
+      } else {
+        this.provider.sendEvent(EventCode.MOVE, payload, false);
+      }
     }
   }
 
@@ -328,15 +367,39 @@ export class NetworkManager implements INetworkAuthority {
       direction: { x: number; y: number; z: number };
     };
   }): void {
+    if (this.isMasterClient() && this.localServer && fireData.muzzleTransform) {
+      this.localServer.processFireEvent(
+        this.getSocketId()!,
+        fireData.muzzleTransform.position,
+        fireData.muzzleTransform.direction,
+        fireData.weaponId
+      );
+    }
     this.provider.sendEvent(EventCode.FIRE, fireData, true);
   }
 
+  public reload(weaponId: string): void {
+    const myId = this.getSocketId();
+    if (!myId) return;
+
+    const payload = { playerId: myId, weaponId };
+    this.provider.sendEvent(EventCode.RELOAD, payload, true);
+  }
+
   public syncWeapon(weaponId: string): void {
-    this.provider.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
+    if (this.isMasterClient() && this.localServer) {
+      this.localServer.processSyncWeapon(this.getSocketId()!, weaponId);
+    } else {
+      this.provider.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
+    }
   }
 
   public requestHit(hitData: RequestHitData): void {
-    this.provider.sendEvent(EventCode.REQUEST_HIT, hitData, true);
+    if (this.isMasterClient() && this.localServer) {
+      this.localServer.processHitRequest(this.getSocketId()!, hitData);
+    } else {
+      this.provider.sendEvent(EventCode.REQUEST_HIT, hitData, true);
+    }
   }
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {

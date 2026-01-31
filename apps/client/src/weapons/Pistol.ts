@@ -17,11 +17,6 @@ import { AssetLoader } from '../core/AssetLoader';
 export class Pistol extends Firearm {
   // Removed hardcoded stats, these should be passed to the super constructor or managed by the base class
   public name = 'Pistol';
-  public magazineSize = 0;
-  public damage = 0;
-  public fireRate = 0;
-  public range = 0;
-  public reloadTime = 0;
   public firingMode: 'semi' | 'auto' = 'semi';
   public recoilForce = 0.015;
 

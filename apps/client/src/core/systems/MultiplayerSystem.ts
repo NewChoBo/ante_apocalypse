@@ -5,7 +5,7 @@ import { RemotePlayerPawn } from '../RemotePlayerPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { CombatComponent } from '../components/CombatComponent';
 import { WorldEntityManager } from './WorldEntityManager';
-import { playerHealthStore } from '../store/GameStore';
+import { playerHealthStore, gameStateStore } from '../store/GameStore';
 
 export class MultiplayerSystem {
   private scene: Scene;
@@ -108,6 +108,21 @@ export class MultiplayerSystem {
       }
     });
 
+    this.networkManager.onPlayerFired.add((data): void => {
+      const remote = this.remotePlayers.get(data.playerId);
+      if (remote) {
+        remote.fire(data.weaponId, data.muzzleTransform);
+      }
+    });
+
+    this.networkManager.onPlayerReloaded.add((data): void => {
+      const remote = this.remotePlayers.get(data.playerId);
+      if (remote) {
+        // remote.reload() call if implemented, or just for visual sync
+        (remote as any).reload?.(data.weaponId);
+      }
+    });
+
     this.networkManager.onPlayerHit.add((data) => {
       // 서버로부터 받은 '확정된 체력(newHealth)'을 우선적으로 사용
       if (data.targetId === this.networkManager.getSocketId()) {
@@ -133,6 +148,26 @@ export class MultiplayerSystem {
         }
       }
     });
+
+    this.networkManager.onPlayerRespawn.add((data) => {
+      const pos = new Vector3(data.position.x, data.position.y, data.position.z);
+
+      if (data.playerId === this.networkManager.getSocketId()) {
+        // Local player respawn
+        this.localPlayer.respawn(pos);
+        gameStateStore.set('PLAYING');
+      } else {
+        // Remote player respawn
+        const remote = this.remotePlayers.get(data.playerId);
+        if (remote) {
+          remote.respawn(pos);
+        }
+      }
+    });
+  }
+
+  public getRemotePlayers(): RemotePlayerPawn[] {
+    return Array.from(this.remotePlayers.values());
   }
 
   private spawnRemotePlayer(player: PlayerState): void {

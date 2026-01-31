@@ -2,7 +2,10 @@ import { NullEngine, Scene, MeshBuilder, ArcRotateCamera, Vector3 } from '@babyl
 import { ServerNetworkAuthority } from './ServerNetworkAuthority.js';
 import { RequestHitData, Vector3 as commonVector3, Logger, EventCode } from '@ante/common';
 import { WorldSimulation } from '../simulation/WorldSimulation.js';
+import { IGameRule } from '../rules/IGameRule.js';
 import { WaveSurvivalRule } from '../rules/WaveSurvivalRule.js';
+import { ShootingRangeRule } from '../rules/ShootingRangeRule.js';
+import { DeathmatchRule } from '../rules/DeathmatchRule.js';
 import { HitRegistrationSystem } from '../systems/HitRegistrationSystem.js';
 
 import { ServerEnemyManager } from './managers/ServerEnemyManager.js';
@@ -17,10 +20,18 @@ const logger = new Logger('LogicalServer');
  * 게임 로직을 수행하는 핵심 서버 클래스.
  * Node.js(Dedicated Server)와 Browser(Client Host) 모두에서 동작할 수 있도록 설계됨.
  */
+export interface LogicalServerOptions {
+  /** If true, skip world initialization (used for host migration) */
+  isTakeover?: boolean;
+  /** Game mode ID: 'survival' | 'shooting_range' | 'deathmatch' */
+  gameMode?: string;
+}
+
 export class LogicalServer {
   private networkManager: ServerNetworkAuthority;
   private assetLoader: IServerAssetLoader;
   private isRunning = false;
+  private isTakeover: boolean;
 
   private engine: NullEngine;
   private scene: Scene;
@@ -31,9 +42,14 @@ export class LogicalServer {
   // 플레이어 ID와 물리 메쉬(Hitbox) 매핑
   private playerPawns: Map<string, ServerPlayerPawn> = new Map();
 
-  constructor(networkManager: ServerNetworkAuthority, assetLoader: IServerAssetLoader) {
+  constructor(
+    networkManager: ServerNetworkAuthority,
+    assetLoader: IServerAssetLoader,
+    options?: LogicalServerOptions
+  ) {
     this.networkManager = networkManager;
     this.assetLoader = assetLoader;
+    this.isTakeover = options?.isTakeover ?? false;
 
     this.engine = new NullEngine();
     this.scene = new Scene(this.engine);
@@ -53,8 +69,11 @@ export class LogicalServer {
       this.networkManager
     );
 
-    // 게임 룰(모드) 설정
-    this.simulation.setGameRule(new WaveSurvivalRule());
+    // 게임 룰(모드) 설정 - gameMode에 따라 선택
+    const gameMode = options?.gameMode ?? 'survival';
+    const gameRule = this.createGameRule(gameMode);
+    this.simulation.setGameRule(gameRule);
+    logger.info(`Game mode set to: ${gameMode}`);
 
     // 서버용 더미 카메라 생성
     // 서버는 화면을 그리지 않지만, 씬 구동을 위해 카메라가 필수입니다.
@@ -74,8 +93,8 @@ export class LogicalServer {
   private setupNetworkEvents(): void {
     this.networkManager.onPlayerJoin = (id) => {
       this.createPlayerPawn(id);
-      // 첫 플레이어가 입장하면 게임 레이아웃 생성
-      if (this.playerPawns.size === 1) {
+      // 첫 플레이어가 입장하면 게임 레이아웃 생성 (Takeover가 아닐 때만)
+      if (!this.isTakeover && this.playerPawns.size === 1) {
         this.simulation.initializeRequest();
       }
     };
@@ -84,8 +103,45 @@ export class LogicalServer {
       this.updatePlayerPawn(id, pos, rot);
     this.networkManager.onFireRequest = (id, origin: commonVector3, dir: commonVector3) =>
       this.processFireEvent(id, origin, dir);
+
+    // Register RELOAD callback
+    this.networkManager.onReloadRequest = (playerId: string, weaponId: string) => {
+      const pawn = this.playerPawns.get(playerId);
+      if (pawn) {
+        pawn.reloadRequest();
+        this.networkManager.broadcastReload(playerId, weaponId);
+      }
+    };
+
     this.networkManager.onHitRequest = (shooterId: string, data: RequestHitData) =>
       this.processHitRequest(shooterId, data);
+
+    this.networkManager.onPlayerDeath = (targetId: string, _attackerId: string) => {
+      if (this.simulation['gameRule']) {
+        const decision = this.simulation['gameRule'].onPlayerDeath(this.simulation, targetId);
+        if (decision.action === 'respawn') {
+          const delayMs = decision.delay * 1000;
+          logger.info(`Player ${targetId} will respawn in ${decision.delay}s`);
+
+          setTimeout(() => {
+            const spawnPos = decision.position || { x: 0, y: 1.75, z: 0 };
+            this.networkManager.broadcastRespawn(targetId, spawnPos);
+          }, delayMs);
+        }
+      }
+    };
+  }
+
+  private createGameRule(mode: string): IGameRule {
+    switch (mode) {
+      case 'shooting_range':
+        return new ShootingRangeRule();
+      case 'deathmatch':
+        return new DeathmatchRule();
+      case 'survival':
+      default:
+        return new WaveSurvivalRule();
+    }
   }
 
   public start(): void {
@@ -95,17 +151,18 @@ export class LogicalServer {
 
     let lastTickTime = performance.now();
     const tickInterval = 7.8; // 128Hz
+    let lastClock = performance.now();
 
     // 게임 루프: 렌더링 대신 씬 업데이트 수행
     this.engine.runRenderLoop(() => {
       if (!this.isRunning) return;
 
       const currentTime = performance.now();
+      const deltaTime = (currentTime - lastClock) / 1000;
+      lastClock = currentTime;
 
-      // NOTE: TickManager.tick() is intentionally NOT called here.
-      // When client hosts locally, TickManager is a singleton shared with client.
-      // Calling it here would double-tick player movement.
-      // Server only needs to update its own scene and simulation.
+      // 0. Update Player Logic (Weapon timers)
+      this.playerPawns.forEach((pawn) => pawn.tick(deltaTime));
 
       // 1. Babylon 물리/로직 업데이트
       this.scene.render();
@@ -118,7 +175,6 @@ export class LogicalServer {
       }
     });
   }
-
   private createPlayerPawn(id: string): void {
     if (this.playerPawns.has(id)) return;
 
@@ -127,7 +183,7 @@ export class LogicalServer {
     this.playerPawns.set(id, pawn);
   }
 
-  private updatePlayerPawn(id: string, pos: commonVector3, rot: commonVector3): void {
+  public updatePlayerPawn(id: string, pos: commonVector3, rot: commonVector3): void {
     const pawn = this.playerPawns.get(id);
     if (pawn && pawn.mesh) {
       // 서버의 캡슐을 클라이언트 위치로 순간이동
@@ -156,14 +212,45 @@ export class LogicalServer {
 
   public processFireEvent(
     playerId: string,
-    _origin: commonVector3,
-    _direction: commonVector3,
-    _weaponIdOverride?: string
+    origin: commonVector3,
+    direction: commonVector3,
+    weaponIdOverride?: string
   ): void {
-    logger.debug(`Fire Event from: ${playerId}`);
+    // 1. Get Player Pawn
+    const pawn = this.playerPawns.get(playerId);
+    if (!pawn) {
+      logger.warn(`Fire event from unknown player: ${playerId}`);
+      return;
+    }
+
+    // 2. Validate Fire
+    const canFire = pawn.fireRequest();
+
+    if (canFire) {
+      // Broadcast Event
+      // Re-construct event data to broadcast
+      this.networkManager.sendEvent(EventCode.FIRE, {
+        playerId,
+        weaponId: weaponIdOverride || pawn.currentWeapon?.id || 'Unknown',
+        muzzleTransform: { position: origin, direction: direction },
+      });
+
+      logger.debug(`[VALID] Fire from: ${playerId} (Ammo: ${pawn.currentWeapon?.currentAmmo})`);
+    } else {
+      logger.warn(`[REJECTED] Fire from: ${playerId} - Weapon not ready or out of ammo.`);
+      // Optional: Send correction event to client? (e.g. force reload)
+    }
   }
 
-  private processHitRequest(shooterId: string, data: RequestHitData): void {
+  public processSyncWeapon(playerId: string, weaponId: string): void {
+    const state = this.networkManager.getPlayerState(playerId);
+    if (state) {
+      // Short-circuit: only update if state exists
+      state.weaponId = weaponId;
+    }
+  }
+
+  public processHitRequest(shooterId: string, data: RequestHitData): void {
     // 1. Validate Hit using Server Raycast
     let isValidHit = false;
     const finalDamage = data.damage;

@@ -18,6 +18,11 @@ export class WorldEntityManager extends BaseEntityManager {
   private constructor() {
     super();
     this.networkManager = NetworkManager.getInstance();
+  }
+
+  public initialize(): void {
+    // We don't bother individual removal because NetworkManager.clearObservers()
+    // is called when a session ends, wiping all listeners on its observables.
     this.setupNetworkListeners();
   }
 

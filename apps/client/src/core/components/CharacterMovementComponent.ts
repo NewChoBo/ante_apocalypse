@@ -1,6 +1,7 @@
 import { Vector3, Scene, Ray } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { CombatComponent } from './CombatComponent';
+import { CameraComponent } from './CameraComponent';
 import type { BasePawn } from '../BasePawn';
 
 export interface MovementInput {
@@ -18,9 +19,7 @@ export interface MovementInput {
  * 캐릭터의 이동, 중력, 점프 로직을 담당하는 컴포넌트.
  */
 export class CharacterMovementComponent extends BaseComponent {
-  private playerHeight = 1.75;
-  private crouchHeight = 1.0;
-  private moveSpeed = 8;
+  private moveSpeed = 6;
   private sprintMultiplier = 1.6;
   private crouchMultiplier = 0.5;
 
@@ -29,19 +28,19 @@ export class CharacterMovementComponent extends BaseComponent {
   private gravity = -25;
   private jumpForce = 9;
   private isGrounded = false;
-  private currentHeight = 1.75;
 
   constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
-    this.currentHeight = this.playerHeight;
   }
 
   /** 입력 데이터에 기반해 이동 처리 */
   public handleMovement(input: MovementInput, deltaTime: number): void {
-    // 1. 앉기 상태 처리 (높이 변경)
-    const targetHeight = input.crouch ? this.crouchHeight : this.playerHeight;
-    // 부드러운 전환을 위해 보간 사용 (옵션, 여기서는 즉시 변경)
-    this.currentHeight = targetHeight;
+    const isGhost = this.owner.isDead;
+
+    if (isGhost) {
+      this.handleGhostMovement(input, deltaTime);
+      return;
+    }
 
     const combatComp = this.owner.getComponent(CombatComponent);
     const weapon = combatComp ? combatComp.getCurrentWeapon() : null;
@@ -78,8 +77,41 @@ export class CharacterMovementComponent extends BaseComponent {
     }
   }
 
+  private handleGhostMovement(input: MovementInput, deltaTime: number): void {
+    const ghostSpeed = this.moveSpeed * 2.0;
+    const cameraComp = this.owner.getComponent(CameraComponent);
+    const camera = cameraComp?.camera;
+    if (!camera) return;
+
+    // Calculate move direction based on camera orientation if detached
+    // Otherwise use mesh orientation (though usually they aligned)
+    const forward = camera.getForwardRay().direction;
+    const right = Vector3.Cross(Vector3.Up(), forward).normalize();
+    const up = Vector3.Up();
+
+    const moveDirection = Vector3.Zero();
+    if (input.forward) moveDirection.addInPlace(forward);
+    if (input.backward) moveDirection.subtractInPlace(forward);
+    if (input.right) moveDirection.subtractInPlace(right);
+    if (input.left) moveDirection.addInPlace(right);
+
+    // Vertical movement in ghost mode
+    if (input.jump) moveDirection.addInPlace(up); // Space
+    if (input.crouch) moveDirection.subtractInPlace(up); // Crouch/Ctrl
+
+    if (moveDirection.length() > 0) {
+      moveDirection.normalize();
+      const velocity = moveDirection.scale(ghostSpeed * deltaTime);
+
+      // Move camera directly (Decoupled Spectator)
+      camera.position.addInPlace(velocity);
+    }
+  }
+
   public update(deltaTime: number): void {
-    this.updateGravity(deltaTime);
+    if (!this.owner.isDead) {
+      this.updateGravity(deltaTime);
+    }
   }
 
   private updateGravity(deltaTime: number): void {
@@ -94,16 +126,17 @@ export class CharacterMovementComponent extends BaseComponent {
     const gravityVelocity = new Vector3(0, this.velocityY * deltaTime, 0);
     this.owner.mesh.moveWithCollisions(gravityVelocity);
 
-    // 최소 높이 안전장치 (또는 바닥 충돌 시 처리)
-    if (this.owner.mesh.position.y < this.currentHeight) {
-      this.owner.mesh.position.y = this.currentHeight;
+    // 최소 높이 안전장치 (지면 0)
+    if (this.owner.mesh.position.y < 0) {
+      this.owner.mesh.position.y = 0;
       this.velocityY = 0;
       this.isGrounded = true;
     }
   }
 
   private checkGround(): void {
-    const ray = new Ray(this.owner.mesh.position, Vector3.Down(), this.currentHeight + 0.1);
+    // Pivot is at feet (0), ray starts slightly above
+    const ray = new Ray(this.owner.mesh.position.add(new Vector3(0, 0.1, 0)), Vector3.Down(), 0.2);
     const pickInfo = this.scene.pickWithRay(ray, (m) => m.isPickable && m !== this.owner.mesh);
     this.isGrounded = !!pickInfo?.hit;
   }

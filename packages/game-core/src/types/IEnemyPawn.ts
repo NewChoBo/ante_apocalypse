@@ -3,6 +3,8 @@ import { Vector3 } from '@babylonjs/core';
 export interface IEnemyPawn {
   id: string;
   position: Vector3;
+  rotation: Vector3;
+  health: number;
   isDead: boolean;
 
   lookAt(targetPoint: Vector3): void;
