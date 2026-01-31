@@ -29,10 +29,14 @@ export class ServerPlayerPawn extends BasePawn {
     super(scene);
     this.id = id;
 
-    // 1. Root Collider (Pivot at eye level: 1.75m) - Matches RemotePlayerPawn
-    this.mesh = MeshBuilder.CreateBox('serverPlayerRoot_' + id, { size: 0.1 }, scene);
-    // Initial position logic will be handled by updatePlayerHitbox, usually set to (x, 1.75, z)
-    this.mesh.position.copyFrom(position);
+    // 1. Root Collider (Pivot at feet: 0.0m)
+    this.mesh = MeshBuilder.CreateBox(
+      'serverPlayerRoot_' + id,
+      { width: 0.5, height: 2, depth: 0.5 },
+      scene
+    );
+    this.mesh.setPivotPoint(new Vector3(0, -1, 0));
+    this.mesh.position.copyFrom(position); // Should be ground level
     this.mesh.checkCollisions = true;
     this.mesh.isPickable = true;
     this.mesh.metadata = { type: 'player', id: this.id, pawn: this };
@@ -64,8 +68,8 @@ export class ServerPlayerPawn extends BasePawn {
 
       this.visualMesh.parent = this.mesh;
 
-      // Pivot is at eye level (1.75m), visual model feet at -1.75m -- Matches RemotePlayerPawn
-      this.visualMesh.position = new Vector3(0, -1.75, 0);
+      // Pivot is now at ground level (0,0,0)
+      this.visualMesh.position = Vector3.Zero();
       this.visualMesh.rotation = Vector3.Zero();
       this.visualMesh.scaling.set(1, 1, 1);
 

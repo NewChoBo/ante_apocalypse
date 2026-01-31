@@ -59,7 +59,7 @@ export class RemotePlayerPawn extends CharacterPawn {
 
     // Override mesh setup for remote player
     this.mesh.name = 'remotePlayerRoot_' + id;
-    this.mesh.position.copyFrom(config.position); // config.position is already 1.75 (eye level)
+    this.mesh.position.copyFrom(config.position); // Ground level (0.0)
     this.mesh.rotationQuaternion = null;
     this.mesh.metadata = {
       type: 'remote_player',
@@ -80,7 +80,7 @@ export class RemotePlayerPawn extends CharacterPawn {
 
   private createNameLabel(scene: Scene, name: string): void {
     const plane = MeshBuilder.CreatePlane('nameLabel_' + this.id, { width: 2, height: 0.5 }, scene);
-    plane.position.y = 0.4;
+    plane.position.y = 2.3; // Above head level (Ground pivot 0.0 + ~2.3m)
     plane.parent = this.mesh;
     plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
 
@@ -233,8 +233,8 @@ export class RemotePlayerPawn extends CharacterPawn {
       // Use networked muzzle position
       flashPos = new Vector3(muzzleData.position.x, muzzleData.position.y, muzzleData.position.z);
     } else {
-      // Fallback to local approximation
-      flashPos = this.mesh.position.clone().add(new Vector3(0, -0.2, 0.5));
+      // Fallback to local approximation (Eye level is ~1.5m above ground for effects)
+      flashPos = this.mesh.position.clone().add(new Vector3(0, 1.5, 0.5));
       if (this.weaponMesh) {
         const matrix = this.weaponMesh.computeWorldMatrix(true);
         flashPos = Vector3.TransformCoordinates(new Vector3(0, 0.2, 0), matrix);

@@ -18,8 +18,6 @@ export interface MovementInput {
  * 캐릭터의 이동, 중력, 점프 로직을 담당하는 컴포넌트.
  */
 export class CharacterMovementComponent extends BaseComponent {
-  private playerHeight = 1.75;
-  private crouchHeight = 1.0;
   private moveSpeed = 8;
   private sprintMultiplier = 1.6;
   private crouchMultiplier = 0.5;
@@ -29,19 +27,15 @@ export class CharacterMovementComponent extends BaseComponent {
   private gravity = -25;
   private jumpForce = 9;
   private isGrounded = false;
-  private currentHeight = 1.75;
 
   constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
-    this.currentHeight = this.playerHeight;
   }
 
   /** 입력 데이터에 기반해 이동 처리 */
   public handleMovement(input: MovementInput, deltaTime: number): void {
-    // 1. 앉기 상태 처리 (높이 변경)
-    const targetHeight = input.crouch ? this.crouchHeight : this.playerHeight;
-    // 부드러운 전환을 위해 보간 사용 (옵션, 여기서는 즉시 변경)
-    this.currentHeight = targetHeight;
+    // 1. 앉기 상태 처리 (물리 볼륨 조정은 나중에 구현)
+    // const targetHeight = input.crouch ? this.crouchHeight : this.playerHeight;
 
     const combatComp = this.owner.getComponent(CombatComponent);
     const weapon = combatComp ? combatComp.getCurrentWeapon() : null;
@@ -94,16 +88,17 @@ export class CharacterMovementComponent extends BaseComponent {
     const gravityVelocity = new Vector3(0, this.velocityY * deltaTime, 0);
     this.owner.mesh.moveWithCollisions(gravityVelocity);
 
-    // 최소 높이 안전장치 (또는 바닥 충돌 시 처리)
-    if (this.owner.mesh.position.y < this.currentHeight) {
-      this.owner.mesh.position.y = this.currentHeight;
+    // 최소 높이 안전장치 (지면 0)
+    if (this.owner.mesh.position.y < 0) {
+      this.owner.mesh.position.y = 0;
       this.velocityY = 0;
       this.isGrounded = true;
     }
   }
 
   private checkGround(): void {
-    const ray = new Ray(this.owner.mesh.position, Vector3.Down(), this.currentHeight + 0.1);
+    // Pivot is at feet (0), ray starts slightly above
+    const ray = new Ray(this.owner.mesh.position.add(new Vector3(0, 0.1, 0)), Vector3.Down(), 0.2);
     const pickInfo = this.scene.pickWithRay(ray, (m) => m.isPickable && m !== this.owner.mesh);
     this.isGrounded = !!pickInfo?.hit;
   }

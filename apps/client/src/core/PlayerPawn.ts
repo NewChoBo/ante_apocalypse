@@ -45,18 +45,18 @@ export class PlayerPawn extends BasePawn {
     // 초기 체력 동기화
     playerHealthStore.set(this.health);
 
-    // 단순한 히트박스 또는 투명 메쉬 (Pawn의 실체)
+    // Root mesh is at ground level (feet)
     this.mesh = Mesh.CreateBox('playerPawn', 0.5, scene);
-    this.mesh.isVisible = false; // 1인칭에서는 자신의 몸이 안보이게 함
-    this.mesh.position.set(0, 1.75, -5);
+    this.mesh.isVisible = false;
+    this.mesh.position.set(0, 0, -5); // Grounded initial position
 
-    // 물리 충돌 설정
+    // 물리 충돌 설정 (루트가 지면이므로 ellipsoidOffset 조정)
     this.mesh.checkCollisions = true;
-    this.mesh.ellipsoid = new Vector3(0.4, 0.875, 0.4); // 캐릭터의 충돌 볼륨 (높이 1.75m)
-    this.mesh.ellipsoidOffset = new Vector3(0, -0.875, 0); // 메쉬(눈높이)가 상단에 위치하도록 오프셋 설정
+    this.mesh.ellipsoid = new Vector3(0.4, 0.875, 0.4);
+    this.mesh.ellipsoidOffset = new Vector3(0, 0.875, 0); // 콜라이더 중심이 지면 위 0.875m
 
-    // 카메라 컴포넌트 추가 (오프셋 0: 메쉬 위치가 눈 높이임)
-    this.cameraComponent = new CameraComponent(this, scene, 0);
+    // 카메라 컴포넌트 추가 (눈높이: 지면 + 1.75m)
+    this.cameraComponent = new CameraComponent(this, scene, 1.75);
     this.addComponent(this.cameraComponent);
 
     // 이동 컴포넌트 추가

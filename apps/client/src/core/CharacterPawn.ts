@@ -57,21 +57,14 @@ export abstract class CharacterPawn extends BasePawn {
     };
 
     // Create root collider (invisible)
+    // Root mesh is now at ground level (feet).
     this.mesh = MeshBuilder.CreateBox(
       `${config.type}Root`,
       { width: 0.5, height: 2, depth: 0.5 },
       scene
     );
-    this.mesh.position.copyFrom(config.position);
-    // Pivot matches config.position.
-    // If it's Eye Level (1.75m), the 2m box should be shifted down to cover the body.
-    // Center of 2m box should be 1.0m above ground.
-    // If mesh.position is 1.75m, center of box relative to mesh should be -0.75m.
-    this.mesh.getChildMeshes().forEach((m) => {
-      if (m.name === `${config.type}Root`) {
-        m.position.y = -0.75;
-      }
-    });
+    this.mesh.setPivotPoint(new Vector3(0, -1, 0));
+    this.mesh.position.copyFrom(config.position); // Ground pivot
     // Wait, MeshBuilder.CreateBox creates the mesh.
     // We want the pivot of 'this.mesh' to be at config.position.
     // Since this.mesh IS the box, we can't easily change its pivot without transform node.
@@ -96,8 +89,7 @@ export abstract class CharacterPawn extends BasePawn {
     // Actually, I'll just adjust the Y addition to be relative to the expected pivot.
     // If player: config.position is 1.75. We want center at 1.0. So we subtract 0.75.
     // If enemy: config.position is 0.0. We want center at 1.0. So we add 1.0.
-    const pivotOffset = config.type === 'player' ? -0.75 : 1.0;
-    this.mesh.position.y += pivotOffset;
+    // No pivot offset needed for ground pivot
     this.mesh.checkCollisions = true;
     this.mesh.isVisible = false;
     this.mesh.metadata = { type: config.type, pawn: this };
@@ -108,7 +100,7 @@ export abstract class CharacterPawn extends BasePawn {
         style: config.healthBarStyle ?? config.type,
         width: 1.0,
         height: 0.15,
-        yOffset: 2.0,
+        yOffset: 2.1, // Adjusted height above ground (0.1m above head)
       });
       this.addComponent(this.healthBarComponent);
     }

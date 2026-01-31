@@ -14,16 +14,14 @@ export class ServerEnemyPawn extends BasePawn implements IEnemyPawn {
     super(scene);
     this.id = id;
 
-    // 1. Root Collider (Body) - Matches client's root collider
-    // Client: Box { width: 0.5, height: 2, depth: 0.5 }
-    // Positioned at y += 1.0 (Pivot center)
+    // 1. Root Collider (Pivot at feet: 0.0m)
     this.mesh = MeshBuilder.CreateBox(
       'enemyRoot_' + id,
       { width: 0.5, height: 2, depth: 0.5 },
       scene
     );
+    this.mesh.setPivotPoint(new Vector3(0, -1, 0));
     this.mesh.position.copyFrom(position);
-    this.mesh.position.y += 1.0;
     this.mesh.checkCollisions = true;
     this.mesh.isPickable = true;
     this.mesh.metadata = { type: 'enemy', id: this.id, bodyPart: 'body', pawn: this };
@@ -41,8 +39,7 @@ export class ServerEnemyPawn extends BasePawn implements IEnemyPawn {
     // Adjust this value to match the visual mesh's head bone position
     // If root is 2m tall centered at 1m, top is at 2m. Head is likely near 1.75m.
     // Relative position = 1.75 - 1.0 = 0.75
-    this.headBox.position = new Vector3(0, 0.75, 0);
-
+    this.headBox.position = new Vector3(0, 1.75, 0);
     this.headBox.checkCollisions = true;
     this.headBox.isPickable = true;
     this.headBox.metadata = { type: 'enemy', id: this.id, bodyPart: 'head', pawn: this };

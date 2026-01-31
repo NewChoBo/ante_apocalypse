@@ -46,9 +46,9 @@ export class HitRegistrationSystem {
 
     // 3. 관대한 판정 (Lenient Validation / Shooter Favor)
     // 레이와 타겟 중심 사이의 최단 거리가 마진(반지름) 이내인지 확인
-    const targetPos = targetMesh.getAbsolutePosition();
+    // 지면 피벗(Feet) 기준인 경우 중심점(1.0m 위)으로 보정
+    const targetPos = targetMesh.getAbsolutePosition().add(new Vector3(0, 1.0, 0));
     const v = targetPos.subtract(origin);
-    // d = |(P-O) x direction| / |direction|. direction이 정규화되어 있으므로 분모 생략 가능
     const dist = Vector3.Cross(v, direction).length();
 
     if (dist < margin) {
