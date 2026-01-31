@@ -73,6 +73,7 @@ export class NetworkManager implements INetworkAuthority {
   // Game Events (kept in NetworkManager for now)
   public onPlayersList = new Observable<PlayerState[]>();
   public onPlayerFired = new Observable<FireEventData>();
+  public onPlayerReloaded = new Observable<{ playerId: string; weaponId: string }>();
   public onPlayerHit = new Observable<HitEventData>();
   public onPlayerDied = new Observable<DeathEventData>();
   public onPlayerRespawn = new Observable<RespawnEventData>();
@@ -111,12 +112,22 @@ export class NetworkManager implements INetworkAuthority {
   public clearObservers(): void {
     this.onPlayersList.clear();
     this.onPlayerFired.clear();
+    this.onPlayerReloaded.clear();
     this.onPlayerHit.clear();
     this.onPlayerDied.clear();
     this.onEnemyUpdated.clear();
     this.onEnemyHit.clear();
     this.onEnemyDestroyed.clear();
     this.onPickupDestroyed.clear();
+    this.onPlayerRespawn.clear();
+    this.onGameEnd.clear();
+    this.onInitialStateReceived.clear();
+    this.onInitialStateRequested.clear();
+    this.onTargetHit.clear();
+    this.onTargetDestroy.clear();
+    this.onTargetSpawn.clear();
+    // this.onPlayersList.clear(); - Already cleared above
+
     this.playerStateManager.clearObservers();
   }
 
@@ -200,6 +211,10 @@ export class NetworkManager implements INetworkAuthority {
 
     this.dispatcher.register(EventCode.TARGET_DESTROY, (data: TargetDestroyPayload) => {
       this.onTargetDestroy.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.RELOAD, (data: { playerId: string; weaponId: string }) => {
+      this.onPlayerReloaded.notifyObservers(data);
     });
 
     this.dispatcher.register(EventCode.SPAWN_TARGET, (data: SpawnTargetPayload) => {

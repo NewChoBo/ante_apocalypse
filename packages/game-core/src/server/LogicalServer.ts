@@ -105,9 +105,12 @@ export class LogicalServer {
       this.processFireEvent(id, origin, dir);
 
     // Register RELOAD callback
-    this.networkManager.onReloadRequest = (playerId: string) => {
+    this.networkManager.onReloadRequest = (playerId: string, weaponId: string) => {
       const pawn = this.playerPawns.get(playerId);
-      if (pawn) pawn.reloadRequest();
+      if (pawn) {
+        pawn.reloadRequest();
+        this.networkManager.broadcastReload(playerId, weaponId);
+      }
     };
 
     this.networkManager.onHitRequest = (shooterId: string, data: RequestHitData) =>

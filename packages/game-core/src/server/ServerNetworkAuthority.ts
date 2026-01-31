@@ -222,14 +222,16 @@ export class ServerNetworkAuthority extends BasePhotonClient {
   public broadcastHit(hitData: HitEventData, code: number = EventCode.HIT): void {
     const targetState = this.getPlayerState(hitData.targetId);
     if (targetState) {
+      const wasAlive = targetState.health > 0;
       targetState.health = hitData.newHealth;
+
       logger.info(
         `Player ${hitData.targetId} Health: ${targetState.health} (Part: ${hitData.part})`
       );
 
       this.sendEventToAll(code, hitData);
 
-      if (targetState.health <= 0) {
+      if (wasAlive && targetState.health <= 0) {
         this.broadcastDeath(hitData.targetId, hitData.attackerId);
       }
     } else {
@@ -261,6 +263,13 @@ export class ServerNetworkAuthority extends BasePhotonClient {
     this.sendEventToAll(EventCode.RESPAWN, {
       playerId,
       position,
+    });
+  }
+
+  public broadcastReload(playerId: string, weaponId: string): void {
+    this.sendEventToAll(EventCode.RELOAD, {
+      playerId,
+      weaponId,
     });
   }
 }

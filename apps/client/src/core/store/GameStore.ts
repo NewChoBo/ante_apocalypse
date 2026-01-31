@@ -41,7 +41,7 @@ function initStores(): GameStores {
     }),
     playerHealthStore: atom<number>(100),
     inventoryStore: map<InventoryState>({
-      weaponSlots: ['pistol', 'rifle', 'knife', 'bat'],
+      weaponSlots: ['Pistol', 'Rifle', 'Knife', 'Bat'],
       bagItems: [
         { id: 'health_pack', name: 'First Aid Kit', type: 'consumable', count: 2 },
         { id: 'ammo_box', name: 'Ammo Crate', type: 'consumable', count: 1 },

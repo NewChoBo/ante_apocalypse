@@ -35,6 +35,7 @@ export class Game {
   private renderFunction: () => void;
   private _networkStateObserver: Observer<NetworkState> | null = null;
   private _playerDiedObserver: Observer<any> | null = null;
+  private _gameEndObserver: Observer<any> | null = null;
 
   constructor() {
     this.renderFunction = () => {
@@ -141,7 +142,11 @@ export class Game {
     });
 
     // Handle Game End from Server
-    nm.onGameEnd.add((data) => {
+    if (this._gameEndObserver) {
+      nm.onGameEnd.remove(this._gameEndObserver);
+      this._gameEndObserver = null;
+    }
+    this._gameEndObserver = nm.onGameEnd.add((data) => {
       logger.info(`Game End received: ${data.reason}`);
       this.gameOver(data.reason);
     });
@@ -247,6 +252,10 @@ export class Game {
 
   public quitToMenu(): void {
     this.isRunning = false;
+
+    import('./server/LocalServerManager').then(({ LocalServerManager }) => {
+      LocalServerManager.getInstance().stopSession();
+    });
 
     this.uiManager.showScreen(UIScreen.NONE); // Cleanup current
     this.uiManager.exitPointerLock();

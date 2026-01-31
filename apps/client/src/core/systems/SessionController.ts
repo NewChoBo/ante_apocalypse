@@ -43,6 +43,7 @@ export class SessionController {
 
   public async initialize(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
     this.playerPawn = new PlayerPawn(this.scene);
+    WorldEntityManager.getInstance().initialize();
     WorldEntityManager.getInstance().register(this.playerPawn);
 
     if (levelData.playerSpawn) {

@@ -21,14 +21,6 @@ export class Rifle extends Firearm {
   // Logic uses this.stats in base, but here we override them as simple properties for now.
   // Ideally we should use stats object, but for refactoring speed we keep legacy props.
   public name = 'Rifle';
-  // @ts-ignore
-  public magazineSize = 0;
-  public damage = 0;
-  // @ts-ignore
-  public fireRate = 0;
-  public range = 0;
-  // @ts-ignore
-  public reloadTime = 0;
   public firingMode: 'semi' | 'auto' = 'auto';
   public recoilForce = 0.008;
 
