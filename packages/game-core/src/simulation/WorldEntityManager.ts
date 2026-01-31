@@ -2,6 +2,8 @@ import { IWorldEntity } from '../types/IWorldEntity.js';
 import { DamageSystem } from '../systems/DamageSystem.js';
 import { Logger } from '@ante/common';
 import { Vector3 } from '@babylonjs/core';
+import { TickManager } from '../systems/TickManager.js';
+import { ITickable } from '../types/ITickable.js';
 
 const logger = new Logger('WorldEntityManager');
 
@@ -30,13 +32,35 @@ export class WorldEntityManager {
       logger.warn(`Entity with ID ${entity.id} already exists. Overwriting.`);
     }
     this.entities.set(entity.id, entity);
+
+    // Lifecycle Management
+    // If entity has activate() method, allow it to handle its own registration (e.g. BasePawn)
+    if ('activate' in entity && typeof (entity as any).activate === 'function') {
+      (entity as any).activate();
+    }
+    // Fallback: Auto-register to TickManager if tickable and not handled by activate
+    else if ('tick' in entity && typeof (entity as any).tick === 'function') {
+      TickManager.getInstance().register(entity as unknown as ITickable);
+    }
   }
 
   /**
    * 엔티티 제거
    */
   public unregister(id: string): void {
-    this.entities.delete(id);
+    const entity = this.entities.get(id);
+    if (entity) {
+      // Lifecycle Management
+      if ('deactivate' in entity && typeof (entity as any).deactivate === 'function') {
+        (entity as any).deactivate();
+      }
+      // Fallback: Unregister from TickManager if tickable
+      else if ('tick' in entity && typeof (entity as any).tick === 'function') {
+        TickManager.getInstance().unregister(entity as unknown as ITickable);
+      }
+
+      this.entities.delete(id);
+    }
   }
 
   /**

@@ -39,8 +39,8 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
 
     // Subscribe to fire events
     this.observer = GameObservables.weaponFire.add((data) => {
-      // Only react if this component's owner is the one who fired
-      if (data.ownerId === this.owner.id) {
+      // Only react if this component's owner is the one who fired AND it is a firearm event
+      if (data.ownerId === this.owner.id && data.fireType === 'firearm') {
         const isLocal = true; // For now, we use the same effect logic, but can differentiate
         this.playFireEffect(data.weaponId, data.muzzleTransform, isLocal);
       }

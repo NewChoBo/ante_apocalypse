@@ -34,6 +34,7 @@ export class UIManager {
   // UI Containers
   private screens: Map<UIScreen, Container> = new Map();
   public currentScreen: UIScreen = UIScreen.NONE;
+  private previousScreen: UIScreen = UIScreen.MAIN_MENU;
   private lobbyUI: LobbyUI | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private observers: Observer<any>[] = [];
@@ -57,6 +58,20 @@ export class UIManager {
     this.ui = AdvancedDynamicTexture.CreateFullscreenUI('UI', true, scene);
     this.createScreens();
     this.setupNetworkListeners();
+    this.setupInput();
+  }
+
+  private setupInput(): void {
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Escape') {
+        if (this.currentScreen === UIScreen.SETTINGS) {
+          // Return to previous screen if valid, otherwise Main Menu
+          const target =
+            this.previousScreen !== UIScreen.NONE ? this.previousScreen : UIScreen.MAIN_MENU;
+          this.showScreen(target);
+        }
+      }
+    });
   }
 
   private setupNetworkListeners(): void {
@@ -112,6 +127,11 @@ export class UIManager {
     if (this.currentScreen !== UIScreen.NONE) {
       const prev = this.screens.get(this.currentScreen);
       if (prev) prev.isVisible = false;
+
+      // Track history if we are not navigating to 'NONE' (Game) or from 'NONE' to 'PAUSE'
+      if (screen !== UIScreen.NONE) {
+        this.previousScreen = this.currentScreen;
+      }
     }
 
     this.currentScreen = screen;

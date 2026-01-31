@@ -14,7 +14,7 @@ export abstract class BasePawn implements IPawnCore, ITickable {
   public id: string = '';
   public health: number = 100;
   public maxHealth: number = 100;
-  public isActive: boolean = true;
+  public isActive: boolean = false;
   public isDead: boolean = false;
   public readonly priority = 20;
 
@@ -27,8 +27,19 @@ export abstract class BasePawn implements IPawnCore, ITickable {
   }
 
   constructor(protected scene: Scene) {
-    // TickManager에 자동 등록
+    // TickManager registration moved to explicit activation or WorldEntityManager
+  }
+
+  public activate(): void {
+    if (this.isActive) return;
+    this.isActive = true;
     TickManager.getInstance().register(this);
+  }
+
+  public deactivate(): void {
+    if (!this.isActive) return;
+    this.isActive = false;
+    TickManager.getInstance().unregister(this);
   }
 
   /** ITickable 인터페이스 구현 */

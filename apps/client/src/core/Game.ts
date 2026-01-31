@@ -39,7 +39,7 @@ export class Game {
   private _gameEndObserver: Observer<{ reason: string }> | null = null;
 
   constructor() {
-    this.renderFunction = () => {
+    this.renderFunction = (): void => {
       const scene = this.sceneManager.getScene();
       if (scene) {
         if (scene.activeCamera) {
@@ -50,16 +50,7 @@ export class Game {
       }
     };
 
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Escape') {
-        if (this.uiManager && this.uiManager.currentScreen === UIScreen.SETTINGS) {
-          if (!this.isRunning) {
-            this.uiManager.showScreen(UIScreen.MAIN_MENU);
-          }
-          // In-game is handled by GlobalInputManager
-        }
-      }
-    });
+    // Input handling delegated to GlobalInputManager (in-game) and UIManager (menu)
 
     this.initCanvas();
     this.initEngine();
