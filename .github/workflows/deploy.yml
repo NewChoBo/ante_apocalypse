@@ -51,6 +51,7 @@ jobs:
       - name: Build
         env:
           VITE_PHOTON_APP_ID: ${{ secrets.VITE_PHOTON_APP_ID }}
+          VITE_PHOTON_APP_VERSION: ${{ secrets.VITE_PHOTON_APP_VERSION }}
         run: pnpm --filter @ante/client build
 
       - name: Setup Pages
