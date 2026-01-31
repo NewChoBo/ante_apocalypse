@@ -30,16 +30,41 @@ export abstract class BasePawn implements IPawnCore, ITickable {
   /** ITickable 인터페이스 구현 */
   public abstract tick(deltaTime: number): void;
 
-  /** 데미지 처리 */
-  public abstract takeDamage(
-    amount: number,
-    attackerId?: string,
-    part?: string,
-    hitPoint?: Vector3
-  ): void;
+  /**
+   * Common damage handling logic.
+   * Subclasses should override `onTakeDamage` or `onDeath` for specific behavior.
+   */
+  public takeDamage(amount: number, attackerId?: string, part?: string, hitPoint?: Vector3): void {
+    if (this.isDead) return;
 
-  /** 사망 처리 */
-  public abstract die(): void;
+    this.health = Math.max(0, this.health - amount);
+
+    this.onTakeDamage(amount, attackerId, part, hitPoint);
+
+    if (this.health <= 0) {
+      this.die();
+    }
+  }
+
+  protected onTakeDamage(
+    _amount: number,
+    _attackerId?: string,
+    _part?: string,
+    _hitPoint?: Vector3
+  ): void {
+    // Override in subclass
+  }
+
+  public die(): void {
+    if (this.isDead) return;
+    this.isDead = true;
+    this.health = 0; // Ensure 0
+    this.onDeath();
+  }
+
+  protected onDeath(): void {
+    // Override in subclass
+  }
 
   /** 컴포넌트 추가 */
   public addComponent(component: BaseComponent): void {

@@ -1,15 +1,9 @@
-import {
-  Mesh,
-  MeshBuilder,
-  Scene,
-  Vector3,
-  AbstractMesh,
-  Skeleton,
-  AnimationPropertiesOverride,
-} from '@babylonjs/core';
+import { Mesh, MeshBuilder, Scene, Vector3, AbstractMesh, Skeleton } from '@babylonjs/core';
 import { Logger } from '@ante/common';
 import { BasePawn } from '../../simulation/BasePawn.js';
 import { IServerAssetLoader } from '../IServerAssetLoader.js';
+import { SkeletonAnimationComponent } from '../../simulation/components/SkeletonAnimationComponent.js';
+import { MeshUtils } from '../../simulation/utils/MeshUtils.js';
 
 const logger = new Logger('ServerPlayerPawn');
 
@@ -19,6 +13,8 @@ export class ServerPlayerPawn extends BasePawn {
   public skeleton: Skeleton | null = null;
   public headBox: Mesh | null = null;
   public override type = 'player';
+
+  protected animationComponent: SkeletonAnimationComponent;
 
   constructor(
     id: string,
@@ -42,6 +38,10 @@ export class ServerPlayerPawn extends BasePawn {
     this.mesh.metadata = { type: 'player', id: this.id, pawn: this };
 
     logger.info(`Created ServerPlayerPawn for ${id}`);
+
+    // Animation Component
+    this.animationComponent = new SkeletonAnimationComponent(this, scene);
+    this.addComponent(this.animationComponent);
 
     // 2. Load Model
     this.loadModel(scene);
@@ -87,39 +87,14 @@ export class ServerPlayerPawn extends BasePawn {
 
       // 3. Head Hitbox (Critical for Headshots)
       if (this.skeleton) {
-        // Animation overrides to ensure T-pose or Idle doesn't distort too much?
-        // Actually we want to sync animation?
-        // For now, let's assume 'Idle' pose is enough for basic verification.
-        this.skeleton.animationPropertiesOverride = new AnimationPropertiesOverride();
-        this.skeleton.animationPropertiesOverride.enableBlending = true;
-        this.skeleton.animationPropertiesOverride.blendingSpeed = 0.1;
+        // Initialize shared animation component
+        this.animationComponent.initializeSkeleton(this.skeleton);
 
-        // Debug Animation Ranges (Removed for production)
-
-        // Ensure Idle animation is playing so bones are in correct place
-        const idleRange = this.skeleton.getAnimationRange('YBot_Idle');
-        if (idleRange) {
-          logger.info(`Playing Idle Animation for ${this.id}`);
-          scene.beginAnimation(this.skeleton, idleRange.from, idleRange.to, true);
-        } else {
-          logger.warn(`YBot_Idle not found! Playing default 0-100`);
-          scene.beginAnimation(this.skeleton, 0, 89, true);
-        }
-
-        const headBone = this.skeleton.bones.find((b) => b.name.toLowerCase().includes('head'));
-        if (headBone) {
-          this.headBox = MeshBuilder.CreateBox('headBox_' + this.id, { size: 0.25 }, scene);
-          const transformNode = headBone.getTransformNode();
-          if (transformNode) {
-            this.headBox.parent = transformNode;
-            this.headBox.position = Vector3.Zero();
-          } else {
-            this.headBox.attachToBone(headBone, this.visualMesh);
-          }
-          this.headBox.checkCollisions = true;
-          this.headBox.isPickable = true;
-          this.headBox.metadata = { type: 'player', id: this.id, bodyPart: 'head', pawn: this };
-        }
+        this.headBox = MeshUtils.createHeadHitbox(scene, this.skeleton, this.visualMesh, {
+          id: this.id,
+          type: 'player',
+          pawn: this,
+        });
       }
 
       logger.info(`Model loaded successfully for ${this.id}`);
@@ -133,17 +108,7 @@ export class ServerPlayerPawn extends BasePawn {
     this.updateComponents(_deltaTime);
   }
 
-  public takeDamage(amount: number): void {
-    if (this.isDead) return;
-    this.health = Math.max(0, this.health - amount);
-    if (this.health <= 0) {
-      this.die();
-    }
-  }
-
-  public die(): void {
-    this.isDead = true;
-    this.health = 0;
+  protected onDeath(): void {
     logger.info(`ServerPlayerPawn ${this.id} died.`);
   }
 

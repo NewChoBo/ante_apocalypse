@@ -19,6 +19,8 @@ export * from './systems/TickManager.js';
 export * from './simulation/BaseComponent.js';
 export * from './simulation/BasePawn.js';
 export * from './weapons/WeaponRegistry.js';
+export * from './simulation/components/SkeletonAnimationComponent.js';
+export * from './simulation/utils/MeshUtils.js';
 
 export * from './rules/IGameRule.js';
 export * from './rules/IGameRule.js';

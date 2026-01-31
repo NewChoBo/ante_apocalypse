@@ -10,7 +10,7 @@ import {
 import { BasePawn } from './BasePawn';
 import { Logger } from '@ante/common';
 import { HealthBarComponent } from './components/HealthBarComponent';
-import { SkeletonAnimationComponent } from './components/SkeletonAnimationComponent';
+import { SkeletonAnimationComponent } from '@ante/game-core';
 import { CharacterModelLoader } from './components/CharacterModelLoader';
 
 const logger = new Logger('CharacterPawn');
@@ -121,15 +121,21 @@ export abstract class CharacterPawn extends BasePawn {
     }
   }
 
-  public takeDamage(
+  public override takeDamage(
     amount: number,
     _attackerId?: string,
     _part?: string,
     _hitPoint?: Vector3
   ): void {
-    if (this.isDead) return;
+    super.takeDamage(amount, _attackerId, _part, _hitPoint);
+  }
 
-    this.health -= amount;
+  protected override onTakeDamage(
+    _amount: number,
+    _attackerId?: string,
+    _part?: string,
+    _hitPoint?: Vector3
+  ): void {
     this.healthBarComponent?.updateHealth(this.health);
 
     // Hit flash effect (fallback box)
@@ -141,15 +147,9 @@ export abstract class CharacterPawn extends BasePawn {
         }
       }, 100);
     }
-
-    if (this.health <= 0) {
-      this.die();
-    }
   }
 
-  public die(): void {
-    if (this.isDead) return;
-    this.isDead = true;
+  protected override onDeath(): void {
     logger.info(`${this.config.type} died`);
     this.mesh.setEnabled(false);
   }

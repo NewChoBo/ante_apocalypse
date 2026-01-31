@@ -51,17 +51,7 @@ export class ServerEnemyPawn extends BasePawn implements IEnemyPawn {
     this.updateComponents(deltaTime);
   }
 
-  public takeDamage(amount: number): void {
-    if (this.isDead) return;
-    this.health = Math.max(0, this.health - amount);
-    if (this.health <= 0) {
-      this.die();
-    }
-  }
-
-  public die(): void {
-    this.isDead = true;
-    this.health = 0;
+  protected onDeath(): void {
     logger.info(`ServerEnemyPawn ${this.id} died.`);
   }
 

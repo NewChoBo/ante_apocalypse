@@ -1,6 +1,6 @@
 import { Scene, Skeleton, AnimationPropertiesOverride, Bone, Vector3 } from '@babylonjs/core';
-import { BaseComponent } from './BaseComponent';
-import { BasePawn } from '../BasePawn';
+import { BaseComponent } from '../BaseComponent.js';
+import { BasePawn } from '../BasePawn.js';
 
 interface AnimationRange {
   from: number;
@@ -153,7 +153,8 @@ export class SkeletonAnimationComponent extends BaseComponent {
     }
 
     // Transform smoothed world velocity to local space
-    const mesh = (this.owner as any).mesh;
+    // BasePawn assumes mesh property exists.
+    const mesh = this.owner.mesh;
     if (!mesh) return;
 
     mesh.computeWorldMatrix(true);
