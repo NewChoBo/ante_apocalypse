@@ -1,4 +1,4 @@
-import { Engine, Vector3, UniversalCamera } from '@babylonjs/core';
+import { Engine, Vector3, UniversalCamera, Observer } from '@babylonjs/core';
 import { gameStateStore } from './store/GameStore';
 import { GameObservables } from './events/GameObservables';
 import { LevelLoader, LevelData } from './systems/LevelLoader';
@@ -30,8 +30,11 @@ export class Game {
   private uiManager!: UIManager;
 
   private isRunning = false;
+  private isLoading = false;
   private playerName: string = 'Anonymous';
   private renderFunction: () => void;
+  private _networkStateObserver: Observer<NetworkState> | null = null;
+  private _playerDiedObserver: Observer<any> | null = null;
 
   constructor() {
     this.renderFunction = () => {
@@ -112,12 +115,16 @@ export class Game {
     });
 
     // Listen for room join
-    NetworkManager.getInstance().onStateChanged.removeCallback((state) =>
-      this.handleNetworkStateChange(state)
-    );
-    NetworkManager.getInstance().onStateChanged.add((state) =>
-      this.handleNetworkStateChange(state)
-    );
+    const nm = NetworkManager.getInstance();
+    if (this._networkStateObserver) {
+      nm.onStateChanged.remove(this._networkStateObserver);
+      this._networkStateObserver = null;
+    }
+
+    logger.info('Registering NetworkState observer in Game...');
+    this._networkStateObserver = nm.onStateChanged.add((state) => {
+      this.handleNetworkStateChange(state);
+    });
 
     this.uiManager.onAbort.add(() => this.quitToMenu());
 
@@ -135,6 +142,7 @@ export class Game {
   }
 
   private handleNetworkStateChange(state: NetworkState): void {
+    logger.info(`Game received network state: ${state} (isRunning: ${this.isRunning})`);
     if (state === NetworkState.InRoom && !this.isRunning) {
       logger.info('Joined room, starting multiplayer game...');
       this.start();
@@ -148,7 +156,9 @@ export class Game {
   }
 
   public async start(): Promise<void> {
-    if (this.isRunning) return;
+    if (this.isRunning || this.isLoading) return;
+
+    this.isLoading = true;
 
     // Use map selected from UI (or synchronized from room)
     let mapKey = this.uiManager.getSelectedMap();
@@ -162,46 +172,57 @@ export class Game {
     this.engine.stopRenderLoop(this.renderFunction);
     this.engine.displayLoadingUI();
 
-    const { scene, shadowGenerator } = await this.sceneManager.createGameScene();
-    this.uiManager = UIManager.initialize(scene);
-    this.setupUIManagerEvents();
-
-    const levelLoader = new LevelLoader(scene, shadowGenerator);
-    await levelLoader.loadLevelData(levelData);
-
     try {
+      const { scene, shadowGenerator } = await this.sceneManager.createGameScene();
+      this.uiManager = UIManager.initialize(scene);
+      this.setupUIManagerEvents();
+
+      const levelLoader = new LevelLoader(scene, shadowGenerator);
+      await levelLoader.loadLevelData(levelData);
+
       await AssetLoader.getInstance().load(scene);
+
+      this.sessionController = new SessionController(scene, this.canvas, shadowGenerator);
+      await this.sessionController.initialize(levelData, this.playerName);
+
+      // Ensure the player camera is active
+      if (this.sessionController.getPlayerCamera()) {
+        scene.activeCamera = this.sessionController.getPlayerCamera();
+      }
+
+      // Listen for player death to trigger Game Over
+      if (this._playerDiedObserver) {
+        GameObservables.playerDied.remove(this._playerDiedObserver);
+      }
+      this._playerDiedObserver = GameObservables.playerDied.add(() => {
+        if (this.isRunning) this.gameOver();
+      });
+
+      this.engine.hideLoadingUI();
+      this.isRunning = true;
+      gameStateStore.set('PLAYING');
+
+      this.uiManager.showScreen(UIScreen.NONE);
+      // requestPointerLock is already called inside showScreen(UIScreen.NONE)
+
+      // Unlock audio
+      AssetLoader.getInstance().getAudioEngine()?.resumeAsync();
+
+      this.engine.runRenderLoop(this.renderFunction);
     } catch (e) {
-      logger.error('CRITICAL: Failed to preload assets. Aborting game start.', e);
-      this.uiManager.showNotification('SYSTEM_FAILURE:_REQUIRED_ASSETS_MISSING');
+      // Check if scene was disposed during loading (e.g. user quit)
+      const scene = this.sceneManager.getScene();
+      if (!scene || scene.isDisposed || (e as Error).message.includes('Scene disposed')) {
+        logger.warn('Scene disposed or error during game start/loading. Aborting.');
+        return;
+      }
+
+      logger.error('CRITICAL: Failed to start game.', e);
+      this.uiManager.showNotification('SYSTEM_FAILURE:_STARTUP_ABORTED');
       this.quitToMenu();
-      return;
+    } finally {
+      this.isLoading = false;
     }
-
-    this.sessionController = new SessionController(scene, this.canvas, shadowGenerator);
-    await this.sessionController.initialize(levelData, this.playerName);
-
-    // Ensure the player camera is active
-    if (this.sessionController.getPlayerCamera()) {
-      scene.activeCamera = this.sessionController.getPlayerCamera();
-    }
-
-    // Listen for player death to trigger Game Over
-    GameObservables.playerDied.add(() => {
-      if (this.isRunning) this.gameOver();
-    });
-
-    this.engine.hideLoadingUI();
-    this.isRunning = true;
-    gameStateStore.set('PLAYING');
-
-    this.uiManager.showScreen(UIScreen.NONE);
-    // requestPointerLock is already called inside showScreen(UIScreen.NONE)
-
-    // Unlock audio
-    AssetLoader.getInstance().getAudioEngine()?.resumeAsync();
-
-    this.engine.runRenderLoop(this.renderFunction);
   }
 
   public gameOver(): void {
@@ -228,7 +249,20 @@ export class Game {
     PickupManager.getInstance().clear();
     AssetLoader.getInstance().clear();
 
+    if (this._playerDiedObserver) {
+      GameObservables.playerDied.remove(this._playerDiedObserver);
+      this._playerDiedObserver = null;
+    }
+
     NetworkManager.getInstance().leaveRoom();
+
+    // Clean up network listener
+    // Clean up network listener
+    if (this._networkStateObserver) {
+      NetworkManager.getInstance().onStateChanged.remove(this._networkStateObserver);
+      this._networkStateObserver = null;
+      logger.info('Removed NetworkState observer in Game');
+    }
 
     this.initMenu();
   }

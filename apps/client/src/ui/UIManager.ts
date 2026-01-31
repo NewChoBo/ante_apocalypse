@@ -9,7 +9,7 @@ import {
   Container,
   Slider,
 } from '@babylonjs/gui';
-import { Scene, Observable } from '@babylonjs/core';
+import { Scene, Observable, Observer } from '@babylonjs/core';
 import { LobbyUI } from './LobbyUI';
 import { NetworkManager } from '../core/systems/NetworkManager';
 import { settingsStore } from '../core/store/SettingsStore';
@@ -31,9 +31,11 @@ export class UIManager {
   public ui: AdvancedDynamicTexture;
 
   // UI Containers
+  // UI Containers
   private screens: Map<UIScreen, Container> = new Map();
   public currentScreen: UIScreen = UIScreen.NONE;
   private lobbyUI: LobbyUI | null = null;
+  private observers: Observer<any>[] = [];
 
   // Visual Constants
   private readonly PRIMARY_COLOR = '#ffc400';
@@ -58,13 +60,17 @@ export class UIManager {
 
   private setupNetworkListeners(): void {
     const network = NetworkManager.getInstance();
-    network.onStateChanged.add((state) => {
-      if (state === NetworkState.Disconnected || state === NetworkState.Error) {
-        this.showNotification('COMMUNICATION_LINK_LOST - ATTEMPTING_RECONNECT');
-      } else if (state === NetworkState.ConnectedToMaster || state === NetworkState.InLobby) {
-        this.showNotification('UPLINK_ESTABLISHED');
+    const stateObserver = network.onStateChanged.add((state) => {
+      // Safety check: if UI texture is disposed, don't try to add notifications
+      if (this.ui && this.ui.getScene()) {
+        if (state === NetworkState.Disconnected || state === NetworkState.Error) {
+          this.showNotification('COMMUNICATION_LINK_LOST - ATTEMPTING_RECONNECT');
+        } else if (state === NetworkState.ConnectedToMaster || state === NetworkState.InLobby) {
+          this.showNotification('UPLINK_ESTABLISHED');
+        }
       }
     });
+    if (stateObserver) this.observers.push(stateObserver);
   }
 
   public static initialize(scene: Scene): UIManager {
@@ -471,6 +477,10 @@ export class UIManager {
   }
 
   public showNotification(message: string): void {
+    if (!this.ui || !this.ui.getScene() || this.ui.getScene()?.isDisposed) {
+      return;
+    }
+
     const notification = new Rectangle('notification');
     notification.width = '400px';
     notification.height = '60px';
@@ -492,6 +502,12 @@ export class UIManager {
     // Fade out and remove
     let alpha = 1;
     const interval = setInterval(() => {
+      // Safety check inside interval
+      if (!this.ui || !this.ui.getScene() || this.ui.getScene()?.isDisposed) {
+        clearInterval(interval);
+        return;
+      }
+
       alpha -= 0.05;
       if (alpha <= 0) {
         notification.dispose();
@@ -503,6 +519,17 @@ export class UIManager {
   }
 
   public dispose(): void {
+    if (this.lobbyUI) {
+      this.lobbyUI.dispose();
+      this.lobbyUI = null;
+    }
+
+    // Clean up observers
+    this.observers.forEach((obs) => {
+      NetworkManager.getInstance().onStateChanged.remove(obs);
+    });
+    this.observers = [];
+
     this.ui.dispose();
   }
 }

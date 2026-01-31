@@ -1,5 +1,5 @@
 import { BaseTargetSpawner } from '@ante/game-core';
-import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
+import { Scene, Vector3, ShadowGenerator, Observer } from '@babylonjs/core';
 import { TargetPawn, TargetPawnConfig } from '../TargetPawn';
 import { NetworkManager } from '../systems/NetworkManager';
 import { WorldEntityManager } from '../systems/WorldEntityManager';
@@ -12,6 +12,8 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
   private shadowGenerator: ShadowGenerator;
   private worldManager: WorldEntityManager;
   private networkManager: NetworkManager;
+  private _spawnObserver: Observer<any> | null = null;
+  private _destroyObserver: Observer<any> | null = null;
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
     const netManager = NetworkManager.getInstance();
@@ -22,7 +24,7 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
     this.worldManager = WorldEntityManager.getInstance();
     this.networkManager = netManager;
 
-    this.networkManager.onTargetSpawn.add((data) => {
+    this._spawnObserver = this.networkManager.onTargetSpawn.add((data) => {
       // If I am Master, I already spawned it locally via broadcastTargetSpawn logic?
       // No, broadcastTargetSpawn calls spawnTarget.
       // But if loopback is NOT disabled for "Others", I might double spawn?
@@ -32,7 +34,7 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
       this.spawnTarget(position, data.isMoving, data.id, data.type);
     });
 
-    this.networkManager.onTargetDestroy.add(() => {
+    this._destroyObserver = this.networkManager.onTargetDestroy.add(() => {
       // Respawn logic is now handled by the authority (server/simulation)
     });
   }
@@ -81,5 +83,14 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
     this.worldManager.removeEntity(targetId);
   }
 
-  public dispose(): void {}
+  public dispose(): void {
+    if (this._spawnObserver) {
+      this.networkManager.onTargetSpawn.remove(this._spawnObserver);
+      this._spawnObserver = null;
+    }
+    if (this._destroyObserver) {
+      this.networkManager.onTargetDestroy.remove(this._destroyObserver);
+      this._destroyObserver = null;
+    }
+  }
 }

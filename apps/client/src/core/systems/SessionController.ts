@@ -1,4 +1,4 @@
-import { Scene, Vector3, ShadowGenerator, UniversalCamera } from '@babylonjs/core';
+import { Scene, Vector3, ShadowGenerator, UniversalCamera, Observer } from '@babylonjs/core';
 import { PlayerPawn } from '../PlayerPawn';
 import { PlayerController } from '../controllers/PlayerController';
 import { LevelData } from './LevelLoader';
@@ -33,6 +33,7 @@ export class SessionController {
   private targetSpawner: TargetSpawnerComponent | null = null;
   private simulation: WorldSimulation | null = null;
   private healthUnsub: (() => void) | null = null;
+  private _initialStateObserver: Observer<InitialStatePayload> | null = null;
 
   constructor(scene: Scene, canvas: HTMLCanvasElement, shadowGenerator: ShadowGenerator) {
     this.scene = scene;
@@ -184,24 +185,26 @@ export class SessionController {
       network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
     }
 
-    network.onInitialStateReceived.add((data: InitialStatePayload): void => {
-      if (this.enemyManager) {
-        this.enemyManager.applyEnemyStates(data.enemies);
+    this._initialStateObserver = network.onInitialStateReceived.add(
+      (data: InitialStatePayload): void => {
+        if (this.enemyManager) {
+          this.enemyManager.applyEnemyStates(data.enemies);
+        }
+        if (this.multiplayerSystem) {
+          this.multiplayerSystem.applyPlayerStates(data.players);
+        }
+        if (data.targets && this.targetSpawner) {
+          data.targets.forEach((t: SpawnTargetPayload): void => {
+            this.targetSpawner!.spawnTarget(
+              new Vector3(t.position.x, t.position.y, t.position.z),
+              t.isMoving,
+              t.id,
+              t.type
+            );
+          });
+        }
       }
-      if (this.multiplayerSystem) {
-        this.multiplayerSystem.applyPlayerStates(data.players);
-      }
-      if (data.targets && this.targetSpawner) {
-        data.targets.forEach((t: SpawnTargetPayload): void => {
-          this.targetSpawner!.spawnTarget(
-            new Vector3(t.position.x, t.position.y, t.position.z),
-            t.isMoving,
-            t.id,
-            t.type
-          );
-        });
-      }
-    });
+    );
 
     // Request logic moved up
   }
@@ -259,6 +262,10 @@ export class SessionController {
     this.inventoryUI?.dispose();
     this.multiplayerSystem?.dispose();
     this.enemyManager?.dispose();
+    if (this._initialStateObserver) {
+      NetworkManager.getInstance().onInitialStateReceived.remove(this._initialStateObserver);
+      this._initialStateObserver = null;
+    }
     // Managers are singletons, cleared in Game.ts for now or we could add clear here
   }
 }

@@ -1,4 +1,4 @@
-import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
+import { Scene, Vector3, ShadowGenerator, Observer } from '@babylonjs/core';
 import { EnemyPawn } from '../EnemyPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { NetworkManager } from './NetworkManager';
@@ -17,6 +17,8 @@ export class EnemyManager extends BaseEnemyManager {
   private enemies: Map<string, EnemyPawn> = new Map();
   private networkManager: NetworkManager;
   private worldManager: WorldEntityManager;
+  private _enemyUpdateObserver: Observer<any> | null = null;
+  private _eventObserver: Observer<any> | null = null;
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
     const netManager = NetworkManager.getInstance();
@@ -29,7 +31,7 @@ export class EnemyManager extends BaseEnemyManager {
   }
 
   private setupNetworkListeners(): void {
-    this.networkManager.onEnemyUpdated.add((data) => {
+    this._enemyUpdateObserver = this.networkManager.onEnemyUpdated.add((data) => {
       this.processEnemyMove(data);
     });
 
@@ -37,13 +39,15 @@ export class EnemyManager extends BaseEnemyManager {
 
     this.networkManager.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
 
-    this.networkManager.onEvent.add((event: { code: number; data: unknown }): void => {
-      if (event.code === EventCode.SPAWN_ENEMY) {
-        this.handleSpawnEnemy(event.data as EnemyState);
-      } else if (event.code === EventCode.DESTROY_ENEMY) {
-        this.handleDestroyEnemy(event.data as { id: string });
+    this._eventObserver = this.networkManager.onEvent.add(
+      (event: { code: number; data: unknown }): void => {
+        if (event.code === EventCode.SPAWN_ENEMY) {
+          this.handleSpawnEnemy(event.data as EnemyState);
+        } else if (event.code === EventCode.DESTROY_ENEMY) {
+          this.handleDestroyEnemy(event.data as { id: string });
+        }
       }
-    });
+    );
   }
 
   private handleSpawnEnemy(data: EnemyState): void {
@@ -122,6 +126,14 @@ export class EnemyManager extends BaseEnemyManager {
   }
 
   public dispose(): void {
+    if (this._enemyUpdateObserver) {
+      this.networkManager.onEnemyUpdated.remove(this._enemyUpdateObserver);
+      this._enemyUpdateObserver = null;
+    }
+    if (this._eventObserver) {
+      this.networkManager.onEvent.remove(this._eventObserver);
+      this._eventObserver = null;
+    }
     this.enemies.clear();
   }
 

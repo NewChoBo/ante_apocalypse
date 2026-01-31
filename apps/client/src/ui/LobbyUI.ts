@@ -9,6 +9,7 @@ import {
   Checkbox,
   InputText,
 } from '@babylonjs/gui';
+import { Observer } from '@babylonjs/core';
 import { NetworkManager } from '../core/systems/NetworkManager';
 import { UIManager, UIScreen } from './UIManager';
 import { RoomInfo } from '@ante/common';
@@ -22,6 +23,7 @@ export class LobbyUI {
   private roomListPanel: StackPanel;
   private networkManager: NetworkManager;
   private uiManager: UIManager;
+  private observers: Observer<any>[] = [];
 
   // Visual Constants from UIManager (for consistency)
   private readonly PRIMARY_COLOR = '#ffc400';
@@ -38,6 +40,15 @@ export class LobbyUI {
       .find((d) => d.name === 'room-list') as StackPanel;
 
     this.setupListeners();
+  }
+
+  public dispose(): void {
+    this.observers.forEach((obs) => {
+      this.networkManager.onRoomListUpdated.remove(obs);
+      this.networkManager.onStateChanged.remove(obs);
+    });
+    this.observers = [];
+    this.container.dispose();
   }
 
   public getContainer(): Container {
@@ -139,13 +150,15 @@ export class LobbyUI {
   }
 
   private setupListeners(): void {
-    this.networkManager.onRoomListUpdated.add((rooms) => {
+    const roomListObserver = this.networkManager.onRoomListUpdated.add((rooms) => {
       this.updateRoomList(rooms);
     });
+    if (roomListObserver) this.observers.push(roomListObserver);
 
-    this.networkManager.onStateChanged.add((state) => {
+    const stateObserver = this.networkManager.onStateChanged.add((state) => {
       this.handleStateChange(state);
     });
+    if (stateObserver) this.observers.push(stateObserver);
 
     // Initial fetch from cache
     this.updateRoomList(this.networkManager.getRoomList());
@@ -153,6 +166,9 @@ export class LobbyUI {
   }
 
   private handleStateChange(state: string): void {
+    // Safety check: if UI is disposed or not attached, don't update
+    if (!this.container || !this.container.host) return;
+
     const isDisconnected = state === 'Disconnected' || state === 'Error' || state === 'Connecting';
 
     // Find Join buttons and Create button to disable them
@@ -398,27 +414,68 @@ export class LobbyUI {
     });
     buttonPanel.addControl(cancelBtn);
 
+    const errorMsg = new TextBlock();
+    errorMsg.text = '';
+    errorMsg.color = '#ff4d4d';
+    errorMsg.fontSize = 14;
+    errorMsg.fontFamily = this.FONT_MONO;
+    errorMsg.height = '20px';
+    errorMsg.isVisible = false;
+    stack.addControl(errorMsg);
+
     const initBtn = this.createButton('INITIATE', '200px');
     initBtn.paddingLeft = '20px';
     initBtn.onPointerUpObservable.add(async () => {
+      // Reset Error
+      errorMsg.isVisible = false;
+      errorMsg.text = '';
+
+      // Set Loading State
+      initBtn.isEnabled = false;
+      initBtn.textBlock!.text = 'DEPLOYING...';
+      initBtn.alpha = 0.5;
+
       const roomName = roomInput.text;
       const mapId = selectedMap;
 
-      modalOverlay.dispose();
+      // Force minimal delay for UX
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      if (checkbox.isChecked) {
-        logger.info('Creating Local Server Session...');
-        try {
+      try {
+        let success = false;
+        if (checkbox.isChecked) {
+          logger.info('Creating Local Server Session...');
           await LocalServerManager.getInstance().startSession(roomName, mapId);
-          await this.networkManager.joinRoom(roomName);
-        } catch (e) {
-          logger.error('Failed to create or join local server room:', e);
+          // Wait for local server to be ready before joining?
+          // LocalServerManager.startSession is async and waits for Authority connection.
+          success = await this.networkManager.joinRoom(roomName);
+        } else {
+          success = await this.networkManager.createRoom(roomName, mapId);
+        }
+
+        if (success) {
+          modalOverlay.dispose();
+        } else {
+          throw new Error('FAILED_TO_ESTABLISH_UPLINK');
+        }
+      } catch (e: any) {
+        logger.error('Failed to create/join room:', e);
+
+        // Clean up partial state if necessary
+        if (checkbox.isChecked) {
           LocalServerManager.getInstance().stopSession();
         }
-      } else {
-        await this.networkManager.createRoom(roomName, mapId);
+
+        errorMsg.text = 'ERROR: ' + (e.message || 'CONNECTION_FAILED');
+        errorMsg.isVisible = true;
+
+        // Reset Button
+        initBtn.isEnabled = true;
+        initBtn.textBlock!.text = 'INITIATE';
+        initBtn.alpha = 1.0;
       }
     });
+
     buttonPanel.addControl(initBtn);
   }
 
