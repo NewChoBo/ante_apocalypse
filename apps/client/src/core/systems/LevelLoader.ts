@@ -12,8 +12,8 @@ import { Logger } from '@ante/common';
 import { LevelData } from '@ante/game-core';
 
 const logger = new Logger('LevelLoader');
-import diffAsset from '../../assets/textures/ground_crackedMud_baseColor.png';
-import normAsset from '../../assets/textures/ground_crackedMud_normal.png';
+import diffAsset from '@ante/assets/textures/ground_crackedMud_baseColor.png';
+import normAsset from '@ante/assets/textures/ground_crackedMud_normal.png';
 
 export type { LevelData };
 

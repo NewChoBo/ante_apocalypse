@@ -9,7 +9,7 @@ import {
   CubeTexture,
   Color4,
 } from '@babylonjs/core';
-import studioEnvAsset from '../../assets/environments/studio.env';
+import studioEnvAsset from '@ante/assets/environments/studio.env';
 
 export class SceneManager {
   private engine: Engine;

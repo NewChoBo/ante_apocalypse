@@ -15,12 +15,12 @@ import { Logger } from '@ante/common';
 
 import { settingsStore } from './store/SettingsStore';
 
-// Asset Imports
-import gunshotAsset from '../assets/sounds/gunshot.wav';
-import swipeAsset from '../assets/sounds/swipe.wav';
-import dummy3Asset from '../assets/models/dummy3.babylon';
-import gunAsset from '../assets/models/Gun.glb';
-import flareAsset from '../assets/textures/flare.png';
+// Asset Imports from @ante/assets package
+import gunshotAsset from '@ante/assets/sounds/gunshot.wav';
+import swipeAsset from '@ante/assets/sounds/swipe.wav';
+import dummy3Asset from '@ante/assets/models/dummy3.babylon';
+import gunAsset from '@ante/assets/models/Gun.glb';
+import flareAsset from '@ante/assets/textures/flare.png';
 
 const logger = new Logger('GameAssets');
 

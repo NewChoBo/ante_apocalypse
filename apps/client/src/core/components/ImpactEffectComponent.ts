@@ -2,7 +2,7 @@ import { Scene, Vector3, ParticleSystem, Texture, Color4 } from '@babylonjs/core
 import { BaseComponent } from './BaseComponent';
 import { GameObservables } from '../events/GameObservables';
 import type { BasePawn } from '../BasePawn';
-import flareAsset from '../../assets/textures/Flare.png';
+import flareAsset from '@ante/assets/textures/Flare.png';
 
 /**
  * 타격 이펙트(Impact)를 담당하는 컴포넌트.

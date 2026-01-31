@@ -41,6 +41,9 @@ importers:
 
   apps/client:
     dependencies:
+      '@ante/assets':
+        specifier: workspace:*
+        version: link:../../packages/assets
       '@ante/common':
         specifier: workspace:*
         version: link:../../packages/common
@@ -133,6 +136,8 @@ importers:
       typescript:
         specifier: ^5.7.3
         version: 5.7.3
+
+  packages/assets: {}
 
   packages/common: {}
 

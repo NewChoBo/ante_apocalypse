@@ -9,12 +9,12 @@ export interface ItemMetadata {
   onUse?: (player: PlayerPawn) => void;
 }
 
-import pistolIcon from '../../assets/images/items/pistol.png';
-import rifleIcon from '../../assets/images/items/rifle.png';
-import knifeIcon from '../../assets/images/items/knife.png';
-import batIcon from '../../assets/images/items/bat.png';
-import healthIcon from '../../assets/images/items/health_pack.png';
-import ammoIcon from '../../assets/images/items/ammo_box.png';
+import pistolIcon from '@ante/assets/images/items/pistol.png';
+import rifleIcon from '@ante/assets/images/items/rifle.png';
+import knifeIcon from '@ante/assets/images/items/knife.png';
+import batIcon from '@ante/assets/images/items/bat.png';
+import healthIcon from '@ante/assets/images/items/health_pack.png';
+import ammoIcon from '@ante/assets/images/items/ammo_box.png';
 
 export const ITEM_DATABASE: Record<string, ItemMetadata> = {
   pistol: {

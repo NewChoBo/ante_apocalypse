@@ -2,8 +2,8 @@ import { Scene, SceneLoader } from '@babylonjs/core';
 import { IServerAssetLoader, LoadedModel } from '@ante/game-core';
 import { Logger } from '@ante/common';
 
-import dummy3Asset from '../../assets/models/dummy3.babylon';
-import gunAsset from '../../assets/models/Gun.glb';
+import dummy3Asset from '@ante/assets/models/dummy3.babylon';
+import gunAsset from '@ante/assets/models/Gun.glb';
 
 const logger = new Logger('BrowserAssetLoader');
 

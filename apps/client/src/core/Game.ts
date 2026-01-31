@@ -15,8 +15,8 @@ import { NetworkState, Logger } from '@ante/common';
 const logger = new Logger('Game');
 import { NetworkManager } from './systems/NetworkManager';
 
-import trainingGroundData from '../assets/levels/training_ground.json';
-import combatZoneData from '../assets/levels/combat_zone.json';
+import trainingGroundData from '@ante/assets/levels/training_ground.json';
+import combatZoneData from '@ante/assets/levels/combat_zone.json';
 
 const LEVELS: Record<string, LevelData> = {
   training_ground: trainingGroundData as LevelData,
