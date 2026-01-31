@@ -9,7 +9,7 @@ import {
   CubeTexture,
   Color4,
 } from '@babylonjs/core';
-import studioEnvUrl from '../../assets/environments/studio.env?url';
+import studioEnvAsset from '../../assets/environments/studio.env';
 
 export class SceneManager {
   private engine: Engine;
@@ -27,7 +27,7 @@ export class SceneManager {
     scene.clearColor = new Color4(0.1, 0.1, 0.15, 1);
 
     // PBR 환경 맵 로드
-    const envTexture = CubeTexture.CreateFromPrefilteredData(studioEnvUrl, scene);
+    const envTexture = CubeTexture.CreateFromPrefilteredData(studioEnvAsset, scene);
     scene.environmentTexture = envTexture;
     scene.environmentIntensity = 1.0;
 

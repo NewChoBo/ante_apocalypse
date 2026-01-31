@@ -12,10 +12,10 @@ import { settingsStore } from './store/SettingsStore';
 
 const logger = new Logger('AssetLoader');
 
-import gunshotUrl from '../assets/sounds/gunshot.wav';
-import swipeUrl from '../assets/sounds/swipe.wav';
-import dummy3Url from '../assets/models/dummy3.babylon?url';
-import gunUrl from '../assets/models/Gun.glb?url';
+import gunshotAsset from '../assets/sounds/gunshot.wav';
+import swipeAsset from '../assets/sounds/swipe.wav';
+import dummy3Asset from '../assets/models/dummy3.babylon';
+import gunAsset from '../assets/models/Gun.glb';
 
 // Audio V2 타입을 위해 가져옵니다.
 import type { AudioEngineV2 } from '@babylonjs/core';
@@ -150,13 +150,13 @@ export class AssetLoader {
       // 2. Load Sounds
       if (this.sounds.size === 0) {
         logger.info(`[Load#${id}] Loading default sound effects...`);
-        const gunshotSound = await this.audioEngine.createSoundAsync('gunshot', gunshotUrl, {
+        const gunshotSound = await this.audioEngine.createSoundAsync('gunshot', gunshotAsset, {
           volume: 0.5,
         });
         this.sounds.set('gunshot', gunshotSound);
 
         try {
-          const swipeSound = await this.audioEngine.createSoundAsync('swipe', swipeUrl, {
+          const swipeSound = await this.audioEngine.createSoundAsync('swipe', swipeAsset, {
             volume: 0.6,
           });
           this.sounds.set('swipe', swipeSound);
@@ -170,8 +170,8 @@ export class AssetLoader {
       // 3. Load Mesh Containers
       logger.info(`[Load#${id}] Loading model containers for Scene#${sceneId}...`);
       await Promise.all([
-        this.loadMeshToContainer(scene, 'enemy', '', dummy3Url),
-        this.loadMeshToContainer(scene, 'rifle', '', gunUrl),
+        this.loadMeshToContainer(scene, 'enemy', '', dummy3Asset),
+        this.loadMeshToContainer(scene, 'rifle', '', gunAsset),
       ]);
 
       if (scene.isDisposed) throw new Error('Scene disposed during mesh loading');

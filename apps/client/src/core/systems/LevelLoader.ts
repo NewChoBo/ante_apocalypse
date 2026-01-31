@@ -11,8 +11,8 @@ import {
 import { Logger } from '@ante/common';
 
 const logger = new Logger('LevelLoader');
-import diffUrl from '../../assets/textures/ground_crackedMud_baseColor.png?url';
-import normUrl from '../../assets/textures/ground_crackedMud_normal.png?url';
+import diffAsset from '../../assets/textures/ground_crackedMud_baseColor.png';
+import normAsset from '../../assets/textures/ground_crackedMud_normal.png';
 
 export interface LevelData {
   ground: {
@@ -44,19 +44,6 @@ export class LevelLoader {
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
-  }
-
-  public async loadLevel(url: string): Promise<LevelData | null> {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`Failed to load level: ${url}`);
-      const data: LevelData = await response.json();
-      this.buildLevel(data);
-      return data;
-    } catch (e) {
-      logger.error(`Failed to load level: ${e}`);
-      return null;
-    }
   }
 
   public async loadLevelData(data: LevelData): Promise<void> {
@@ -104,12 +91,12 @@ export class LevelLoader {
 
       // Apply Analyzed Textures
       if (wallData.name.includes('wall')) {
-        const diffTex = new Texture(diffUrl, this.scene);
+        const diffTex = new Texture(diffAsset, this.scene);
         diffTex.uScale = wallData.size[0] / 8;
         diffTex.vScale = wallData.size[1] / 8;
         mat.diffuseTexture = diffTex;
 
-        const normTex = new Texture(normUrl, this.scene);
+        const normTex = new Texture(normAsset, this.scene);
         normTex.uScale = wallData.size[0] / 8;
         normTex.vScale = wallData.size[1] / 8;
         mat.bumpTexture = normTex;
