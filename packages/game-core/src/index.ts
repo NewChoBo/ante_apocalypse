@@ -21,8 +21,7 @@ export * from './simulation/BasePawn.js';
 export * from './weapons/WeaponRegistry.js';
 export * from './simulation/components/SkeletonAnimationComponent.js';
 export * from './simulation/utils/MeshUtils.js';
-
-export * from './rules/IGameRule.js';
+export * from './types/IPickup.js';
 export * from './rules/IGameRule.js';
 export * from './rules/WaveSurvivalRule.js';
 

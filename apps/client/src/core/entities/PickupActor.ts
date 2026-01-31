@@ -4,6 +4,7 @@ export type PickupType = 'health_pack' | 'ammo_box';
 
 export class PickupActor {
   public mesh: Mesh;
+  public id: string = '';
   public type: PickupType;
   private lifeTime = 15; // 15 seconds
   private timeAlive = 0;
