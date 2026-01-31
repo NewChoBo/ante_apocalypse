@@ -22,6 +22,11 @@ export class SkeletonAnimationComponent extends BaseComponent {
     super(owner, scene);
   }
 
+  private smoothedVelocity: Vector3 = new Vector3();
+  private readonly LERP_FACTOR = 0.15; // Low-pass filter factor
+  private readonly MOVE_THRESHOLD_ENTER = 0.2; // Speed to enter move state
+  private readonly MOVE_THRESHOLD_EXIT = 0.05; // Speed to exit move state
+
   /**
    * 스케레톤과 애니메이션 범위 초기화
    */
@@ -31,7 +36,7 @@ export class SkeletonAnimationComponent extends BaseComponent {
     // Animation blending setup
     skeleton.animationPropertiesOverride = new AnimationPropertiesOverride();
     skeleton.animationPropertiesOverride.enableBlending = true;
-    skeleton.animationPropertiesOverride.blendingSpeed = 0.1;
+    skeleton.animationPropertiesOverride.blendingSpeed = 0.15; // Slightly faster blending for responsiveness
 
     // Define standard ranges for YBot
     const rangesToDefine: Record<string, [number, number]> = {
@@ -131,32 +136,41 @@ export class SkeletonAnimationComponent extends BaseComponent {
   public updateAnimationByVelocity(velocity: Vector3): void {
     if (!this.skeleton) return;
 
-    const speed = velocity.length();
-    if (speed < 0.01) {
+    // 1. Smooth the input velocity using LERP (Low-pass filter)
+    Vector3.LerpToRef(this.smoothedVelocity, velocity, this.LERP_FACTOR, this.smoothedVelocity);
+
+    const speed = this.smoothedVelocity.length();
+
+    // 2. Hysteresis for Idle/Move transition
+    const isCurrentlyIdle = this.currentAnim === 'idle' || this.currentAnim === 'none';
+    const threshold = isCurrentlyIdle ? this.MOVE_THRESHOLD_ENTER : this.MOVE_THRESHOLD_EXIT;
+
+    if (speed < threshold) {
       this.playAnimation('idle');
       return;
     }
 
-    // Transform world velocity to local space
+    // Transform smoothed world velocity to local space
     const mesh = (this.owner as any).mesh;
     if (!mesh) return;
 
-    // Actually simpler: obtain local vector by transforming world velocity
     mesh.computeWorldMatrix(true);
     const worldMatrix = mesh.getWorldMatrix();
     const invWorldMatrix = worldMatrix.clone().invert();
-    const localVelocity = Vector3.TransformNormal(velocity, invWorldMatrix);
+    const localVelocity = Vector3.TransformNormal(this.smoothedVelocity, invWorldMatrix);
 
     // Analyze local velocity components
     const vz = localVelocity.z; // Forward/Backward
     const vx = localVelocity.x; // Left/Right
 
-    if (Math.abs(vz) >= Math.abs(vx)) {
+    // 3. Select animation based on dominant direction with small bias to prevent rapid switching
+    if (Math.abs(vz) >= Math.abs(vx) * 0.8) {
       if (vz > 0.1) {
-        this.playAnimation(speed > 10 ? 'run' : 'walk');
+        this.playAnimation(speed > 6 ? 'run' : 'walk'); // Adjusted run speed threshold
       } else if (vz < -0.1) {
         this.playAnimation('walk_back');
       } else {
+        // This case is largely covered by speed threshold, but for safety:
         this.playAnimation('idle');
       }
     } else {
