@@ -73,7 +73,9 @@ export class LocalServerManager {
 
       // 3. Initialize Logical Server
       const assetLoader = new BrowserAssetLoader();
-      this.logicalServer = new LogicalServer(this.networkAuthority, assetLoader);
+      this.logicalServer = new LogicalServer(this.networkAuthority, assetLoader, {
+        isTakeover,
+      });
 
       // 4. Start Simulation
       this.logicalServer.start();

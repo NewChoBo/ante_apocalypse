@@ -17,10 +17,16 @@ const logger = new Logger('LogicalServer');
  * 게임 로직을 수행하는 핵심 서버 클래스.
  * Node.js(Dedicated Server)와 Browser(Client Host) 모두에서 동작할 수 있도록 설계됨.
  */
+export interface LogicalServerOptions {
+  /** If true, skip world initialization (used for host migration) */
+  isTakeover?: boolean;
+}
+
 export class LogicalServer {
   private networkManager: ServerNetworkAuthority;
   private assetLoader: IServerAssetLoader;
   private isRunning = false;
+  private isTakeover: boolean;
 
   private engine: NullEngine;
   private scene: Scene;
@@ -31,9 +37,14 @@ export class LogicalServer {
   // 플레이어 ID와 물리 메쉬(Hitbox) 매핑
   private playerPawns: Map<string, ServerPlayerPawn> = new Map();
 
-  constructor(networkManager: ServerNetworkAuthority, assetLoader: IServerAssetLoader) {
+  constructor(
+    networkManager: ServerNetworkAuthority,
+    assetLoader: IServerAssetLoader,
+    options?: LogicalServerOptions
+  ) {
     this.networkManager = networkManager;
     this.assetLoader = assetLoader;
+    this.isTakeover = options?.isTakeover ?? false;
 
     this.engine = new NullEngine();
     this.scene = new Scene(this.engine);
@@ -74,8 +85,8 @@ export class LogicalServer {
   private setupNetworkEvents(): void {
     this.networkManager.onPlayerJoin = (id) => {
       this.createPlayerPawn(id);
-      // 첫 플레이어가 입장하면 게임 레이아웃 생성
-      if (this.playerPawns.size === 1) {
+      // 첫 플레이어가 입장하면 게임 레이아웃 생성 (Takeover가 아닐 때만)
+      if (!this.isTakeover && this.playerPawns.size === 1) {
         this.simulation.initializeRequest();
       }
     };
