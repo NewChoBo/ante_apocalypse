@@ -109,7 +109,11 @@ export class CharacterModelLoader extends BaseComponent {
 
       // Parent to root collider
       this.visualMesh.parent = this.charOwner.mesh;
-      this.visualMesh.position = new Vector3(0, -1.0, 0);
+
+      // Pivot is at eye level (1.75m) for players, center (1.0m) for enemies.
+      // Offset visual mesh accordingly to ground it.
+      const yOffset = this.config.entityType === 'player' ? -1.75 : -1.0;
+      this.visualMesh.position = new Vector3(0, yOffset, 0);
       this.visualMesh.rotation = Vector3.Zero();
 
       // Shadow setup

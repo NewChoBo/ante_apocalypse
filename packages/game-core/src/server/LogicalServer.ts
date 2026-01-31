@@ -161,12 +161,8 @@ export class LogicalServer {
     weaponIdOverride?: string
   ): void {
     logger.debug(
-      `Fire Event from: ${playerId} at ${origin.x}, ${origin.y}, ${origin.z} (weapon: ${weaponIdOverride || 'default'})`
+      `Fire Event from: ${playerId} at ${origin.x}, ${origin.y}, ${origin.z} (dir: ${direction.x}, ${direction.y}, ${direction.z}, weapon: ${weaponIdOverride || 'default'})`
     );
-    // Note: direction is currently logged but not used for physics yet
-    // The instruction to "clean up unused param" is interpreted as explicitly marking it as unused
-    // to avoid linter warnings, as the parameter is still part of the function signature.
-    const _unused = direction;
   }
 
   public processSyncWeapon(playerId: string, weaponId: string): void {

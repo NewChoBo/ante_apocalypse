@@ -59,7 +59,7 @@ export class RemotePlayerPawn extends CharacterPawn {
 
     // Override mesh setup for remote player
     this.mesh.name = 'remotePlayerRoot_' + id;
-    this.mesh.position.set(0, 1.75, 0);
+    this.mesh.position.copyFrom(config.position); // config.position is already 1.75 (eye level)
     this.mesh.rotationQuaternion = null;
     this.mesh.metadata = {
       type: 'remote_player',
@@ -218,18 +218,27 @@ export class RemotePlayerPawn extends CharacterPawn {
 
   // Fire effect
   public fire(
-    _weaponId: string,
-    _muzzleData?: {
+    weaponId: string,
+    muzzleData?: {
       position: { x: number; y: number; z: number };
       direction: { x: number; y: number; z: number };
     }
   ): void {
+    logger.debug(`Firing weapon: ${weaponId}`);
     this.muzzleFlash.playFireSound();
 
-    let flashPos = this.mesh.position.clone().add(new Vector3(0, 1.5, 0.5));
-    if (this.weaponMesh) {
-      const matrix = this.weaponMesh.computeWorldMatrix(true);
-      flashPos = Vector3.TransformCoordinates(new Vector3(0, 0.2, 0), matrix);
+    let flashPos: Vector3;
+
+    if (muzzleData) {
+      // Use networked muzzle position
+      flashPos = new Vector3(muzzleData.position.x, muzzleData.position.y, muzzleData.position.z);
+    } else {
+      // Fallback to local approximation
+      flashPos = this.mesh.position.clone().add(new Vector3(0, -0.2, 0.5));
+      if (this.weaponMesh) {
+        const matrix = this.weaponMesh.computeWorldMatrix(true);
+        flashPos = Vector3.TransformCoordinates(new Vector3(0, 0.2, 0), matrix);
+      }
     }
 
     this.muzzleFlash.createFlash(flashPos);

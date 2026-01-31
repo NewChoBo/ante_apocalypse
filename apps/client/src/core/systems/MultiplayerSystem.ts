@@ -108,6 +108,13 @@ export class MultiplayerSystem {
       }
     });
 
+    this.networkManager.onPlayerFired.add((data): void => {
+      const remote = this.remotePlayers.get(data.playerId);
+      if (remote) {
+        remote.fire(data.weaponId, data.muzzleTransform);
+      }
+    });
+
     this.networkManager.onPlayerHit.add((data) => {
       // 서버로부터 받은 '확정된 체력(newHealth)'을 우선적으로 사용
       if (data.targetId === this.networkManager.getSocketId()) {
