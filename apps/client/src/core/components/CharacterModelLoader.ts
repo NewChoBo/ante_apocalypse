@@ -11,7 +11,7 @@ import {
   ShadowGenerator,
 } from '@babylonjs/core';
 import { BaseComponent, IPawnCore, MeshUtils } from '@ante/game-core';
-import { AssetLoader } from '../AssetLoader';
+import { GameAssets } from '../GameAssets';
 import { Logger } from '@ante/common';
 
 const logger = new Logger('CharacterModelLoader');
@@ -71,13 +71,10 @@ export class CharacterModelLoader extends BaseComponent {
 
   public async loadModel(): Promise<void> {
     try {
-      const entries = AssetLoader.getInstance().instantiateMesh(this.config.assetKey);
+      const entries = GameAssets.instantiateModel(this.config.assetKey);
 
       if (!entries) {
-        const isReady = AssetLoader.getInstance().ready;
-        throw new Error(
-          `${this.config.assetKey} asset not preloaded. Loader status: isReady=${isReady}`
-        );
+        throw new Error(`${this.config.assetKey} asset not found in GameAssets.`);
       }
 
       this.visualMesh = entries.rootNodes[0] as AbstractMesh;

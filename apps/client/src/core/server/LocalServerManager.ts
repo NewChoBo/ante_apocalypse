@@ -2,6 +2,15 @@ import { LogicalServer, ServerNetworkAuthority } from '@ante/game-core';
 import { BrowserAssetLoader } from './BrowserAssetLoader';
 import { Logger } from '@ante/common';
 import { NetworkManager } from '../systems/NetworkManager';
+import { LevelData } from '@ante/game-core';
+
+import trainingGroundData from '../../assets/levels/training_ground.json';
+import combatZoneData from '../../assets/levels/combat_zone.json';
+
+const LEVELS: Record<string, LevelData> = {
+  training_ground: trainingGroundData as LevelData,
+  combat_zone: combatZoneData as LevelData,
+};
 
 const logger = new Logger('LocalServerManager');
 
@@ -78,6 +87,16 @@ export class LocalServerManager {
         isTakeover,
         gameMode,
       });
+
+      // 3.5 Load Level Data
+      const currentMapId =
+        mapId || this.networkAuthority.getCurrentRoomProperty('mapId') || 'training_ground';
+      const levelData = LEVELS[currentMapId];
+      if (levelData) {
+        this.logicalServer.loadLevel(levelData);
+      } else {
+        logger.warn(`Level data not found for mapId: ${currentMapId}. Hits might fail.`);
+      }
 
       // 4. Start Simulation
       this.logicalServer.start();

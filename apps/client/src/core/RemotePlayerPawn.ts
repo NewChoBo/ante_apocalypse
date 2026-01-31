@@ -11,8 +11,9 @@ import {
   DynamicTexture,
 } from '@babylonjs/core';
 import { CharacterPawn, CharacterPawnConfig } from './CharacterPawn';
-import { AssetLoader } from './AssetLoader';
+import { GameAssets } from './GameAssets';
 import { Logger } from '@ante/common';
+
 import { NetworkInterpolationComponent } from './components/NetworkInterpolationComponent';
 import { MuzzleFlashComponent } from './components/MuzzleFlashComponent';
 
@@ -195,10 +196,7 @@ export class RemotePlayerPawn extends CharacterPawn {
         this.weaponMesh = null;
       }
 
-      const entries = AssetLoader.getInstance().instantiateMesh(
-        assetKey,
-        'remoteWeapon_' + this.id
-      );
+      const entries = GameAssets.instantiateModel(assetKey, 'remoteWeapon_' + this.id);
       if (!entries) return;
 
       this.weaponMesh = entries.rootNodes[0] as AbstractMesh;

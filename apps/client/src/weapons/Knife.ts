@@ -95,6 +95,7 @@ export class Knife extends MeleeWeapon {
     // 발사 이벤트 발행 (사운드 및 HUD 연동용)
     GameObservables.weaponFire.notifyObservers({
       weaponId: this.name,
+      ownerId: 'player_local',
       ammoRemaining: 0,
       fireType: 'melee',
     });

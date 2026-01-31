@@ -8,7 +8,7 @@ import {
   AbstractMesh,
 } from '@babylonjs/core';
 import { Firearm } from './Firearm';
-import { AssetLoader } from '../core/AssetLoader';
+import { GameAssets } from '../core/GameAssets';
 
 /**
  * 권총 (Pistol) - 단발
@@ -35,12 +35,10 @@ export class Pistol extends Firearm {
   private async createWeaponModel(): Promise<void> {
     try {
       // Reuse 'rifle' asset (Gun.glb) for Pistol as they share the same source model
-      const entries = AssetLoader.getInstance().instantiateMesh('rifle');
+      const entries = GameAssets.instantiateModel('rifle');
 
       if (!entries) {
-        throw new Error(
-          `Gun asset not preloaded. Loader status: isReady=${AssetLoader.getInstance().ready}`
-        );
+        throw new Error(`Gun asset not found in GameAssets.`);
       }
 
       this.weaponMesh = entries.rootNodes[0] as AbstractMesh;

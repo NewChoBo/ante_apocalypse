@@ -12,7 +12,7 @@ const logger = new Logger('PlayerPawn');
 import { CharacterMovementComponent } from './components/CharacterMovementComponent';
 import { CameraComponent } from './components/CameraComponent';
 import { CombatComponent } from './components/CombatComponent';
-import { AssetLoader } from './AssetLoader';
+import { GameAssets } from './GameAssets';
 import { HealthBarComponent } from './components/HealthBarComponent';
 
 export interface InputState {
@@ -166,7 +166,8 @@ export class PlayerPawn extends BasePawn {
 
   private createCorpse(): void {
     try {
-      const entries = AssetLoader.getInstance().instantiateMesh('enemy', 'corpse_local');
+      const entries = GameAssets.instantiateModel('enemy', 'corpse_' + this.id);
+
       if (!entries) return;
 
       this.corpseMesh = entries.rootNodes[0] as Mesh;

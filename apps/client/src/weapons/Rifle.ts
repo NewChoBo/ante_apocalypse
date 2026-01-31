@@ -10,7 +10,7 @@ import {
   AbstractMesh,
 } from '@babylonjs/core';
 import { Firearm } from './Firearm';
-import { AssetLoader } from '../core/AssetLoader';
+import { GameAssets } from '../core/GameAssets';
 
 /**
  * 소총 (Rifle) - 연발 가능
@@ -37,12 +37,10 @@ export class Rifle extends Firearm {
 
   private async createWeaponModel(): Promise<void> {
     try {
-      const entries = AssetLoader.getInstance().instantiateMesh('rifle');
+      const entries = GameAssets.instantiateModel('rifle');
 
       if (!entries) {
-        throw new Error(
-          `Rifle asset not preloaded. Loader status: isReady=${AssetLoader.getInstance().ready}`
-        );
+        throw new Error(`Rifle asset not found in GameAssets.`);
       }
 
       // Gun.glb often comes with a __root__ or specific node structure.

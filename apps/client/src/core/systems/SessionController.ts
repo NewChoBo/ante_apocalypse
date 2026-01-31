@@ -1,7 +1,7 @@
 import { Scene, Vector3, ShadowGenerator, UniversalCamera, Observer } from '@babylonjs/core';
 import { PlayerPawn } from '../PlayerPawn';
 import { PlayerController } from '../controllers/PlayerController';
-import { LevelData } from './LevelLoader';
+import { LevelData } from '@ante/game-core';
 import { CombatComponent } from '../components/CombatComponent';
 import { HUD } from '../../ui/HUD';
 import { InventoryUI } from '../../ui/inventory/InventoryUI';
@@ -16,7 +16,7 @@ import { EventCode, InitialStatePayload, SpawnTargetPayload } from '@ante/common
 import { WorldSimulation, WaveSurvivalRule } from '@ante/game-core';
 import { WorldEntityManager } from './WorldEntityManager';
 import { GameObservables } from '../events/GameObservables';
-import { AssetLoader } from '../AssetLoader';
+import { GameAssets } from '../GameAssets';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
 
 export class SessionController {
@@ -80,7 +80,7 @@ export class SessionController {
     PickupManager.getInstance().initialize(this.scene, this.playerPawn!);
 
     GameObservables.itemCollection.add((): void => {
-      const swipeSound = AssetLoader.getInstance().getSound('swipe');
+      const swipeSound = GameAssets.swipe;
       swipeSound?.play();
     });
   }
@@ -145,6 +145,12 @@ export class SessionController {
         }
       },
     });
+    this.syncInventoryStore();
+  }
+
+  public start(): void {
+    if (!this.playerPawn) return;
+    this.playerPawn.initialize();
     this.syncInventoryStore();
   }
 

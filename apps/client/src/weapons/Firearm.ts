@@ -47,7 +47,7 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
     applyRecoil?: (force: number) => void
   ) {
     // Pass dummy stats to core, subclasses should initialize proper stats or we update them here
-    super('firearm', 'local_player', {
+    super('firearm', 'player_local', {
       name: 'Firearm',
       damage: 0,
       range: 100,
@@ -110,6 +110,7 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
     // 발사 이벤트 발행
     GameObservables.weaponFire.notifyObservers({
       weaponId: this.name,
+      ownerId: this.ownerId,
       ammoRemaining: this.currentAmmo,
       fireType: 'firearm',
       muzzleTransform: this.getMuzzleTransform(),

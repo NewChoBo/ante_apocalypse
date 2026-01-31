@@ -64,9 +64,9 @@ export class ServerPlayerPawn extends BasePawn {
         return;
       }
 
-      // Currently assuming all registry items are firearms for simplicity, or check stats
-      // We can also infer type from name or add 'type' to WeaponStats
+      // Server side: give substantial reserve ammo to allow multiple reloads
       const weapon = new Firearm(weaponId, this.id, stats);
+      weapon.reserveAmmo = 999;
       this.weapons.set(weaponId, weapon);
     }
 

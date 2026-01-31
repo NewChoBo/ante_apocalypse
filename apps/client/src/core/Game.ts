@@ -1,9 +1,10 @@
 import { Engine, Vector3, UniversalCamera, Observer } from '@babylonjs/core';
 import { gameStateStore } from './store/GameStore';
 import { GameObservables } from './events/GameObservables';
-import { LevelLoader, LevelData } from './systems/LevelLoader';
+import { LevelLoader } from './systems/LevelLoader';
+import { LevelData } from '@ante/game-core';
 import { TickManager } from './TickManager';
-import { AssetLoader } from './AssetLoader';
+import { GameAssets } from './GameAssets';
 import { WorldEntityManager } from './systems/WorldEntityManager';
 import { PickupManager } from './systems/PickupManager';
 import { UIManager, UIScreen } from '../ui/UIManager';
@@ -191,7 +192,8 @@ export class Game {
       const levelLoader = new LevelLoader(scene, shadowGenerator);
       await levelLoader.loadLevelData(levelData);
 
-      await AssetLoader.getInstance().load(scene);
+      // Initialize GameAssets (Audio engines, preload model containers)
+      await GameAssets.initialize(scene);
 
       this.sessionController = new SessionController(scene, this.canvas, shadowGenerator);
       await this.sessionController.initialize(levelData, this.playerName);
@@ -221,7 +223,7 @@ export class Game {
       // requestPointerLock is already called inside showScreen(UIScreen.NONE)
 
       // Unlock audio
-      AssetLoader.getInstance().getAudioEngine()?.resumeAsync();
+      GameAssets.resumeAudio();
 
       this.engine.runRenderLoop(this.renderFunction);
     } catch (e) {
@@ -268,7 +270,7 @@ export class Game {
     TickManager.getInstance().clear();
     WorldEntityManager.getInstance().clear();
     PickupManager.getInstance().clear();
-    AssetLoader.getInstance().clear();
+    GameAssets.clear();
 
     if (this._playerDiedObserver) {
       GameObservables.playerDied.remove(this._playerDiedObserver);

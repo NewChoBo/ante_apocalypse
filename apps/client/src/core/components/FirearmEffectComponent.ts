@@ -1,11 +1,8 @@
 import { Scene, Vector3, MeshBuilder, StandardMaterial, Color3, PointLight } from '@babylonjs/core';
 import { BaseWeaponEffectComponent } from './BaseWeaponEffectComponent';
-import { AssetLoader } from '../AssetLoader';
+import { GameAssets } from '../GameAssets';
 import { GameObservables } from '../events/GameObservables';
 import type { BasePawn } from '../BasePawn';
-import { Logger } from '@ante/common';
-
-const logger = new Logger('FirearmEffectComponent');
 
 /**
  * 총기류 전용 시각적 피드백 컴포넌트.
@@ -19,6 +16,7 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
   private observer: import('@babylonjs/core').Nullable<
     import('@babylonjs/core').Observer<{
       weaponId: string;
+      ownerId: string;
       ammoRemaining: number;
       fireType: 'firearm' | 'melee';
       muzzleTransform?: import('../../types/IWeapon').MuzzleTransform;
@@ -37,39 +35,46 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
     this.muzzleLight.diffuse = new Color3(1, 0.8, 0.4);
     this.muzzleLight.intensity = 0;
 
-    this.gunshotSound = AssetLoader.getInstance().getSound('gunshot');
+    this.gunshotSound = GameAssets.gunshot;
 
-    // 이벤트 구독: 'firearm' 타입인 경우에만 총구 화염 및 소리 발생
-    this.observer = GameObservables.weaponFire.add((payload) => {
-      if (payload.fireType === 'firearm') {
-        this.playGunshot();
-        if (payload.muzzleTransform) {
-          this.emitMuzzleFlash(
-            payload.muzzleTransform.position,
-            payload.muzzleTransform.direction,
-            payload.muzzleTransform.transformNode,
-            payload.muzzleTransform.localMuzzlePosition
-          );
-        } else {
-          logger.warn('No muzzle transform in payload');
-        }
+    // Subscribe to fire events
+    this.observer = GameObservables.weaponFire.add((data) => {
+      // Only react if this component's owner is the one who fired
+      if (data.ownerId === this.owner.id) {
+        const isLocal = true; // For now, we use the same effect logic, but can differentiate
+        this.playFireEffect(data.weaponId, data.muzzleTransform, isLocal);
       }
     });
   }
 
-  private playGunshot(): void {
-    const sound = this.gunshotSound || AssetLoader.getInstance().getSound('gunshot');
+  private playFireEffect(
+    _weaponId: string,
+    muzzleTransform: import('../../types/IWeapon').MuzzleTransform | undefined,
+    _isLocal: boolean
+  ): void {
+    if (muzzleTransform) {
+      this.emitMuzzleFlash(
+        muzzleTransform.position,
+        muzzleTransform.direction,
+        muzzleTransform.transformNode,
+        muzzleTransform.localMuzzlePosition
+      );
+    }
+    this.playGunshot();
+  }
+
+  public playGunshot(): void {
+    const sound = this.gunshotSound || GameAssets.gunshot;
     if (sound) {
       this.gunshotSound = sound;
+
       // 피치(재생 속도)를 0.9 ~ 1.1 사이로 랜덤화
       const randomRate = 0.9 + Math.random() * 0.2;
-
-      if (typeof sound.setPlaybackRate === 'function') {
+      if (typeof (sound as any).setPlaybackRate === 'function') {
         sound.setPlaybackRate(randomRate);
-      } else if (typeof sound.setPitch === 'function') {
-        sound.setPitch(randomRate);
+      } else {
+        (sound as any).playbackRate = randomRate;
       }
-
       sound.play();
     }
   }

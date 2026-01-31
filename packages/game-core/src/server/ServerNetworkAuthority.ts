@@ -52,6 +52,49 @@ export class ServerNetworkAuthority extends BasePhotonClient {
 
     this.setupDispatcher();
     this.setupServerCallbacks();
+    this.setupJoinListener();
+  }
+
+  private setupJoinListener(): void {
+    const originalOnStateChanged = this.onStateChanged;
+    this.onStateChanged = (state: number): void => {
+      originalOnStateChanged?.(state);
+
+      if (this.isJoinedToRoom()) {
+        logger.info('Joined Room - Registering all existing actors...');
+        this.registerAllActors();
+      }
+    };
+  }
+
+  public registerAllActors(): void {
+    const actors = this.getRoomActors();
+    actors.forEach((info, nr) => {
+      this.handleActorJoin(nr, info.name);
+    });
+  }
+
+  private handleActorJoin(actorNr: number, name: string): void {
+    const id = actorNr.toString();
+
+    // Skip self
+    if (id === this.getSocketId()) return;
+
+    if (!this.entityManager.getEntity(id)) {
+      logger.info(`Registering Actor: ${id} (${name})`);
+      const state: PlayerState = {
+        id: id,
+        name: name,
+        position: { x: 0, y: 0, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 },
+        weaponId: 'Pistol',
+        health: 100,
+      };
+      (state as unknown as { type: string }).type = 'remote_player';
+      this.entityManager.register(state as unknown as IWorldEntity);
+    }
+
+    if (this.onPlayerJoin) this.onPlayerJoin(id);
   }
 
   private setupDispatcher(): void {
@@ -130,24 +173,7 @@ export class ServerNetworkAuthority extends BasePhotonClient {
   private setupServerCallbacks(): void {
     // Hook into base class callbacks
     this.onActorJoin = (actorNr: number, name: string): void => {
-      const id = actorNr.toString();
-
-      logger.info(`Player Joined: ${id} (${name})`);
-
-      if (!this.entityManager.getEntity(id)) {
-        const state: PlayerState = {
-          id: id,
-          name: name,
-          position: { x: 0, y: 0, z: 0 },
-          rotation: { x: 0, y: 0, z: 0 },
-          weaponId: 'Pistol',
-          health: 100,
-        };
-        (state as unknown as { type: string }).type = 'remote_player';
-        this.entityManager.register(state as unknown as IWorldEntity);
-      }
-
-      if (this.onPlayerJoin) this.onPlayerJoin(id);
+      this.handleActorJoin(actorNr, name);
     };
 
     this.onActorLeave = (actorNr: number): void => {

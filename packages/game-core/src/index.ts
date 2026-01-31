@@ -36,3 +36,7 @@ export * from './server/ServerNetworkAuthority.js';
 export * from './server/pawns/ServerPlayerPawn.js';
 export * from './server/pawns/ServerEnemyPawn.js';
 export * from './server/pawns/ServerTargetPawn.js';
+
+// Level logic
+export * from './levels/LevelData.js';
+export * from './levels/ServerLevelLoader.js';

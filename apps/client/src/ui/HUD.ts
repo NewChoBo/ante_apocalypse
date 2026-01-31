@@ -26,8 +26,10 @@ export class HUD {
   private healthUnsub: (() => void) | null = null;
   private weaponFireObserver: Observer<{
     weaponId: string;
+    ownerId: string;
     ammoRemaining: number;
     fireType: 'firearm' | 'melee';
+    muzzleTransform?: import('../types/IWeapon').MuzzleTransform;
   }> | null = null;
   private expandTimeout: ReturnType<typeof setTimeout> | undefined;
   private previousHealth: number = 100;

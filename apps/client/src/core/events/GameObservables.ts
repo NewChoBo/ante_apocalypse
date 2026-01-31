@@ -20,6 +20,7 @@ export const GameObservables = {
 
   weaponFire: new Observable<{
     weaponId: string;
+    ownerId: string;
     ammoRemaining: number;
     fireType: 'firearm' | 'melee';
     muzzleTransform?: MuzzleTransform;

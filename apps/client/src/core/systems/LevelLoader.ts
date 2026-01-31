@@ -9,33 +9,13 @@ import {
   Texture,
 } from '@babylonjs/core';
 import { Logger } from '@ante/common';
+import { LevelData } from '@ante/game-core';
 
 const logger = new Logger('LevelLoader');
 import diffAsset from '../../assets/textures/ground_crackedMud_baseColor.png';
 import normAsset from '../../assets/textures/ground_crackedMud_normal.png';
 
-export interface LevelData {
-  ground: {
-    width: number;
-    height: number;
-    material: { diffuse: number[]; specular: number[] };
-  };
-  walls: Array<{
-    name: string;
-    position: number[];
-    size: number[];
-    material: { diffuse: number[] };
-  }>;
-  props: Array<{
-    type: 'box' | 'cylinder';
-    name: string;
-    position: number[];
-    size: number[]; // [width, height, depth] or [height, diameter]
-    material: { diffuse: number[]; emissive?: number[] };
-  }>;
-  playerSpawn?: number[]; // [x, y, z]
-  enemySpawns?: number[][]; // [[x,y,z], [x,y,z], ...]
-}
+export type { LevelData };
 
 export class LevelLoader {
   private scene: Scene;
@@ -44,6 +24,18 @@ export class LevelLoader {
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
+  }
+
+  public async loadLevel(url: string): Promise<LevelData | null> {
+    try {
+      const response = await fetch(url);
+      const data = await response.json();
+      await this.loadLevelData(data);
+      return data;
+    } catch (e) {
+      logger.error(`Failed to load level from ${url}: ${e}`);
+      return null;
+    }
   }
 
   public async loadLevelData(data: LevelData): Promise<void> {

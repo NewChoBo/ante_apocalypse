@@ -1,4 +1,4 @@
-import { NullEngine, Scene, MeshBuilder, ArcRotateCamera, Vector3 } from '@babylonjs/core';
+import { NullEngine, Scene, ArcRotateCamera, Vector3 } from '@babylonjs/core';
 import { ServerNetworkAuthority } from './ServerNetworkAuthority.js';
 import { RequestHitData, Vector3 as commonVector3, Logger, EventCode } from '@ante/common';
 import { WorldSimulation } from '../simulation/WorldSimulation.js';
@@ -13,6 +13,8 @@ import { ServerPickupManager } from './managers/ServerPickupManager.js';
 import { ServerTargetSpawner } from './managers/ServerTargetSpawner.js';
 import { ServerPlayerPawn } from './pawns/ServerPlayerPawn.js';
 import { IServerAssetLoader } from './IServerAssetLoader.js';
+import { LevelData } from '../levels/LevelData.js';
+import { ServerLevelLoader } from '../levels/ServerLevelLoader.js';
 
 const logger = new Logger('LogicalServer');
 
@@ -41,6 +43,7 @@ export class LogicalServer {
 
   // 플레이어 ID와 물리 메쉬(Hitbox) 매핑
   private playerPawns: Map<string, ServerPlayerPawn> = new Map();
+  private levelLoader: ServerLevelLoader;
 
   constructor(
     networkManager: ServerNetworkAuthority,
@@ -75,17 +78,21 @@ export class LogicalServer {
     this.simulation.setGameRule(gameRule);
     logger.info(`Game mode set to: ${gameMode}`);
 
+    this.levelLoader = new ServerLevelLoader(this.scene);
+
     // 서버용 더미 카메라 생성
     // 서버는 화면을 그리지 않지만, 씬 구동을 위해 카메라가 필수입니다.
     const camera = new ArcRotateCamera('ServerCamera', 0, 0, 10, Vector3.Zero(), this.scene);
     logger.info('Camera was created...', camera);
 
-    // 기본 바닥 생성
-    const ground = MeshBuilder.CreateGround('ground', { width: 100, height: 100 }, this.scene);
-    ground.position.y = 0;
+    // 기본 바닥 생성 (LevelLoader에서 생성하므로 여기서는 제거하거나 중복 확인 필요)
+    // this.levelLoader.loadLevelData(...) 호출 전까지는 충돌체가 없을 수 있음.
 
     // 네트워크 이벤트 연결
     this.setupNetworkEvents();
+
+    // [Fix] Register all existing actors immediately (in case they joined before LogicalServer setup)
+    this.networkManager.registerAllActors();
 
     logger.info('Physics World Initialized');
   }
@@ -156,7 +163,6 @@ export class LogicalServer {
     const tickInterval = 7.8; // 128Hz
     let lastClock = performance.now();
 
-    // 게임 루프: 렌더링 대신 씬 업데이트 수행
     this.engine.runRenderLoop(() => {
       if (!this.isRunning) return;
 
@@ -164,13 +170,9 @@ export class LogicalServer {
       const deltaTime = (currentTime - lastClock) / 1000;
       lastClock = currentTime;
 
-      // 0. Update Player Logic (Weapon timers)
       this.playerPawns.forEach((pawn) => pawn.tick(deltaTime));
-
-      // 1. Babylon 물리/로직 업데이트
       this.scene.render();
 
-      // 3. 네트워크 상태 전파 (TickRate 조절)
       if (currentTime - lastTickTime >= tickInterval) {
         const enemyStates = this.enemyManager.getEnemyStates();
         this.networkManager.broadcastState(enemyStates);
@@ -178,6 +180,12 @@ export class LogicalServer {
       }
     });
   }
+
+  public loadLevel(data: LevelData): void {
+    logger.info('Loading Level Data into LogicalServer...');
+    this.levelLoader.loadLevelData(data);
+  }
+
   private createPlayerPawn(id: string): void {
     if (this.playerPawns.has(id)) return;
 
@@ -291,14 +299,20 @@ export class LogicalServer {
         hitPart = validation.part;
 
         if (isValidHit) {
-          logger.info(
-            `[${validation.method.toUpperCase()}] Hit Verified: ${data.targetId} (${hitPart})`
-          );
+          logger.info(`Verified Hit: ${data.targetId} (${hitPart})`);
         } else {
           logger.warn(`[Rejected] Hit too far: Distance=${validation.distance?.toFixed(3)}m`);
         }
       } else {
-        logger.warn(`[Rejected] Target mesh not found: ${data.targetId}`);
+        // [New] Check if it's an environment hit (Wall, Prop)
+        const environmentMesh = this.scene.getMeshByName(data.targetId);
+        if (environmentMesh) {
+          logger.debug(`[VALID] Environment Hit: ${data.targetId}`);
+          isValidHit = true;
+          hitPart = 'object';
+        } else {
+          logger.warn(`[Rejected] Target mesh not found: ${data.targetId}`);
+        }
       }
     } else {
       // Fallback for missing ray data

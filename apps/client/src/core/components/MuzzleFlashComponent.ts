@@ -1,7 +1,7 @@
 import { Scene, Vector3, Color3, ParticleSystem, Texture } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { BasePawn } from '../BasePawn';
-import { AssetLoader } from '../AssetLoader';
+import { GameAssets } from '../GameAssets';
 
 /**
  * 발사 시 Muzzle Flash 이펙트를 담당하는 컴포넌트
@@ -16,7 +16,7 @@ export class MuzzleFlashComponent extends BaseComponent {
    * 발사 사운드 재생
    */
   public playFireSound(): void {
-    const sound = AssetLoader.getInstance().getSound('shoot');
+    const sound = GameAssets.gunshot;
     if (sound) {
       sound.play();
     }

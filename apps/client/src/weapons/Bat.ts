@@ -96,6 +96,7 @@ export class Bat extends MeleeWeapon {
     // 공격 사운드 및 이벤트 발행 (swipe 사운드 재사용 혹은 전용 사운드)
     GameObservables.weaponFire.notifyObservers({
       weaponId: this.name,
+      ownerId: 'player_local',
       ammoRemaining: 0,
       fireType: 'melee',
     });
