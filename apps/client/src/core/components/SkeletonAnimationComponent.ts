@@ -133,19 +133,6 @@ export class SkeletonAnimationComponent extends BaseComponent {
   }
 
   /**
-   * 움직임 상태에 따른 애니메이션 업데이트 (Legacy support)
-   */
-  public updateByMovementState(isMoving: boolean): void {
-    if (isMoving) {
-      if (this.currentAnim === 'idle' || this.currentAnim === 'none') {
-        this.playAnimation('walk');
-      }
-    } else {
-      this.playAnimation('idle');
-    }
-  }
-
-  /**
    * 위치 변화량(속도)에 기반한 방향성 애니메이션 업데이트
    */
   public updateAnimationByVelocity(velocity: Vector3): void {
