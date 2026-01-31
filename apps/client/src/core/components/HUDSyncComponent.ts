@@ -9,7 +9,8 @@ export class HUDSyncComponent {
 
   /** 탄약 정보 업데이트 */
   public syncAmmo(weapon: IWeapon): void {
-    const isFirearm = (w: any): w is IFirearm => w.currentAmmo !== undefined;
+    const isFirearm = (w: IWeapon): w is IFirearm =>
+      (w as unknown as IFirearm).currentAmmo !== undefined;
 
     if (isFirearm(weapon)) {
       ammoStore.set({

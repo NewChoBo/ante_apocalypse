@@ -26,6 +26,7 @@ import type { AudioEngineV2 } from '@babylonjs/core';
  */
 export class AssetLoader {
   private static instance: AssetLoader;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private sounds: Map<string, any> = new Map();
   private containers: Map<string, AssetContainer> = new Map();
   private isLoaded = false;
@@ -123,6 +124,7 @@ export class AssetLoader {
         // Apply initial volume
         const currentSettings = settingsStore.get();
         if (this.audioEngine) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const v2 = this.audioEngine as any;
           v2.volume = currentSettings.masterVolume;
           if (typeof v2.setVolume === 'function') {
@@ -133,6 +135,7 @@ export class AssetLoader {
         // Subscribe to volume changes
         settingsStore.subscribe((state) => {
           if (this.audioEngine) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const v2 = this.audioEngine as any;
             v2.volume = state.masterVolume;
             if (typeof v2.setVolume === 'function') {
@@ -238,17 +241,20 @@ export class AssetLoader {
     // Ensure we always return a single root node for the caller to grab (at index 0)
     if (entries.rootNodes.length !== 1) {
       // Access scene via any mesh or the container's scene property
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const scene = (container as any).scene;
       const wrapper = new Mesh(rootName || `${name}_wrapper`, scene);
       entries.rootNodes.forEach((node) => {
         node.parent = wrapper;
       });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (entries as any).rootNodes = [wrapper];
     }
 
     return entries;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public getSound(name: string): any {
     return this.sounds.get(name);
   }

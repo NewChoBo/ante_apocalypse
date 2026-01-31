@@ -2,7 +2,7 @@ import { Scene, UniversalCamera, Vector3, AbstractMesh, Mesh } from '@babylonjs/
 import { WorldEntityManager } from '../core/systems/WorldEntityManager';
 import { GameObservables } from '../core/events/GameObservables';
 
-type Constructor<T = {}> = new (...args: any[]) => T;
+type Constructor<T = object> = new (...args: any[]) => T;
 
 export function ClientWeaponMixin<TBase extends Constructor>(Base: TBase) {
   // Remove strict implements IWeapon on the mixin class itself to avoid "missing abstract methods" error
@@ -62,7 +62,8 @@ export function ClientWeaponMixin<TBase extends Constructor>(Base: TBase) {
     public hide(): void {
       this.isActive = false;
       // stopFire() needs to be handled by the base class or abstract
-      if ((this as any).stopFire) (this as any).stopFire();
+      const self = this as unknown as { stopFire?: () => void };
+      if (self.stopFire) self.stopFire();
       if (this.weaponMesh) {
         this.weaponMesh.setEnabled(false);
       }
@@ -139,7 +140,8 @@ export function ClientWeaponMixin<TBase extends Constructor>(Base: TBase) {
       return true;
     }
 
-    public updateStats(stats: Partial<Record<string, unknown>>): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    public updateStats(stats: Partial<Record<string, any>>): void {
       // Base updateStats?
       if (stats.damage !== undefined) this.damage = stats.damage as number;
       if (stats.range !== undefined) this.range = stats.range as number;

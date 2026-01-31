@@ -9,6 +9,7 @@ import type { BasePawn } from '../BasePawn';
  * 휘두르기 소리(Swipe Sound)를 전담합니다.
  */
 export class MeleeEffectComponent extends BaseWeaponEffectComponent {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private swipeSound: any;
 
   constructor(owner: BasePawn, scene: Scene) {
@@ -17,7 +18,7 @@ export class MeleeEffectComponent extends BaseWeaponEffectComponent {
     this.swipeSound = AssetLoader.getInstance().getSound('swipe');
 
     // 이벤트 구독: 'melee' 타입인 경우에만 휘두르기 소리 발생
-    GameObservables.weaponFire.add((payload) => {
+    GameObservables.weaponFire.add((payload): void => {
       if (payload.fireType === 'melee') {
         this.playSwipe();
       }

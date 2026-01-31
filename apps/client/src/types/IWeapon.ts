@@ -1,4 +1,4 @@
-import { Vector3 } from '@babylonjs/core';
+import { Vector3, Node } from '@babylonjs/core';
 
 /**
  * 총구의 위치와 방향을 제공하는 인터페이스.
@@ -7,7 +7,7 @@ export interface IMuzzleProvider {
   getMuzzleTransform(): {
     position: Vector3;
     direction: Vector3;
-    transformNode?: unknown;
+    transformNode?: Node;
   };
 }
 
@@ -37,7 +37,8 @@ export interface IWeapon {
   update(deltaTime: number): void;
 
   /** 무기 스태츠 가져오기 */
-  getStats(): Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getStats(): Record<string, any>;
 
   /** 무기 모델 표시 */
   show(): void;
@@ -64,6 +65,7 @@ export interface IWeapon {
   addAmmo(amount: number): void;
 
   /** 서버 데이터로 스태츠 업데이트 */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   updateStats(stats: Partial<Record<string, any>>): void;
 
   /** 리소스 해제 */
@@ -76,7 +78,7 @@ export interface IWeapon {
 export interface MuzzleTransform {
   position: Vector3;
   direction: Vector3;
-  transformNode?: unknown;
+  transformNode?: Node;
   localMuzzlePosition?: Vector3;
 }
 

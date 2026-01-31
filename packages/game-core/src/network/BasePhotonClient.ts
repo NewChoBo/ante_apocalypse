@@ -12,6 +12,7 @@ const logger = new Logger('BasePhotonClient');
  * Shared between Client (PhotonProvider) and Server (ServerNetworkAuthority).
  */
 export abstract class BasePhotonClient implements INetworkAuthority {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected client: any; // Photon.LoadBalancing.LoadBalancingClient
   protected dispatcher: NetworkDispatcher = new NetworkDispatcher();
   protected connectionResolver: (() => void) | null = null;
@@ -26,7 +27,9 @@ export abstract class BasePhotonClient implements INetworkAuthority {
     protected appId: string,
     protected appVersion: string
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.client = new (Photon as any).LoadBalancing.LoadBalancingClient(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (Photon as any).ConnectionProtocol.Wss,
       this.appId,
       this.appVersion
@@ -36,10 +39,11 @@ export abstract class BasePhotonClient implements INetworkAuthority {
   }
 
   private setupBaseListeners(): void {
-    this.client.onStateChange = (state: number) => {
+    this.client.onStateChange = (state: number): void => {
       logger.info(`State Changed: ${state}`);
       this.onStateChanged?.(state);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const States = (Photon as any).LoadBalancing.LoadBalancingClient.State;
       if (state === States.JoinedLobby || state === States.ConnectedToMaster) {
         if (this.connectionResolver) {
@@ -50,23 +54,25 @@ export abstract class BasePhotonClient implements INetworkAuthority {
       }
     };
 
-    this.client.onEvent = (code: number, content: unknown, actorNr: number) => {
+    this.client.onEvent = (code: number, content: unknown, actorNr: number): void => {
       this.onEventReceived?.(code, content, actorNr);
       this.dispatcher.dispatch(code, content, actorNr.toString());
     };
 
-    this.client.onActorJoin = (actor: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.client.onActorJoin = (actor: any): void => {
       const myActorNr = this.client.myActor()?.actorNr;
       if (actor.actorNr !== myActorNr) {
         this.onActorJoin?.(actor.actorNr, actor.name || 'Anonymous');
       }
     };
 
-    this.client.onActorLeave = (actor: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.client.onActorLeave = (actor: any): void => {
       this.onActorLeave?.(actor.actorNr);
     };
 
-    this.client.onError = (errorCode: number, errorMsg: string) => {
+    this.client.onError = (errorCode: number, errorMsg: string): void => {
       logger.error(`Photon Error ${errorCode}: ${errorMsg}`);
     };
   }
@@ -80,6 +86,7 @@ export abstract class BasePhotonClient implements INetworkAuthority {
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
     this.client.raiseEvent(code, data, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.Others,
       cache: reliable ? 1 : 0,
     });
@@ -87,6 +94,7 @@ export abstract class BasePhotonClient implements INetworkAuthority {
 
   public sendEventToAll(code: number, data: unknown): void {
     this.client.raiseEvent(code, data, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
     });
   }

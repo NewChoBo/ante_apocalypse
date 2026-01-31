@@ -16,7 +16,9 @@ export class EnemyManager extends BaseEnemyManager {
   private shadowGenerator: ShadowGenerator;
   private networkManager: NetworkManager;
   private worldManager: WorldEntityManager;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _enemyUpdateObserver: Observer<any> | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _eventObserver: Observer<any> | null = null;
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {

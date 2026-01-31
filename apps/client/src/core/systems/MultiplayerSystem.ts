@@ -108,22 +108,25 @@ export class MultiplayerSystem {
       }
     });
 
-    this.networkManager.onPlayerFired.add((data): void => {
+    this.networkManager.onPlayerFired.add((data: import('@ante/common').FireEventData): void => {
       const remote = this.remotePlayers.get(data.playerId);
       if (remote) {
         remote.fire(data.weaponId, data.muzzleTransform);
       }
     });
 
-    this.networkManager.onPlayerReloaded.add((data): void => {
-      const remote = this.remotePlayers.get(data.playerId);
-      if (remote) {
-        // remote.reload() call if implemented, or just for visual sync
-        (remote as any).reload?.(data.weaponId);
+    this.networkManager.onPlayerReloaded.add(
+      (data: { playerId: string; weaponId: string }): void => {
+        const remote = this.remotePlayers.get(data.playerId);
+        if (remote) {
+          // remote.reload() call if implemented, or just for visual sync
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (remote as any).reload?.(data.weaponId);
+        }
       }
-    });
+    );
 
-    this.networkManager.onPlayerHit.add((data) => {
+    this.networkManager.onPlayerHit.add((data: import('@ante/common').HitEventData): void => {
       // 서버로부터 받은 '확정된 체력(newHealth)'을 우선적으로 사용
       if (data.targetId === this.networkManager.getSocketId()) {
         // Local player update
@@ -138,7 +141,7 @@ export class MultiplayerSystem {
       }
     });
 
-    this.networkManager.onPlayerDied.add((data) => {
+    this.networkManager.onPlayerDied.add((data: import('@ante/common').DeathEventData): void => {
       if (data.targetId === this.networkManager.getSocketId()) {
         this.localPlayer.die();
       } else {
@@ -149,21 +152,23 @@ export class MultiplayerSystem {
       }
     });
 
-    this.networkManager.onPlayerRespawn.add((data) => {
-      const pos = new Vector3(data.position.x, data.position.y, data.position.z);
+    this.networkManager.onPlayerRespawn.add(
+      (data: import('@ante/common').RespawnEventData): void => {
+        const pos = new Vector3(data.position.x, data.position.y, data.position.z);
 
-      if (data.playerId === this.networkManager.getSocketId()) {
-        // Local player respawn
-        this.localPlayer.respawn(pos);
-        gameStateStore.set('PLAYING');
-      } else {
-        // Remote player respawn
-        const remote = this.remotePlayers.get(data.playerId);
-        if (remote) {
-          remote.respawn(pos);
+        if (data.playerId === this.networkManager.getSocketId()) {
+          // Local player respawn
+          this.localPlayer.respawn(pos);
+          gameStateStore.set('PLAYING');
+        } else {
+          // Remote player respawn
+          const remote = this.remotePlayers.get(data.playerId);
+          if (remote) {
+            remote.respawn(pos);
+          }
         }
       }
-    });
+    );
   }
 
   public getRemotePlayers(): RemotePlayerPawn[] {

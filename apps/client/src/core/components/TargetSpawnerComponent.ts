@@ -12,7 +12,9 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
   private shadowGenerator: ShadowGenerator;
   private worldManager: WorldEntityManager;
   private networkManager: NetworkManager;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _spawnObserver: Observer<any> | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _destroyObserver: Observer<any> | null = null;
 
   constructor(scene: Scene, shadowGenerator: ShadowGenerator) {

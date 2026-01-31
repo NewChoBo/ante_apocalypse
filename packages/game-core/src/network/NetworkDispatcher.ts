@@ -2,7 +2,7 @@ import { Logger } from '@ante/common';
 
 const logger = new Logger('NetworkDispatcher');
 
-export type NetworkHandler<T = any> = (data: T, senderId: string) => void;
+export type NetworkHandler<T = unknown> = (data: T, senderId: string) => void;
 
 /**
  * 네트워크 이벤트 디스패처.
@@ -31,7 +31,7 @@ export class NetworkDispatcher {
   /**
    * 수신된 이벤트 실행
    */
-  public dispatch(code: number, data: any, senderId: string): void {
+  public dispatch(code: number, data: unknown, senderId: string): void {
     const codeHandlers = this.handlers.get(code);
     if (codeHandlers) {
       codeHandlers.forEach((handler) => {

@@ -155,7 +155,7 @@ export class HUD {
     let current = seconds;
     this.respawnText.isVisible = true;
 
-    const updateText = () => {
+    const updateText = (): void => {
       this.respawnText.text = `RESPAWNING_IN_${current}S...`;
     };
 

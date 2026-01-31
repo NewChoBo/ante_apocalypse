@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare let process: any;
 
 export enum LogLevel {
@@ -19,7 +20,7 @@ export class Logger {
     this.context = context;
   }
 
-  public static setGlobalLevel(level: LogLevel) {
+  public static setGlobalLevel(level: LogLevel): void {
     Logger.globalLevel = level;
   }
 
@@ -40,35 +41,35 @@ export class Logger {
     return `${timestamp} ${levelLabel} ${contextLabel} ${message}`;
   }
 
-  public debug(message: string, ...args: any[]): void {
+  public debug(message: string, ...args: unknown[]): void {
     if (Logger.globalLevel <= LogLevel.DEBUG) {
       // eslint-disable-next-line no-console
       console.debug(this.formatMessage('DEBUG', message, '94'), ...args); // Bright Blue
     }
   }
 
-  public info(message: string, ...args: any[]): void {
+  public info(message: string, ...args: unknown[]): void {
     if (Logger.globalLevel <= LogLevel.INFO) {
       // eslint-disable-next-line no-console
       console.info(this.formatMessage('INFO', message, '32'), ...args); // Green
     }
   }
 
-  public warn(message: string, ...args: any[]): void {
+  public warn(message: string, ...args: unknown[]): void {
     if (Logger.globalLevel <= LogLevel.WARN) {
       // eslint-disable-next-line no-console
       console.warn(this.formatMessage('WARN', message, '33'), ...args); // Yellow
     }
   }
 
-  public error(message: string, ...args: any[]): void {
+  public error(message: string, ...args: unknown[]): void {
     if (Logger.globalLevel <= LogLevel.ERROR) {
       // eslint-disable-next-line no-console
       console.error(this.formatMessage('ERROR', message, '31'), ...args); // Red
     }
   }
 
-  public log(message: string, ...args: any[]): void {
+  public log(message: string, ...args: unknown[]): void {
     this.info(message, ...args);
   }
 }

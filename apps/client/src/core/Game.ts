@@ -34,8 +34,8 @@ export class Game {
   private playerName: string = 'Anonymous';
   private renderFunction: () => void;
   private _networkStateObserver: Observer<NetworkState> | null = null;
-  private _playerDiedObserver: Observer<any> | null = null;
-  private _gameEndObserver: Observer<any> | null = null;
+  private _playerDiedObserver: Observer<null> | null = null;
+  private _gameEndObserver: Observer<{ reason: string }> | null = null;
 
   constructor() {
     this.renderFunction = () => {

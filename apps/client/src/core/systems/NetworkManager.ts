@@ -144,81 +144,84 @@ export class NetworkManager implements INetworkAuthority {
   }
 
   private setupDispatcher(): void {
-    this.dispatcher.register(EventCode.FIRE, (data: FireEventData, senderId: string) => {
+    this.dispatcher.register(EventCode.FIRE, (data: unknown, senderId: string): void => {
+      const fireData = data as FireEventData;
       this.onPlayerFired.notifyObservers({
         playerId: senderId,
-        weaponId: data.weaponId,
-        muzzleTransform: data.muzzleTransform,
+        weaponId: fireData.weaponId,
+        muzzleTransform: fireData.muzzleTransform,
       });
     });
 
-    this.dispatcher.register(EventCode.HIT, (data: HitEventData) => {
-      this.onPlayerHit.notifyObservers(data);
+    this.dispatcher.register(EventCode.HIT, (data: unknown): void => {
+      this.onPlayerHit.notifyObservers(data as HitEventData);
     });
 
-    this.dispatcher.register(EventCode.DESTROY_ENEMY, (data: EnemyDestroyPayload) => {
-      this.onEnemyDestroyed.notifyObservers(data);
+    this.dispatcher.register(EventCode.DESTROY_ENEMY, (data: unknown): void => {
+      this.onEnemyDestroyed.notifyObservers(data as EnemyDestroyPayload);
     });
 
-    this.dispatcher.register(EventCode.DESTROY_PICKUP, (data: PickupDestroyPayload) => {
-      this.onPickupDestroyed.notifyObservers(data);
+    this.dispatcher.register(EventCode.DESTROY_PICKUP, (data: unknown): void => {
+      this.onPickupDestroyed.notifyObservers(data as PickupDestroyPayload);
     });
 
-    this.dispatcher.register(EventCode.SYNC_WEAPON, (data: SyncWeaponPayload, senderId: string) => {
-      this.playerStateManager.updatePlayer(senderId, { weaponId: data.weaponId });
+    this.dispatcher.register(EventCode.SYNC_WEAPON, (data: unknown, senderId: string): void => {
+      const syncData = data as SyncWeaponPayload;
+      this.playerStateManager.updatePlayer(senderId, { weaponId: syncData.weaponId });
     });
 
-    this.dispatcher.register(EventCode.MOVE, (data: MovePayload, senderId: string) => {
+    this.dispatcher.register(EventCode.MOVE, (data: unknown, senderId: string): void => {
+      const moveData = data as MovePayload;
       const player = this.playerStateManager.getPlayer(senderId);
       if (player) {
         const isMe = senderId === this.getSocketId();
         if (isMe) {
           const dist = Vector3.Distance(
             new Vector3(player.position.x, player.position.y, player.position.z),
-            new Vector3(data.position.x, data.position.y, data.position.z)
+            new Vector3(moveData.position.x, moveData.position.y, moveData.position.z)
           );
           if (dist > 2.0) {
             // 서버와의 위치 불일치 감지! 위치 보정 필요시 여기에 로직 추가
           }
         } else {
           this.playerStateManager.updatePlayer(senderId, {
-            position: { x: data.position.x, y: data.position.y, z: data.position.z },
-            rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
+            position: { x: moveData.position.x, y: moveData.position.y, z: moveData.position.z },
+            rotation: { x: moveData.rotation.x, y: moveData.rotation.y, z: moveData.rotation.z },
           });
         }
       }
     });
 
-    this.dispatcher.register(EventCode.ENEMY_MOVE, (data: EnemyMovePayload) => {
-      this.onEnemyUpdated.notifyObservers(data);
+    this.dispatcher.register(EventCode.ENEMY_MOVE, (data: unknown): void => {
+      this.onEnemyUpdated.notifyObservers(data as EnemyMovePayload);
     });
 
-    this.dispatcher.register(EventCode.TARGET_HIT, (data: TargetHitPayload) => {
-      this.onTargetHit.notifyObservers(data);
+    this.dispatcher.register(EventCode.TARGET_HIT, (data: unknown): void => {
+      this.onTargetHit.notifyObservers(data as TargetHitPayload);
     });
 
-    this.dispatcher.register(EventCode.PLAYER_DEATH, (data: DeathEventData) => {
-      this.onPlayerDied.notifyObservers(data);
+    this.dispatcher.register(EventCode.PLAYER_DEATH, (data: unknown): void => {
+      this.onPlayerDied.notifyObservers(data as DeathEventData);
     });
 
-    this.dispatcher.register(EventCode.RESPAWN, (data: RespawnEventData) => {
-      this.onPlayerRespawn.notifyObservers(data);
+    this.dispatcher.register(EventCode.RESPAWN, (data: unknown): void => {
+      this.onPlayerRespawn.notifyObservers(data as RespawnEventData);
     });
 
-    this.dispatcher.register(EventCode.GAME_END, (data: GameEndEventData) => {
-      this.onGameEnd.notifyObservers(data);
+    this.dispatcher.register(EventCode.GAME_END, (data: unknown): void => {
+      this.onGameEnd.notifyObservers(data as GameEndEventData);
     });
 
-    this.dispatcher.register(EventCode.TARGET_DESTROY, (data: TargetDestroyPayload) => {
-      this.onTargetDestroy.notifyObservers(data);
+    this.dispatcher.register(EventCode.TARGET_DESTROY, (data: unknown): void => {
+      this.onTargetDestroy.notifyObservers(data as TargetDestroyPayload);
     });
 
-    this.dispatcher.register(EventCode.RELOAD, (data: { playerId: string; weaponId: string }) => {
-      this.onPlayerReloaded.notifyObservers(data);
+    this.dispatcher.register(EventCode.RELOAD, (data: unknown): void => {
+      this.onPlayerReloaded.notifyObservers(data as { playerId: string; weaponId: string });
     });
 
-    this.dispatcher.register(EventCode.SPAWN_TARGET, (data: SpawnTargetPayload) => {
-      this.onTargetSpawn.notifyObservers(data);
+    this.dispatcher.register(EventCode.SPAWN_TARGET, (data: unknown): void => {
+      this.onTargetSpawn.notifyObservers(data as SpawnTargetPayload);
     });
 
     this.dispatcher.register(
@@ -228,12 +231,13 @@ export class NetworkManager implements INetworkAuthority {
       }
     );
 
-    this.dispatcher.register(EventCode.INITIAL_STATE, (data: InitialStatePayload) => {
+    this.dispatcher.register(EventCode.INITIAL_STATE, (data: unknown): void => {
+      const stateData = data as InitialStatePayload;
       this.onInitialStateReceived.notifyObservers({
-        players: data.players,
-        enemies: data.enemies,
-        targets: data.targets,
-        weaponConfigs: data.weaponConfigs,
+        players: stateData.players,
+        enemies: stateData.enemies,
+        targets: stateData.targets,
+        weaponConfigs: stateData.weaponConfigs,
       });
     });
   }

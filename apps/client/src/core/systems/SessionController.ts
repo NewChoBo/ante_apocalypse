@@ -308,7 +308,7 @@ export class SessionController {
   }
 
   private setupSpectatorInput(): void {
-    const onMouseDown = (e: MouseEvent) => {
+    const onMouseDown = (e: MouseEvent): void => {
       if (!this.isSpectating) return;
       if (!document.pointerLockElement) return;
 
@@ -321,7 +321,7 @@ export class SessionController {
       }
     };
 
-    const onKeyDown = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent): void => {
       if (!this.isSpectating) return;
       if (e.code === 'Space' && !e.repeat) {
         this.spectateMode = this.spectateMode === 'FREE' ? 'FOLLOW' : 'FREE';
@@ -335,7 +335,7 @@ export class SessionController {
     window.addEventListener('keydown', onKeyDown);
 
     // Cleanup will be needed in dispose
-    this._spectatorCleanup = () => {
+    this._spectatorCleanup = (): void => {
       window.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('keydown', onKeyDown);
     };

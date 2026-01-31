@@ -14,21 +14,21 @@ export class WeaponInputComponent {
     this.setupInputEvents();
   }
 
-  private onMouseDown = (e: MouseEvent) => {
+  private onMouseDown = (e: MouseEvent): void => {
     if (this.owner.isDead) return;
     if (e.button === 0 && document.pointerLockElement) {
       this.inventory.currentWeapon.startFire();
     }
   };
 
-  private onMouseUp = (e: MouseEvent) => {
+  private onMouseUp = (e: MouseEvent): void => {
     if (this.owner.isDead) return;
     if (e.button === 0) {
       this.inventory.currentWeapon.stopFire();
     }
   };
 
-  private onKeyDown = (e: KeyboardEvent) => {
+  private onKeyDown = (e: KeyboardEvent): void => {
     if (this.owner.isDead) return;
     // 포인터가 잠겨있을 때만 무기 조작 허용
     if (!document.pointerLockElement) return;
@@ -48,6 +48,7 @@ export class WeaponInputComponent {
         break;
       case 'KeyR': {
         const weapon = this.inventory.currentWeapon;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const firearm = weapon as any;
         if (firearm.reload && typeof firearm.reload === 'function') {
           firearm.reload();

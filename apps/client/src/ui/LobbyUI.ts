@@ -23,6 +23,7 @@ export class LobbyUI {
   private roomListPanel: StackPanel;
   private networkManager: NetworkManager;
   private uiManager: UIManager;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private observers: Observer<any>[] = [];
 
   // Visual Constants from UIManager (for consistency)
@@ -150,12 +151,14 @@ export class LobbyUI {
   }
 
   private setupListeners(): void {
-    const roomListObserver = this.networkManager.onRoomListUpdated.add((rooms) => {
-      this.updateRoomList(rooms);
-    });
+    const roomListObserver = this.networkManager.onRoomListUpdated.add(
+      (rooms: RoomInfo[]): void => {
+        this.updateRoomList(rooms);
+      }
+    );
     if (roomListObserver) this.observers.push(roomListObserver);
 
-    const stateObserver = this.networkManager.onStateChanged.add((state) => {
+    const stateObserver = this.networkManager.onStateChanged.add((state: string): void => {
       this.handleStateChange(state);
     });
     if (stateObserver) this.observers.push(stateObserver);
@@ -503,8 +506,9 @@ export class LobbyUI {
         } else {
           throw new Error('FAILED_TO_ESTABLISH_UPLINK');
         }
-      } catch (e: any) {
-        logger.error('Failed to create/join room:', e);
+      } catch (e: unknown) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        logger.error('Failed to create/join room:', e as any);
         if (checkbox.isChecked) {
           LocalServerManager.getInstance().stopSession();
         }

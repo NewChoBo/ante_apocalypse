@@ -14,9 +14,16 @@ const logger = new Logger('FirearmEffectComponent');
 export class FirearmEffectComponent extends BaseWeaponEffectComponent {
   private flashMaterial: StandardMaterial;
   private muzzleLight: PointLight;
-  private gunshotSound: any;
+  private gunshotSound: import('@babylonjs/core').Sound | undefined;
 
-  private observer: any = null;
+  private observer: import('@babylonjs/core').Nullable<
+    import('@babylonjs/core').Observer<{
+      weaponId: string;
+      ammoRemaining: number;
+      fireType: 'firearm' | 'melee';
+      muzzleTransform?: import('../../types/IWeapon').MuzzleTransform;
+    }>
+  > = null;
 
   constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
@@ -70,7 +77,7 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
   protected emitMuzzleFlash(
     position: Vector3,
     _direction: Vector3,
-    transformNode?: any,
+    transformNode?: import('@babylonjs/core').Node,
     localPosition?: Vector3
   ): void {
     const flash = MeshBuilder.CreateSphere('muzzleFlash', { diameter: 0.15 }, this.scene);
@@ -87,6 +94,7 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
         flash.position.copyFrom(localPosition);
       }
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const player = this.owner as any;
       if (player.camera) {
         flash.parent = player.camera;

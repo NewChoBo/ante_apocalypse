@@ -4,7 +4,7 @@ import { IWeapon } from '../types/IWeapon';
 import { ClientWeaponMixin } from './ClientWeaponMixin';
 
 // Define base with Mixin
-// @ts-ignore
+// @ts-expect-error: Mixin return types can be complex and cause false positives in older TS versions
 const VisualBaseWeapon = ClientWeaponMixin(CoreBaseWeapon);
 
 /**

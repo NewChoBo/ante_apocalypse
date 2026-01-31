@@ -27,7 +27,7 @@ export class PlayerController extends BaseController {
     this.setupInputEvents();
   }
 
-  private onKeyDown = (e: KeyboardEvent) => {
+  private onKeyDown = (e: KeyboardEvent): void => {
     // 포인터가 잠겨있을 때 (게임 플레이 중)
     if (document.pointerLockElement === this.canvas) {
       // 브라우저 단축키 차단 (Ctrl+D, Ctrl+S, Ctrl+W 등)

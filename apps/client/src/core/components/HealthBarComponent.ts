@@ -32,6 +32,7 @@ export class HealthBarComponent extends BaseComponent {
       yOffset?: number;
     } = {}
   ) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     super(owner as any, scene);
     this.style = options.style ?? 'player';
     this.width = options.width ?? 1.5;

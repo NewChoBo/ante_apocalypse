@@ -35,6 +35,7 @@ export class UIManager {
   private screens: Map<UIScreen, Container> = new Map();
   public currentScreen: UIScreen = UIScreen.NONE;
   private lobbyUI: LobbyUI | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private observers: Observer<any>[] = [];
 
   // Visual Constants
@@ -60,7 +61,7 @@ export class UIManager {
 
   private setupNetworkListeners(): void {
     const network = NetworkManager.getInstance();
-    const stateObserver = network.onStateChanged.add((state) => {
+    const stateObserver = network.onStateChanged.add((state: string): void => {
       // Safety check: if UI texture is disposed, don't try to add notifications
       if (this.ui && this.ui.getScene()) {
         if (state === NetworkState.Disconnected || state === NetworkState.Error) {
@@ -181,8 +182,8 @@ export class UIManager {
 
     // Button
     const btn = this.createTacticalButton('INITIALIZE', '200px', '50px');
-    btn.onPointerUpObservable.add(() => {
-      if (input.text) this.onLogin.notifyObservers(input.text);
+    btn.onPointerUpObservable.add((): void | boolean => {
+      if (input.text) return this.onLogin.notifyObservers(input.text);
     });
     stack.addControl(btn);
 
@@ -223,7 +224,9 @@ export class UIManager {
     /* [REMOVED] Singleplayer Button */
 
     const multiBtn = this.createMenuButton('DEPLOY_OP.EXE', 'ESTABLISH_UPLINK');
-    multiBtn.onPointerUpObservable.add(() => this.onStartMultiplayer.notifyObservers());
+    multiBtn.onPointerUpObservable.add((): void | boolean => {
+      return this.onStartMultiplayer.notifyObservers();
+    });
     stack.addControl(multiBtn);
 
     const settingsBtn = this.createTacticalButton('SETTINGS', '250px', '40px');
@@ -238,7 +241,9 @@ export class UIManager {
 
     const logoutBtn = this.createTacticalButton('TERMINATE_SESSION', '250px', '40px');
     logoutBtn.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    logoutBtn.onPointerUpObservable.add(() => this.onLogout.notifyObservers());
+    logoutBtn.onPointerUpObservable.add((): void | boolean => {
+      return this.onLogout.notifyObservers();
+    });
     stack.addControl(logoutBtn);
 
     return container;
@@ -273,7 +278,9 @@ export class UIManager {
     stack.addControl(title);
 
     const resumeBtn = this.createTacticalButton('RESUME OPERATIONS', '300px', '50px');
-    resumeBtn.onPointerUpObservable.add(() => this.onResume.notifyObservers());
+    resumeBtn.onPointerUpObservable.add((): void | boolean => {
+      return this.onResume.notifyObservers();
+    });
     stack.addControl(resumeBtn);
 
     const settingsBtn = this.createTacticalButton('SETTINGS', '300px', '50px');
@@ -287,7 +294,9 @@ export class UIManager {
     stack.addControl(spacer);
 
     const abortBtn = this.createTacticalButton('ABORT MISSION', '300px', '50px');
-    abortBtn.onPointerUpObservable.add(() => this.onAbort.notifyObservers());
+    abortBtn.onPointerUpObservable.add((): void | boolean => {
+      return this.onAbort.notifyObservers();
+    });
     stack.addControl(abortBtn);
 
     return container;
@@ -338,7 +347,7 @@ export class UIManager {
     volSlider.width = '400px';
     volSlider.color = this.PRIMARY_COLOR;
     volSlider.background = 'rgba(255, 255, 255, 0.1)';
-    volSlider.onValueChangedObservable.add((value) => {
+    volSlider.onValueChangedObservable.add((value: number): void => {
       settingsStore.setKey('masterVolume', value);
       volLabel.text = `MASTER_VOLUME: ${Math.round(value * 100)}%`;
     });
@@ -366,7 +375,7 @@ export class UIManager {
     sensSlider.width = '400px';
     sensSlider.color = this.PRIMARY_COLOR;
     sensSlider.background = 'rgba(255, 255, 255, 0.1)';
-    sensSlider.onValueChangedObservable.add((value) => {
+    sensSlider.onValueChangedObservable.add((value: number): void => {
       settingsStore.setKey('mouseSensitivity', value);
       sensLabel.text = `INPUT_SENSITIVITY: ${Math.round(value * 10000)}`;
     });

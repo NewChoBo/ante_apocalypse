@@ -1,6 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import Photon from 'photon-realtime';
+// Removed unused Photon import
 import {
   EventCode,
   PlayerState,
@@ -16,6 +14,7 @@ import {
 } from '@ante/common';
 import { WorldEntityManager } from '../simulation/WorldEntityManager.js';
 import { BasePhotonClient } from '../network/BasePhotonClient.js';
+import { IWorldEntity } from '../types/IWorldEntity.js';
 
 const logger = new Logger('ServerNetworkAuthority');
 
@@ -60,7 +59,8 @@ export class ServerNetworkAuthority extends BasePhotonClient {
       this.sendInitialState(senderId);
     });
 
-    this.dispatcher.register(EventCode.MOVE, (data: MovePayload, senderId: string) => {
+    this.dispatcher.register(EventCode.MOVE, (data: unknown, senderId: string): void => {
+      const moveData = data as MovePayload;
       if (senderId === this.client.myActor().actorNr.toString()) return;
 
       let entity = this.entityManager.getEntity(senderId) as unknown as PlayerState;
@@ -73,62 +73,63 @@ export class ServerNetworkAuthority extends BasePhotonClient {
         entity = {
           id: senderId,
           name: name,
-          position: data.position,
-          rotation: data.rotation,
+          position: moveData.position,
+          rotation: moveData.rotation,
           weaponId: 'Pistol',
           health: 100,
         };
         (entity as unknown as { type: string }).type = 'remote_player'; // IWorldEntity type
-        this.entityManager.register(entity as any);
+        this.entityManager.register(entity as unknown as IWorldEntity);
       } else {
-        entity.position = data.position;
-        entity.rotation = data.rotation;
+        entity.position = moveData.position;
+        entity.rotation = moveData.rotation;
       }
 
       if (this.onPlayerMove) {
-        this.onPlayerMove(senderId, data.position, data.rotation);
+        this.onPlayerMove(senderId, moveData.position, moveData.rotation);
       }
     });
 
-    this.dispatcher.register(EventCode.SYNC_WEAPON, (data: SyncWeaponPayload, senderId: string) => {
+    this.dispatcher.register(EventCode.SYNC_WEAPON, (data: unknown, senderId: string): void => {
+      const syncData = data as SyncWeaponPayload;
       const state = this.getPlayerState(senderId);
       if (state) {
-        state.weaponId = data.weaponId;
+        state.weaponId = syncData.weaponId;
       }
     });
 
-    this.dispatcher.register(EventCode.FIRE, (data: FireEventData, senderId: string) => {
-      if (this.onFireRequest && data.muzzleTransform) {
+    this.dispatcher.register(EventCode.FIRE, (data: unknown, senderId: string): void => {
+      const fireData = data as FireEventData;
+      if (this.onFireRequest && fireData.muzzleTransform) {
         this.onFireRequest(
           senderId,
-          data.muzzleTransform.position,
-          data.muzzleTransform.direction,
-          data.weaponId
+          fireData.muzzleTransform.position,
+          fireData.muzzleTransform.direction,
+          fireData.weaponId
         );
       }
     });
 
-    this.dispatcher.register(
-      EventCode.RELOAD,
-      (data: { playerId: string; weaponId: string }, senderId: string) => {
-        // Security check
-        if (data.playerId !== senderId) return;
-        if (this.onReloadRequest) {
-          this.onReloadRequest(data.playerId, data.weaponId);
-        }
+    this.dispatcher.register(EventCode.RELOAD, (data: unknown, senderId: string): void => {
+      const reloadData = data as { playerId: string; weaponId: string };
+      // Security check
+      if (reloadData.playerId !== senderId) return;
+      if (this.onReloadRequest) {
+        this.onReloadRequest(reloadData.playerId, reloadData.weaponId);
       }
-    );
+    });
 
-    this.dispatcher.register(EventCode.REQUEST_HIT, (data: RequestHitData, senderId: string) => {
+    this.dispatcher.register(EventCode.REQUEST_HIT, (data: unknown, senderId: string): void => {
+      const hitData = data as RequestHitData;
       if (this.onHitRequest) {
-        this.onHitRequest(senderId, data);
+        this.onHitRequest(senderId, hitData);
       }
     });
   }
 
   private setupServerCallbacks(): void {
     // Hook into base class callbacks
-    this.onActorJoin = (actorNr: number, name: string) => {
+    this.onActorJoin = (actorNr: number, name: string): void => {
       const id = actorNr.toString();
 
       logger.info(`Player Joined: ${id} (${name})`);
@@ -143,13 +144,13 @@ export class ServerNetworkAuthority extends BasePhotonClient {
           health: 100,
         };
         (state as unknown as { type: string }).type = 'remote_player';
-        this.entityManager.register(state as any);
+        this.entityManager.register(state as unknown as IWorldEntity);
       }
 
       if (this.onPlayerJoin) this.onPlayerJoin(id);
     };
 
-    this.onActorLeave = (actorNr: number) => {
+    this.onActorLeave = (actorNr: number): void => {
       const id = actorNr.toString();
       logger.info(`Player Left: ${id}`);
       this.entityManager.unregister(id);

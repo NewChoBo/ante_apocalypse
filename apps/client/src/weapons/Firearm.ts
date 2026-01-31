@@ -15,7 +15,6 @@ import { HitScanSystem, DamageSystem } from '@ante/game-core';
 import { ClientWeaponMixin } from './ClientWeaponMixin';
 
 // Apply Mixin to CoreFirearm
-// @ts-ignore - Mixin complex type
 class VisualFirearm extends ClientWeaponMixin(CoreFirearm) {}
 
 /**

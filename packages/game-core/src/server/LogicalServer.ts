@@ -91,21 +91,24 @@ export class LogicalServer {
   }
 
   private setupNetworkEvents(): void {
-    this.networkManager.onPlayerJoin = (id) => {
+    this.networkManager.onPlayerJoin = (id: string): void => {
       this.createPlayerPawn(id);
       // 첫 플레이어가 입장하면 게임 레이아웃 생성 (Takeover가 아닐 때만)
       if (!this.isTakeover && this.playerPawns.size === 1) {
         this.simulation.initializeRequest();
       }
     };
-    this.networkManager.onPlayerLeave = (id: string) => this.removePlayerPawn(id);
-    this.networkManager.onPlayerMove = (id: string, pos: commonVector3, rot: commonVector3) =>
+    this.networkManager.onPlayerLeave = (id: string): void => this.removePlayerPawn(id);
+    this.networkManager.onPlayerMove = (id: string, pos: commonVector3, rot: commonVector3): void =>
       this.updatePlayerPawn(id, pos, rot);
-    this.networkManager.onFireRequest = (id, origin: commonVector3, dir: commonVector3) =>
-      this.processFireEvent(id, origin, dir);
+    this.networkManager.onFireRequest = (
+      id: string,
+      origin: commonVector3,
+      dir: commonVector3
+    ): void => this.processFireEvent(id, origin, dir);
 
     // Register RELOAD callback
-    this.networkManager.onReloadRequest = (playerId: string, weaponId: string) => {
+    this.networkManager.onReloadRequest = (playerId: string, weaponId: string): void => {
       const pawn = this.playerPawns.get(playerId);
       if (pawn) {
         pawn.reloadRequest();
@@ -113,10 +116,10 @@ export class LogicalServer {
       }
     };
 
-    this.networkManager.onHitRequest = (shooterId: string, data: RequestHitData) =>
+    this.networkManager.onHitRequest = (shooterId: string, data: RequestHitData): void =>
       this.processHitRequest(shooterId, data);
 
-    this.networkManager.onPlayerDeath = (targetId: string, _attackerId: string) => {
+    this.networkManager.onPlayerDeath = (targetId: string, _attackerId: string): void => {
       if (this.simulation['gameRule']) {
         const decision = this.simulation['gameRule'].onPlayerDeath(this.simulation, targetId);
         if (decision.action === 'respawn') {
