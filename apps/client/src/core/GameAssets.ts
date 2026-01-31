@@ -23,107 +23,107 @@ import gunAsset from '../assets/models/Gun.glb';
 const logger = new Logger('GameAssets');
 
 /**
- * 게임의 모든 에셋을 정적으로 임포트하고 런타임 객체로 변환하여 보관하는 레지스트리.
+ * 에셋 유형별 보관소
  */
-export class GameAssets {
-  private static scene: Scene;
-  private static audioEngine: AudioEngineV2 | null = null;
+export const GameAssets = {
+  scene: null as unknown as Scene,
+  audioEngine: null as unknown as AudioEngineV2,
 
-  // Sounds
-  public static gunshot: Sound;
-  public static swipe: Sound;
-
-  // Models (Containers)
-  private static modelContainers: Map<string, AssetContainer> = new Map();
+  // 에셋 접근용 네임스페이스
+  sounds: {} as Record<string, Sound>,
+  glb: {} as Record<string, AssetContainer>,
+  babylon: {} as Record<string, AssetContainer>,
 
   /**
-   * 초기화: 엔진 및 기본 에셋 로드
+   * 초기화: 모든 에셋을 유형별로 자동 분류하여 로드
    */
-  public static async initialize(scene: Scene): Promise<void> {
+  async initialize(scene: Scene): Promise<void> {
     this.scene = scene;
 
     try {
-      // 1. AudioEngine 초기화
-      if (!this.audioEngine) {
-        logger.info('Initializing AudioEngine...');
-        this.audioEngine = await CreateAudioEngineAsync();
-        if (this.audioEngine) {
-          this.applyVolume(settingsStore.get().masterVolume);
-          settingsStore.subscribe((state) => this.applyVolume(state.masterVolume));
-        }
-      }
-
-      // 2. 모델 로드 (AssetContainer)
-      logger.info('Preloading model containers...');
-      await Promise.all([this.loadModel('enemy', dummy3Asset), this.loadModel('rifle', gunAsset)]);
-
-      // 3. 사운드 로드
+      // 1. Audio Engine
+      this.audioEngine = await CreateAudioEngineAsync();
       if (this.audioEngine) {
-        logger.info('Preloading sounds...');
-        this.gunshot = (await this.audioEngine.createSoundAsync('gunshot', gunshotAsset, {
-          volume: 0.5,
-        })) as any;
-        this.swipe = (await this.audioEngine.createSoundAsync('swipe', swipeAsset, {
-          volume: 0.6,
-        })) as any;
+        const applyVol = (v: number): void => {
+          (this.audioEngine as any).volume = v;
+          if (typeof (this.audioEngine as any).setVolume === 'function') {
+            (this.audioEngine as any).setVolume(v);
+          }
+        };
+        applyVol(settingsStore.get().masterVolume);
+        settingsStore.subscribe((s) => applyVol(s.masterVolume));
       }
 
-      logger.info('GameAssets initialized successfully.');
+      // 2. Asset Manifest
+      const manifest = [
+        { key: 'gunshot', asset: gunshotAsset, type: 'sound', vol: 0.5 },
+        { key: 'swipe', asset: swipeAsset, type: 'sound', vol: 0.6 },
+        { key: 'enemy', asset: dummy3Asset, type: 'babylon' },
+        { key: 'rifle', asset: gunAsset, type: 'glb' },
+      ];
+
+      logger.info('Preloading assets...');
+
+      await Promise.all(
+        manifest.map(async (item) => {
+          if (item.type === 'sound') {
+            if (!this.audioEngine) return;
+            const s = await this.audioEngine.createSoundAsync(item.key, item.asset, {
+              volume: item.vol,
+            });
+            this.sounds[item.key] = s as unknown as Sound;
+          } else {
+            const container = await SceneLoader.LoadAssetContainerAsync('', item.asset, this.scene);
+            const targetMap = item.type === 'glb' ? this.glb : this.babylon;
+            targetMap[item.key] = container;
+          }
+        })
+      );
+
+      logger.info('GameAssets initialized.');
     } catch (e) {
       logger.error('Failed to initialize GameAssets:', e);
     }
-  }
-
-  private static applyVolume(volume: number): void {
-    if (this.audioEngine) {
-      (this.audioEngine as any).volume = volume;
-      if (typeof (this.audioEngine as any).setVolume === 'function') {
-        (this.audioEngine as any).setVolume(volume);
-      }
-    }
-  }
-
-  private static async loadModel(key: string, asset: string): Promise<AssetContainer> {
-    const container = await SceneLoader.LoadAssetContainerAsync('', asset, this.scene);
-    this.modelContainers.set(key, container);
-    return container;
-  }
+  },
 
   /**
-   * 캐시된 모델 컨테이너로부터 새 인스턴스 생성
+   * 모델 인스턴스 생성 (GLB/Babylon 자동 판별)
    */
-  public static instantiateModel(key: string, rootName?: string): Nullable<InstantiatedEntries> {
-    const container = this.modelContainers.get(key);
+  instantiateModel(key: string, rootName?: string): Nullable<InstantiatedEntries> {
+    const container = this.glb[key] || this.babylon[key];
     if (!container) {
-      logger.error(`Model container not found: ${key}`);
+      logger.error(`Model not found: ${key}`);
       return null;
     }
 
     const entries = container.instantiateModelsToScene(
       (n) => (rootName ? `${rootName}_${n}` : n),
       false,
-      { doNotInstantiate: true } // 클로닝 강제
+      {
+        doNotInstantiate: true,
+      }
     );
 
-    // 단일 루트 노드 보장
     if (entries.rootNodes.length !== 1) {
-      const scene = container.scene;
-      const wrapper = new Mesh(rootName || `${key}_wrapper`, scene);
-      entries.rootNodes.forEach((node) => {
-        node.parent = wrapper;
-      });
+      const wrapper = new Mesh(rootName || `${key}_wrapper`, this.scene);
+      entries.rootNodes.forEach((node) => (node.parent = wrapper));
       (entries as any).rootNodes = [wrapper];
     }
 
     return entries;
-  }
+  },
 
-  public static resumeAudio(): void {
+  resumeAudio(): void {
     this.audioEngine?.resumeAsync();
-  }
+  },
 
-  public static clear(): void {
-    this.modelContainers.forEach((c) => c.dispose());
-    this.modelContainers.clear();
-  }
-}
+  clear(): void {
+    [this.glb, this.babylon].forEach((map) => {
+      Object.values(map).forEach((c) => c.dispose());
+    });
+    Object.values(this.sounds).forEach((s) => s.dispose());
+    this.sounds = {};
+    this.glb = {};
+    this.babylon = {};
+  },
+};

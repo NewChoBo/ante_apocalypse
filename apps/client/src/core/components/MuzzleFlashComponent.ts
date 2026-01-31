@@ -16,7 +16,7 @@ export class MuzzleFlashComponent extends BaseComponent {
    * 발사 사운드 재생
    */
   public playFireSound(): void {
-    const sound = GameAssets.gunshot;
+    const sound = GameAssets.sounds.gunshot;
     if (sound) {
       sound.play();
     }

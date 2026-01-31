@@ -80,8 +80,7 @@ export class SessionController {
     PickupManager.getInstance().initialize(this.scene, this.playerPawn!);
 
     GameObservables.itemCollection.add((): void => {
-      const swipeSound = GameAssets.swipe;
-      swipeSound?.play();
+      GameAssets.sounds.swipe?.play();
     });
   }
 

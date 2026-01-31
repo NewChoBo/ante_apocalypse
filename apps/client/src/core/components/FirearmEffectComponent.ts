@@ -35,7 +35,7 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
     this.muzzleLight.diffuse = new Color3(1, 0.8, 0.4);
     this.muzzleLight.intensity = 0;
 
-    this.gunshotSound = GameAssets.gunshot;
+    this.gunshotSound = GameAssets.sounds.gunshot;
 
     // Subscribe to fire events
     this.observer = GameObservables.weaponFire.add((data) => {
@@ -64,7 +64,7 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
   }
 
   public playGunshot(): void {
-    const sound = this.gunshotSound || GameAssets.gunshot;
+    const sound = this.gunshotSound || GameAssets.sounds.gunshot;
     if (sound) {
       this.gunshotSound = sound;
 

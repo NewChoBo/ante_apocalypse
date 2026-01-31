@@ -16,7 +16,7 @@ export class MeleeEffectComponent extends BaseWeaponEffectComponent {
   constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
 
-    this.swipeSound = GameAssets.swipe;
+    this.swipeSound = GameAssets.sounds.swipe;
 
     // Event subscription: Play swipe sound only for 'melee' type weapon fire
     GameObservables.weaponFire.add((payload): void => {
@@ -27,7 +27,7 @@ export class MeleeEffectComponent extends BaseWeaponEffectComponent {
   }
 
   private playSwipe(): void {
-    const sound = this.swipeSound || GameAssets.swipe;
+    const sound = this.swipeSound || GameAssets.sounds.swipe;
     if (sound) {
       this.swipeSound = sound;
       sound.play();
