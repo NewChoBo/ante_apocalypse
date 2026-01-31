@@ -27,7 +27,7 @@ export class ConnectionManager {
 
     try {
       await this.provider.connect(userId);
-    } catch (_e) {
+    } catch {
       // Connection failure handled via onStateChanged
     }
   }
