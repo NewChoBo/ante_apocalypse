@@ -8,6 +8,7 @@ import {
   AudioEngineV2,
   Sound,
   Nullable,
+  Texture,
 } from '@babylonjs/core';
 import '@babylonjs/loaders';
 import { Logger } from '@ante/common';
@@ -19,6 +20,7 @@ import gunshotAsset from '../assets/sounds/gunshot.wav';
 import swipeAsset from '../assets/sounds/swipe.wav';
 import dummy3Asset from '../assets/models/dummy3.babylon';
 import gunAsset from '../assets/models/Gun.glb';
+import flareAsset from '../assets/textures/flare.png';
 
 const logger = new Logger('GameAssets');
 
@@ -33,6 +35,7 @@ export const GameAssets = {
   sounds: {} as Record<string, Sound>,
   glb: {} as Record<string, AssetContainer>,
   babylon: {} as Record<string, AssetContainer>,
+  textures: {} as Record<string, Texture>,
 
   /**
    * 초기화: 모든 에셋을 유형별로 자동 분류하여 로드
@@ -58,6 +61,7 @@ export const GameAssets = {
       const manifest = [
         { key: 'gunshot', asset: gunshotAsset, type: 'sound', vol: 0.5 },
         { key: 'swipe', asset: swipeAsset, type: 'sound', vol: 0.6 },
+        { key: 'flare', asset: flareAsset, type: 'texture' },
         { key: 'enemy', asset: dummy3Asset, type: 'babylon' },
         { key: 'rifle', asset: gunAsset, type: 'glb' },
       ];
@@ -72,6 +76,8 @@ export const GameAssets = {
               volume: item.vol,
             });
             this.sounds[item.key] = s as unknown as Sound;
+          } else if (item.type === 'texture') {
+            this.textures[item.key] = new Texture(item.asset, this.scene);
           } else {
             const container = await SceneLoader.LoadAssetContainerAsync('', item.asset, this.scene);
             const targetMap = item.type === 'glb' ? this.glb : this.babylon;
@@ -122,7 +128,9 @@ export const GameAssets = {
       Object.values(map).forEach((c) => c.dispose());
     });
     Object.values(this.sounds).forEach((s) => s.dispose());
+    Object.values(this.textures).forEach((t) => t.dispose());
     this.sounds = {};
+    this.textures = {};
     this.glb = {};
     this.babylon = {};
   },

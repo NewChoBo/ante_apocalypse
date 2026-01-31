@@ -1,4 +1,4 @@
-import { Scene, Vector3, Color3, ParticleSystem, Texture } from '@babylonjs/core';
+import { Scene, Vector3, Color3, ParticleSystem } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { BasePawn } from '../BasePawn';
 import { GameAssets } from '../GameAssets';
@@ -28,10 +28,7 @@ export class MuzzleFlashComponent extends BaseComponent {
   public createFlash(position: Vector3): void {
     const particleSystem = new ParticleSystem('muzzleFlash', 10, this.scene);
 
-    particleSystem.particleTexture = new Texture(
-      'https://www.babylonjs-playground.com/textures/flare.png',
-      this.scene
-    );
+    particleSystem.particleTexture = GameAssets.textures.flare;
 
     particleSystem.emitter = position;
     particleSystem.minEmitBox = new Vector3(0, 0, 0);
