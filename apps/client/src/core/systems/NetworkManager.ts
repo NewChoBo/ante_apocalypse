@@ -2,6 +2,7 @@ import { Observable, Vector3 } from '@babylonjs/core';
 import { INetworkProvider } from '../network/INetworkProvider';
 import { PhotonProvider } from '../network/providers/PhotonProvider';
 import { INetworkAuthority, NetworkDispatcher, LogicalServer } from '@ante/game-core';
+import { LocalServerManager } from '../server/LocalServerManager';
 import {
   RoomInfo,
   NetworkState,
@@ -276,14 +277,83 @@ export class NetworkManager implements INetworkAuthority {
       if (myId === newMasterId) {
         // INetworkProvider 인터페이스를 통해 room name 획득
         const roomName = this.provider.getCurrentRoomName?.();
-        if (roomName) {
-          logger.info(`I AM THE NEW HOST - Triggering Takeover for Room: ${roomName}`);
-          import('../server/LocalServerManager').then(({ LocalServerManager }) => {
-            LocalServerManager.getInstance().takeover(roomName);
-          });
-        }
+        this.handleTakeover(roomName || null);
       }
     };
+  }
+
+  // =================================================================
+  // [New] Centralized Session Management (Host, Join, Leave, Takeover)
+  // =================================================================
+
+  /**
+   * 게임 호스팅 (방 생성 + 로컬 서버 시작)
+   */
+  public async hostGame(
+    roomName: string,
+    mapId: string,
+    gameMode: string = 'deathmatch'
+  ): Promise<boolean> {
+    // 1. 방 생성 (Create Room)
+    const created = await this.roomManager.createRoom(roomName, mapId);
+    if (!created) return false;
+
+    // 2. 로컬 서버 시작 (Start Local Server)
+    logger.info(`HostGame: Starting Local Server for ${roomName}`);
+    await LocalServerManager.getInstance().startSession(roomName, mapId, gameMode);
+
+    // 3. 서버 인스턴스 등록 (Register Server Instance)
+    this.setLocalServer(LocalServerManager.getInstance().getLogicalServer());
+
+    return true;
+  }
+
+  /**
+   * 게임 참가 (방 참가 only)
+   */
+  public async joinGame(roomName: string): Promise<boolean> {
+    const joined = await this.roomManager.joinRoom(roomName);
+    if (!joined) return false;
+
+    // 혹시 들어가자마자 방장인 경우 (방이 비어있었을 때 등) 체크
+    if (this.isMasterClient()) {
+      await this.handleTakeover(roomName);
+    }
+    return true;
+  }
+
+  /**
+   * 게임 떠나기 (서버 종료 + 방 나가기 통합)
+   */
+  public leaveGame(): void {
+    // 1. 내가 서버를 돌리고 있었다면 종료
+    if (LocalServerManager.getInstance().isServerRunning()) {
+      logger.info('LeaveGame: Stopping Local Server...');
+      LocalServerManager.getInstance().stopSession();
+      this.setLocalServer(null);
+    }
+
+    // 2. 방 나가기
+    this.roomManager.leaveRoom();
+
+    // 3. 옵저버 정리
+    this.clearObservers();
+  }
+
+  /**
+   * [Internal] 호스트 권한 위임 처리
+   */
+  private async handleTakeover(roomName: string | null): Promise<void> {
+    if (!roomName) return;
+
+    // 이미 서버가 돌고 있으면 패스
+    if (LocalServerManager.getInstance().isServerRunning()) return;
+
+    logger.info('HandleTakeover: Taking over host duties...');
+    await LocalServerManager.getInstance().takeover(roomName);
+
+    // 서버 인스턴스 등록
+    this.setLocalServer(LocalServerManager.getInstance().getLogicalServer());
   }
 
   // === Connection Methods (delegated) ===

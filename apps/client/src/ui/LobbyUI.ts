@@ -13,7 +13,6 @@ import { Observer } from '@babylonjs/core';
 import { NetworkManager } from '../core/systems/NetworkManager';
 import { UIManager, UIScreen } from './UIManager';
 import { RoomInfo } from '@ante/common';
-import { LocalServerManager } from '../core/server/LocalServerManager';
 import { Logger } from '@ante/common';
 
 const logger = new Logger('LobbyUI');
@@ -142,7 +141,7 @@ export class LobbyUI {
     backBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
     backBtn.top = '-40px';
     backBtn.onPointerUpObservable.add(() => {
-      LocalServerManager.getInstance().stopSession(); // Ensure local server stops if we leave lobby
+      // Local Server should be stopped by now if we are in Lobby
       this.uiManager.showScreen(UIScreen.MAIN_MENU);
     });
     content.addControl(backBtn);
@@ -284,7 +283,7 @@ export class LobbyUI {
     joinBtn.thickness = 1;
     joinBtn.fontFamily = this.FONT_TACTICAL;
     joinBtn.onPointerUpObservable.add(() => {
-      this.networkManager.joinRoom(room.name);
+      this.networkManager.joinGame(room.name);
     });
     stack.addControl(joinBtn);
 
@@ -494,9 +493,8 @@ export class LobbyUI {
       try {
         let success = false;
         if (checkbox.isChecked) {
-          logger.info('Creating Local Server Session...');
-          await LocalServerManager.getInstance().startSession(roomName, mapId, gameMode);
-          success = await this.networkManager.joinRoom(roomName);
+          logger.info('Creating Local Server Session (HostGame)...');
+          success = await this.networkManager.hostGame(roomName, mapId, gameMode);
         } else {
           success = await this.networkManager.createRoom(roomName, mapId);
         }
@@ -510,7 +508,7 @@ export class LobbyUI {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         logger.error('Failed to create/join room:', e as any);
         if (checkbox.isChecked) {
-          LocalServerManager.getInstance().stopSession();
+          this.networkManager.leaveGame();
         }
         initBtn.isEnabled = true;
         initBtn.textBlock!.text = 'INITIATE';

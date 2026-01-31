@@ -246,9 +246,7 @@ export class Game {
   public quitToMenu(): void {
     this.isRunning = false;
 
-    import('./server/LocalServerManager').then(({ LocalServerManager }) => {
-      LocalServerManager.getInstance().stopSession();
-    });
+    NetworkManager.getInstance().leaveGame();
 
     this.uiManager.showScreen(UIScreen.NONE); // Cleanup current
     this.uiManager.exitPointerLock();
@@ -267,8 +265,6 @@ export class Game {
       GameObservables.playerDied.remove(this._playerDiedObserver);
       this._playerDiedObserver = null;
     }
-
-    NetworkManager.getInstance().leaveRoom();
 
     // Clean up network listener
     // Clean up network listener
