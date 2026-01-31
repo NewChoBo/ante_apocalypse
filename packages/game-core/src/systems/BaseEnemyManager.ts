@@ -13,6 +13,8 @@ export abstract class BaseEnemyManager {
   protected syncInterval = 100; // 10Hz sync
   protected aiControllers: Map<string, AIController> = new Map();
 
+  protected pawns: Map<string, IEnemyPawn> = new Map();
+
   constructor(protected authority: INetworkAuthority) {}
 
   /**
@@ -125,13 +127,11 @@ export abstract class BaseEnemyManager {
       if (enemy.position && enemy.position.set) {
         enemy.position.set(data.position.x, data.position.y, data.position.z);
       }
-      // Rotation/Movement handling depends on specific Pawn implementation details not in IEnemyPawn yet.
-      // But we can cast or extend IEnemyPawn if needed.
-      // For now, let's assume IEnemyPawn has position (Vector3).
-      // Rotation might need to be added to IEnemyPawn if we want to support it here generically.
 
-      // Let's add rotation validation or casting for now to avoid breaking changes if IEnemyPawn is minimal
-      if ((enemy as any).mesh && (enemy as any).mesh.rotation) {
+      if (enemy.rotation && enemy.rotation.set) {
+        enemy.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+      } else if ((enemy as any).mesh && (enemy as any).mesh.rotation) {
+        // Fallback for types not fully implementing IEnemyPawn yet (should be resolved by interface update)
         (enemy as any).mesh.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
       }
 
@@ -142,8 +142,34 @@ export abstract class BaseEnemyManager {
     }
   }
 
-  /**
-   * ID로 IEnemyPawn 구현체를 찾는 추상 메서드
-   */
-  protected abstract getEnemyPawn(id: string): IEnemyPawn | undefined;
+  protected getEnemyPawn(id: string): IEnemyPawn | undefined {
+    return this.pawns.get(id);
+  }
+
+  public getEnemyStates(): {
+    id: string;
+    position: { x: number; y: number; z: number };
+    rotation: { x: number; y: number; z: number };
+    health: number;
+    isDead: boolean;
+  }[] {
+    const states: {
+      id: string;
+      position: { x: number; y: number; z: number };
+      rotation: { x: number; y: number; z: number };
+      health: number;
+      isDead: boolean;
+    }[] = [];
+
+    this.pawns.forEach((pawn, id) => {
+      states.push({
+        id,
+        position: { x: pawn.position.x, y: pawn.position.y, z: pawn.position.z },
+        rotation: { x: pawn.rotation.x, y: pawn.rotation.y, z: pawn.rotation.z },
+        health: pawn.health,
+        isDead: pawn.isDead,
+      });
+    });
+    return states;
+  }
 }

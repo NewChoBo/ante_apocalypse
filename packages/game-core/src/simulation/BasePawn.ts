@@ -22,6 +22,10 @@ export abstract class BasePawn implements IPawnCore, ITickable {
 
   protected components: BaseComponent[] = [];
 
+  public get rotation(): Vector3 {
+    return this.mesh.rotation;
+  }
+
   constructor(protected scene: Scene) {
     // TickManager에 자동 등록
     TickManager.getInstance().register(this);
