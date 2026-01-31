@@ -27,6 +27,12 @@ export class SkeletonAnimationComponent extends BaseComponent {
   private readonly MOVE_THRESHOLD_ENTER = 0.2; // Speed to enter move state
   private readonly MOVE_THRESHOLD_EXIT = 0.05; // Speed to exit move state
 
+  // Reference speeds for animation scaling (units/sec)
+  // Lower values make animations play faster for the same movement speed
+  private readonly WALK_REF_SPEED = 3.0; // Decreased from 4.0
+  private readonly RUN_REF_SPEED = 6.0; // Decreased from 8.0
+  private readonly ANIM_SPEED_MULTIPLIER = 1.3; // Adjusted from 1.5
+
   /**
    * 스케레톤과 애니메이션 범위 초기화
    */
@@ -80,13 +86,22 @@ export class SkeletonAnimationComponent extends BaseComponent {
   /**
    * 특정 애니메이션 재생
    */
-  public playAnimation(name: AnimState): void {
-    if (!this.skeleton || this.currentAnim === name) return;
+  public playAnimation(name: AnimState, speedRatio: number = 1.0): void {
+    if (!this.skeleton) return;
+
+    // speedRatio가 변했을 경우에도 갱신이 필요하므로 currentAnim만으로 리턴하지 않음
+    if (this.currentAnim === name) {
+      const anims = this.scene.animatables.filter((a) => a.target === this.skeleton);
+      anims.forEach((a) => {
+        a.speedRatio = name === 'walk_back' ? -speedRatio : speedRatio;
+      });
+      return;
+    }
 
     const range = this.ranges.get(name);
     if (range) {
-      const speedRatio = name === 'walk_back' ? -1.0 : 1.0;
-      this.scene.beginAnimation(this.skeleton, range.from, range.to, true, speedRatio);
+      const finalSpeedRatio = name === 'walk_back' ? -speedRatio : speedRatio;
+      this.scene.beginAnimation(this.skeleton, range.from, range.to, true, finalSpeedRatio);
       this.currentAnim = name;
     }
   }
@@ -163,24 +178,44 @@ export class SkeletonAnimationComponent extends BaseComponent {
     const vz = localVelocity.z; // Forward/Backward
     const vx = localVelocity.x; // Left/Right
 
-    // 3. Select animation based on dominant direction with small bias to prevent rapid switching
+    // 3. Select animation and calculate speed ratio based on dominant direction
+    let targetAnim: AnimState = 'idle';
+    let targetSpeedRatio = 1.0;
+
     if (Math.abs(vz) >= Math.abs(vx) * 0.8) {
       if (vz > 0.1) {
-        this.playAnimation(speed > 6 ? 'run' : 'walk'); // Adjusted run speed threshold
+        if (speed > 6.5) {
+          targetAnim = 'run';
+          targetSpeedRatio = speed / this.RUN_REF_SPEED;
+        } else {
+          targetAnim = 'walk';
+          targetSpeedRatio = speed / this.WALK_REF_SPEED;
+        }
       } else if (vz < -0.1) {
-        this.playAnimation('walk_back');
+        targetAnim = 'walk_back';
+        targetSpeedRatio = speed / this.WALK_REF_SPEED;
       } else {
-        // This case is largely covered by speed threshold, but for safety:
-        this.playAnimation('idle');
+        targetAnim = 'idle';
       }
     } else {
+      targetSpeedRatio = speed / this.WALK_REF_SPEED;
       if (vx > 0.1) {
-        this.playAnimation('strafe_right');
+        targetAnim = 'strafe_right';
       } else if (vx < -0.1) {
-        this.playAnimation('strafe_left');
+        targetAnim = 'strafe_left';
       } else {
-        this.playAnimation('idle');
+        targetAnim = 'idle';
       }
+    }
+
+    // Clamp speed ratio to reasonable limits
+    targetSpeedRatio *= this.ANIM_SPEED_MULTIPLIER;
+    targetSpeedRatio = Math.max(0.5, Math.min(4.0, targetSpeedRatio));
+
+    if (targetAnim === 'idle') {
+      this.playAnimation('idle', this.ANIM_SPEED_MULTIPLIER);
+    } else {
+      this.playAnimation(targetAnim, targetSpeedRatio);
     }
   }
 

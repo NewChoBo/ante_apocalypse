@@ -18,7 +18,7 @@ export interface MovementInput {
  * 캐릭터의 이동, 중력, 점프 로직을 담당하는 컴포넌트.
  */
 export class CharacterMovementComponent extends BaseComponent {
-  private moveSpeed = 8;
+  private moveSpeed = 6;
   private sprintMultiplier = 1.6;
   private crouchMultiplier = 0.5;
 
