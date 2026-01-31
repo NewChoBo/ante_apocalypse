@@ -351,6 +351,14 @@ export class NetworkManager implements INetworkAuthority {
     this.provider.sendEvent(EventCode.FIRE, fireData, true);
   }
 
+  public reload(weaponId: string): void {
+    const myId = this.getSocketId();
+    if (!myId) return;
+
+    const payload = { playerId: myId, weaponId };
+    this.provider.sendEvent(EventCode.RELOAD, payload, true);
+  }
+
   public syncWeapon(weaponId: string): void {
     if (this.isMasterClient() && this.localServer) {
       this.localServer.processSyncWeapon(this.getSocketId()!, weaponId);

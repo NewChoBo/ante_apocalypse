@@ -26,7 +26,9 @@ export class ServerNetworkAuthority extends BasePhotonClient {
   public onPlayerJoin?: (id: string) => void;
   public onPlayerLeave?: (id: string) => void;
   public onPlayerMove?: (id: string, pos: Vector3, rot: Vector3) => void;
+
   public onFireRequest?: (id: string, origin: Vector3, dir: Vector3, weaponId?: string) => void;
+  public onReloadRequest?: (playerId: string, weaponId: string) => void;
   public onHitRequest?: (shooterId: string, data: RequestHitData) => void;
 
   public getPlayerState(id: string): PlayerState | undefined {
@@ -104,6 +106,17 @@ export class ServerNetworkAuthority extends BasePhotonClient {
         );
       }
     });
+
+    this.dispatcher.register(
+      EventCode.RELOAD,
+      (data: { playerId: string; weaponId: string }, senderId: string) => {
+        // Security check
+        if (data.playerId !== senderId) return;
+        if (this.onReloadRequest) {
+          this.onReloadRequest(data.playerId, data.weaponId);
+        }
+      }
+    );
 
     this.dispatcher.register(EventCode.REQUEST_HIT, (data: RequestHitData, senderId: string) => {
       if (this.onHitRequest) {

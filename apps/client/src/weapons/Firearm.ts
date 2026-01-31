@@ -166,6 +166,9 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
     this.onReloadStart();
     this.ejectMagazine();
 
+    // Notify Server
+    NetworkManager.getInstance().reload(this.name);
+
     // Core handles the timer in tick(), but we can also hook into that or just keep visual logic here.
     // However, Core 'reloadLogic' is called when timer finishes.
     // We should override 'reloadLogic' to add our visual callbacks.

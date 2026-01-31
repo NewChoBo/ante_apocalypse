@@ -4,6 +4,9 @@ import { BasePawn } from '../../simulation/BasePawn.js';
 import { IServerAssetLoader } from '../IServerAssetLoader.js';
 import { SkeletonAnimationComponent } from '../../simulation/components/SkeletonAnimationComponent.js';
 import { MeshUtils } from '../../simulation/utils/MeshUtils.js';
+import { BaseWeapon } from '../../combat/BaseWeapon.js';
+import { Firearm } from '../../combat/Firearm.js';
+import { WeaponRegistry } from '../../weapons/WeaponRegistry.js';
 
 const logger = new Logger('ServerPlayerPawn');
 
@@ -13,6 +16,9 @@ export class ServerPlayerPawn extends BasePawn {
   public skeleton: Skeleton | null = null;
   public headBox: Mesh | null = null;
   public override type = 'player';
+
+  public weapons: Map<string, BaseWeapon> = new Map();
+  public currentWeapon: BaseWeapon | null = null;
 
   protected animationComponent: SkeletonAnimationComponent;
 
@@ -45,6 +51,39 @@ export class ServerPlayerPawn extends BasePawn {
 
     // 2. Load Model
     this.loadModel(scene);
+
+    // 3. Init Default Weapon
+    this.equipWeapon('Pistol');
+  }
+
+  public equipWeapon(weaponId: string): void {
+    if (!this.weapons.has(weaponId)) {
+      const stats = WeaponRegistry[weaponId];
+      if (!stats) {
+        logger.error(`Unknown weapon stats for: ${weaponId}`);
+        return;
+      }
+
+      // Currently assuming all registry items are firearms for simplicity, or check stats
+      // We can also infer type from name or add 'type' to WeaponStats
+      const weapon = new Firearm(weaponId, this.id, stats);
+      this.weapons.set(weaponId, weapon);
+    }
+
+    this.currentWeapon = this.weapons.get(weaponId) || null;
+    logger.info(`Player ${this.id} equipped ${weaponId}`);
+  }
+
+  public fireRequest(): boolean {
+    if (!this.currentWeapon) return false;
+    return this.currentWeapon.fireLogic();
+  }
+
+  public reloadRequest(): void {
+    if (!this.currentWeapon) return;
+    if (this.currentWeapon instanceof Firearm) {
+      this.currentWeapon.reload();
+    }
   }
 
   private async loadModel(scene: Scene): Promise<void> {
@@ -103,9 +142,14 @@ export class ServerPlayerPawn extends BasePawn {
     }
   }
 
-  public tick(_deltaTime: number): void {
-    // 서버측에서는 컴포넌트 업데이트 정도만 수행
-    this.updateComponents(_deltaTime);
+  public tick(deltaTime: number): void {
+    // 1. Weapon Logic (Reload timers, etc)
+    if (this.currentWeapon) {
+      this.currentWeapon.tick(deltaTime);
+    }
+
+    // 2. Component Logic (Animation, etc)
+    this.updateComponents(deltaTime);
   }
 
   protected onDeath(): void {

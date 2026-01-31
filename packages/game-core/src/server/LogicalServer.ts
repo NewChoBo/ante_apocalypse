@@ -84,6 +84,13 @@ export class LogicalServer {
       this.updatePlayerPawn(id, pos, rot);
     this.networkManager.onFireRequest = (id, origin: commonVector3, dir: commonVector3) =>
       this.processFireEvent(id, origin, dir);
+
+    // Register RELOAD callback
+    this.networkManager.onReloadRequest = (playerId: string) => {
+      const pawn = this.playerPawns.get(playerId);
+      if (pawn) pawn.reloadRequest();
+    };
+
     this.networkManager.onHitRequest = (shooterId: string, data: RequestHitData) =>
       this.processHitRequest(shooterId, data);
   }
@@ -95,17 +102,18 @@ export class LogicalServer {
 
     let lastTickTime = performance.now();
     const tickInterval = 7.8; // 128Hz
+    let lastClock = performance.now();
 
     // 게임 루프: 렌더링 대신 씬 업데이트 수행
     this.engine.runRenderLoop(() => {
       if (!this.isRunning) return;
 
       const currentTime = performance.now();
+      const deltaTime = (currentTime - lastClock) / 1000;
+      lastClock = currentTime;
 
-      // NOTE: TickManager.tick() is intentionally NOT called here.
-      // When client hosts locally, TickManager is a singleton shared with client.
-      // Calling it here would double-tick player movement.
-      // Server only needs to update its own scene and simulation.
+      // 0. Update Player Logic (Weapon timers)
+      this.playerPawns.forEach((pawn) => pawn.tick(deltaTime));
 
       // 1. Babylon 물리/로직 업데이트
       this.scene.render();
@@ -118,7 +126,6 @@ export class LogicalServer {
       }
     });
   }
-
   private createPlayerPawn(id: string): void {
     if (this.playerPawns.has(id)) return;
 
@@ -160,9 +167,30 @@ export class LogicalServer {
     direction: commonVector3,
     weaponIdOverride?: string
   ): void {
-    logger.debug(
-      `Fire Event from: ${playerId} at ${origin.x}, ${origin.y}, ${origin.z} (dir: ${direction.x}, ${direction.y}, ${direction.z}, weapon: ${weaponIdOverride || 'default'})`
-    );
+    // 1. Get Player Pawn
+    const pawn = this.playerPawns.get(playerId);
+    if (!pawn) {
+      logger.warn(`Fire event from unknown player: ${playerId}`);
+      return;
+    }
+
+    // 2. Validate Fire
+    const canFire = pawn.fireRequest();
+
+    if (canFire) {
+      // Broadcast Event
+      // Re-construct event data to broadcast
+      this.networkManager.sendEvent(EventCode.FIRE, {
+        playerId,
+        weaponId: weaponIdOverride || pawn.currentWeapon?.id || 'Unknown',
+        muzzleTransform: { position: origin, direction: direction },
+      });
+
+      logger.debug(`[VALID] Fire from: ${playerId} (Ammo: ${pawn.currentWeapon?.currentAmmo})`);
+    } else {
+      logger.warn(`[REJECTED] Fire from: ${playerId} - Weapon not ready or out of ammo.`);
+      // Optional: Send correction event to client? (e.g. force reload)
+    }
   }
 
   public processSyncWeapon(playerId: string, weaponId: string): void {

@@ -22,6 +22,7 @@ export enum EventCode {
   REQ_WEAPON_CONFIGS = 21,
   WEAPON_CONFIGS = 22,
   REQUEST_HIT = 23,
+  RELOAD = 24,
 }
 
 export interface Vector3 {
@@ -89,6 +90,11 @@ export interface RequestHitData {
   weaponId: string;
   origin: Vector3;
   direction: Vector3;
+}
+
+export interface ReloadEventData {
+  playerId: string;
+  weaponId: string;
 }
 
 export interface EnemyState {
