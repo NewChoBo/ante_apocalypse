@@ -132,9 +132,17 @@ export abstract class CharacterPawn extends BasePawn {
   }
 
   public tick(deltaTime: number): void {
+    const prevPosition = this.mesh.position.clone();
+
     this.updateComponents(deltaTime);
-    // Update animation based on movement state
-    this.animationComponent.updateByMovementState(this.isMoving);
+
+    const currentPosition = this.mesh.position;
+    const velocity = currentPosition.subtract(prevPosition).scale(1 / deltaTime);
+
+    // Update animation based on velocity
+    if (this.animationComponent) {
+      this.animationComponent.updateAnimationByVelocity(velocity);
+    }
   }
 
   public takeDamage(

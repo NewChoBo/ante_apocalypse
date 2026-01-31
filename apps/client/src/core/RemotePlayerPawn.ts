@@ -113,18 +113,15 @@ export class RemotePlayerPawn extends CharacterPawn {
   }
 
   public override tick(deltaTime: number): void {
-    // Update interpolation first
+    // 1. Update interpolation (this updates this.mesh.position)
     this.interpolation.update(deltaTime);
     this.isMoving = this.interpolation.isMoving;
 
-    // Update head pitch
+    // 2. Call super.tick which handles velocity-based animation and component updates
+    super.tick(deltaTime);
+
+    // 3. Update extra remote-only features
     this.animationComponent.setHeadPitch(this.interpolation.getTargetPitch());
-
-    // Update animations based on movement
-    this.animationComponent.updateByMovementState(this.isMoving);
-
-    // Update all other components
-    this.updateComponents(deltaTime);
   }
 
   public override takeDamage(
