@@ -6,46 +6,43 @@ import {
   Color3,
   MeshBuilder,
   AbstractMesh,
-  Skeleton,
-  AnimationPropertiesOverride,
   ShadowGenerator,
   Animation,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { AssetLoader } from './AssetLoader';
-import { ParticleSystem, Texture, DynamicTexture } from '@babylonjs/core';
+import { DynamicTexture } from '@babylonjs/core';
 import { Logger } from '@ante/common';
 import { HealthBarComponent } from './components/HealthBarComponent';
+import { NetworkInterpolationComponent } from './components/NetworkInterpolationComponent';
+import { SkeletonAnimationComponent } from './components/SkeletonAnimationComponent';
+import { MuzzleFlashComponent } from './components/MuzzleFlashComponent';
 
 const logger = new Logger('RemotePlayerPawn');
 
 /**
  * 다른 네트워크 플레이어를 나타내는 Pawn.
+ * 컴포넌트 기반으로 리팩토링됨.
  */
 export class RemotePlayerPawn extends BasePawn {
   public mesh: Mesh;
-  private targetPosition: Vector3;
-  private targetRotation: Vector3;
-  private lerpSpeed = 10;
   public id: string;
   public playerName: string;
-  private _nameLabel: Mesh | null = null;
-  private healthBarComponent: HealthBarComponent | null = null;
   public type = 'remote_player';
   public isMoving = false;
 
-  // Visuals & Animation
+  // Components
+  private interpolation: NetworkInterpolationComponent;
+  private animation: SkeletonAnimationComponent;
+  private muzzleFlash: MuzzleFlashComponent;
+  private healthBarComponent: HealthBarComponent;
+
+  // Visuals
   private visualMesh: AbstractMesh | null = null;
-  private skeleton: Skeleton | null = null;
-  private headBoneNode: any = null;
+  private _nameLabel: Mesh | null = null;
   private shadowGenerator: ShadowGenerator;
   private weaponMesh: AbstractMesh | null = null;
   private currentWeaponId: string | null = null;
-
-  // Animation Ranges
-  private idleRange: any;
-  private walkRange: any;
-  private currentAnim = 'idle';
 
   constructor(
     scene: Scene,
@@ -62,18 +59,29 @@ export class RemotePlayerPawn extends BasePawn {
       defaultMultiplier: 1.0,
     };
 
-    // 1. Root Collider (Pivot at eye level: 1.75m)
+    // Root Collider (Pivot at eye level: 1.75m)
     this.mesh = MeshBuilder.CreateBox('remotePlayerRoot_' + id, { size: 0.1 }, scene);
     this.mesh.position.set(0, 1.75, 0);
     this.mesh.isVisible = false;
     this.mesh.checkCollisions = true;
-
-    // Euler rotation synchronization
     this.mesh.rotationQuaternion = null;
+    this.mesh.isPickable = true;
+    this.mesh.metadata = {
+      type: 'remote_player',
+      pawn: this,
+      bodyPart: 'body',
+    };
 
-    this.createNameLabel(scene, name);
+    // Initialize Components
+    this.interpolation = new NetworkInterpolationComponent(this);
+    this.addComponent(this.interpolation);
 
-    // Health Bar Component
+    this.animation = new SkeletonAnimationComponent(this, scene);
+    this.addComponent(this.animation);
+
+    this.muzzleFlash = new MuzzleFlashComponent(this, scene);
+    this.addComponent(this.muzzleFlash);
+
     this.healthBarComponent = new HealthBarComponent(this, scene, {
       style: 'player',
       width: 1.5,
@@ -82,17 +90,8 @@ export class RemotePlayerPawn extends BasePawn {
     });
     this.addComponent(this.healthBarComponent);
 
-    this.mesh.isPickable = true;
-    this.mesh.metadata = {
-      type: 'remote_player',
-      pawn: this,
-      bodyPart: 'body',
-    };
-
-    this.targetPosition = this.mesh.position.clone();
-    this.targetRotation = new Vector3(0, 0, 0);
-
-    // 2. Load Model
+    // Visuals
+    this.createNameLabel(scene, name);
     this.loadModel();
   }
 
@@ -118,7 +117,6 @@ export class RemotePlayerPawn extends BasePawn {
     mat.backFaceCulling = false;
     plane.material = mat;
     this._nameLabel = plane;
-    logger.info(`Created name label for ${name}`);
   }
 
   public initialize(): void {}
@@ -130,24 +128,16 @@ export class RemotePlayerPawn extends BasePawn {
 
       this.visualMesh = entries.rootNodes[0] as AbstractMesh;
       this.visualMesh.parent = this.mesh;
-
-      // Pivot is at eye level (1.75m), visual model feet at -1.75m
       this.visualMesh.position = new Vector3(0, -1.75, 0);
       this.visualMesh.rotation = Vector3.Zero();
-
-      // Scaling to match player height if YBot is slightly different
-      // Assuming original YBot is roughly 1.8-1.9m, 1.0 scale is usually fine for 1.75m eye level
       this.visualMesh.scaling.set(1, 1, 1);
 
-      this.skeleton = entries.skeletons.length > 0 ? entries.skeletons[0] : null;
-
-      if (this.skeleton) {
-        // Try to find head or neck for pitch rotation
-        this.headBoneNode =
-          this.skeleton.bones.find((b) => b.name.toLowerCase().includes('head')) ||
-          this.skeleton.bones.find((b) => b.name.toLowerCase().includes('neck'));
+      const skeleton = entries.skeletons.length > 0 ? entries.skeletons[0] : null;
+      if (skeleton) {
+        this.animation.initializeSkeleton(skeleton);
       }
 
+      // Set up pickable meshes
       entries.rootNodes.forEach((node) => {
         if (node instanceof AbstractMesh) {
           node.isPickable = true;
@@ -156,35 +146,17 @@ export class RemotePlayerPawn extends BasePawn {
         node.getChildMeshes().forEach((m) => {
           m.isPickable = true;
           m.metadata = { type: 'remote_player', pawn: this, bodyPart: 'body' };
-          if (this.skeleton) m.skeleton = this.skeleton;
+          if (skeleton) m.skeleton = skeleton;
         });
       });
 
       this.shadowGenerator.addShadowCaster(this.visualMesh, true);
 
-      // Animation Setup
-      if (this.skeleton) {
-        this.skeleton.animationPropertiesOverride = new AnimationPropertiesOverride();
-        this.skeleton.animationPropertiesOverride.enableBlending = true;
-        this.skeleton.animationPropertiesOverride.blendingSpeed = 0.1;
-
-        this.idleRange = this.skeleton.getAnimationRange('YBot_Idle');
-        if (!this.idleRange) {
-          this.skeleton.createAnimationRange('YBot_Idle', 0, 89);
-          this.skeleton.createAnimationRange('YBot_Walk', 90, 118);
-          this.idleRange = this.skeleton.getAnimationRange('YBot_Idle');
-        }
-        this.walkRange = this.skeleton.getAnimationRange('YBot_Walk');
-
-        if (this.idleRange) {
-          this.scene.beginAnimation(this.skeleton, this.idleRange.from, this.idleRange.to, true);
-        }
-
-        // Add Head Hitbox
-        const headBone = this.skeleton.bones.find((b) => b.name.toLowerCase().includes('head'));
+      // Add Head Hitbox
+      if (skeleton) {
+        const headBone = skeleton.bones.find((b) => b.name.toLowerCase().includes('head'));
         if (headBone) {
           const headBox = MeshBuilder.CreateBox('headBox_' + this.id, { size: 0.25 }, this.scene);
-          // Attach to TransformNode if available, otherwise bone
           const transformNode = headBone.getTransformNode();
           if (transformNode) {
             headBox.parent = transformNode;
@@ -192,8 +164,7 @@ export class RemotePlayerPawn extends BasePawn {
           } else {
             headBox.attachToBone(headBone, this.visualMesh!);
           }
-
-          headBox.visibility = 0; // Invisible but pickable
+          headBox.visibility = 0;
           headBox.isPickable = true;
           headBox.metadata = { type: 'remote_player', pawn: this, bodyPart: 'head' };
         }
@@ -204,7 +175,6 @@ export class RemotePlayerPawn extends BasePawn {
   }
 
   public updateWeapon(_weaponId: string): void {
-    // Map weaponId to asset key (currently only 'rifle' is available)
     const assetKey = 'rifle';
     if (this.currentWeaponId === assetKey) return;
     this.currentWeaponId = assetKey;
@@ -227,15 +197,13 @@ export class RemotePlayerPawn extends BasePawn {
       this.weaponMesh = entries.rootNodes[0] as AbstractMesh;
       this.weaponMesh.parent = this.mesh;
 
-      // Pivot/Attachment logic:
-      // Hand bone search
-      const handBone = this.skeleton?.bones.find(
+      const skeleton = this.animation.getSkeleton();
+      const handBone = skeleton?.bones.find(
         (b) =>
           b.name.toLowerCase().includes('righthand') || b.name.toLowerCase().includes('right_hand')
       );
 
       if (handBone) {
-        // Attach to bone
         const boneNode = (handBone as any).getTransformNode();
         if (boneNode) {
           this.weaponMesh.parent = boneNode;
@@ -243,7 +211,6 @@ export class RemotePlayerPawn extends BasePawn {
           this.weaponMesh.rotation = new Vector3(Math.PI / 2, 0, 0);
         }
       } else {
-        // Fallback: position relative to root
         this.weaponMesh.position = new Vector3(0.3, -0.5, 0.5);
       }
 
@@ -257,55 +224,21 @@ export class RemotePlayerPawn extends BasePawn {
     position: { x: number; y: number; z: number },
     rotation: { x: number; y: number; z: number }
   ): void {
-    this.targetPosition.set(position.x, position.y, position.z);
-    this.targetRotation.set(rotation.x, rotation.y, rotation.z);
+    this.interpolation.updateTarget(position, rotation);
   }
 
   public tick(deltaTime: number): void {
-    // 1. Calculate movement state
-    const posDiff = Vector3.Distance(this.mesh.position, this.targetPosition);
-    this.isMoving = posDiff > 0.02;
+    // Update interpolation
+    this.interpolation.update(deltaTime);
+    this.isMoving = this.interpolation.isMoving;
 
-    // 2. Position Interpolation
-    this.mesh.position = Vector3.Lerp(
-      this.mesh.position,
-      this.targetPosition,
-      Math.min(1.0, deltaTime * this.lerpSpeed)
-    );
+    // Update head pitch
+    this.animation.setHeadPitch(this.interpolation.getTargetPitch());
 
-    // 3. Rotation Interpolation
-    // Yaw (Y) for body
-    const targetYaw = this.targetRotation.y;
-    let diffYaw = targetYaw - this.mesh.rotation.y;
-    // Normalize angle difference
-    while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
-    while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
-    this.mesh.rotation.y += diffYaw * deltaTime * this.lerpSpeed;
+    // Update animations based on movement
+    this.animation.updateByMovementState(this.isMoving);
 
-    // Pitch (X) for head (if bone found)
-    if (this.headBoneNode) {
-      // Simple direct match for now, bones in Babylon might need rotation fix
-      // We can simulate looking up/down by rotating the head bone
-      // Note: Bones use local space, so this might need adjustment depending on bone axis
-      // For Y-Bot GLB, X axis is usually correct for pitch.
-      this.headBoneNode.rotation.x = this.targetRotation.x;
-    }
-
-    // 4. Update Animations
-    if (this.skeleton) {
-      if (this.isMoving) {
-        if (this.currentAnim !== 'walk' && this.walkRange) {
-          this.scene.beginAnimation(this.skeleton, this.walkRange.from, this.walkRange.to, true);
-          this.currentAnim = 'walk';
-        }
-      } else {
-        if (this.currentAnim !== 'idle' && this.idleRange) {
-          this.scene.beginAnimation(this.skeleton, this.idleRange.from, this.idleRange.to, true);
-          this.currentAnim = 'idle';
-        }
-      }
-    }
-
+    // Update all other components
     this.updateComponents(deltaTime);
   }
 
@@ -317,9 +250,7 @@ export class RemotePlayerPawn extends BasePawn {
   ): void {
     if (this.isDead) return;
     logger.info(`Hit for ${amount} damage.`);
-    // Note: Actual health sync comes from NetworkManager/MultiplayerSystem updates
-    // But if we want local prediction or visual feedback:
-    this.healthBarComponent?.updateHealth(this.health - amount); // Prediction
+    this.healthBarComponent?.updateHealth(this.health - amount);
   }
 
   public updateHealth(health: number): void {
@@ -332,21 +263,12 @@ export class RemotePlayerPawn extends BasePawn {
     this.isDead = true;
     logger.info(`Died.`);
 
-    // Disable collider
     this.mesh.checkCollisions = false;
     this.mesh.isPickable = false;
 
-    // Simple visual death: Fall backward
-    // Since mesh is a Box, unauthorized change might be weird if physics enabled?
-    // We just animate rotation.
-    // If skeleton exists, we might want to stop standard anims.
-    if (this.skeleton) {
-      this.scene.stopAnimation(this.skeleton);
-    }
+    this.animation.stopAnimation();
 
-    // Rotate root mesh backward
-    // Animation to rotate X -90 deg
-    // Actually mesh.rotation is Euler.
+    // Death animation
     const deathAnim = new Animation(
       'deathAnim',
       'rotation.x',
@@ -359,9 +281,7 @@ export class RemotePlayerPawn extends BasePawn {
       { frame: 30, value: this.mesh.rotation.x - Math.PI / 2 },
     ]);
     this.mesh.animations.push(deathAnim);
-    this.scene.beginAnimation(this.mesh, 0, 30, false, 1, () => {
-      // Optional: Fade out or leave corpse
-    });
+    this.scene.beginAnimation(this.mesh, 0, 30, false);
   }
 
   public fire(
@@ -371,45 +291,16 @@ export class RemotePlayerPawn extends BasePawn {
       direction: { x: number; y: number; z: number };
     }
   ): void {
-    // Play sound from asset loader
-    const sound = AssetLoader.getInstance().getSound('shoot');
-    if (sound) {
-      sound.play(); // Play as 2D for now, or use play(0, position) for 3D
-    }
+    this.muzzleFlash.playFireSound();
 
-    // Muzzle Flash
-    let flashPos = this.mesh.position.clone().add(new Vector3(0, 1.5, 0.5)); // Default
-    // If we have weaponMesh, try to use its tip
+    // Calculate flash position
+    let flashPos = this.mesh.position.clone().add(new Vector3(0, 1.5, 0.5));
     if (this.weaponMesh) {
-      // Estimate tip. If we had a socket, better.
-      // Transform relative point
       const matrix = this.weaponMesh.computeWorldMatrix(true);
       flashPos = Vector3.TransformCoordinates(new Vector3(0, 0.2, 0), matrix);
     }
 
-    // Simple particle flash
-    this.createMuzzleFlash(flashPos);
-  }
-
-  private createMuzzleFlash(position: Vector3): void {
-    const particleSystem = new ParticleSystem('muzzleFlash', 10, this.scene);
-    particleSystem.particleTexture = new Texture(
-      'https://www.babylonjs-playground.com/textures/flare.png',
-      this.scene
-    );
-    particleSystem.emitter = position;
-    particleSystem.minEmitBox = new Vector3(0, 0, 0);
-    particleSystem.maxEmitBox = new Vector3(0, 0, 0);
-    particleSystem.color1 = new Color3(1, 1, 0.5).toColor4();
-    particleSystem.color2 = new Color3(1, 0.5, 0).toColor4();
-    particleSystem.minSize = 0.2;
-    particleSystem.maxSize = 0.5;
-    particleSystem.minLifeTime = 0.1;
-    particleSystem.maxLifeTime = 0.2;
-    particleSystem.emitRate = 100;
-    particleSystem.targetStopDuration = 0.1;
-    particleSystem.start();
-    setTimeout(() => particleSystem.dispose(), 500);
+    this.muzzleFlash.createFlash(flashPos);
   }
 
   public dispose(): void {

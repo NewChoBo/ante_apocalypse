@@ -1,7 +1,7 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { INetworkProvider } from '../network/INetworkProvider';
 import { PhotonProvider } from '../network/providers/PhotonProvider';
-import { INetworkAuthority } from '@ante/game-core';
+import { INetworkAuthority, NetworkDispatcher } from '@ante/game-core';
 import {
   RoomInfo,
   NetworkState,
@@ -22,16 +22,50 @@ import {
   EnemyDestroyPayload,
   PickupDestroyPayload,
 } from '@ante/common';
-import { NetworkDispatcher } from '@ante/game-core';
+import { ConnectionManager } from '../network/ConnectionManager';
+import { PlayerStateManager } from '../network/PlayerStateManager';
+import { RoomManager } from '../network/RoomManager';
 
+/**
+ * 네트워크 관리 Facade 클래스
+ * 기존 API를 유지하면서 내부적으로 분리된 Manager들에 위임
+ */
 export class NetworkManager implements INetworkAuthority {
   private static instance: NetworkManager;
   private provider: INetworkProvider;
 
+  // Sub-managers
+  private connectionManager: ConnectionManager;
+  private playerStateManager: PlayerStateManager;
+  private roomManager: RoomManager;
+  private dispatcher: NetworkDispatcher = new NetworkDispatcher();
+
+  // Player Observables (delegated from PlayerStateManager)
+  public get onPlayerJoined() {
+    return this.playerStateManager.onPlayerJoined;
+  }
+  public get onPlayerUpdated() {
+    return this.playerStateManager.onPlayerUpdated;
+  }
+  public get onPlayerLeft() {
+    return this.playerStateManager.onPlayerLeft;
+  }
+
+  // Connection Observables (delegated from ConnectionManager)
+  public get onStateChanged() {
+    return this.connectionManager.onStateChanged;
+  }
+  public get currentState() {
+    return this.connectionManager.currentState;
+  }
+
+  // Room Observables (delegated from RoomManager)
+  public get onRoomListUpdated() {
+    return this.roomManager.onRoomListUpdated;
+  }
+
+  // Game Events (kept in NetworkManager for now)
   public onPlayersList = new Observable<PlayerState[]>();
-  public onPlayerJoined = new Observable<PlayerState>();
-  public onPlayerUpdated = new Observable<PlayerState>();
-  public onPlayerLeft = new Observable<string>();
   public onPlayerFired = new Observable<FireEventData>();
   public onPlayerHit = new Observable<HitEventData>();
   public onPlayerDied = new Observable<DeathEventData>();
@@ -46,9 +80,7 @@ export class NetworkManager implements INetworkAuthority {
   public onInitialStateRequested = new Observable<{ senderId: string }>();
   public onInitialStateReceived = new Observable<InitialStatePayload>();
 
-  // New Observables for Lobby/State
-  public onRoomListUpdated = new Observable<RoomInfo[]>();
-  public onStateChanged = new Observable<NetworkState>();
+  // Raw Event Observable
   public onEvent = new Observable<{ code: number; data: unknown; senderId: string }>();
 
   // Target Observables
@@ -56,28 +88,28 @@ export class NetworkManager implements INetworkAuthority {
   public onTargetDestroy = new Observable<TargetDestroyPayload>();
   public onTargetSpawn = new Observable<SpawnTargetPayload>();
 
-  private players: Map<string, PlayerState> = new Map();
-  private dispatcher: NetworkDispatcher = new NetworkDispatcher();
-
-  public currentState: NetworkState = NetworkState.Disconnected;
-  private lastRoomList: RoomInfo[] = [];
-
   private constructor() {
     this.provider = new PhotonProvider();
+
+    // Initialize sub-managers
+    this.connectionManager = new ConnectionManager(this.provider);
+    this.playerStateManager = new PlayerStateManager();
+    this.roomManager = new RoomManager(this.provider, () => this.connectionManager.currentState);
+
     this.setupDispatcher();
     this.setupProviderListeners();
   }
 
   public clearObservers(): void {
     this.onPlayersList.clear();
-    this.onPlayerJoined.clear();
-    this.onPlayerUpdated.clear();
-    this.onPlayerLeft.clear();
     this.onPlayerFired.clear();
     this.onPlayerHit.clear();
     this.onPlayerDied.clear();
-    this.onRoomListUpdated.clear();
-    this.onStateChanged.clear();
+    this.onEnemyUpdated.clear();
+    this.onEnemyHit.clear();
+    this.onEnemyDestroyed.clear();
+    this.onPickupDestroyed.clear();
+    this.playerStateManager.clearObservers();
   }
 
   public static getInstance(): NetworkManager {
@@ -109,15 +141,11 @@ export class NetworkManager implements INetworkAuthority {
     });
 
     this.dispatcher.register(EventCode.SYNC_WEAPON, (data: SyncWeaponPayload, senderId: string) => {
-      const player = this.players.get(senderId);
-      if (player) {
-        player.weaponId = data.weaponId;
-        this.onPlayerUpdated.notifyObservers(player);
-      }
+      this.playerStateManager.updatePlayer(senderId, { weaponId: data.weaponId });
     });
 
     this.dispatcher.register(EventCode.MOVE, (data: MovePayload, senderId: string) => {
-      const player = this.players.get(senderId);
+      const player = this.playerStateManager.getPlayer(senderId);
       if (player) {
         const isMe = senderId === this.getSocketId();
         if (isMe) {
@@ -129,9 +157,10 @@ export class NetworkManager implements INetworkAuthority {
             // 서버와의 위치 불일치 감지! 위치 보정 필요시 여기에 로직 추가
           }
         } else {
-          player.position = { x: data.position.x, y: data.position.y, z: data.position.z };
-          player.rotation = { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z };
-          this.onPlayerUpdated.notifyObservers(player);
+          this.playerStateManager.updatePlayer(senderId, {
+            position: { x: data.position.x, y: data.position.y, z: data.position.z },
+            rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
+          });
         }
       }
     });
@@ -164,13 +193,6 @@ export class NetworkManager implements INetworkAuthority {
     );
 
     this.dispatcher.register(EventCode.INITIAL_STATE, (data: InitialStatePayload) => {
-      if (data.players && Array.isArray(data.players)) {
-        data.players.forEach((_p: PlayerState): void => {
-          // WorldEntityManager handles storage, but we still need to know if it's a PlayerState
-          // In a full refactor, RemotePlayerPawn would be added to WorldEntityManager
-        });
-      }
-
       this.onInitialStateReceived.notifyObservers({
         players: data.players,
         enemies: data.enemies,
@@ -182,32 +204,15 @@ export class NetworkManager implements INetworkAuthority {
 
   private setupProviderListeners(): void {
     this.provider.onStateChanged = (state: NetworkState): void => {
-      this.currentState = state;
-      this.onStateChanged.notifyObservers(state);
-
-      // Auto-reconnect logic
-      if (state === NetworkState.Disconnected || state === NetworkState.Error) {
-        const userId = localStorage.getItem('playerName') || 'COMMANDER';
-        // Reconnect after a delay to avoid spamming
-        setTimeout((): void => {
-          if (
-            this.currentState === NetworkState.Disconnected ||
-            this.currentState === NetworkState.Error
-          ) {
-            this.connect(userId);
-          }
-        }, 3000);
-      }
+      this.connectionManager.handleStateChange(state);
     };
 
     this.provider.onRoomListUpdated = (rooms: RoomInfo[]): void => {
-      this.lastRoomList = rooms;
-      this.onRoomListUpdated.notifyObservers(rooms);
+      this.roomManager.handleRoomListUpdate(rooms);
     };
 
     this.provider.onPlayerJoined = (user: { userId: string; name?: string }): void => {
-      // NOTE: BasePawn-based registration should happen in MultiplayerSystem
-      this.onPlayerJoined.notifyObservers({
+      this.playerStateManager.registerPlayer({
         id: user.userId,
         name: user.name || 'Anonymous',
         position: { x: 0, y: 0, z: 0 },
@@ -218,8 +223,7 @@ export class NetworkManager implements INetworkAuthority {
     };
 
     this.provider.onPlayerLeft = (id) => {
-      this.players.delete(id);
-      this.onPlayerLeft.notifyObservers(id);
+      this.playerStateManager.removePlayer(id);
     };
 
     this.provider.onEvent = (code: number, data: unknown, senderId: string): void => {
@@ -229,14 +233,8 @@ export class NetworkManager implements INetworkAuthority {
 
     this.provider.onMasterClientSwitched = (newMasterId: string) => {
       const myId = this.getSocketId();
-      // Let's rely on provider exposing it or infer it.
-      // For now, let's use a method to get room name.
-
       if (myId === newMasterId) {
-        // accessing room name from provider might be needed.
-        // Im implementing a helper in NetworkManager first or just casting provider
         const roomName = (this.provider as any).client?.myRoom()?.name;
-
         if (roomName) {
           console.log(`!!! I AM THE NEW HOST !!! - Triggering Takeover for Room: ${roomName}`);
           import('../server/LocalServerManager').then(({ LocalServerManager }) => {
@@ -247,68 +245,45 @@ export class NetworkManager implements INetworkAuthority {
     };
   }
 
+  // === Connection Methods (delegated) ===
   public connect(userId: string): void {
-    // Prevent redundant connection attempts using internal state
-    if (
-      this.currentState !== NetworkState.Disconnected &&
-      this.currentState !== NetworkState.Error
-    ) {
-      return;
-    }
-
-    this.provider.connect(userId).catch((_e): void => {
-      // Connection failure handled via onStateChanged
-    });
+    this.connectionManager.connect(userId);
   }
 
+  // === Room Methods (delegated) ===
   public async joinRoom(name: string): Promise<boolean> {
-    if (
-      this.currentState !== NetworkState.InLobby &&
-      this.currentState !== NetworkState.ConnectedToMaster
-    ) {
-      return false;
-    }
-    return this.provider.joinRoom(name);
+    return this.roomManager.joinRoom(name);
   }
 
   public async createRoom(name: string, mapId: string): Promise<boolean> {
-    if (
-      this.currentState !== NetworkState.InLobby &&
-      this.currentState !== NetworkState.ConnectedToMaster
-    ) {
-      return false;
-    }
-    const options = {
-      maxPlayers: 20,
-      customGameProperties: { mapId },
-      propsListedInLobby: ['mapId'],
-    };
-    return this.provider.createRoom(name, options);
+    return this.roomManager.createRoom(name, mapId);
   }
 
   public leaveRoom(): void {
-    // Stop local server if running (host leaving room)
-    // Dynamic import to avoid circular dependency, but wrapped in void
-    void import('../server/LocalServerManager').then(({ LocalServerManager }) => {
-      if (LocalServerManager.getInstance().isServerRunning()) {
-        LocalServerManager.getInstance().stopSession();
-      }
-    });
-    this.provider.disconnect();
+    this.roomManager.leaveRoom();
   }
 
   public isMasterClient(): boolean {
-    return this.provider.isMasterClient();
+    return this.roomManager.isMasterClient();
   }
 
   public getActors(): Map<string, { id: string; name: string }> {
-    return this.provider.getActors();
+    return this.roomManager.getActors();
   }
 
   public getMapId(): string | null {
-    return this.provider.getCurrentRoomProperty('mapId');
+    return this.roomManager.getMapId();
   }
 
+  public refreshRoomList(): void {
+    this.roomManager.refreshRoomList();
+  }
+
+  public getRoomList(): RoomInfo[] {
+    return this.roomManager.getRoomList();
+  }
+
+  // === Player State Methods ===
   public join(data: {
     position: Vector3;
     rotation: Vector3;
@@ -317,15 +292,14 @@ export class NetworkManager implements INetworkAuthority {
   }): void {
     const myId = this.getSocketId();
     if (myId) {
-      const myState: PlayerState = {
+      this.playerStateManager.registerPlayer({
         id: myId,
         name: data.name,
         position: { x: data.position.x, y: data.position.y, z: data.position.z },
         rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
         weaponId: data.weaponId,
         health: 100,
-      };
-      this.players.set(myId, myState);
+      });
     }
     this.updateState(data);
   }
@@ -333,24 +307,16 @@ export class NetworkManager implements INetworkAuthority {
   public updateState(data: { position: Vector3; rotation: Vector3; weaponId: string }): void {
     const myId = this.getSocketId();
     if (myId) {
-      const state = this.players.get(myId);
-      if (state) {
-        state.position = { x: data.position.x, y: data.position.y, z: data.position.z };
-        state.rotation = { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z };
-        state.weaponId = data.weaponId;
-      }
+      const payload = this.playerStateManager.createMovePayload(myId, data.position, data.rotation);
+      this.provider.sendEvent(EventCode.MOVE, payload, false);
     }
-
-    this.provider.sendEvent(
-      EventCode.MOVE,
-      {
-        position: { x: data.position.x, y: data.position.y, z: data.position.z },
-        rotation: { x: data.rotation.x, y: data.rotation.y, z: data.rotation.z },
-      },
-      false
-    );
   }
 
+  public getAllPlayerStates(): PlayerState[] {
+    return this.playerStateManager.getAllPlayers();
+  }
+
+  // === Game Action Methods ===
   public fire(fireData: {
     weaponId: string;
     muzzleTransform?: {
@@ -373,23 +339,12 @@ export class NetworkManager implements INetworkAuthority {
     this.provider.sendEvent(code, data, reliable);
   }
 
+  // === Utility Methods ===
   public getSocketId(): string | undefined {
     return this.provider.getLocalPlayerId() || undefined;
   }
 
   public getServerTime(): number {
     return this.provider.getServerTime();
-  }
-
-  public refreshRoomList(): void {
-    this.provider.refreshRoomList?.();
-  }
-
-  public getRoomList(): RoomInfo[] {
-    return this.lastRoomList;
-  }
-
-  public getAllPlayerStates(): PlayerState[] {
-    return Array.from(this.players.values());
   }
 }

@@ -1,0 +1,73 @@
+import { Vector3, Mesh } from '@babylonjs/core';
+import { BaseComponent } from './BaseComponent';
+import { BasePawn } from '../BasePawn';
+
+/**
+ * 네트워크 위치/회전 보간을 담당하는 컴포넌트
+ * RemotePlayerPawn에서 분리됨
+ */
+export class NetworkInterpolationComponent extends BaseComponent {
+  private targetPosition: Vector3;
+  private targetRotation: Vector3;
+  private lerpSpeed = 10;
+  private _isMoving = false;
+
+  constructor(owner: BasePawn & { mesh: Mesh }) {
+    super(owner, (owner as any).scene);
+    this.targetPosition = owner.mesh.position.clone();
+    this.targetRotation = new Vector3(0, 0, 0);
+  }
+
+  /**
+   * 현재 움직이고 있는지 여부
+   */
+  public get isMoving(): boolean {
+    return this._isMoving;
+  }
+
+  /**
+   * 네트워크에서 받은 목표 위치/회전 설정
+   */
+  public updateTarget(
+    position: { x: number; y: number; z: number },
+    rotation: { x: number; y: number; z: number }
+  ): void {
+    this.targetPosition.set(position.x, position.y, position.z);
+    this.targetRotation.set(rotation.x, rotation.y, rotation.z);
+  }
+
+  /**
+   * 매 프레임 보간 업데이트
+   */
+  public update(deltaTime: number): void {
+    const mesh = (this.owner as any).mesh as Mesh;
+    if (!mesh) return;
+
+    // 1. Calculate movement state
+    const posDiff = Vector3.Distance(mesh.position, this.targetPosition);
+    this._isMoving = posDiff > 0.02;
+
+    // 2. Position Interpolation
+    mesh.position = Vector3.Lerp(
+      mesh.position,
+      this.targetPosition,
+      Math.min(1.0, deltaTime * this.lerpSpeed)
+    );
+
+    // 3. Yaw (Y) Rotation Interpolation
+    const targetYaw = this.targetRotation.y;
+    let diffYaw = targetYaw - mesh.rotation.y;
+
+    // Normalize angle difference
+    while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
+    while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
+    mesh.rotation.y += diffYaw * deltaTime * this.lerpSpeed;
+  }
+
+  /**
+   * 현재 목표 Pitch 값 (헤드 회전용)
+   */
+  public getTargetPitch(): number {
+    return this.targetRotation.x;
+  }
+}

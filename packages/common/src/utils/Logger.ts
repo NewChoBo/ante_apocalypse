@@ -1,4 +1,4 @@
-declare var process: any;
+declare let process: any;
 
 export enum LogLevel {
   DEBUG = 0,
