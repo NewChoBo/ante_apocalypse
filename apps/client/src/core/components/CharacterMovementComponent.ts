@@ -1,6 +1,7 @@
 import { Vector3, Scene, Ray } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { CombatComponent } from './CombatComponent';
+import { CameraComponent } from './CameraComponent';
 import type { BasePawn } from '../BasePawn';
 
 export interface MovementInput {
@@ -77,16 +78,22 @@ export class CharacterMovementComponent extends BaseComponent {
   }
 
   private handleGhostMovement(input: MovementInput, deltaTime: number): void {
-    const ghostSpeed = this.moveSpeed * 2.0; // Faster in ghost mode
-    const forward = this.owner.mesh.getDirection(Vector3.Forward());
-    const right = this.owner.mesh.getDirection(Vector3.Right());
+    const ghostSpeed = this.moveSpeed * 2.0;
+    const cameraComp = this.owner.getComponent(CameraComponent);
+    const camera = cameraComp?.camera;
+    if (!camera) return;
+
+    // Calculate move direction based on camera orientation if detached
+    // Otherwise use mesh orientation (though usually they aligned)
+    const forward = camera.getForwardRay().direction;
+    const right = Vector3.Cross(Vector3.Up(), forward).normalize();
     const up = Vector3.Up();
 
     const moveDirection = Vector3.Zero();
     if (input.forward) moveDirection.addInPlace(forward);
     if (input.backward) moveDirection.subtractInPlace(forward);
-    if (input.right) moveDirection.addInPlace(right);
-    if (input.left) moveDirection.subtractInPlace(right);
+    if (input.right) moveDirection.subtractInPlace(right);
+    if (input.left) moveDirection.addInPlace(right);
 
     // Vertical movement in ghost mode
     if (input.jump) moveDirection.addInPlace(up); // Space
@@ -95,8 +102,9 @@ export class CharacterMovementComponent extends BaseComponent {
     if (moveDirection.length() > 0) {
       moveDirection.normalize();
       const velocity = moveDirection.scale(ghostSpeed * deltaTime);
-      // Noclip: directly update position
-      this.owner.mesh.position.addInPlace(velocity);
+
+      // Move camera directly (Decoupled Spectator)
+      camera.position.addInPlace(velocity);
     }
   }
 

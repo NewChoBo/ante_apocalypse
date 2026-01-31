@@ -161,6 +161,10 @@ export class MultiplayerSystem {
     });
   }
 
+  public getRemotePlayers(): RemotePlayerPawn[] {
+    return Array.from(this.remotePlayers.values());
+  }
+
   private spawnRemotePlayer(player: PlayerState): void {
     if (this.remotePlayers.has(player.id)) return;
 

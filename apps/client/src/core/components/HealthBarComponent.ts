@@ -7,7 +7,6 @@ import {
   Color3,
 } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
-import { BasePawn } from '../BasePawn';
 
 export type HealthBarStyle = 'enemy' | 'player';
 
@@ -24,7 +23,7 @@ export class HealthBarComponent extends BaseComponent {
   private yOffset: number;
 
   constructor(
-    owner: BasePawn,
+    owner: { mesh: Mesh },
     scene: Scene,
     options: {
       style?: HealthBarStyle;
@@ -33,7 +32,7 @@ export class HealthBarComponent extends BaseComponent {
       yOffset?: number;
     } = {}
   ) {
-    super(owner, scene);
+    super(owner as any, scene);
     this.style = options.style ?? 'player';
     this.width = options.width ?? 1.5;
     this.height = options.height ?? 0.2;
@@ -41,6 +40,12 @@ export class HealthBarComponent extends BaseComponent {
 
     this.createHealthBar();
     this.updateHealth(100);
+  }
+
+  public setVisible(visible: boolean): void {
+    if (this.plane) {
+      this.plane.setEnabled(visible);
+    }
   }
 
   private createHealthBar(): void {

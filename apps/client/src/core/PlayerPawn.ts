@@ -1,4 +1,10 @@
-import { Mesh, Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
+import {
+  Mesh,
+  Scene,
+  UniversalCamera,
+  Vector3,
+  Animation as BabylonAnimation,
+} from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { Logger } from '@ante/common';
 
@@ -6,6 +12,8 @@ const logger = new Logger('PlayerPawn');
 import { CharacterMovementComponent } from './components/CharacterMovementComponent';
 import { CameraComponent } from './components/CameraComponent';
 import { CombatComponent } from './components/CombatComponent';
+import { AssetLoader } from './AssetLoader';
+import { HealthBarComponent } from './components/HealthBarComponent';
 
 export interface InputState {
   forward: boolean;
@@ -124,12 +132,30 @@ export class PlayerPawn extends BasePawn {
     }
   }
 
+  private corpseMesh: Mesh | null = null;
+  private corpseHealthBar: HealthBarComponent | null = null;
+
   public die(): void {
     if (this.isDead) return;
     this.isDead = true;
     this.mesh.checkCollisions = false; // Disable collisions for ghost mode
 
-    // Hide weapons on death
+    // 1. Create Corpse
+    this.createCorpse();
+
+    // 2. Hide local visuals and detach camera
+    this.cameraComponent.detach();
+    // Hide actual model child meshes
+    this.mesh.getChildMeshes().forEach((m) => {
+      // Don't hide the camera if it was somehow a mesh child,
+      // but usually it's not.
+      // We only want to hide the character models.
+      if (m.name.includes('Character') || m.name.includes('Model') || m.id.includes('Character')) {
+        m.setEnabled(false);
+      }
+    });
+
+    // 3. Hide weapons on death
     const combat = this.getComponent(CombatComponent) as CombatComponent;
     if (combat) {
       combat.getCurrentWeapon()?.hide();
@@ -138,13 +164,66 @@ export class PlayerPawn extends BasePawn {
     logger.info('Died - Entering Ghost Mode');
   }
 
+  private createCorpse(): void {
+    try {
+      const entries = AssetLoader.getInstance().instantiateMesh('enemy', 'corpse_local');
+      if (!entries) return;
+
+      this.corpseMesh = entries.rootNodes[0] as Mesh;
+      this.corpseMesh.position.copyFrom(this.mesh.position);
+      this.corpseMesh.rotation.copyFrom(this.mesh.rotation);
+
+      // Add a 0-health bar to the corpse
+      this.corpseHealthBar = new HealthBarComponent({ mesh: this.corpseMesh }, this.scene, {
+        style: 'player',
+        width: 1.0,
+        height: 0.15,
+        yOffset: 2.1,
+      });
+      this.corpseHealthBar.updateHealth(0);
+
+      // Simple death animation for the corpse
+      const deathAnim = new BabylonAnimation(
+        'deathAnim',
+        'rotation.x',
+        30,
+        BabylonAnimation.ANIMATIONTYPE_FLOAT,
+        BabylonAnimation.ANIMATIONLOOPMODE_CONSTANT
+      );
+      deathAnim.setKeys([
+        { frame: 0, value: this.corpseMesh.rotation.x },
+        { frame: 30, value: this.corpseMesh.rotation.x - Math.PI / 2 },
+      ]);
+      this.corpseMesh.animations.push(deathAnim);
+      this.scene.beginAnimation(this.corpseMesh, 0, 30, false);
+    } catch (e) {
+      logger.error('Failed to create corpse mesh', e);
+    }
+  }
+
   public respawn(position: Vector3): void {
     this.isDead = false;
     this.health = 100;
     this.mesh.position.copyFrom(position);
     this.mesh.checkCollisions = true; // Restore collisions
 
-    // Show weapons on respawn
+    // 1. Cleanup Corpse
+    if (this.corpseMesh) {
+      this.corpseMesh.dispose();
+      this.corpseMesh = null;
+    }
+    if (this.corpseHealthBar) {
+      this.corpseHealthBar.dispose();
+      this.corpseHealthBar = null;
+    }
+
+    // 2. Restore local visuals and attach camera
+    this.cameraComponent.attach();
+    this.mesh.getChildMeshes().forEach((m) => {
+      m.setEnabled(true);
+    });
+
+    // 3. Show weapons on respawn
     const combat = this.getComponent(CombatComponent) as CombatComponent;
     if (combat) {
       combat.getCurrentWeapon()?.show();
