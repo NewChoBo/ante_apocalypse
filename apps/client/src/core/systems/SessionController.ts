@@ -93,6 +93,7 @@ export class SessionController {
         GameObservables.playerDied.notifyObservers(null);
         this.isSpectating = true;
         this.spectateMode = 'FREE'; // Default to free look on death
+        this.hud?.showRespawnCountdown(3);
       }
     });
 
@@ -219,6 +220,7 @@ export class SessionController {
       if (data.playerId === network.getSocketId()) {
         this.isSpectating = false;
         this.spectateMode = 'FREE';
+        this.hud?.hideRespawnMessage();
       }
     });
 

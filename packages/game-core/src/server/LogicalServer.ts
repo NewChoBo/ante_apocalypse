@@ -112,6 +112,21 @@ export class LogicalServer {
 
     this.networkManager.onHitRequest = (shooterId: string, data: RequestHitData) =>
       this.processHitRequest(shooterId, data);
+
+    this.networkManager.onPlayerDeath = (targetId: string, _attackerId: string) => {
+      if (this.simulation['gameRule']) {
+        const decision = this.simulation['gameRule'].onPlayerDeath(this.simulation, targetId);
+        if (decision.action === 'respawn') {
+          const delayMs = decision.delay * 1000;
+          logger.info(`Player ${targetId} will respawn in ${decision.delay}s`);
+
+          setTimeout(() => {
+            const spawnPos = decision.position || { x: 0, y: 1.75, z: 0 };
+            this.networkManager.broadcastRespawn(targetId, spawnPos);
+          }, delayMs);
+        }
+      }
+    };
   }
 
   private createGameRule(mode: string): IGameRule {

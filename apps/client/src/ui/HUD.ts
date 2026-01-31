@@ -15,6 +15,7 @@ export class HUD {
   private healthValueText!: TextBlock;
   private damageOverlay!: Rectangle;
   private crosshair!: Rectangle;
+  private respawnText!: TextBlock;
 
   private scoreContainer!: Rectangle;
   private ammoContainer!: Rectangle;
@@ -137,6 +138,40 @@ export class HUD {
     this.crosshair.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
     this.crosshair.isHitTestVisible = false;
     this.ui.addControl(this.crosshair);
+
+    // 6. Respawn Text (Center)
+    this.respawnText = new TextBlock('respawnText', '');
+    this.respawnText.color = '#ffc400';
+    this.respawnText.fontSize = 20;
+    this.respawnText.fontFamily = 'Rajdhani, sans-serif';
+    this.respawnText.fontWeight = '700';
+    this.respawnText.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+    this.respawnText.top = '100px';
+    this.respawnText.isVisible = false;
+    this.ui.addControl(this.respawnText);
+  }
+
+  public showRespawnCountdown(seconds: number): void {
+    let current = seconds;
+    this.respawnText.isVisible = true;
+
+    const updateText = () => {
+      this.respawnText.text = `RESPAWNING_IN_${current}S...`;
+    };
+
+    updateText();
+    const interval = setInterval(() => {
+      current--;
+      if (current <= 0) {
+        clearInterval(interval);
+      } else {
+        updateText();
+      }
+    }, 1000);
+  }
+
+  public hideRespawnMessage(): void {
+    this.respawnText.isVisible = false;
   }
 
   private showDamageFlash(): void {

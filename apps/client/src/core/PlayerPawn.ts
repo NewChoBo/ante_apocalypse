@@ -205,6 +205,7 @@ export class PlayerPawn extends BasePawn {
     this.isDead = false;
     this.health = 100;
     this.mesh.position.copyFrom(position);
+    this.mesh.rotation.x = 0; // Ensure upright
     this.mesh.checkCollisions = true; // Restore collisions
 
     // 1. Cleanup Corpse

@@ -166,6 +166,20 @@ export class RemotePlayerPawn extends CharacterPawn {
     this.scene.beginAnimation(this.mesh, 0, 30, false);
   }
 
+  public respawn(position: Vector3): void {
+    this.isDead = false;
+    this.health = 100;
+    this.mesh.position.copyFrom(position);
+    this.mesh.rotation.x = 0; // Reset death tilt
+
+    this.mesh.checkCollisions = true;
+    this.mesh.isPickable = true;
+
+    this.updateHealth(100);
+    this.animationComponent.playAnimation('idle'); // Ensure it's not in death pose
+    logger.info(`Respawned.`);
+  }
+
   // Weapon handling
   public updateWeapon(_weaponId: string): void {
     const assetKey = 'rifle';

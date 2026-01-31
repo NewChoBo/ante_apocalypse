@@ -152,10 +152,7 @@ export class MultiplayerSystem {
         // Remote player respawn
         const remote = this.remotePlayers.get(data.playerId);
         if (remote) {
-          remote.position.copyFrom(pos);
-          remote.isDead = false;
-          remote.updateHealth(100);
-          // If the remote player model was hidden or removed, re-show it here
+          remote.respawn(pos);
         }
       }
     });

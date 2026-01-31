@@ -399,7 +399,7 @@ export class LobbyUI {
     modeGrid.height = '50px';
     stack.addControl(modeGrid);
 
-    let selectedMode = 'survival';
+    let selectedMode = 'deathmatch';
     const modeBtns: Button[] = [];
 
     const createModeOption = (id: string, label: string): Button => {
