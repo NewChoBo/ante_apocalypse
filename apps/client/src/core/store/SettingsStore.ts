@@ -1,4 +1,7 @@
 import { map } from 'nanostores';
+import { Logger } from '@ante/common';
+
+const logger = new Logger('SettingsStore');
 
 export interface SettingsState {
   masterVolume: number;
@@ -20,7 +23,7 @@ function loadSettings(): SettingsState {
       return { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
     }
   } catch (e) {
-    console.warn('Failed to load settings from localStorage', e);
+    logger.warn('Failed to load settings from localStorage', e);
   }
   return DEFAULT_SETTINGS;
 }
@@ -32,6 +35,6 @@ settingsStore.subscribe((state) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch (e) {
-    console.warn('Failed to save settings to localStorage', e);
+    logger.warn('Failed to save settings to localStorage', e);
   }
 });

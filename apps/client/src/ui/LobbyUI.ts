@@ -329,7 +329,7 @@ export class LobbyUI {
     let selectedMap = 'training_ground';
     const mapBtns: Button[] = [];
 
-    const createMapOption = (id: string, label: string) => {
+    const createMapOption = (id: string, label: string): Button => {
       const btn = Button.CreateSimpleButton('modal-map-' + id, label);
       btn.width = '180px';
       btn.height = '35px';
@@ -338,13 +338,13 @@ export class LobbyUI {
       btn.thickness = 1;
       btn.paddingRight = '10px';
 
-      const updateMapStyles = () => {
+      const updateMapStyles = (): void => {
         const isSelected = selectedMap === id;
         btn.color = isSelected ? 'black' : 'white';
         btn.background = isSelected ? this.PRIMARY_COLOR : 'rgba(255,255,255,0.05)';
       };
 
-      btn.onPointerUpObservable.add(() => {
+      btn.onPointerUpObservable.add((): void => {
         selectedMap = id;
         mapBtns.forEach((b) => {
           const isSel = b.name === 'modal-map-' + id;

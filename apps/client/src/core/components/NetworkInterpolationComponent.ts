@@ -1,6 +1,10 @@
-import { Vector3, Mesh } from '@babylonjs/core';
+import { Vector3, Mesh, Scene } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { BasePawn } from '../BasePawn';
+
+interface MeshOwner extends BasePawn {
+  mesh: Mesh;
+}
 
 /**
  * 네트워크 위치/회전 보간을 담당하는 컴포넌트
@@ -11,9 +15,11 @@ export class NetworkInterpolationComponent extends BaseComponent {
   private targetRotation: Vector3;
   private lerpSpeed = 10;
   private _isMoving = false;
+  private ownerMesh: Mesh;
 
-  constructor(owner: BasePawn & { mesh: Mesh }) {
-    super(owner, (owner as any).scene);
+  constructor(owner: MeshOwner) {
+    super(owner, owner['scene'] as Scene);
+    this.ownerMesh = owner.mesh;
     this.targetPosition = owner.mesh.position.clone();
     this.targetRotation = new Vector3(0, 0, 0);
   }
@@ -40,7 +46,7 @@ export class NetworkInterpolationComponent extends BaseComponent {
    * 매 프레임 보간 업데이트
    */
   public update(deltaTime: number): void {
-    const mesh = (this.owner as any).mesh as Mesh;
+    const mesh = this.ownerMesh;
     if (!mesh) return;
 
     // 1. Calculate movement state

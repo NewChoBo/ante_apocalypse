@@ -41,28 +41,28 @@ export class PlayerController extends BaseController {
     this.updateKeyState(e.code, true);
   };
 
-  private onKeyUp = (e: KeyboardEvent) => {
+  private onKeyUp = (e: KeyboardEvent): void => {
     this.updateKeyState(e.code, false);
   };
 
-  private onMouseMove = (e: MouseEvent) => {
+  private onMouseMove = (e: MouseEvent): void => {
     if (document.pointerLockElement === this.canvas) {
       this.mouseDelta.x += e.movementX;
       this.mouseDelta.y += e.movementY;
     }
   };
 
-  private onMouseDown = (e: MouseEvent) => {
+  private onMouseDown = (e: MouseEvent): void => {
     if (e.button === 0) this.updateKeyState('MouseLeft', true);
     if (e.button === 2) this.updateKeyState('MouseRight', true);
   };
 
-  private onMouseUp = (e: MouseEvent) => {
+  private onMouseUp = (e: MouseEvent): void => {
     if (e.button === 0) this.updateKeyState('MouseLeft', false);
     if (e.button === 2) this.updateKeyState('MouseRight', false);
   };
 
-  private onContextMenu = (e: Event) => {
+  private onContextMenu = (e: Event): void => {
     e.preventDefault();
   };
 

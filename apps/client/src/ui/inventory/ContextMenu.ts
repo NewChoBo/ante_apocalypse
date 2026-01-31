@@ -31,19 +31,23 @@ export class InventoryContextMenu {
     const stack = new StackPanel();
     this.container.addControl(stack);
 
-    const createMenuBtn = (id: string, text: string, onClick: () => void) => {
+    const createMenuBtn = (id: string, text: string, onClick: () => void): Button => {
       const btn = Button.CreateSimpleButton(id, text);
       btn.height = '40px';
       btn.color = UI_CONFIG.colors.textMain;
       btn.background = 'transparent';
       btn.thickness = 0;
-      btn.onPointerEnterObservable.add(() => (btn.background = UI_CONFIG.colors.accent));
-      btn.onPointerOutObservable.add(() => (btn.background = 'transparent'));
+      btn.onPointerEnterObservable.add((): void => {
+        btn.background = UI_CONFIG.colors.accent;
+      });
+      btn.onPointerOutObservable.add((): void => {
+        btn.background = 'transparent';
+      });
       btn.onPointerClickObservable.add(onClick);
       return btn;
     };
 
-    const actionBtn = createMenuBtn('actionBtn', UI_CONFIG.labels.use, () => {
+    const actionBtn = createMenuBtn('actionBtn', UI_CONFIG.labels.use, (): void => {
       if (this.activeItemId) this.callbacks.onUseItem(this.activeItemId);
       this.hide();
     });
@@ -51,7 +55,7 @@ export class InventoryContextMenu {
     stack.addControl(actionBtn);
 
     stack.addControl(
-      createMenuBtn('dropBtn', UI_CONFIG.labels.drop, () => {
+      createMenuBtn('dropBtn', UI_CONFIG.labels.drop, (): void => {
         if (this.activeItemId) this.callbacks.onDropItem(this.activeItemId);
         this.hide();
       })

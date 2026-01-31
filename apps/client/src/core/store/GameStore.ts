@@ -15,7 +15,15 @@ declare global {
   }
 }
 
-function initStores() {
+type GameStores = {
+  scoreStore: WritableAtom<number>;
+  gameStateStore: WritableAtom<'READY' | 'PLAYING' | 'GAME_OVER'>;
+  ammoStore: MapStore<AmmoState>;
+  playerHealthStore: WritableAtom<number>;
+  inventoryStore: MapStore<InventoryState>;
+};
+
+function initStores(): GameStores {
   if (window.__GAME_STORES__) {
     logger.log('Reusing existing global stores (Singleton)');
     return window.__GAME_STORES__;

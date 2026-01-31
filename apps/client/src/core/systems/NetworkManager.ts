@@ -21,10 +21,13 @@ import {
   MovePayload,
   EnemyDestroyPayload,
   PickupDestroyPayload,
+  Logger,
 } from '@ante/common';
 import { ConnectionManager } from '../network/ConnectionManager';
 import { PlayerStateManager } from '../network/PlayerStateManager';
 import { RoomManager } from '../network/RoomManager';
+
+const logger = new Logger('NetworkManager');
 
 /**
  * 네트워크 관리 Facade 클래스
@@ -41,26 +44,26 @@ export class NetworkManager implements INetworkAuthority {
   private dispatcher: NetworkDispatcher = new NetworkDispatcher();
 
   // Player Observables (delegated from PlayerStateManager)
-  public get onPlayerJoined() {
+  public get onPlayerJoined(): Observable<PlayerState> {
     return this.playerStateManager.onPlayerJoined;
   }
-  public get onPlayerUpdated() {
+  public get onPlayerUpdated(): Observable<PlayerState> {
     return this.playerStateManager.onPlayerUpdated;
   }
-  public get onPlayerLeft() {
+  public get onPlayerLeft(): Observable<string> {
     return this.playerStateManager.onPlayerLeft;
   }
 
   // Connection Observables (delegated from ConnectionManager)
-  public get onStateChanged() {
+  public get onStateChanged(): Observable<NetworkState> {
     return this.connectionManager.onStateChanged;
   }
-  public get currentState() {
+  public get currentState(): NetworkState {
     return this.connectionManager.currentState;
   }
 
   // Room Observables (delegated from RoomManager)
-  public get onRoomListUpdated() {
+  public get onRoomListUpdated(): Observable<RoomInfo[]> {
     return this.roomManager.onRoomListUpdated;
   }
 
@@ -222,7 +225,7 @@ export class NetworkManager implements INetworkAuthority {
       });
     };
 
-    this.provider.onPlayerLeft = (id) => {
+    this.provider.onPlayerLeft = (id): void => {
       this.playerStateManager.removePlayer(id);
     };
 
@@ -231,12 +234,13 @@ export class NetworkManager implements INetworkAuthority {
       this.dispatcher.dispatch(code, data, senderId);
     };
 
-    this.provider.onMasterClientSwitched = (newMasterId: string) => {
+    this.provider.onMasterClientSwitched = (newMasterId: string): void => {
       const myId = this.getSocketId();
       if (myId === newMasterId) {
-        const roomName = (this.provider as any).client?.myRoom()?.name;
+        // INetworkProvider 인터페이스를 통해 room name 획득
+        const roomName = this.provider.getCurrentRoomName?.();
         if (roomName) {
-          console.log(`!!! I AM THE NEW HOST !!! - Triggering Takeover for Room: ${roomName}`);
+          logger.info(`I AM THE NEW HOST - Triggering Takeover for Room: ${roomName}`);
           import('../server/LocalServerManager').then(({ LocalServerManager }) => {
             LocalServerManager.getInstance().takeover(roomName);
           });

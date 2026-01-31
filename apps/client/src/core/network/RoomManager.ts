@@ -84,7 +84,8 @@ export class RoomManager {
    * 현재 룸의 맵 ID 조회
    */
   public getMapId(): string | null {
-    return this.provider.getCurrentRoomProperty('mapId');
+    const mapId = this.provider.getCurrentRoomProperty('mapId');
+    return typeof mapId === 'string' ? mapId : null;
   }
 
   /**

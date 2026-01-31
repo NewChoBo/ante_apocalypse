@@ -204,7 +204,7 @@ export class RemotePlayerPawn extends BasePawn {
       );
 
       if (handBone) {
-        const boneNode = (handBone as any).getTransformNode();
+        const boneNode = handBone.getTransformNode();
         if (boneNode) {
           this.weaponMesh.parent = boneNode;
           this.weaponMesh.position = new Vector3(0, 0, 0);

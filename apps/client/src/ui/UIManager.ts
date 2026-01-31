@@ -383,11 +383,11 @@ export class UIManager {
     btn.fontSize = 18;
     btn.fontWeight = '700';
 
-    btn.onPointerEnterObservable.add(() => {
+    btn.onPointerEnterObservable.add((): void => {
       btn.background = this.PRIMARY_COLOR;
       btn.color = 'black';
     });
-    btn.onPointerOutObservable.add(() => {
+    btn.onPointerOutObservable.add((): void => {
       btn.background = 'transparent';
       btn.color = this.PRIMARY_COLOR;
     });
@@ -430,12 +430,12 @@ export class UIManager {
     subText.paddingLeft = '30px';
     stack.addControl(subText);
 
-    btn.onPointerEnterObservable.add(() => {
+    btn.onPointerEnterObservable.add((): void => {
       btn.background = 'rgba(255, 255, 255, 0.08)';
       btn.color = this.PRIMARY_COLOR;
       btn.left = '10px';
     });
-    btn.onPointerOutObservable.add(() => {
+    btn.onPointerOutObservable.add((): void => {
       btn.background = 'rgba(255, 255, 255, 0.03)';
       btn.color = 'rgba(255, 255, 255, 0.1)';
       btn.left = '0px';
@@ -457,8 +457,9 @@ export class UIManager {
             }
           });
         }
-      } catch (e: any) {
-        logger.warn(`PointerLock request failed (sync): ${e.message}`);
+      } catch (e: unknown) {
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        logger.warn(`PointerLock request failed (sync): ${errorMessage}`);
       }
     }
   }

@@ -37,7 +37,12 @@ export class InventoryTooltip {
     stack.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     this.container.addControl(stack);
 
-    const createTBlock = (size: number, color: string, height: string, bold: boolean = false) => {
+    const createTBlock = (
+      size: number,
+      color: string,
+      height: string,
+      bold: boolean = false
+    ): TextBlock => {
       const tb = new TextBlock('', '');
       tb.color = color;
       tb.fontSize = size;

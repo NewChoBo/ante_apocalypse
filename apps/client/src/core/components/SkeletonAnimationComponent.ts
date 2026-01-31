@@ -1,4 +1,4 @@
-import { Scene, Skeleton, AnimationPropertiesOverride } from '@babylonjs/core';
+import { Scene, Skeleton, AnimationPropertiesOverride, Bone } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { BasePawn } from '../BasePawn';
 
@@ -16,7 +16,7 @@ export class SkeletonAnimationComponent extends BaseComponent {
   private idleRange: AnimationRange | null = null;
   private walkRange: AnimationRange | null = null;
   private currentAnim: 'idle' | 'walk' | 'none' = 'none';
-  private headBoneNode: any = null;
+  private headBoneNode: Bone | null = null;
 
   constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
@@ -44,8 +44,9 @@ export class SkeletonAnimationComponent extends BaseComponent {
 
     // Find head bone for pitch rotation
     this.headBoneNode =
-      skeleton.bones.find((b) => b.name.toLowerCase().includes('head')) ||
-      skeleton.bones.find((b) => b.name.toLowerCase().includes('neck'));
+      skeleton.bones.find((b) => b.name.toLowerCase().includes('head')) ??
+      skeleton.bones.find((b) => b.name.toLowerCase().includes('neck')) ??
+      null;
 
     // Start with idle animation
     this.playAnimation('idle');
