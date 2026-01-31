@@ -14,18 +14,25 @@ import { BaseComponent, IPawnCore } from '@ante/game-core';
 import { AssetLoader } from '../AssetLoader';
 import { Logger } from '@ante/common';
 
-const logger = new Logger('EnemyModelLoader');
+const logger = new Logger('CharacterModelLoader');
 
-interface EnemyModelOwner extends IPawnCore {
+export interface CharacterModelLoaderConfig {
+  assetKey: string;
+  shadowGenerator: ShadowGenerator;
+  entityType: 'player' | 'enemy';
+}
+
+interface CharacterModelOwner extends IPawnCore {
   mesh: Mesh;
 }
 
 /**
- * 적 모델 로딩 및 Hitbox 생성을 담당하는 컴포넌트
+ * 캐릭터 모델 로딩을 담당하는 통합 컴포넌트
+ * player/enemy 모두 사용 가능
  */
-export class EnemyModelLoader extends BaseComponent {
-  private enemyOwner: EnemyModelOwner;
-  private shadowGenerator: ShadowGenerator;
+export class CharacterModelLoader extends BaseComponent {
+  private charOwner: CharacterModelOwner;
+  private config: CharacterModelLoaderConfig;
 
   // Loaded assets
   private visualMesh: AbstractMesh | null = null;
@@ -33,10 +40,10 @@ export class EnemyModelLoader extends BaseComponent {
   private skeleton: Skeleton | null = null;
   private isLoaded = false;
 
-  constructor(owner: EnemyModelOwner, scene: Scene, shadowGenerator: ShadowGenerator) {
+  constructor(owner: CharacterModelOwner, scene: Scene, config: CharacterModelLoaderConfig) {
     super(owner, scene);
-    this.enemyOwner = owner;
-    this.shadowGenerator = shadowGenerator;
+    this.charOwner = owner;
+    this.config = config;
 
     // Create placeholder immediately
     this.createPlaceholder();
@@ -47,31 +54,37 @@ export class EnemyModelLoader extends BaseComponent {
   }
 
   private createPlaceholder(): void {
+    const color = this.config.entityType === 'enemy' ? Color3.Red() : Color3.Blue();
+
     this.placeholderMesh = MeshBuilder.CreateCylinder(
-      'enemyPlaceholder',
+      `${this.config.entityType}Placeholder`,
       { height: 1.8, diameter: 0.5 },
       this.scene
     );
     this.placeholderMesh.position = new Vector3(0, 0, 0);
-    this.placeholderMesh.parent = this.enemyOwner.mesh;
+    this.placeholderMesh.parent = this.charOwner.mesh;
 
     const mat = new StandardMaterial('placeholderMat', this.scene);
-    mat.diffuseColor = Color3.Red();
+    mat.diffuseColor = color;
     this.placeholderMesh.material = mat;
   }
 
   public async loadModel(): Promise<void> {
     try {
-      const entries = AssetLoader.getInstance().instantiateMesh('enemy');
+      const entries = AssetLoader.getInstance().instantiateMesh(this.config.assetKey);
 
       if (!entries) {
         const isReady = AssetLoader.getInstance().ready;
-        throw new Error(`Enemy asset not preloaded. Loader status: isReady=${isReady}`);
+        throw new Error(
+          `${this.config.assetKey} asset not preloaded. Loader status: isReady=${isReady}`
+        );
       }
 
       this.visualMesh = entries.rootNodes[0] as AbstractMesh;
       if (!this.visualMesh) {
-        throw new Error('Failed to find root node in instantiated entries for enemy');
+        throw new Error(
+          `Failed to find root node in instantiated entries for ${this.config.assetKey}`
+        );
       }
       this.visualMesh.setEnabled(false);
 
@@ -81,12 +94,12 @@ export class EnemyModelLoader extends BaseComponent {
       entries.rootNodes.forEach((node) => {
         if (node instanceof AbstractMesh) {
           node.checkCollisions = false;
-          node.metadata = { type: 'enemy', pawn: this.enemyOwner };
+          node.metadata = { type: this.config.entityType, pawn: this.charOwner };
           node.isPickable = true;
         }
 
         node.getChildMeshes().forEach((m) => {
-          m.metadata = { type: 'enemy', pawn: this.enemyOwner };
+          m.metadata = { type: this.config.entityType, pawn: this.charOwner };
           m.isPickable = true;
           if (this.skeleton && m.skeleton !== this.skeleton) {
             m.skeleton = this.skeleton;
@@ -95,12 +108,12 @@ export class EnemyModelLoader extends BaseComponent {
       });
 
       // Parent to root collider
-      this.visualMesh.parent = this.enemyOwner.mesh;
+      this.visualMesh.parent = this.charOwner.mesh;
       this.visualMesh.position = new Vector3(0, -1.0, 0);
       this.visualMesh.rotation = Vector3.Zero();
 
       // Shadow setup
-      this.shadowGenerator.addShadowCaster(this.visualMesh, true);
+      this.config.shadowGenerator.addShadowCaster(this.visualMesh, true);
 
       // Animation setup
       this.setupAnimations();
@@ -116,7 +129,7 @@ export class EnemyModelLoader extends BaseComponent {
 
       this.isLoaded = true;
     } catch (e) {
-      logger.error(`Failed to load enemy model: ${e}`);
+      logger.error(`Failed to load ${this.config.assetKey} model: ${e}`);
       this.showFallbackVisual();
     }
   }
@@ -159,12 +172,10 @@ export class EnemyModelLoader extends BaseComponent {
     const transformNode = headBone.getTransformNode();
 
     if (transformNode) {
-      logger.info('Attaching headBox to TransformNode');
       headBox.parent = transformNode;
       headBox.position = Vector3.Zero();
       headBox.rotation = Vector3.Zero();
     } else {
-      logger.info('Attaching headBox using attachToBone');
       try {
         headBox.attachToBone(headBone, this.visualMesh);
       } catch (e) {
@@ -174,14 +185,15 @@ export class EnemyModelLoader extends BaseComponent {
 
     headBox.visibility = 0;
     headBox.isPickable = true;
-    headBox.metadata = { type: 'enemy', pawn: this.enemyOwner, bodyPart: 'head' };
+    headBox.metadata = { type: this.config.entityType, pawn: this.charOwner, bodyPart: 'head' };
   }
 
   private showFallbackVisual(): void {
-    this.enemyOwner.mesh.isVisible = true;
+    const color = this.config.entityType === 'enemy' ? Color3.Red() : Color3.Blue();
+    this.charOwner.mesh.isVisible = true;
     const mat = new StandardMaterial('errMat', this.scene);
-    mat.diffuseColor = Color3.Red();
-    this.enemyOwner.mesh.material = mat;
+    mat.diffuseColor = color;
+    this.charOwner.mesh.material = mat;
   }
 
   private disposePlaceholder(): void {

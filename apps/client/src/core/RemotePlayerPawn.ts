@@ -8,41 +8,34 @@ import {
   AbstractMesh,
   ShadowGenerator,
   Animation,
+  DynamicTexture,
 } from '@babylonjs/core';
-import { BasePawn } from './BasePawn';
+import { CharacterPawn, CharacterPawnConfig } from './CharacterPawn';
 import { AssetLoader } from './AssetLoader';
-import { DynamicTexture } from '@babylonjs/core';
 import { Logger } from '@ante/common';
-import { HealthBarComponent } from './components/HealthBarComponent';
 import { NetworkInterpolationComponent } from './components/NetworkInterpolationComponent';
-import { SkeletonAnimationComponent } from './components/SkeletonAnimationComponent';
 import { MuzzleFlashComponent } from './components/MuzzleFlashComponent';
 
 const logger = new Logger('RemotePlayerPawn');
 
 /**
  * 다른 네트워크 플레이어를 나타내는 Pawn.
- * 컴포넌트 기반으로 리팩토링됨.
+ * CharacterPawn 상속 + 네트워크/플레이어 전용 기능
  */
-export class RemotePlayerPawn extends BasePawn {
-  public mesh: Mesh;
+export class RemotePlayerPawn extends CharacterPawn {
+  public type = 'remote_player';
   public id: string;
   public playerName: string;
-  public type = 'remote_player';
-  public isMoving = false;
 
-  // Components
+  // Player-specific components
   private interpolation: NetworkInterpolationComponent;
-  private animation: SkeletonAnimationComponent;
   private muzzleFlash: MuzzleFlashComponent;
-  private healthBarComponent: HealthBarComponent;
 
   // Visuals
-  private visualMesh: AbstractMesh | null = null;
   private _nameLabel: Mesh | null = null;
-  private shadowGenerator: ShadowGenerator;
   private weaponMesh: AbstractMesh | null = null;
   private currentWeaponId: string | null = null;
+  private shadowGenerator: ShadowGenerator;
 
   constructor(
     scene: Scene,
@@ -50,49 +43,39 @@ export class RemotePlayerPawn extends BasePawn {
     shadowGenerator: ShadowGenerator,
     name: string = 'Unknown'
   ) {
-    super(scene);
+    const config: CharacterPawnConfig = {
+      assetKey: 'enemy', // 현재 enemy 모델 사용
+      type: 'player',
+      position: new Vector3(0, 0, 0),
+      shadowGenerator,
+      healthBarStyle: 'player',
+      showHealthBar: true,
+    };
+    super(scene, config);
+
     this.id = id;
     this.playerName = name;
     this.shadowGenerator = shadowGenerator;
-    this.damageProfile = {
-      multipliers: { head: 2.0, body: 1.0 },
-      defaultMultiplier: 1.0,
-    };
 
-    // Root Collider (Pivot at eye level: 1.75m)
-    this.mesh = MeshBuilder.CreateBox('remotePlayerRoot_' + id, { size: 0.1 }, scene);
+    // Override mesh setup for remote player
+    this.mesh.name = 'remotePlayerRoot_' + id;
     this.mesh.position.set(0, 1.75, 0);
-    this.mesh.isVisible = false;
-    this.mesh.checkCollisions = true;
     this.mesh.rotationQuaternion = null;
-    this.mesh.isPickable = true;
     this.mesh.metadata = {
       type: 'remote_player',
       pawn: this,
       bodyPart: 'body',
     };
 
-    // Initialize Components
+    // Player-specific components
     this.interpolation = new NetworkInterpolationComponent(this);
     this.addComponent(this.interpolation);
-
-    this.animation = new SkeletonAnimationComponent(this, scene);
-    this.addComponent(this.animation);
 
     this.muzzleFlash = new MuzzleFlashComponent(this, scene);
     this.addComponent(this.muzzleFlash);
 
-    this.healthBarComponent = new HealthBarComponent(this, scene, {
-      style: 'player',
-      width: 1.5,
-      height: 0.2,
-      yOffset: 0.8,
-    });
-    this.addComponent(this.healthBarComponent);
-
-    // Visuals
+    // Name label
     this.createNameLabel(scene, name);
-    this.loadModel();
   }
 
   private createNameLabel(scene: Scene, name: string): void {
@@ -121,59 +104,72 @@ export class RemotePlayerPawn extends BasePawn {
 
   public initialize(): void {}
 
-  private async loadModel(): Promise<void> {
-    try {
-      const entries = AssetLoader.getInstance().instantiateMesh('enemy', 'remoteVisual_' + this.id);
-      if (!entries) return;
-
-      this.visualMesh = entries.rootNodes[0] as AbstractMesh;
-      this.visualMesh.parent = this.mesh;
-      this.visualMesh.position = new Vector3(0, -1.75, 0);
-      this.visualMesh.rotation = Vector3.Zero();
-      this.visualMesh.scaling.set(1, 1, 1);
-
-      const skeleton = entries.skeletons.length > 0 ? entries.skeletons[0] : null;
-      if (skeleton) {
-        this.animation.initializeSkeleton(skeleton);
-      }
-
-      // Set up pickable meshes
-      entries.rootNodes.forEach((node) => {
-        if (node instanceof AbstractMesh) {
-          node.isPickable = true;
-          node.metadata = { type: 'remote_player', pawn: this, bodyPart: 'body' };
-        }
-        node.getChildMeshes().forEach((m) => {
-          m.isPickable = true;
-          m.metadata = { type: 'remote_player', pawn: this, bodyPart: 'body' };
-          if (skeleton) m.skeleton = skeleton;
-        });
-      });
-
-      this.shadowGenerator.addShadowCaster(this.visualMesh, true);
-
-      // Add Head Hitbox
-      if (skeleton) {
-        const headBone = skeleton.bones.find((b) => b.name.toLowerCase().includes('head'));
-        if (headBone) {
-          const headBox = MeshBuilder.CreateBox('headBox_' + this.id, { size: 0.25 }, this.scene);
-          const transformNode = headBone.getTransformNode();
-          if (transformNode) {
-            headBox.parent = transformNode;
-            headBox.position = Vector3.Zero();
-          } else {
-            headBox.attachToBone(headBone, this.visualMesh!);
-          }
-          headBox.visibility = 0;
-          headBox.isPickable = true;
-          headBox.metadata = { type: 'remote_player', pawn: this, bodyPart: 'head' };
-        }
-      }
-    } catch (e) {
-      logger.error(`Failed to load remote player model: ${e}`);
-    }
+  // Network state update
+  public updateNetworkState(
+    position: { x: number; y: number; z: number },
+    rotation: { x: number; y: number; z: number }
+  ): void {
+    this.interpolation.updateTarget(position, rotation);
   }
 
+  public override tick(deltaTime: number): void {
+    // Update interpolation first
+    this.interpolation.update(deltaTime);
+    this.isMoving = this.interpolation.isMoving;
+
+    // Update head pitch
+    this.animationComponent.setHeadPitch(this.interpolation.getTargetPitch());
+
+    // Update animations based on movement
+    this.animationComponent.updateByMovementState(this.isMoving);
+
+    // Update all other components
+    this.updateComponents(deltaTime);
+  }
+
+  public override takeDamage(
+    amount: number,
+    _attackerId?: string,
+    _part?: string,
+    _hitPoint?: Vector3
+  ): void {
+    if (this.isDead) return;
+    logger.info(`Hit for ${amount} damage.`);
+    this.healthBarComponent?.updateHealth(this.health - amount);
+  }
+
+  public updateHealth(health: number): void {
+    this.health = health;
+    this.healthBarComponent?.updateHealth(health);
+  }
+
+  public override die(): void {
+    if (this.isDead) return;
+    this.isDead = true;
+    logger.info(`Died.`);
+
+    this.mesh.checkCollisions = false;
+    this.mesh.isPickable = false;
+
+    this.animationComponent.stopAnimation();
+
+    // Death animation (tilt backward)
+    const deathAnim = new Animation(
+      'deathAnim',
+      'rotation.x',
+      30,
+      Animation.ANIMATIONTYPE_FLOAT,
+      Animation.ANIMATIONLOOPMODE_CONSTANT
+    );
+    deathAnim.setKeys([
+      { frame: 0, value: this.mesh.rotation.x },
+      { frame: 30, value: this.mesh.rotation.x - Math.PI / 2 },
+    ]);
+    this.mesh.animations.push(deathAnim);
+    this.scene.beginAnimation(this.mesh, 0, 30, false);
+  }
+
+  // Weapon handling
   public updateWeapon(_weaponId: string): void {
     const assetKey = 'rifle';
     if (this.currentWeaponId === assetKey) return;
@@ -197,7 +193,7 @@ export class RemotePlayerPawn extends BasePawn {
       this.weaponMesh = entries.rootNodes[0] as AbstractMesh;
       this.weaponMesh.parent = this.mesh;
 
-      const skeleton = this.animation.getSkeleton();
+      const skeleton = this.animationComponent.getSkeleton();
       const handBone = skeleton?.bones.find(
         (b) =>
           b.name.toLowerCase().includes('righthand') || b.name.toLowerCase().includes('right_hand')
@@ -220,70 +216,7 @@ export class RemotePlayerPawn extends BasePawn {
     }
   }
 
-  public updateNetworkState(
-    position: { x: number; y: number; z: number },
-    rotation: { x: number; y: number; z: number }
-  ): void {
-    this.interpolation.updateTarget(position, rotation);
-  }
-
-  public tick(deltaTime: number): void {
-    // Update interpolation
-    this.interpolation.update(deltaTime);
-    this.isMoving = this.interpolation.isMoving;
-
-    // Update head pitch
-    this.animation.setHeadPitch(this.interpolation.getTargetPitch());
-
-    // Update animations based on movement
-    this.animation.updateByMovementState(this.isMoving);
-
-    // Update all other components
-    this.updateComponents(deltaTime);
-  }
-
-  public takeDamage(
-    amount: number,
-    _attackerId?: string,
-    _part?: string,
-    _hitPoint?: Vector3
-  ): void {
-    if (this.isDead) return;
-    logger.info(`Hit for ${amount} damage.`);
-    this.healthBarComponent?.updateHealth(this.health - amount);
-  }
-
-  public updateHealth(health: number): void {
-    this.health = health;
-    this.healthBarComponent?.updateHealth(health);
-  }
-
-  public die(): void {
-    if (this.isDead) return;
-    this.isDead = true;
-    logger.info(`Died.`);
-
-    this.mesh.checkCollisions = false;
-    this.mesh.isPickable = false;
-
-    this.animation.stopAnimation();
-
-    // Death animation
-    const deathAnim = new Animation(
-      'deathAnim',
-      'rotation.x',
-      30,
-      Animation.ANIMATIONTYPE_FLOAT,
-      Animation.ANIMATIONLOOPMODE_CONSTANT
-    );
-    deathAnim.setKeys([
-      { frame: 0, value: this.mesh.rotation.x },
-      { frame: 30, value: this.mesh.rotation.x - Math.PI / 2 },
-    ]);
-    this.mesh.animations.push(deathAnim);
-    this.scene.beginAnimation(this.mesh, 0, 30, false);
-  }
-
+  // Fire effect
   public fire(
     _weaponId: string,
     _muzzleData?: {
@@ -293,7 +226,6 @@ export class RemotePlayerPawn extends BasePawn {
   ): void {
     this.muzzleFlash.playFireSound();
 
-    // Calculate flash position
     let flashPos = this.mesh.position.clone().add(new Vector3(0, 1.5, 0.5));
     if (this.weaponMesh) {
       const matrix = this.weaponMesh.computeWorldMatrix(true);
@@ -303,7 +235,7 @@ export class RemotePlayerPawn extends BasePawn {
     this.muzzleFlash.createFlash(flashPos);
   }
 
-  public dispose(): void {
+  public override dispose(): void {
     super.dispose();
     if (this.weaponMesh) this.weaponMesh.dispose();
     if (this._nameLabel) this._nameLabel.dispose();
