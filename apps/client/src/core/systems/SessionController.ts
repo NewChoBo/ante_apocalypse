@@ -167,23 +167,28 @@ export class SessionController {
     // If Guest, we request initial state.
 
     // Initialize WorldSimulation with Client managers
-    if (this.enemyManager && this.targetSpawner) {
-      this.simulation = new WorldSimulation(
-        this.enemyManager,
-        PickupManager.getInstance(),
-        this.targetSpawner,
-        network
-      );
-      this.simulation.setGameRule(new WaveSurvivalRule());
-    }
+    // Skip if we are running a local server (LogicalServer handles simulation)
+    import('../server/LocalServerManager').then(({ LocalServerManager }) => {
+      const isLocalServerRunning = LocalServerManager.getInstance().isServerRunning();
 
-    if (network.isMasterClient()) {
-      if (this.simulation) {
-        this.simulation.initializeRequest(); // Spawns enemies/targets
+      if (this.enemyManager && this.targetSpawner && !isLocalServerRunning) {
+        this.simulation = new WorldSimulation(
+          this.enemyManager,
+          PickupManager.getInstance(),
+          this.targetSpawner,
+          network
+        );
+        this.simulation.setGameRule(new WaveSurvivalRule());
       }
-    } else {
-      network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
-    }
+
+      if (network.isMasterClient()) {
+        if (this.simulation) {
+          this.simulation.initializeRequest(); // Spawns enemies/targets
+        }
+      } else {
+        network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
+      }
+    });
 
     this._initialStateObserver = network.onInitialStateReceived.add(
       (data: InitialStatePayload): void => {

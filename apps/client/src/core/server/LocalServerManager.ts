@@ -1,6 +1,7 @@
 import { LogicalServer, ServerNetworkAuthority } from '@ante/game-core';
 import { BrowserAssetLoader } from './BrowserAssetLoader';
 import { Logger } from '@ante/common';
+import { NetworkManager } from '../systems/NetworkManager';
 
 const logger = new Logger('LocalServerManager');
 
@@ -77,6 +78,9 @@ export class LocalServerManager {
       // 4. Start Simulation
       this.logicalServer.start();
 
+      // [New] Register with NetworkManager for Short-circuiting
+      NetworkManager.getInstance().setLocalServer(this.logicalServer);
+
       this.isRunning = true;
       logger.info('Local Server Session Started (Takeover Complete).');
     } catch (e) {
@@ -90,6 +94,8 @@ export class LocalServerManager {
     if (this.logicalServer) {
       this.logicalServer.stop();
       this.logicalServer = null;
+      // [New] Unregister from NetworkManager
+      NetworkManager.getInstance().setLocalServer(null);
     }
     if (this.networkAuthority) {
       this.networkAuthority.disconnect();

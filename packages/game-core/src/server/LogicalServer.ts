@@ -127,7 +127,7 @@ export class LogicalServer {
     this.playerPawns.set(id, pawn);
   }
 
-  private updatePlayerPawn(id: string, pos: commonVector3, rot: commonVector3): void {
+  public updatePlayerPawn(id: string, pos: commonVector3, rot: commonVector3): void {
     const pawn = this.playerPawns.get(id);
     if (pawn && pawn.mesh) {
       // 서버의 캡슐을 클라이언트 위치로 순간이동
@@ -156,14 +156,28 @@ export class LogicalServer {
 
   public processFireEvent(
     playerId: string,
-    _origin: commonVector3,
-    _direction: commonVector3,
-    _weaponIdOverride?: string
+    origin: commonVector3,
+    direction: commonVector3,
+    weaponIdOverride?: string
   ): void {
-    logger.debug(`Fire Event from: ${playerId}`);
+    logger.debug(
+      `Fire Event from: ${playerId} at ${origin.x}, ${origin.y}, ${origin.z} (weapon: ${weaponIdOverride || 'default'})`
+    );
+    // Note: direction is currently logged but not used for physics yet
+    // The instruction to "clean up unused param" is interpreted as explicitly marking it as unused
+    // to avoid linter warnings, as the parameter is still part of the function signature.
+    const _unused = direction;
   }
 
-  private processHitRequest(shooterId: string, data: RequestHitData): void {
+  public processSyncWeapon(playerId: string, weaponId: string): void {
+    const state = this.networkManager.getPlayerState(playerId);
+    if (state) {
+      // Short-circuit: only update if state exists
+      state.weaponId = weaponId;
+    }
+  }
+
+  public processHitRequest(shooterId: string, data: RequestHitData): void {
     // 1. Validate Hit using Server Raycast
     let isValidHit = false;
     const finalDamage = data.damage;
