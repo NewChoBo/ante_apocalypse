@@ -23,6 +23,8 @@ export enum EventCode {
   WEAPON_CONFIGS = 22,
   REQUEST_HIT = 23,
   RELOAD = 24,
+  RESPAWN = 25,
+  GAME_END = 26,
 }
 
 export interface Vector3 {
@@ -151,6 +153,17 @@ export interface EnemyDestroyPayload {
 
 export interface PickupDestroyPayload {
   id: string;
+}
+
+export interface RespawnEventData {
+  playerId: string;
+  position: Vector3;
+}
+
+export interface GameEndEventData {
+  winnerId?: string;
+  winnerTeam?: string;
+  reason: string;
 }
 
 export enum NetworkState {

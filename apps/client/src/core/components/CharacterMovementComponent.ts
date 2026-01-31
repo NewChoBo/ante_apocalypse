@@ -34,8 +34,12 @@ export class CharacterMovementComponent extends BaseComponent {
 
   /** 입력 데이터에 기반해 이동 처리 */
   public handleMovement(input: MovementInput, deltaTime: number): void {
-    // 1. 앉기 상태 처리 (물리 볼륨 조정은 나중에 구현)
-    // const targetHeight = input.crouch ? this.crouchHeight : this.playerHeight;
+    const isGhost = this.owner.isDead;
+
+    if (isGhost) {
+      this.handleGhostMovement(input, deltaTime);
+      return;
+    }
 
     const combatComp = this.owner.getComponent(CombatComponent);
     const weapon = combatComp ? combatComp.getCurrentWeapon() : null;
@@ -72,8 +76,34 @@ export class CharacterMovementComponent extends BaseComponent {
     }
   }
 
+  private handleGhostMovement(input: MovementInput, deltaTime: number): void {
+    const ghostSpeed = this.moveSpeed * 2.0; // Faster in ghost mode
+    const forward = this.owner.mesh.getDirection(Vector3.Forward());
+    const right = this.owner.mesh.getDirection(Vector3.Right());
+    const up = Vector3.Up();
+
+    const moveDirection = Vector3.Zero();
+    if (input.forward) moveDirection.addInPlace(forward);
+    if (input.backward) moveDirection.subtractInPlace(forward);
+    if (input.right) moveDirection.addInPlace(right);
+    if (input.left) moveDirection.subtractInPlace(right);
+
+    // Vertical movement in ghost mode
+    if (input.jump) moveDirection.addInPlace(up); // Space
+    if (input.crouch) moveDirection.subtractInPlace(up); // Crouch/Ctrl
+
+    if (moveDirection.length() > 0) {
+      moveDirection.normalize();
+      const velocity = moveDirection.scale(ghostSpeed * deltaTime);
+      // Noclip: directly update position
+      this.owner.mesh.position.addInPlace(velocity);
+    }
+  }
+
   public update(deltaTime: number): void {
-    this.updateGravity(deltaTime);
+    if (!this.owner.isDead) {
+      this.updateGravity(deltaTime);
+    }
   }
 
   private updateGravity(deltaTime: number): void {

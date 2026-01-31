@@ -2,7 +2,10 @@ import { NullEngine, Scene, MeshBuilder, ArcRotateCamera, Vector3 } from '@babyl
 import { ServerNetworkAuthority } from './ServerNetworkAuthority.js';
 import { RequestHitData, Vector3 as commonVector3, Logger, EventCode } from '@ante/common';
 import { WorldSimulation } from '../simulation/WorldSimulation.js';
+import { IGameRule } from '../rules/IGameRule.js';
 import { WaveSurvivalRule } from '../rules/WaveSurvivalRule.js';
+import { ShootingRangeRule } from '../rules/ShootingRangeRule.js';
+import { DeathmatchRule } from '../rules/DeathmatchRule.js';
 import { HitRegistrationSystem } from '../systems/HitRegistrationSystem.js';
 
 import { ServerEnemyManager } from './managers/ServerEnemyManager.js';
@@ -20,6 +23,8 @@ const logger = new Logger('LogicalServer');
 export interface LogicalServerOptions {
   /** If true, skip world initialization (used for host migration) */
   isTakeover?: boolean;
+  /** Game mode ID: 'survival' | 'shooting_range' | 'deathmatch' */
+  gameMode?: string;
 }
 
 export class LogicalServer {
@@ -64,8 +69,11 @@ export class LogicalServer {
       this.networkManager
     );
 
-    // 게임 룰(모드) 설정
-    this.simulation.setGameRule(new WaveSurvivalRule());
+    // 게임 룰(모드) 설정 - gameMode에 따라 선택
+    const gameMode = options?.gameMode ?? 'survival';
+    const gameRule = this.createGameRule(gameMode);
+    this.simulation.setGameRule(gameRule);
+    logger.info(`Game mode set to: ${gameMode}`);
 
     // 서버용 더미 카메라 생성
     // 서버는 화면을 그리지 않지만, 씬 구동을 위해 카메라가 필수입니다.
@@ -104,6 +112,18 @@ export class LogicalServer {
 
     this.networkManager.onHitRequest = (shooterId: string, data: RequestHitData) =>
       this.processHitRequest(shooterId, data);
+  }
+
+  private createGameRule(mode: string): IGameRule {
+    switch (mode) {
+      case 'shooting_range':
+        return new ShootingRangeRule();
+      case 'deathmatch':
+        return new DeathmatchRule();
+      case 'survival':
+      default:
+        return new WaveSurvivalRule();
+    }
   }
 
   public start(): void {

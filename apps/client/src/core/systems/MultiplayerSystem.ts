@@ -5,7 +5,7 @@ import { RemotePlayerPawn } from '../RemotePlayerPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { CombatComponent } from '../components/CombatComponent';
 import { WorldEntityManager } from './WorldEntityManager';
-import { playerHealthStore } from '../store/GameStore';
+import { playerHealthStore, gameStateStore } from '../store/GameStore';
 
 export class MultiplayerSystem {
   private scene: Scene;
@@ -137,6 +137,25 @@ export class MultiplayerSystem {
         const remote = this.remotePlayers.get(data.targetId);
         if (remote) {
           remote.die();
+        }
+      }
+    });
+
+    this.networkManager.onPlayerRespawn.add((data) => {
+      const pos = new Vector3(data.position.x, data.position.y, data.position.z);
+
+      if (data.playerId === this.networkManager.getSocketId()) {
+        // Local player respawn
+        this.localPlayer.respawn(pos);
+        gameStateStore.set('PLAYING');
+      } else {
+        // Remote player respawn
+        const remote = this.remotePlayers.get(data.playerId);
+        if (remote) {
+          remote.position.copyFrom(pos);
+          remote.isDead = false;
+          remote.updateHealth(100);
+          // If the remote player model was hidden or removed, re-show it here
         }
       }
     });

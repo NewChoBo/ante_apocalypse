@@ -125,8 +125,32 @@ export class PlayerPawn extends BasePawn {
   }
 
   public die(): void {
+    if (this.isDead) return;
     this.isDead = true;
-    logger.info('Died');
-    // TODO: Handle Game Over logic (UI, Respawn, etc.)
+    this.mesh.checkCollisions = false; // Disable collisions for ghost mode
+
+    // Hide weapons on death
+    const combat = this.getComponent(CombatComponent) as CombatComponent;
+    if (combat) {
+      combat.getCurrentWeapon()?.hide();
+    }
+
+    logger.info('Died - Entering Ghost Mode');
+  }
+
+  public respawn(position: Vector3): void {
+    this.isDead = false;
+    this.health = 100;
+    this.mesh.position.copyFrom(position);
+    this.mesh.checkCollisions = true; // Restore collisions
+
+    // Show weapons on respawn
+    const combat = this.getComponent(CombatComponent) as CombatComponent;
+    if (combat) {
+      combat.getCurrentWeapon()?.show();
+    }
+
+    playerHealthStore.set(100);
+    logger.info('Respawned');
   }
 }

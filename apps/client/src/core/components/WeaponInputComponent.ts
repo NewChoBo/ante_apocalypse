@@ -1,29 +1,35 @@
 import { WeaponInventoryComponent } from './WeaponInventoryComponent';
+import type { BasePawn } from '../BasePawn';
 
 /**
  * 사용자 입력을 캡처하여 무기 인벤토리 및 현재 무기 행동으로 변환하는 컴포넌트.
  */
 export class WeaponInputComponent {
   private inventory: WeaponInventoryComponent;
+  private owner: BasePawn;
 
-  constructor(inventory: WeaponInventoryComponent) {
+  constructor(inventory: WeaponInventoryComponent, owner: BasePawn) {
     this.inventory = inventory;
+    this.owner = owner;
     this.setupInputEvents();
   }
 
   private onMouseDown = (e: MouseEvent) => {
+    if (this.owner.isDead) return;
     if (e.button === 0 && document.pointerLockElement) {
       this.inventory.currentWeapon.startFire();
     }
   };
 
   private onMouseUp = (e: MouseEvent) => {
+    if (this.owner.isDead) return;
     if (e.button === 0) {
       this.inventory.currentWeapon.stopFire();
     }
   };
 
   private onKeyDown = (e: KeyboardEvent) => {
+    if (this.owner.isDead) return;
     // 포인터가 잠겨있을 때만 무기 조작 허용
     if (!document.pointerLockElement) return;
 

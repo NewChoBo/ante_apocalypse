@@ -32,14 +32,15 @@ export class LocalServerManager {
     await this.internalStart(roomName, true);
   }
 
-  public async startSession(roomName: string, mapId: string): Promise<void> {
-    await this.internalStart(roomName, false, mapId);
+  public async startSession(roomName: string, mapId: string, gameMode: string): Promise<void> {
+    await this.internalStart(roomName, false, mapId, gameMode);
   }
 
   private async internalStart(
     roomName: string,
     isTakeover: boolean,
-    mapId?: string
+    mapId?: string,
+    gameMode?: string
   ): Promise<void> {
     if (this.isRunning) {
       logger.warn('Local Server is already running.');
@@ -75,6 +76,7 @@ export class LocalServerManager {
       const assetLoader = new BrowserAssetLoader();
       this.logicalServer = new LogicalServer(this.networkAuthority, assetLoader, {
         isTakeover,
+        gameMode,
       });
 
       // 4. Start Simulation

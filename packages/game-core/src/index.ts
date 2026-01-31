@@ -26,6 +26,8 @@ export * from './combat/BaseWeapon.js';
 export * from './combat/Firearm.js';
 export * from './rules/IGameRule.js';
 export * from './rules/WaveSurvivalRule.js';
+export * from './rules/ShootingRangeRule.js';
+export * from './rules/DeathmatchRule.js';
 
 // Server-side (Isomorphic) logic
 export * from './server/IServerAssetLoader.js';

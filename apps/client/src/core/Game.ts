@@ -139,6 +139,12 @@ export class Game {
       NetworkManager.getInstance().leaveRoom();
       this.uiManager.showScreen(UIScreen.LOGIN);
     });
+
+    // Handle Game End from Server
+    nm.onGameEnd.add((data) => {
+      logger.info(`Game End received: ${data.reason}`);
+      this.gameOver(data.reason);
+    });
   }
 
   private handleNetworkStateChange(state: NetworkState): void {
@@ -195,7 +201,11 @@ export class Game {
         GameObservables.playerDied.remove(this._playerDiedObserver);
       }
       this._playerDiedObserver = GameObservables.playerDied.add(() => {
-        if (this.isRunning) this.gameOver();
+        if (this.isRunning) {
+          // Just set state, don't show menu. Respawn logic is handled in MultiplayerSystem.
+          gameStateStore.set('DEAD');
+          logger.info('Local player died. Waiting for respawn or game end...');
+        }
       });
 
       this.engine.hideLoadingUI();
@@ -225,10 +235,12 @@ export class Game {
     }
   }
 
-  public gameOver(): void {
+  public gameOver(reason: string = 'SESSION_TERMINATED'): void {
+    if (!this.isRunning) return;
     this.isRunning = false;
     gameStateStore.set('GAME_OVER');
-    // this.uiManager.setGameOverUI(true); // Removed
+
+    this.uiManager.showNotification(`MISSION_COMPLETE: ${reason}`);
     this.uiManager.showScreen(UIScreen.MAIN_MENU);
     this.uiManager.exitPointerLock();
   }

@@ -305,19 +305,32 @@ export class LobbyUI {
     modal.thickness = 2;
     modalOverlay.addControl(modal);
 
-    const stack = new StackPanel();
-    stack.paddingTop = '20px';
-    stack.spacing = 20;
-    modal.addControl(stack);
-
     const title = new TextBlock();
     title.text = 'CONFIGURE_SQUAD_CHANNEL';
     title.color = 'white';
     title.fontSize = 24;
     title.fontFamily = this.FONT_TACTICAL;
     title.fontWeight = '700';
-    title.height = '40px';
-    stack.addControl(title);
+    title.height = '60px'; // Increased height for padding
+    title.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    title.paddingTop = '20px';
+    modal.addControl(title);
+
+    // Scroll Viewer for settings content
+    const scrollViewer = new ScrollViewer('modal-scroll-viewer');
+    scrollViewer.width = '100%';
+    scrollViewer.height = '320px'; // Fixed height for scrollable area
+    scrollViewer.top = '70px';
+    scrollViewer.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
+    scrollViewer.thickness = 0;
+    scrollViewer.barSize = 5;
+    scrollViewer.barColor = this.PRIMARY_COLOR;
+    modal.addControl(scrollViewer);
+
+    const stack = new StackPanel();
+    stack.paddingTop = '10px';
+    stack.spacing = 20;
+    scrollViewer.addControl(stack);
 
     // Room Name
     const nameLabel = this.createModalLabel('CHANNEL_ID:');
@@ -377,6 +390,51 @@ export class LobbyUI {
     mapGrid.addControl(createMapOption('training_ground', 'TRAINING_GD'));
     mapGrid.addControl(createMapOption('combat_zone', 'COMBAT_ZONE'));
 
+    // Game Mode Selection
+    const modeLabel = this.createModalLabel('OPERATION_MODE:');
+    stack.addControl(modeLabel);
+
+    const modeGrid = new StackPanel();
+    modeGrid.isVertical = false;
+    modeGrid.height = '50px';
+    stack.addControl(modeGrid);
+
+    let selectedMode = 'survival';
+    const modeBtns: Button[] = [];
+
+    const createModeOption = (id: string, label: string): Button => {
+      const btn = Button.CreateSimpleButton('modal-mode-' + id, label);
+      btn.width = '130px';
+      btn.height = '35px';
+      btn.fontFamily = this.FONT_MONO;
+      btn.fontSize = 11;
+      btn.thickness = 1;
+      btn.paddingRight = '10px';
+
+      const updateModeStyles = (): void => {
+        const isSelected = selectedMode === id;
+        btn.color = isSelected ? 'black' : 'white';
+        btn.background = isSelected ? this.PRIMARY_COLOR : 'rgba(255,255,255,0.05)';
+      };
+
+      btn.onPointerUpObservable.add((): void => {
+        selectedMode = id;
+        modeBtns.forEach((b) => {
+          const isSel = b.name === 'modal-mode-' + id;
+          b.color = isSel ? 'black' : 'white';
+          b.background = isSel ? this.PRIMARY_COLOR : 'rgba(255,255,255,0.05)';
+        });
+      });
+
+      updateModeStyles();
+      modeBtns.push(btn);
+      return btn;
+    };
+
+    modeGrid.addControl(createModeOption('shooting_range', 'TRAINING'));
+    modeGrid.addControl(createModeOption('survival', 'SURVIVAL'));
+    modeGrid.addControl(createModeOption('deathmatch', 'DEATHMATCH'));
+
     // Host Locally Toggle
     const hostTogglePanel = new StackPanel();
     hostTogglePanel.isVertical = false;
@@ -400,12 +458,13 @@ export class LobbyUI {
     checkboxLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
     hostTogglePanel.addControl(checkboxLabel);
 
-    // Action Buttons
+    // Bottom Action Buttons (Sticky)
     const buttonPanel = new StackPanel();
     buttonPanel.isVertical = false;
-    buttonPanel.height = '100px';
+    buttonPanel.height = '80px';
     buttonPanel.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
-    stack.addControl(buttonPanel);
+    buttonPanel.background = 'rgba(0,0,0,0.3)';
+    modal.addControl(buttonPanel);
 
     const cancelBtn = this.createButton('ABORT', '150px');
     cancelBtn.color = '#ff4d4d';
@@ -414,22 +473,9 @@ export class LobbyUI {
     });
     buttonPanel.addControl(cancelBtn);
 
-    const errorMsg = new TextBlock();
-    errorMsg.text = '';
-    errorMsg.color = '#ff4d4d';
-    errorMsg.fontSize = 14;
-    errorMsg.fontFamily = this.FONT_MONO;
-    errorMsg.height = '20px';
-    errorMsg.isVisible = false;
-    stack.addControl(errorMsg);
-
     const initBtn = this.createButton('INITIATE', '200px');
     initBtn.paddingLeft = '20px';
     initBtn.onPointerUpObservable.add(async () => {
-      // Reset Error
-      errorMsg.isVisible = false;
-      errorMsg.text = '';
-
       // Set Loading State
       initBtn.isEnabled = false;
       initBtn.textBlock!.text = 'DEPLOYING...';
@@ -437,6 +483,7 @@ export class LobbyUI {
 
       const roomName = roomInput.text;
       const mapId = selectedMap;
+      const gameMode = selectedMode;
 
       // Force minimal delay for UX
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -445,9 +492,7 @@ export class LobbyUI {
         let success = false;
         if (checkbox.isChecked) {
           logger.info('Creating Local Server Session...');
-          await LocalServerManager.getInstance().startSession(roomName, mapId);
-          // Wait for local server to be ready before joining?
-          // LocalServerManager.startSession is async and waits for Authority connection.
+          await LocalServerManager.getInstance().startSession(roomName, mapId, gameMode);
           success = await this.networkManager.joinRoom(roomName);
         } else {
           success = await this.networkManager.createRoom(roomName, mapId);
@@ -460,16 +505,9 @@ export class LobbyUI {
         }
       } catch (e: any) {
         logger.error('Failed to create/join room:', e);
-
-        // Clean up partial state if necessary
         if (checkbox.isChecked) {
           LocalServerManager.getInstance().stopSession();
         }
-
-        errorMsg.text = 'ERROR: ' + (e.message || 'CONNECTION_FAILED');
-        errorMsg.isVisible = true;
-
-        // Reset Button
         initBtn.isEnabled = true;
         initBtn.textBlock!.text = 'INITIATE';
         initBtn.alpha = 1.0;

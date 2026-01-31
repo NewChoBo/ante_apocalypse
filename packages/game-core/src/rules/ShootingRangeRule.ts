@@ -2,25 +2,25 @@ import { IGameRule, RespawnDecision, GameEndResult } from './IGameRule.js';
 import { WorldSimulation } from '../simulation/WorldSimulation.js';
 import { Vector3 } from '@babylonjs/core';
 
-export class WaveSurvivalRule implements IGameRule {
-  public readonly modeId = 'survival';
+/**
+ * 사격장 모드: 연습용, 타겟만 스폰, 적 없음, 승패 조건 없음
+ */
+export class ShootingRangeRule implements IGameRule {
+  public readonly modeId = 'shooting_range';
   public readonly allowRespawn = false;
   public readonly respawnDelay = 0;
 
-  private alivePlayers: Set<string> = new Set();
-
   public onInitialize(simulation: WorldSimulation): void {
-    // 1. Initial Target Spawns
-    const distances = [10, 15, 20];
+    // 타겟만 스폰 (적 없음)
+    const distances = [10, 15, 20, 25, 30];
 
     for (let lane = 0; lane < 5; lane++) {
-      const x = (lane - 2) * 7;
+      const x = (lane - 2) * 5;
       distances.forEach((z) => {
-        const isMoving = Math.random() > 0.5;
+        const isMoving = z >= 20; // 먼 거리는 이동 타겟
         const position = new Vector3(x, 1.0, z);
         const id = `target_${lane}_${z}_${Math.random().toString(36).substr(2, 4)}`;
 
-        // Use exposed method on Spawner
         simulation.targets.spawnTargetAt(
           id,
           isMoving ? 'moving_target' : 'static_target',
@@ -29,39 +29,31 @@ export class WaveSurvivalRule implements IGameRule {
         );
       });
     }
-
-    // 2. Initial Enemies
-    simulation.enemies.spawnEnemiesAt([
-      [5, 0, 5],
-      [-5, 0, 5],
-    ]);
   }
 
   public onUpdate(_simulation: WorldSimulation, _deltaTime: number): void {
-    // TODO: Wave Management, Check Win/Loss
+    // 점수 계산 등 필요시 추가
   }
 
-  public onPlayerJoin(_simulation: WorldSimulation, playerId: string): void {
-    this.alivePlayers.add(playerId);
+  public onPlayerJoin(_simulation: WorldSimulation, _playerId: string): void {
+    // 사격장은 특별한 처리 없음
   }
 
-  public onPlayerLeave(_simulation: WorldSimulation, playerId: string): void {
-    this.alivePlayers.delete(playerId);
+  public onPlayerLeave(_simulation: WorldSimulation, _playerId: string): void {
+    // 사격장은 특별한 처리 없음
   }
 
   public onPlayerDeath(
     _simulation: WorldSimulation,
-    playerId: string,
+    _playerId: string,
     _killerId?: string
   ): RespawnDecision {
-    this.alivePlayers.delete(playerId);
+    // 사격장에서는 사망하지 않음 (혹시 발생하면 무시)
     return { action: 'spectate' };
   }
 
   public checkGameEnd(_simulation: WorldSimulation): GameEndResult | null {
-    if (this.alivePlayers.size === 0) {
-      return { reason: 'All players eliminated' };
-    }
+    // 사격장은 종료 조건 없음
     return null;
   }
 }

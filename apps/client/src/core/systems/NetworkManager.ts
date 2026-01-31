@@ -21,6 +21,8 @@ import {
   MovePayload,
   EnemyDestroyPayload,
   PickupDestroyPayload,
+  RespawnEventData,
+  GameEndEventData,
   Logger,
 } from '@ante/common';
 import { ConnectionManager } from '../network/ConnectionManager';
@@ -73,6 +75,8 @@ export class NetworkManager implements INetworkAuthority {
   public onPlayerFired = new Observable<FireEventData>();
   public onPlayerHit = new Observable<HitEventData>();
   public onPlayerDied = new Observable<DeathEventData>();
+  public onPlayerRespawn = new Observable<RespawnEventData>();
+  public onGameEnd = new Observable<GameEndEventData>();
 
   // Enemy Synchronization
   public onEnemyUpdated = new Observable<EnemyMovePayload>();
@@ -184,6 +188,14 @@ export class NetworkManager implements INetworkAuthority {
 
     this.dispatcher.register(EventCode.PLAYER_DEATH, (data: DeathEventData) => {
       this.onPlayerDied.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.RESPAWN, (data: RespawnEventData) => {
+      this.onPlayerRespawn.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.GAME_END, (data: GameEndEventData) => {
+      this.onGameEnd.notifyObservers(data);
     });
 
     this.dispatcher.register(EventCode.TARGET_DESTROY, (data: TargetDestroyPayload) => {
