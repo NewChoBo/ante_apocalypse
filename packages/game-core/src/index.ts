@@ -1,4 +1,5 @@
 export * from './types/IEnemyPawn.js';
+export * from './types/IPawnCore.js';
 export * from './controllers/AIController.js';
 export * from './types/IWorldEntity.js';
 export * from './types/ITickable.js';
