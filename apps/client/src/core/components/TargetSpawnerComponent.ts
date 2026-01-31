@@ -1,11 +1,8 @@
 import { BaseTargetSpawner } from '@ante/game-core';
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
-import { StaticTarget } from '../../targets/StaticTarget';
-import { MovingTarget } from '../../targets/MovingTarget';
-import { HumanoidTarget } from '../../targets/HumanoidTarget';
+import { TargetPawn, TargetPawnConfig } from '../TargetPawn';
 import { NetworkManager } from '../systems/NetworkManager';
 import { WorldEntityManager } from '../systems/WorldEntityManager';
-import { IWorldEntity } from '@ante/game-core';
 
 /**
  * 타겟의 스폰 및 리스폰 로직을 담당하는 컴포넌트.
@@ -50,20 +47,15 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
 
     if (!type) type = isMoving ? 'moving_target' : 'static_target';
 
-    let target: IWorldEntity;
+    const config: TargetPawnConfig = {
+      id: id!,
+      type: type,
+      position: position,
+      shadowGenerator: this.shadowGenerator,
+      isMoving: isMoving || type === 'moving_target' || type === 'moving',
+    };
 
-    if (type === 'humanoid_target' || type === 'humanoid') {
-      target = new HumanoidTarget(
-        this.scene,
-        id!,
-        position.add(new Vector3(0, 0.5, 0)),
-        this.shadowGenerator
-      );
-    } else if (type === 'moving_target' || type === 'moving' || isMoving) {
-      target = new MovingTarget(this.scene, id!, position, this.shadowGenerator);
-    } else {
-      target = new StaticTarget(this.scene, id!, position, this.shadowGenerator);
-    }
+    const target = new TargetPawn(this.scene, config);
 
     // WorldManager에 등록
     this.worldManager.registerEntity(target);
