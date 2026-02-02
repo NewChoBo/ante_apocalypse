@@ -1,6 +1,13 @@
-import { Scene, Skeleton, AnimationPropertiesOverride, Bone, Vector3 } from '@babylonjs/core';
+import {
+  Scene,
+  Skeleton,
+  AnimationPropertiesOverride,
+  Bone,
+  Vector3,
+  AbstractMesh,
+} from '@babylonjs/core';
 import { BaseComponent } from '../BaseComponent.js';
-import { BasePawn } from '../BasePawn.js';
+import { Pawn } from '../Pawn.js';
 
 interface AnimationRange {
   from: number;
@@ -13,12 +20,14 @@ type AnimState = 'idle' | 'walk' | 'walk_back' | 'run' | 'strafe_left' | 'strafe
  * 스켈레톤 애니메이션 상태 관리를 담당하는 컴포넌트
  */
 export class SkeletonAnimationComponent extends BaseComponent {
+  public readonly componentType = 'SkeletonAnimationComponent';
+
   private skeleton: Skeleton | null = null;
   private ranges: Map<AnimState, AnimationRange> = new Map();
   private currentAnim: AnimState = 'none';
   private headBoneNode: Bone | null = null;
 
-  constructor(owner: BasePawn, scene: Scene) {
+  constructor(owner: Pawn, scene: Scene) {
     super(owner, scene);
   }
 
@@ -153,8 +162,8 @@ export class SkeletonAnimationComponent extends BaseComponent {
     }
 
     // Transform smoothed world velocity to local space
-    // BasePawn assumes mesh property exists.
-    const mesh = this.owner.mesh;
+    // Pawn assumes mesh property exists.
+    const mesh = this.owner.mesh as AbstractMesh;
     if (!mesh) return;
 
     mesh.computeWorldMatrix(true);

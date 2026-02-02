@@ -94,6 +94,20 @@ export class WeaponInventoryComponent {
     this.weapons.forEach((w) => w.addAmmo(amount));
   }
 
+  // Alias methods for CombatComponent compatibility
+  public getCurrentWeapon(): IWeapon | null {
+    return this.currentWeapon;
+  }
+
+  public switchToWeapon(weaponId: string): boolean {
+    const index = this.weapons.findIndex((w) => w.name === weaponId);
+    if (index !== -1) {
+      this.switchWeapon(index);
+      return true;
+    }
+    return false;
+  }
+
   public dispose(): void {
     this.weapons.forEach((w) => w.dispose());
   }

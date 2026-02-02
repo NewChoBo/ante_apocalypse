@@ -11,6 +11,8 @@ interface MeshOwner extends BasePawn {
  * RemotePlayerPawn에서 분리됨
  */
 export class NetworkInterpolationComponent extends BaseComponent {
+  readonly componentType = 'NetworkInterpolation';
+
   private targetPosition: Vector3;
   private targetRotation: Vector3;
   private lerpSpeed = 10;

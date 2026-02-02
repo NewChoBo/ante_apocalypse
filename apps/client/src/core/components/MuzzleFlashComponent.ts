@@ -8,6 +8,8 @@ import { GameAssets } from '../GameAssets';
  * RemotePlayerPawn에서 분리됨
  */
 export class MuzzleFlashComponent extends BaseComponent {
+  readonly componentType = 'MuzzleFlash';
+
   constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
   }

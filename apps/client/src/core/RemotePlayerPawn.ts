@@ -13,6 +13,7 @@ import {
 import { CharacterPawn, CharacterPawnConfig } from './CharacterPawn';
 import { GameAssets } from './GameAssets';
 import { Logger } from '@ante/common';
+import type { EntityType } from '@ante/common';
 
 import { NetworkInterpolationComponent } from './components/NetworkInterpolationComponent';
 import { MuzzleFlashComponent } from './components/MuzzleFlashComponent';
@@ -24,7 +25,8 @@ const logger = new Logger('RemotePlayerPawn');
  * CharacterPawn 상속 + 네트워크/플레이어 전용 기능
  */
 export class RemotePlayerPawn extends CharacterPawn {
-  public type = 'remote_player';
+  public type: EntityType = 'remote_player';
+  public controllerId: string | null = null;
   public id: string;
   public playerName: string;
 
@@ -121,8 +123,12 @@ export class RemotePlayerPawn extends CharacterPawn {
     // 2. Call super.tick which handles velocity-based animation and component updates
     super.tick(deltaTime);
 
-    // 3. Update extra remote-only features
-    this.animationComponent.setHeadPitch(this.interpolation.getTargetPitch());
+    // 3. Update extra remote-only features (get animation component via getComponent)
+    const animComp =
+      this.getComponent<import('@ante/game-core').SkeletonAnimationComponent>('SkeletonAnimation');
+    if (animComp && 'setHeadPitch' in animComp) {
+      (animComp as any).setHeadPitch(this.interpolation.getTargetPitch());
+    }
   }
 
   public override takeDamage(
@@ -133,23 +139,32 @@ export class RemotePlayerPawn extends CharacterPawn {
   ): void {
     if (this.isDead) return;
     logger.info(`Hit for ${amount} damage.`);
-    this.healthBarComponent?.updateHealth(this.health - amount);
+    // Use inherited healthComponent from CharacterPawn
+    this.healthComponent.takeDamage(
+      amount,
+      _attackerId,
+      _part,
+      _hitPoint as { x: number; y: number; z: number }
+    );
   }
 
   public updateHealth(health: number): void {
-    this.health = health;
-    this.healthBarComponent?.updateHealth(health);
+    this.healthComponent.setHealth(health);
   }
 
   public override die(): void {
     if (this.isDead) return;
-    this.isDead = true;
     logger.info(`Died.`);
 
     this.mesh.checkCollisions = false;
     this.mesh.isPickable = false;
 
-    this.animationComponent.stopAnimation();
+    // Stop animation via health component death event or directly
+    const animComp =
+      this.getComponent<import('@ante/game-core').SkeletonAnimationComponent>('SkeletonAnimation');
+    if (animComp && 'stopAnimation' in animComp) {
+      (animComp as any).stopAnimation();
+    }
 
     // Death animation (tilt backward)
     const deathAnim = new Animation(
@@ -168,8 +183,7 @@ export class RemotePlayerPawn extends CharacterPawn {
   }
 
   public respawn(position: Vector3): void {
-    this.isDead = false;
-    this.health = 100;
+    this.healthComponent.revive(100);
     this.mesh.position.copyFrom(position);
     this.mesh.rotation.x = 0; // Reset death tilt
 
@@ -177,7 +191,11 @@ export class RemotePlayerPawn extends CharacterPawn {
     this.mesh.isPickable = true;
 
     this.updateHealth(100);
-    this.animationComponent.playAnimation('idle'); // Ensure it's not in death pose
+    const animComp =
+      this.getComponent<import('@ante/game-core').SkeletonAnimationComponent>('SkeletonAnimation');
+    if (animComp && 'playAnimation' in animComp) {
+      (animComp as any).playAnimation('idle');
+    }
     logger.info(`Respawned.`);
   }
 
@@ -202,9 +220,13 @@ export class RemotePlayerPawn extends CharacterPawn {
       this.weaponMesh = entries.rootNodes[0] as AbstractMesh;
       this.weaponMesh.parent = this.mesh;
 
-      const skeleton = this.animationComponent.getSkeleton();
+      const animComp =
+        this.getComponent<import('@ante/game-core').SkeletonAnimationComponent>(
+          'SkeletonAnimation'
+        );
+      const skeleton = animComp?.getSkeleton?.();
       const handBone = skeleton?.bones.find(
-        (b) =>
+        (b: { name: string }) =>
           b.name.toLowerCase().includes('righthand') || b.name.toLowerCase().includes('right_hand')
       );
 

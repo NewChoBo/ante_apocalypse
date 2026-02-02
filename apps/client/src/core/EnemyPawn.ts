@@ -2,6 +2,7 @@ import { Vector3, Scene, ShadowGenerator } from '@babylonjs/core';
 import { CharacterPawn, CharacterPawnConfig } from './CharacterPawn';
 import { IEnemyPawn } from '@ante/game-core';
 import { EnemyMovementComponent } from './components/EnemyMovementComponent';
+import type { EntityType } from '@ante/common';
 
 /**
  * 적 Pawn - CharacterPawn 상속
@@ -12,12 +13,12 @@ import { EnemyMovementComponent } from './components/EnemyMovementComponent';
  * AI는 외부 AIController에서 제어
  */
 export class EnemyPawn extends CharacterPawn implements IEnemyPawn {
-  public type = 'enemy';
+  public type: EntityType = 'enemy';
 
   // Enemy-specific components
   private movementComponent: EnemyMovementComponent;
 
-  constructor(scene: Scene, position: Vector3, shadowGenerator: ShadowGenerator) {
+  constructor(scene: Scene, position: Vector3, shadowGenerator: ShadowGenerator, id?: string) {
     const config: CharacterPawnConfig = {
       assetKey: 'enemy',
       type: 'enemy',
@@ -27,6 +28,9 @@ export class EnemyPawn extends CharacterPawn implements IEnemyPawn {
       showHealthBar: true,
     };
     super(scene, config);
+    if (id) {
+      (this as any).id = id;
+    }
 
     // Enemy-specific: movement with gravity
     this.movementComponent = new EnemyMovementComponent(this, scene);

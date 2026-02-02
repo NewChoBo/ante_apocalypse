@@ -304,8 +304,8 @@ export class SessionController {
       inventoryStore.setKey('weaponSlots', slots);
 
       if (weaponId) {
-        const combat = this.playerPawn?.getComponent(CombatComponent);
-        (combat as CombatComponent)?.equipWeapon(weaponId);
+        const combat = this.playerPawn?.getComponent<CombatComponent>('CombatComponent');
+        combat?.equipWeapon(weaponId);
       }
     } catch (error) {
       this.errorHandler(error as Error, 'EquipWeapon');
@@ -538,12 +538,12 @@ export class SessionController {
   private syncInventoryStore(): void {
     try {
       if (!this.playerPawn) return;
-      const combat = this.playerPawn.getComponent(CombatComponent);
+      const combat = this.playerPawn.getComponent<CombatComponent>('CombatComponent');
       if (!combat) return;
 
-      const weapons = (combat as CombatComponent).getWeapons();
+      const weapons = combat.getWeapons();
       const slots: (string | null)[] = [null, null, null, null];
-      weapons.forEach((w, i) => {
+      weapons.forEach((w: { name: string }, i: number) => {
         if (i < 4) slots[i] = w.name;
       });
 

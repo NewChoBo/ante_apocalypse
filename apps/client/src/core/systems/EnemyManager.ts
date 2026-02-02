@@ -65,8 +65,7 @@ export class EnemyManager extends BaseEnemyManager {
   }
 
   public createEnemy(id: string, position: Vector3, target?: PlayerPawn): EnemyPawn {
-    const enemy = new EnemyPawn(this.scene, position, this.shadowGenerator);
-    enemy.id = id;
+    const enemy = new EnemyPawn(this.scene, position, this.shadowGenerator, id);
     this.pawns.set(id, enemy);
 
     // WorldManager에 등록하여 전역 피격 및 관리가 가능하게 함

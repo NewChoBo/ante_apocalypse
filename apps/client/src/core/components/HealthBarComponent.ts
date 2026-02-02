@@ -15,6 +15,8 @@ export type HealthBarStyle = 'enemy' | 'player';
  * Displays a billboard health bar above the parent mesh.
  */
 export class HealthBarComponent extends BaseComponent {
+  readonly componentType = 'HealthBar';
+
   private plane: Mesh | null = null;
   private texture: DynamicTexture | null = null;
   private style: HealthBarStyle;
@@ -57,7 +59,7 @@ export class HealthBarComponent extends BaseComponent {
       this.scene
     );
     this.plane.position.y = this.yOffset;
-    this.plane.parent = this.owner.mesh;
+    this.plane.parent = this.owner.mesh as Mesh;
     this.plane.billboardMode = Mesh.BILLBOARDMODE_ALL;
 
     this.texture = new DynamicTexture(

@@ -3,6 +3,8 @@ import { TargetPawn } from '../TargetPawn';
 import { Scene, Vector3, StandardMaterial, Color3, Animation, AbstractMesh } from '@babylonjs/core';
 
 export class HitReactionComponent extends BaseComponent {
+  readonly componentType = 'HitReaction';
+
   private targetOwner: TargetPawn;
 
   constructor(owner: TargetPawn, scene: Scene) {

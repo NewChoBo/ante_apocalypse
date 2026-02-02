@@ -20,6 +20,8 @@ export interface TargetMeshConfig {
  * Humanoid, Moving, Static 등 타입에 따라 다른 메쉬를 생성합니다.
  */
 export class TargetMeshComponent extends BaseComponent {
+  readonly componentType = 'TargetMesh';
+
   private targetOwner: TargetPawn;
   private config: TargetMeshConfig;
   private _visualMesh: AbstractMesh | null = null;
@@ -92,9 +94,12 @@ export class TargetMeshComponent extends BaseComponent {
       multipliers: { head: 4.0, body: 1.0 },
       defaultMultiplier: 1.0,
     };
-    // Health Override
-    this.targetOwner.maxHealth = 150;
-    this.targetOwner.health = 150;
+    // Health Override via HealthComponent
+    const healthComponent =
+      this.targetOwner.getComponent<import('@ante/game-core').HealthComponent>('Health');
+    if (healthComponent) {
+      healthComponent.setHealth(150);
+    }
 
     this._visualMesh = body;
   }
@@ -139,9 +144,12 @@ export class TargetMeshComponent extends BaseComponent {
       multipliers: { head: 3.0, body: 1.0 }, // Center hit treated as 'head' if we had precise collision
       defaultMultiplier: 1.0,
     };
-    // Health Override
-    this.targetOwner.maxHealth = 100;
-    this.targetOwner.health = 100;
+    // Health Override via HealthComponent
+    const healthComponent =
+      this.targetOwner.getComponent<import('@ante/game-core').HealthComponent>('Health');
+    if (healthComponent) {
+      healthComponent.setHealth(100);
+    }
 
     this._visualMesh = target;
   }

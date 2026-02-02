@@ -9,6 +9,8 @@ import flareAsset from '@ante/assets/textures/Flare.png';
  * 타겟 피격 시 파티클 시스템을 생성합니다.
  */
 export class ImpactEffectComponent extends BaseComponent {
+  readonly componentType = 'ImpactEffect';
+
   private particleSystem: ParticleSystem;
 
   constructor(owner: BasePawn, scene: Scene) {

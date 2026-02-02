@@ -1,3 +1,15 @@
+/**
+ * CharacterPawn - Composition-based character pawn
+ *
+ * This refactored version uses the new composition-based Pawn from @ante/game-core
+ * and adds character-specific components like HealthComponent.
+ *
+ * Migration changes:
+ * - Now extends the new Pawn class instead of old BasePawn
+ * - Uses HealthComponent for health management instead of inherited logic
+ * - Components will be migrated incrementally
+ */
+
 import {
   Mesh,
   Vector3,
@@ -7,138 +19,119 @@ import {
   MeshBuilder,
   ShadowGenerator,
 } from '@babylonjs/core';
-import { BasePawn } from './BasePawn';
+import { Pawn, HealthComponent } from '@ante/game-core';
 import { Logger } from '@ante/common';
-import { HealthBarComponent } from './components/HealthBarComponent';
-import { SkeletonAnimationComponent } from '@ante/game-core';
-import { CharacterModelLoader } from './components/CharacterModelLoader';
 
 const logger = new Logger('CharacterPawn');
 
 export interface CharacterPawnConfig {
   assetKey: string;
-  type: 'player' | 'enemy';
+  type: 'player' | 'enemy' | 'remote_player';
   position: Vector3;
   shadowGenerator: ShadowGenerator;
   healthBarStyle?: 'player' | 'enemy';
   showHealthBar?: boolean;
+  maxHealth?: number;
 }
 
 /**
- * 캐릭터 Pawn의 공통 베이스 클래스
+ * 캐릭터 Pawn의 공통 베이스 클래스 (Composition-based)
  * RemotePlayerPawn과 EnemyPawn이 상속받음
- *
- * 공통 기능:
- * - 모델 로딩 (CharacterModelLoader)
- * - 애니메이션 (SkeletonAnimationComponent)
- * - 체력/피격 처리
- * - 체력바 (HealthBarComponent)
  */
-export abstract class CharacterPawn extends BasePawn {
+export abstract class CharacterPawn extends Pawn {
   public mesh: Mesh;
-  public isDead = false;
   public isMoving = false;
-  public abstract type: string;
 
-  // Common components
-  protected modelLoader: CharacterModelLoader;
-  protected animationComponent: SkeletonAnimationComponent;
-  protected healthBarComponent: HealthBarComponent | null = null;
+  // Core components
+  protected healthComponent: HealthComponent;
 
   protected config: CharacterPawnConfig;
 
   constructor(scene: Scene, config: CharacterPawnConfig) {
-    super(scene);
+    super(scene, {
+      type: config.type,
+      position: config.position,
+      maxHealth: config.maxHealth ?? 100,
+    });
+
     this.config = config;
 
-    this.damageProfile = {
-      multipliers: { head: 2.0, body: 1.0 },
-      defaultMultiplier: 1.0,
-    };
-
     // Create root collider (invisible)
-    // Root mesh is now at ground level (feet).
     this.mesh = MeshBuilder.CreateBox(
       `${config.type}Root`,
       { width: 0.5, height: 2, depth: 0.5 },
       scene
     );
     this.mesh.setPivotPoint(new Vector3(0, -1, 0));
-    this.mesh.position.copyFrom(config.position); // Ground pivot
-
+    this.mesh.position.copyFrom(config.position);
     this.mesh.checkCollisions = true;
     this.mesh.isVisible = false;
     this.mesh.metadata = { type: config.type, pawn: this };
 
-    // Health bar component (optional)
-    if (config.showHealthBar !== false) {
-      this.healthBarComponent = new HealthBarComponent(this, scene, {
-        style: config.healthBarStyle ?? config.type,
-        width: 1.0,
-        height: 0.15,
-        yOffset: 2.1, // Adjusted height above ground (0.1m above head)
-      });
-      this.addComponent(this.healthBarComponent);
-    }
+    // Setup damage profile (for compatibility)
+    (this as any).damageProfile = {
+      multipliers: { head: 2.0, body: 1.0 },
+      defaultMultiplier: 1.0,
+    };
 
-    // Model loader component
-    this.modelLoader = new CharacterModelLoader(this, scene, {
-      assetKey: config.assetKey,
-      shadowGenerator: config.shadowGenerator,
-      entityType: config.type,
+    // Health component (composition)
+    this.healthComponent = new HealthComponent({
+      maxHealth: config.maxHealth ?? 100,
+      componentId: `health_${this.id}`,
     });
-    this.addComponent(this.modelLoader);
+    this.addComponent(this.healthComponent);
 
-    // Animation component
-    this.animationComponent = new SkeletonAnimationComponent(this, scene);
-    this.addComponent(this.animationComponent);
+    // Subscribe to health events
+    this.healthComponent.onDamageTaken.add((event) => {
+      this.onTakeDamage(event.amount, event.attackerId, event.part, event.hitPoint as Vector3);
+    });
 
-    // Load model asynchronously
-    this.initializeModel();
-  }
+    this.healthComponent.onDeath.add(() => {
+      this.onDeath();
+    });
 
-  protected async initializeModel(): Promise<void> {
-    await this.modelLoader.loadModel();
-
-    // Connect skeleton to animation component
-    const skeleton = this.modelLoader.getSkeleton();
-    if (skeleton) {
-      this.animationComponent.initializeSkeleton(skeleton);
-    }
+    logger.info(`Created CharacterPawn ${this.id} of type ${config.type}`);
   }
 
   public tick(deltaTime: number): void {
     const prevPosition = this.mesh.position.clone();
 
-    this.updateComponents(deltaTime);
+    // Update all components via parent
+    super.tick(deltaTime);
 
+    // Calculate velocity for animation
     const currentPosition = this.mesh.position;
     const velocity = currentPosition.subtract(prevPosition).scale(1 / deltaTime);
-
-    // Update animation based on velocity
-    if (this.animationComponent) {
-      this.animationComponent.updateAnimationByVelocity(velocity);
-    }
+    this.isMoving = velocity.length() > 0.1;
   }
 
+  /**
+   * Apply damage - delegates to HealthComponent
+   */
   public override takeDamage(
     amount: number,
-    _attackerId?: string,
-    _part?: string,
-    _hitPoint?: Vector3
+    attackerId?: string,
+    part?: string,
+    hitPoint?: Vector3
   ): void {
-    super.takeDamage(amount, _attackerId, _part, _hitPoint);
+    this.healthComponent.takeDamage(
+      amount,
+      attackerId,
+      part,
+      hitPoint as { x: number; y: number; z: number }
+    );
   }
 
-  protected override onTakeDamage(
+  /**
+   * Called when damage is taken (via HealthComponent event)
+   */
+  protected onTakeDamage(
     _amount: number,
     _attackerId?: string,
     _part?: string,
     _hitPoint?: Vector3
   ): void {
-    this.healthBarComponent?.updateHealth(this.health);
-
-    // Hit flash effect (fallback box)
+    // Hit flash effect
     if (this.mesh.isVisible && this.mesh.material instanceof StandardMaterial) {
       this.mesh.material.emissiveColor = Color3.White();
       setTimeout((): void => {
@@ -149,7 +142,10 @@ export abstract class CharacterPawn extends BasePawn {
     }
   }
 
-  protected override onDeath(): void {
+  /**
+   * Called when pawn dies (via HealthComponent event)
+   */
+  protected onDeath(): void {
     logger.info(`${this.config.type} died`);
     this.mesh.setEnabled(false);
   }
@@ -174,7 +170,31 @@ export abstract class CharacterPawn extends BasePawn {
     return this.mesh.isDisposed();
   }
 
+  // Getters for backward compatibility
+  public get health(): number {
+    return this.healthComponent.health;
+  }
+
+  public get maxHealth(): number {
+    return this.healthComponent.maxHealth;
+  }
+
+  public get isDead(): boolean {
+    return this.healthComponent.isDead;
+  }
+
+  public initialize(_scene: Scene): void {
+    // To be implemented by subclasses
+  }
+
+  /**
+   * Update health bar display if available
+   */
   public updateHealthBar(health: number): void {
-    this.healthBarComponent?.updateHealth(health);
+    const healthBar =
+      this.getComponent<import('./components/HealthBarComponent').HealthBarComponent>('HealthBar');
+    if (healthBar) {
+      healthBar.updateHealth(health);
+    }
   }
 }

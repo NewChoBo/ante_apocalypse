@@ -18,6 +18,8 @@ export * from './systems/HitRegistrationSystem.js';
 export * from './systems/TickManager.js';
 export * from './simulation/BaseComponent.js';
 export * from './simulation/BasePawn.js';
+export * from './simulation/Pawn.js';
+export * from './simulation/components/HealthComponent.js';
 export * from './weapons/WeaponRegistry.js';
 export * from './simulation/components/SkeletonAnimationComponent.js';
 export * from './simulation/utils/MeshUtils.js';

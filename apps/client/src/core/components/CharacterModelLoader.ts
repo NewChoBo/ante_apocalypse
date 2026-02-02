@@ -10,9 +10,10 @@ import {
   AbstractMesh,
   ShadowGenerator,
 } from '@babylonjs/core';
-import { BaseComponent, IPawnCore, MeshUtils } from '@ante/game-core';
+import { BaseComponent, MeshUtils } from '@ante/game-core';
 import { GameAssets } from '../GameAssets';
 import { Logger } from '@ante/common';
+import type { IPawn } from '@ante/common';
 
 const logger = new Logger('CharacterModelLoader');
 
@@ -22,16 +23,14 @@ export interface CharacterModelLoaderConfig {
   entityType: 'player' | 'enemy';
 }
 
-interface CharacterModelOwner extends IPawnCore {
-  mesh: Mesh;
-}
-
 /**
  * 캐릭터 모델 로딩을 담당하는 통합 컴포넌트
  * player/enemy 모두 사용 가능
  */
 export class CharacterModelLoader extends BaseComponent {
-  private charOwner: CharacterModelOwner;
+  readonly componentType = 'CharacterModelLoader';
+
+  private charOwner: IPawn & { mesh: Mesh };
   private config: CharacterModelLoaderConfig;
 
   // Loaded assets
@@ -40,7 +39,7 @@ export class CharacterModelLoader extends BaseComponent {
   private skeleton: Skeleton | null = null;
   private isLoaded = false;
 
-  constructor(owner: CharacterModelOwner, scene: Scene, config: CharacterModelLoaderConfig) {
+  constructor(owner: IPawn & { mesh: Mesh }, scene: Scene, config: CharacterModelLoaderConfig) {
     super(owner, scene);
     this.charOwner = owner;
     this.config = config;

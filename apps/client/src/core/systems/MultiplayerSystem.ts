@@ -31,7 +31,7 @@ export class MultiplayerSystem {
     localStorage.setItem('playerName', playerName);
 
     // Join with initial state
-    const combat = this.localPlayer.getComponent(CombatComponent);
+    const combat = this.localPlayer.getComponent<CombatComponent>('CombatComponent');
     const weaponId = combat?.getCurrentWeapon()?.name || 'Pistol';
 
     this.networkManager.join({
@@ -188,7 +188,7 @@ export class MultiplayerSystem {
   public update(): void {
     const now = performance.now();
     if (now - this.lastUpdateTime > this.updateInterval) {
-      const combat = this.localPlayer.getComponent(CombatComponent);
+      const combat = this.localPlayer.getComponent<CombatComponent>('CombatComponent');
       const weaponId = combat?.getCurrentWeapon()?.name || 'Pistol';
 
       this.networkManager.updateState({

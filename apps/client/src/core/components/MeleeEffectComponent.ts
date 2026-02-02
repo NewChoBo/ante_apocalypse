@@ -10,6 +10,8 @@ import type { BasePawn } from '../BasePawn';
  * 휘두르기 소리(Swipe Sound)를 전담합니다.
  */
 export class MeleeEffectComponent extends BaseWeaponEffectComponent {
+  readonly componentType = 'MeleeEffect';
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private swipeSound: any;
 

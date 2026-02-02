@@ -10,6 +10,8 @@ export interface MovementConfig {
 }
 
 export class PatternMovementComponent extends BaseComponent {
+  readonly componentType = 'PatternMovement';
+
   private targetOwner: TargetPawn;
   private config: MovementConfig;
   private baseLocalPosition: Vector3;

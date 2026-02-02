@@ -1,4 +1,4 @@
-import { UniversalCamera, Vector3, Scene } from '@babylonjs/core';
+import { UniversalCamera, Vector3, Scene, AbstractMesh } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { CombatComponent } from './CombatComponent';
 import type { BasePawn } from '../BasePawn';
@@ -10,9 +10,11 @@ export interface RotationInput {
 }
 
 /**
- * 캐릭터의 카메라와 마우스 회전(Pitch/Yaw)을 담당하는 컴포넌트.
+ * 캐릭터의 칙칙와 마우스 회전(Pitch/Yaw)을 담당하는 컴포넌트.
  */
 export class CameraComponent extends BaseComponent {
+  public readonly componentType = 'CameraComponent';
+
   public camera: UniversalCamera;
   private mouseSensitivity = 0.002;
   private settingsUnsubscribe: (() => void) | null = null;
@@ -29,12 +31,16 @@ export class CameraComponent extends BaseComponent {
   private isDetached = false;
   private initialHeight = 0;
 
+  private get mesh(): AbstractMesh {
+    return (this.owner as BasePawn).mesh as AbstractMesh;
+  }
+
   constructor(owner: BasePawn, scene: Scene, initialHeight: number = 0) {
     super(owner, scene);
     this.initialHeight = initialHeight;
 
     this.camera = new UniversalCamera('pawnCamera', Vector3.Zero(), scene);
-    this.camera.parent = this.owner.mesh;
+    this.camera.parent = this.mesh;
     this.camera.position.set(0, initialHeight, 0); // 기본 높이 설정
     this.camera.minZ = 0.1;
     this.camera.fov = this.defaultFOV;
@@ -54,10 +60,10 @@ export class CameraComponent extends BaseComponent {
 
     // Get current world position and rotation before detaching
     this.camera.computeWorldMatrix();
-    const worldPos = this.camera.position.add(this.owner.mesh.getAbsolutePosition());
+    const worldPos = this.camera.position.add(this.mesh.getAbsolutePosition());
 
     // For rotation, we can use the world matrix or just combine mesh + camera rotation
-    const worldYaw = this.owner.mesh.rotation.y;
+    const worldYaw = this.mesh.rotation.y;
     const worldPitch = this.camera.rotation.x;
 
     this.camera.parent = null;
@@ -69,7 +75,7 @@ export class CameraComponent extends BaseComponent {
     if (!this.isDetached) return;
     this.isDetached = false;
 
-    this.camera.parent = this.owner.mesh;
+    this.camera.parent = this.mesh;
     this.camera.position.set(0, this.initialHeight, 0);
     this.camera.rotation.set(0, 0, 0);
   }
@@ -81,10 +87,10 @@ export class CameraComponent extends BaseComponent {
       this.camera.rotation.y += delta.x * this.mouseSensitivity;
     } else {
       // 1. 몸체 회전 (Yaw - Y축)
-      this.owner.mesh.rotation.y += delta.x * this.mouseSensitivity;
+      this.mesh.rotation.y += delta.x * this.mouseSensitivity;
     }
 
-    // 2. 카메라 회전 (Pitch - X축)
+    // 2. 칙칙 회전 (Pitch - X축)
     this.camera.rotation.x += delta.y * this.mouseSensitivity;
 
     // Pitch 제한 (고개 꺾임 방지)
@@ -101,7 +107,7 @@ export class CameraComponent extends BaseComponent {
   }
 
   public update(deltaTime: number): void {
-    const combatComp = this.owner.getComponent(CombatComponent);
+    const combatComp = this.owner.getComponent<CombatComponent>('CombatComponent');
     if (!combatComp) return;
 
     // 1. FOV 처리
@@ -120,27 +126,22 @@ export class CameraComponent extends BaseComponent {
       15 * deltaTime
     );
 
-    // 이번 프레임의 반동 델타를 카메라에 적용
-    const recoilDelta = this.currentRecoilOffset - previousOffset;
-    this.camera.rotation.x -= recoilDelta;
+    // 실제 적용된 반동량 (이번 프레임에서 추가된 반동)
+    const appliedRecoil = this.currentRecoilOffset - previousOffset;
 
-    // 목표 반동값을 0으로 복구 (Recovery)
+    // 칙칙에 반동 각도 적용 (Pitch 위로)
+    this.camera.rotation.x -= appliedRecoil;
+
+    // 반동 복구 (Settle) - 시간이 지남에 따라 목표 반동값을 0으로
     this.targetRecoilOffset = this.lerp(this.targetRecoilOffset, 0, 5 * deltaTime);
   }
 
-  private lerp(start: number, end: number, amt: number): number {
-    return (1 - amt) * start + amt * end;
-  }
-
-  public setMouseSensitivity(value: number): void {
-    this.mouseSensitivity = value;
+  private lerp(start: number, end: number, t: number): number {
+    return start + (end - start) * Math.min(t, 1.0);
   }
 
   public dispose(): void {
-    super.dispose();
-    if (this.settingsUnsubscribe) {
-      this.settingsUnsubscribe();
-    }
+    this.settingsUnsubscribe?.();
     this.camera.dispose();
   }
 }

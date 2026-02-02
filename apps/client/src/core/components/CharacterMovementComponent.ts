@@ -1,4 +1,4 @@
-import { Vector3, Scene, Ray } from '@babylonjs/core';
+import { Vector3, Scene, Ray, AbstractMesh } from '@babylonjs/core';
 import { BaseComponent } from './BaseComponent';
 import { CombatComponent } from './CombatComponent';
 import { CameraComponent } from './CameraComponent';
@@ -19,6 +19,8 @@ export interface MovementInput {
  * 캐릭터의 이동, 중력, 점프 로직을 담당하는 컴포넌트.
  */
 export class CharacterMovementComponent extends BaseComponent {
+  readonly componentType = 'CharacterMovement';
+
   private moveSpeed = 6;
   private sprintMultiplier = 1.6;
   private crouchMultiplier = 0.5;
@@ -33,16 +35,20 @@ export class CharacterMovementComponent extends BaseComponent {
     super(owner, scene);
   }
 
+  private get mesh(): AbstractMesh {
+    return (this.owner as BasePawn).mesh as AbstractMesh;
+  }
+
   /** 입력 데이터에 기반해 이동 처리 */
   public handleMovement(input: MovementInput, deltaTime: number): void {
-    const isGhost = this.owner.isDead;
+    const isGhost = (this.owner as BasePawn).isDead;
 
     if (isGhost) {
       this.handleGhostMovement(input, deltaTime);
       return;
     }
 
-    const combatComp = this.owner.getComponent(CombatComponent);
+    const combatComp = this.owner.getComponent<CombatComponent>('CombatComponent');
     const weapon = combatComp ? combatComp.getCurrentWeapon() : null;
     const weaponSpeedMult = weapon ? weapon.getMovementSpeedMultiplier() : 1.0;
 
@@ -55,8 +61,8 @@ export class CharacterMovementComponent extends BaseComponent {
       speed *= this.sprintMultiplier;
     }
 
-    const forward = this.owner.mesh.getDirection(Vector3.Forward());
-    const right = this.owner.mesh.getDirection(Vector3.Right());
+    const forward = this.mesh.getDirection(Vector3.Forward());
+    const right = this.mesh.getDirection(Vector3.Right());
 
     const moveDirection = Vector3.Zero();
     if (input.forward) moveDirection.addInPlace(forward);
@@ -67,7 +73,7 @@ export class CharacterMovementComponent extends BaseComponent {
     if (moveDirection.length() > 0) {
       moveDirection.normalize();
       const velocity = moveDirection.scale(speed * deltaTime);
-      this.owner.mesh.moveWithCollisions(velocity);
+      this.mesh.moveWithCollisions(velocity);
     }
 
     // 2. 점프 시도 (앉아있을 때는 점프 불가)
@@ -79,7 +85,7 @@ export class CharacterMovementComponent extends BaseComponent {
 
   private handleGhostMovement(input: MovementInput, deltaTime: number): void {
     const ghostSpeed = this.moveSpeed * 2.0;
-    const cameraComp = this.owner.getComponent(CameraComponent);
+    const cameraComp = this.owner.getComponent<CameraComponent>('CameraComponent');
     const camera = cameraComp?.camera;
     if (!camera) return;
 
@@ -109,7 +115,7 @@ export class CharacterMovementComponent extends BaseComponent {
   }
 
   public update(deltaTime: number): void {
-    if (!this.owner.isDead) {
+    if (!(this.owner as BasePawn).isDead) {
       this.updateGravity(deltaTime);
     }
   }
@@ -124,11 +130,11 @@ export class CharacterMovementComponent extends BaseComponent {
     }
 
     const gravityVelocity = new Vector3(0, this.velocityY * deltaTime, 0);
-    this.owner.mesh.moveWithCollisions(gravityVelocity);
+    this.mesh.moveWithCollisions(gravityVelocity);
 
     // 최소 높이 안전장치 (지면 0)
-    if (this.owner.mesh.position.y < 0) {
-      this.owner.mesh.position.y = 0;
+    if (this.mesh.position.y < 0) {
+      this.mesh.position.y = 0;
       this.velocityY = 0;
       this.isGrounded = true;
     }
@@ -136,8 +142,8 @@ export class CharacterMovementComponent extends BaseComponent {
 
   private checkGround(): void {
     // Pivot is at feet (0), ray starts slightly above
-    const ray = new Ray(this.owner.mesh.position.add(new Vector3(0, 0.1, 0)), Vector3.Down(), 0.2);
-    const pickInfo = this.scene.pickWithRay(ray, (m) => m.isPickable && m !== this.owner.mesh);
+    const ray = new Ray(this.mesh.position.add(new Vector3(0, 0.1, 0)), Vector3.Down(), 0.2);
+    const pickInfo = this.scene.pickWithRay(ray, (m) => m.isPickable && m !== this.mesh);
     this.isGrounded = !!pickInfo?.hit;
   }
 

@@ -1,6 +1,6 @@
 import { Mesh, MeshBuilder, Scene, Vector3, AbstractMesh, Skeleton } from '@babylonjs/core';
 import { Logger } from '@ante/common';
-import { BasePawn } from '../../simulation/BasePawn.js';
+import { Pawn } from '../../simulation/Pawn.js';
 import { IServerAssetLoader } from '../IServerAssetLoader.js';
 import { SkeletonAnimationComponent } from '../../simulation/components/SkeletonAnimationComponent.js';
 import { MeshUtils } from '../../simulation/utils/MeshUtils.js';
@@ -10,12 +10,12 @@ import { WeaponRegistry } from '../../weapons/WeaponRegistry.js';
 
 const logger = new Logger('ServerPlayerPawn');
 
-export class ServerPlayerPawn extends BasePawn {
+export class ServerPlayerPawn extends Pawn {
   public override mesh: Mesh;
   public visualMesh: AbstractMesh | null = null;
   public skeleton: Skeleton | null = null;
   public headBox: Mesh | null = null;
-  public override type = 'player';
+  public override type: 'player' = 'player';
 
   public weapons: Map<string, BaseWeapon> = new Map();
   public currentWeapon: BaseWeapon | null = null;
@@ -28,8 +28,7 @@ export class ServerPlayerPawn extends BasePawn {
     position: Vector3,
     private assetLoader: IServerAssetLoader
   ) {
-    super(scene);
-    this.id = id;
+    super(scene, { type: 'player', id, position });
 
     // 1. Root Collider (Pivot at feet: 0.0m)
     this.mesh = MeshBuilder.CreateBox(
@@ -149,7 +148,7 @@ export class ServerPlayerPawn extends BasePawn {
     }
 
     // 2. Component Logic (Animation, etc)
-    this.updateComponents(deltaTime);
+    super.tick(deltaTime);
   }
 
   protected onDeath(): void {

@@ -4,6 +4,7 @@ import { IWorldEntity } from '@ante/game-core';
 import { TargetMeshComponent } from './components/TargetMeshComponent';
 import { HitReactionComponent } from './components/HitReactionComponent';
 import { PatternMovementComponent } from './components/PatternMovementComponent';
+import type { EntityType, DamageProfile } from '@ante/common';
 
 export interface TargetPawnConfig {
   id: string;
@@ -19,13 +20,10 @@ export interface TargetPawnConfig {
  */
 export class TargetPawn extends BasePawn implements IWorldEntity {
   public id: string;
-  public type: string;
+  public type: EntityType;
   public mesh: Mesh;
-  public isDead = false;
-  // IWorldEntity health properties
-  public health: number = 100;
-  public maxHealth: number = 100;
   public isActive = true;
+  public damageProfile: DamageProfile;
 
   // Components
   public meshComponent: TargetMeshComponent;
@@ -33,9 +31,9 @@ export class TargetPawn extends BasePawn implements IWorldEntity {
   public movementComponent: PatternMovementComponent | null = null;
 
   constructor(scene: Scene, config: TargetPawnConfig) {
-    super(scene);
+    super(scene, config.type, config.id);
     this.id = config.id;
-    this.type = config.type;
+    this.type = config.type as EntityType; // BasePawn에서 설정되지만 명시적으로 설정
 
     // 초기값 설정 (Humanoid 등에서 덮어씌워질 수 있음)
     this.damageProfile = {
@@ -75,53 +73,48 @@ export class TargetPawn extends BasePawn implements IWorldEntity {
     // 필요한 경우 초기화 로직
   }
 
-  public tick(deltaTime: number): void {
-    this.updateComponents(deltaTime);
+  public override tick(deltaTime: number): void {
+    // Update all components
+    super.tick(deltaTime);
   }
 
-  public takeDamage(
-    amount: number,
-    _attackerId?: string,
-    part?: string,
-    _hitPoint?: Vector3
-  ): void {
-    if (this.isDead || !this.isActive) return;
+  public takeDamage(amount: number, _attackerId?: string, hitPart?: string): void {
+    if (this.isDead) return;
 
-    this.health -= amount;
+    const multiplier =
+      this.damageProfile.multipliers[hitPart ?? 'body'] ?? this.damageProfile.defaultMultiplier;
+    const finalDamage = amount * multiplier;
 
-    // 피격 반응 효과 재생
-    this.hitReactionComponent.playHitEffect(part);
+    // Use health component
+    const healthComponent = this.getComponent<import('@ante/game-core').HealthComponent>('Health');
+    if (healthComponent) {
+      healthComponent.takeDamage(finalDamage);
+    }
 
-    if (this.health <= 0) {
-      this.health = 0;
+    // 피격 반응
+    this.hitReactionComponent?.playHitEffect(hitPart);
+
+    // Check death
+    if (healthComponent?.isDead) {
       this.die();
     }
   }
 
   public die(): void {
-    if (this.isDead) return;
-    this.isDead = true;
-    this.isActive = false;
-
-    // 파괴 애니메이션 재생은 HitReactionComponent 등이 담당하거나 여기서 직접 처리
-    this.hitReactionComponent.playDestroyEffect(() => {
-      this.dispose();
-    });
-  }
-
-  // Common getters
-  public get position(): Vector3 {
-    return this.mesh.position;
-  }
-
-  public set position(value: Vector3) {
-    this.mesh.position.copyFrom(value);
-  }
-
-  public dispose(): void {
-    if (this.mesh && !this.mesh.isDisposed()) {
-      this.mesh.dispose();
+    // Set death state via health component
+    const healthComponent = this.getComponent<import('@ante/game-core').HealthComponent>('Health');
+    if (healthComponent) {
+      // Health component manages death state
     }
-    super.dispose();
+
+    // Death animation handled by mesh component if available
+    // this.meshComponent?.playDeathAnimation?.();
+  }
+
+  public respawn(): void {
+    const healthComponent = this.getComponent<import('@ante/game-core').HealthComponent>('Health');
+    if (healthComponent) {
+      healthComponent.revive();
+    }
   }
 }

@@ -9,6 +9,8 @@ import type { BasePawn } from '../BasePawn';
  * 총구 화염(Muzzle Flash)과 총성(Gunshot Sound)을 전담합니다.
  */
 export class FirearmEffectComponent extends BaseWeaponEffectComponent {
+  readonly componentType = 'FirearmEffect';
+
   private flashMaterial: StandardMaterial;
   private muzzleLight: PointLight;
   private gunshotSound: import('@babylonjs/core').Sound | undefined;

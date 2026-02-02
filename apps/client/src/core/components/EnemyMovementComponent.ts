@@ -1,16 +1,14 @@
-import { Mesh, Vector3, Scene } from '@babylonjs/core';
-import { BaseComponent, IPawnCore } from '@ante/game-core';
-
-interface MovementOwner extends IPawnCore {
-  mesh: Mesh;
-  isMoving: boolean;
-}
+import { Vector3, Scene, AbstractMesh } from '@babylonjs/core';
+import { BaseComponent } from '@ante/game-core';
+import type { IPawn } from '@ante/common';
 
 /**
  * 적의 이동, 중력 적용, 이동 상태 판단을 담당하는 컴포넌트
  */
 export class EnemyMovementComponent extends BaseComponent {
-  private moveOwner: MovementOwner;
+  readonly componentType = 'EnemyMovement';
+
+  private moveOwner: IPawn & { mesh: AbstractMesh; isMoving: boolean };
   private lastPosition: Vector3 = new Vector3();
   private lastMoveTime: number = 0;
 
@@ -18,7 +16,7 @@ export class EnemyMovementComponent extends BaseComponent {
   private readonly MOVE_THRESHOLD = 0.005;
   private readonly MOVE_GRACE_PERIOD = 200; // ms
 
-  constructor(owner: MovementOwner, scene: Scene) {
+  constructor(owner: IPawn & { mesh: AbstractMesh; isMoving: boolean }, scene: Scene) {
     super(owner, scene);
     this.moveOwner = owner;
     this.lastPosition.copyFrom(owner.mesh.position);
