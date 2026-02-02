@@ -1,13 +1,24 @@
 import { Scene, UniversalCamera, Vector3, Mesh } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon';
+import { GameObservables } from '../core/events/GameObservables';
+import { MeleeWeaponConfig, toVector3 } from '../config/WeaponConfig';
 
 /**
  * 근접 무기(Melee Weapons)를 위한 중간 추상 클래스.
- * 휘두르기 로직, 스테미너 소모, 충돌 판정 등을 구현할 예정입니다.
+ * 공통된 휘두르기 로직, 애니메이션, 충돌 판정 등을 구현합니다.
  */
 export abstract class MeleeWeapon extends BaseWeapon {
   protected isSwinging = false;
   protected lastSwingTime = 0;
+
+  // 애니메이션 상태
+  protected swingAnimationTimer = 0;
+  protected isAnimating = false;
+  protected defaultRotation = new Vector3(0, 0, 0);
+  protected defaultPosition = new Vector3(0, 0, 0);
+
+  // 무기 설정
+  protected abstract weaponConfig: MeleeWeaponConfig;
 
   public getMovementSpeedMultiplier(): number {
     return 1.0;
@@ -21,12 +32,63 @@ export abstract class MeleeWeapon extends BaseWeapon {
     super(scene, camera, onScore);
   }
 
+  /**
+   * 메시 생성 - 하위 클래스에서 호출
+   * ProceduralWeaponBuilder를 사용하여 메시를 생성하고 설정합니다.
+   */
+  protected createMeshFromBuilder(builderFn: (scene: Scene) => Mesh | null): void {
+    this.weaponMesh = builderFn(this.scene);
+
+    if (this.weaponMesh) {
+      this.weaponMesh.name = `${this.weaponConfig.name}Mesh_Proc`;
+      this.weaponMesh.parent = this.camera;
+
+      // 설정에서 위치/회전 적용
+      this.weaponMesh.position = toVector3(this.weaponConfig.transform.position);
+      this.weaponMesh.rotation = toVector3(this.weaponConfig.transform.rotation);
+
+      this.weaponMesh.receiveShadows = true;
+
+      // 기본 상태 저장
+      this.defaultPosition.copyFrom(this.weaponMesh.position);
+      this.defaultRotation.copyFrom(this.weaponMesh.rotation);
+
+      this.setIdleState();
+      this.weaponMesh.setEnabled(false); // Start hidden
+    }
+  }
+
   /** 근접 무기 사용 */
   public fire(): boolean {
     return this.swing();
   }
 
   public abstract swing(): boolean;
+
+  /**
+   * 공통 휘두르기 로직 시작
+   */
+  protected startSwing(): void {
+    this.isSwinging = true;
+    this.isAnimating = true;
+    this.swingAnimationTimer = 0;
+
+    // 발사 이벤트 발행 (사운드 및 HUD 연동용)
+    GameObservables.weaponFire.notifyObservers({
+      weaponId: this.name,
+      ownerId: 'player_local',
+      ammoRemaining: 0,
+      fireType: 'melee',
+    });
+
+    // 공격 판정
+    this.checkMeleeHit();
+
+    // 애니메이션 종료 후 공격 가능 상태로 복귀
+    setTimeout(() => {
+      this.isSwinging = false;
+    }, this.weaponConfig.animation.duration * 1000);
+  }
 
   /**
    * 볼륨 기반 근접 공격 판정 (Bounding Box 거리 및 각도 체크)
@@ -106,8 +168,45 @@ export abstract class MeleeWeapon extends BaseWeapon {
     };
   }
 
+  /**
+   * 공통 애니메이션 업데이트
+   */
   public update(deltaTime: number): void {
     this.updateAnimations(deltaTime);
+
+    if (this.isAnimating && this.weaponMesh) {
+      this.swingAnimationTimer += deltaTime;
+
+      const animConfig = this.weaponConfig.animation;
+      const duration = animConfig.duration;
+      const t = this.swingAnimationTimer / duration;
+
+      if (t < 1.0) {
+        // 휘두르기 애니메이션
+        const swingAngle = Math.sin(t * Math.PI) * animConfig.swingAngle;
+        const forwardOffset = Math.sin(t * Math.PI) * animConfig.forwardOffset;
+
+        // 무기별로 다른 회전 축 적용
+        if (animConfig.zRotationOffset !== undefined) {
+          // Bat 스타일: Z축 회전 위주
+          this.weaponMesh.rotation.z =
+            this.defaultRotation.z - swingAngle * animConfig.zRotationOffset;
+          if (animConfig.xRotationOffset !== undefined) {
+            this.weaponMesh.rotation.x =
+              this.defaultRotation.x + swingAngle * animConfig.xRotationOffset;
+          }
+        } else {
+          // Knife 스타일: X축 회전
+          this.weaponMesh.rotation.x = this.defaultRotation.x + swingAngle;
+          this.weaponMesh.position.z = this.defaultPosition.z + forwardOffset;
+        }
+      } else {
+        // 애니메이션 종료 - 원위치
+        this.isAnimating = false;
+        this.weaponMesh.rotation.copyFrom(this.defaultRotation);
+        this.weaponMesh.position.copyFrom(this.defaultPosition);
+      }
+    }
   }
 
   public addAmmo(_amount: number): void {
