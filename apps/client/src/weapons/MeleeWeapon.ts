@@ -212,4 +212,9 @@ export abstract class MeleeWeapon extends BaseWeapon {
   public addAmmo(_amount: number): void {
     // 근접 무기는 탄약 없음
   }
+
+  // Melee weapons don't need reload logic
+  public reloadLogic(): void {
+    // No-op for melee weapons
+  }
 }
