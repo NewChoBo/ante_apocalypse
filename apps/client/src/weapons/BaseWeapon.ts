@@ -41,22 +41,12 @@ export abstract class BaseWeapon extends CoreBaseWeapon implements IWeapon {
     return this.visualController.isAiming;
   }
 
-  public get onScoreCallback() {
-    return this.visualController.onScoreCallback;
-  }
-
-  public set onScoreCallback(callback) {
-    this.visualController.onScoreCallback = callback;
-  }
-
-  constructor(scene: Scene, camera: UniversalCamera, onScore?: (points: number) => void) {
+  constructor(scene: Scene, camera: UniversalCamera) {
     // Pass dummy stats to core
     super('base_weapon', 'local_player', { name: 'Base', damage: 0, range: 0 });
 
     // Initialize visual controller with stopFire callback
-    this.visualController = new WeaponVisualController(scene, camera, onScore, () =>
-      this.stopFire()
-    );
+    this.visualController = new WeaponVisualController(scene, camera, () => this.stopFire());
   }
 
   // IWeapon methods - delegate to visual controller

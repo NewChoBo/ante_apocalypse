@@ -24,13 +24,8 @@ export class Rifle extends Firearm {
   public firingMode: 'semi' | 'auto' = 'auto';
   public recoilForce = 0.008;
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    onScore?: (points: number) => void,
-    applyRecoil?: (force: number) => void
-  ) {
-    super(scene, camera, 0, 0, onScore, applyRecoil);
+  constructor(scene: Scene, camera: UniversalCamera, applyRecoil?: (force: number) => void) {
+    super(scene, camera, 0, 0, applyRecoil);
     this.muzzleOffset = new Vector3(0, 0.06, 0.4); // 소총 총구 위치 조정 // 총구 상단 정렬, 모델 회전 고려
     this.createWeaponModel();
   }

@@ -28,12 +28,9 @@ export class CombatComponent extends BaseComponent {
 
     this.hudSync = new HUDSyncComponent();
 
-    // 1. 인벤토리 초기화 (점수 콜백을 hudSync에 연결)
-    this.inventory = new WeaponInventoryComponent(
-      scene,
-      cameraComp.camera,
-      (points) => this.hudSync.updateScore(points),
-      (force) => cameraComp.applyRecoil(force)
+    // 1. 인벤토리 초기화
+    this.inventory = new WeaponInventoryComponent(scene, cameraComp.camera, (force) =>
+      cameraComp.applyRecoil(force)
     );
 
     // 무기 변경 시 HUD 동기화 리스너 등록

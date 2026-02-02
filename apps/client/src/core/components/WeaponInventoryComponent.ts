@@ -20,17 +20,12 @@ export class WeaponInventoryComponent {
   /** 무기가 변경될 때 호출되는 Observable */
   public onWeaponChanged = new Observable<IWeapon>();
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    onScore: (points: number) => void,
-    applyRecoil?: (force: number) => void
-  ) {
+  constructor(scene: Scene, camera: UniversalCamera, applyRecoil?: (force: number) => void) {
     this.weapons = [
-      new Pistol(scene, camera, onScore, applyRecoil),
-      new Rifle(scene, camera, onScore, applyRecoil),
-      new Knife(scene, camera, onScore),
-      new Bat(scene, camera, onScore),
+      new Pistol(scene, camera, applyRecoil),
+      new Rifle(scene, camera, applyRecoil),
+      new Knife(scene, camera),
+      new Bat(scene, camera),
     ];
 
     // [Authoritative Weapon Stats Sync] - Directly from shared config in monorepo

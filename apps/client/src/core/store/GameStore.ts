@@ -6,7 +6,6 @@ const logger = new Logger('GameStore');
 declare global {
   interface Window {
     __GAME_STORES__?: {
-      scoreStore: WritableAtom<number>;
       gameStateStore: WritableAtom<'READY' | 'PLAYING' | 'GAME_OVER' | 'DEAD'>;
       ammoStore: MapStore<AmmoState>;
       playerHealthStore: WritableAtom<number>;
@@ -16,7 +15,6 @@ declare global {
 }
 
 type GameStores = {
-  scoreStore: WritableAtom<number>;
   gameStateStore: WritableAtom<'READY' | 'PLAYING' | 'GAME_OVER' | 'DEAD'>;
   ammoStore: MapStore<AmmoState>;
   playerHealthStore: WritableAtom<number>;
@@ -31,7 +29,6 @@ function initStores(): GameStores {
 
   logger.log('Initializing new global stores');
   const stores = {
-    scoreStore: atom<number>(0),
     gameStateStore: atom<'READY' | 'PLAYING' | 'GAME_OVER' | 'DEAD'>('READY'),
     ammoStore: map<AmmoState>({
       current: 0,
@@ -82,6 +79,6 @@ export interface AmmoState {
   showAmmo: boolean;
 }
 
-const { scoreStore, gameStateStore, ammoStore, playerHealthStore, inventoryStore } = initStores();
+const { gameStateStore, ammoStore, playerHealthStore, inventoryStore } = initStores();
 
-export { scoreStore, gameStateStore, ammoStore, playerHealthStore, inventoryStore };
+export { gameStateStore, ammoStore, playerHealthStore, inventoryStore };

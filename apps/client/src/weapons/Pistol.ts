@@ -20,14 +20,9 @@ export class Pistol extends Firearm {
   public firingMode: 'semi' | 'auto' = 'semi';
   public recoilForce = 0.015;
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    onScore?: (points: number) => void,
-    applyRecoil?: (force: number) => void
-  ) {
+  constructor(scene: Scene, camera: UniversalCamera, applyRecoil?: (force: number) => void) {
     // 탄약 수량도 서버에서 관리하는 게 좋지만, 일단 기본값으로 초기화
-    super(scene, camera, 0, 0, onScore, applyRecoil);
+    super(scene, camera, 0, 0, applyRecoil);
     this.muzzleOffset = new Vector3(0, 0.06, 0.2); // 권총 총구 위치 조정
     this.createWeaponModel();
   }

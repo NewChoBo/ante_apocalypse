@@ -28,8 +28,8 @@ export abstract class MeleeWeapon extends BaseWeapon {
     return defaultFOV;
   }
 
-  constructor(scene: Scene, camera: UniversalCamera, onScore?: (points: number) => void) {
-    super(scene, camera, onScore);
+  constructor(scene: Scene, camera: UniversalCamera) {
+    super(scene, camera);
   }
 
   /**

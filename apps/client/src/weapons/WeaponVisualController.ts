@@ -10,7 +10,6 @@ export class WeaponVisualController {
   // Visual State
   public scene: Scene;
   public camera: UniversalCamera;
-  public onScoreCallback: ((points: number) => void) | null = null;
   public weaponMesh: AbstractMesh | null = null;
 
   public isActive = false;
@@ -28,15 +27,9 @@ export class WeaponVisualController {
   // Callback for stopping fire when hiding weapon
   private onStopFireCallback: (() => void) | null = null;
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    onScore?: (points: number) => void,
-    onStopFire?: () => void
-  ) {
+  constructor(scene: Scene, camera: UniversalCamera, onStopFire?: () => void) {
     this.scene = scene;
     this.camera = camera;
-    this.onScoreCallback = onScore || null;
     this.onStopFireCallback = onStopFire || null;
   }
 
@@ -170,11 +163,6 @@ export class WeaponVisualController {
     const part = metadata.bodyPart || metadata.part || 'body';
 
     WorldEntityManager.getInstance().processHit(entityId, damageAmount, part, pickedPoint, false);
-
-    if (this.onScoreCallback) {
-      const score = part === 'head' ? 100 : 50;
-      this.onScoreCallback(score);
-    }
 
     GameObservables.targetHit.notifyObservers({
       targetId: entityId,

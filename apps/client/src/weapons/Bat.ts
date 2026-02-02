@@ -14,8 +14,8 @@ export class Bat extends MeleeWeapon {
 
   protected weaponConfig = MeleeWeaponConfigs.Bat;
 
-  constructor(scene: Scene, camera: UniversalCamera, onScore?: (points: number) => void) {
-    super(scene, camera, onScore);
+  constructor(scene: Scene, camera: UniversalCamera) {
+    super(scene, camera);
     this.createMesh();
   }
 

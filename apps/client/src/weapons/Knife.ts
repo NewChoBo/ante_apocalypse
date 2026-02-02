@@ -13,8 +13,8 @@ export class Knife extends MeleeWeapon {
 
   protected weaponConfig = MeleeWeaponConfigs.Knife;
 
-  constructor(scene: Scene, camera: UniversalCamera, onScore?: (points: number) => void) {
-    super(scene, camera, onScore);
+  constructor(scene: Scene, camera: UniversalCamera) {
+    super(scene, camera);
     this.createMesh();
   }
 

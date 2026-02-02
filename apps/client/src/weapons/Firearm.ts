@@ -55,14 +55,6 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     return this.visualController.isAiming;
   }
 
-  public get onScoreCallback() {
-    return this.visualController.onScoreCallback;
-  }
-
-  public set onScoreCallback(callback) {
-    this.visualController.onScoreCallback = callback;
-  }
-
   public getMovementSpeedMultiplier(): number {
     return this.isAiming ? 0.4 : 1.0;
   }
@@ -81,7 +73,6 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     camera: UniversalCamera,
     initialAmmo: number,
     reserveAmmo: number,
-    onScore?: (points: number) => void,
     applyRecoil?: (force: number) => void
   ) {
     // Pass dummy stats to core, subclasses should initialize proper stats or we update them here
@@ -95,9 +86,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     });
 
     // Initialize visual controller with stopFire callback
-    this.visualController = new WeaponVisualController(scene, camera, onScore, () =>
-      this.stopFire()
-    );
+    this.visualController = new WeaponVisualController(scene, camera, () => this.stopFire());
 
     // Manual setup for client-side legacy compatibility (until subclasses fully move to stats)
     this.currentAmmo = initialAmmo;
