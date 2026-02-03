@@ -20,6 +20,8 @@ export * from './simulation/BaseComponent.js';
 export * from './simulation/BasePawn.js';
 export * from './simulation/Pawn.js';
 export * from './simulation/components/HealthComponent.js';
+export * from './simulation/components/MovementComponent.js';
+export * from './simulation/components/AIComponent.js';
 export * from './weapons/WeaponRegistry.js';
 export * from './simulation/components/SkeletonAnimationComponent.js';
 export * from './simulation/utils/MeshUtils.js';
@@ -38,6 +40,7 @@ export * from './server/ServerNetworkAuthority.js';
 export * from './server/pawns/ServerPlayerPawn.js';
 export * from './server/pawns/ServerEnemyPawn.js';
 export * from './server/pawns/ServerTargetPawn.js';
+export * from './server/pawns/CompositionalEnemyPawn.js';
 
 // Level logic
 export * from './levels/LevelData.js';
