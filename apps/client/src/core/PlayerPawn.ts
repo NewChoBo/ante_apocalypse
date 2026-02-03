@@ -73,7 +73,7 @@ export class PlayerPawn extends BasePawn {
     this.addComponent(this.cameraComponent);
 
     // 이동 컴포넌트 추가
-    this.movementComponent = new CharacterMovementComponent(this, scene);
+    this.movementComponent = new CharacterMovementComponent();
     this.addComponent(this.movementComponent);
   }
 

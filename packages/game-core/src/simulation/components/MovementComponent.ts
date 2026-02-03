@@ -292,6 +292,48 @@ export class MovementComponent implements IPawnComponent<IPawn>, IMovable {
   }
 
   // ============================================
+  // Protected Getters (for subclass access)
+  // ============================================
+
+  protected get ownerRef(): IPawn | null {
+    return this.owner;
+  }
+
+  protected get sceneRef(): Scene {
+    return this.scene;
+  }
+
+  protected get walkSpeedValue(): number {
+    return this.walkSpeed;
+  }
+
+  protected get runSpeedValue(): number {
+    return this.runSpeed;
+  }
+
+  protected get isRunningValue(): boolean {
+    return this.isRunning;
+  }
+
+  protected set isRunningValue(value: boolean) {
+    this.isRunning = value;
+  }
+
+  // ============================================
+  // Public Getters (for composition)
+  // ============================================
+
+  /** Get the owner pawn for external access */
+  public getOwner(): IPawn | null {
+    return this.owner;
+  }
+
+  /** Get the scene */
+  public getScene(): Scene {
+    return this.scene;
+  }
+
+  // ============================================
   // Private Methods
   // ============================================
 
