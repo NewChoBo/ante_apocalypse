@@ -22,6 +22,7 @@ export * from './simulation/Pawn.js';
 export * from './simulation/components/HealthComponent.js';
 export * from './simulation/components/MovementComponent.js';
 export * from './simulation/components/AIComponent.js';
+export * from './simulation/components/interfaces/index.js';
 export * from './weapons/WeaponRegistry.js';
 export * from './simulation/components/SkeletonAnimationComponent.js';
 export * from './simulation/utils/MeshUtils.js';

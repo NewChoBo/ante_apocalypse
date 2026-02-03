@@ -1,10 +1,14 @@
 import { Mesh, MeshBuilder, Scene, Vector3 } from '@babylonjs/core';
-import { Logger } from '@ante/common';
+import { IPawnComponent, Logger } from '@ante/common';
 import { Pawn } from '../../simulation/Pawn.js';
 import { HealthComponent } from '../../simulation/components/HealthComponent.js';
-import { MovementComponent } from '../../simulation/components/MovementComponent.js';
+import {
+  MovementComponent,
+  MovementConfig,
+} from '../../simulation/components/MovementComponent.js';
 import {
   AIComponent,
+  AIConfig,
   AIBehaviorCallbacks,
   AITarget,
 } from '../../simulation/components/AIComponent.js';
@@ -13,99 +17,166 @@ import { IEnemyPawn } from '../../types/IEnemyPawn.js';
 const logger = new Logger('CompositionalEnemyPawn');
 
 /**
- * Configuration for CompositionalEnemyPawn
+ * CompositionalEnemyPawn 설정
+ *
+ * 각 컴포넌트별 설정을 분리하여 응집도를 높입니다.
  */
 export interface CompositionalEnemyPawnConfig {
-  // Health
-  maxHealth: number;
-  initialHealth?: number;
-
-  // Movement
-  walkSpeed: number;
-  runSpeed?: number;
-  acceleration?: number;
-  deceleration?: number;
-
-  // AI
-  detectionRange: number;
-  attackRange: number;
-  patrolRadius?: number;
-  patrolWaitTime?: number;
-  attackCooldown?: number;
+  /** HealthComponent 설정 */
+  health: {
+    maxHealth: number;
+    initialHealth?: number;
+  };
+  /** MovementComponent 설정 */
+  movement: MovementConfig;
+  /** AIComponent 설정 */
+  ai: AIConfig;
 }
 
 /**
- * CompositionalEnemyPawn - Proof of concept for composition-based enemy
+ * 컴포넌트 팩토리 함수 타입
  *
- * This pawn demonstrates the new composition architecture:
- * - Uses Pawn (composition-based) instead of BasePawn (inheritance-based)
- * - Functionality provided by components:
- *   - HealthComponent: Health management
- *   - MovementComponent: Movement and rotation
- *   - AIComponent: AI behavior state machine
+ * 의존성 주입(DI)을 위한 팩토리 패턴
+ */
+export type ComponentFactory<T extends IPawnComponent> = (scene: Scene) => T;
+
+/**
+ * CompositionalEnemyPawn - 컴포지션 기반 Enemy Pawn
  *
- * Benefits:
- * - Modular: Each feature is self-contained
- * - Reusable: Components can be shared across different pawn types
- * - Testable: Individual components can be unit tested
- * - Flexible: Easy to add/remove features without inheritance chains
+ * 아키텍처 원칙:
+ * - 단일 책임 원칙(SRP): 각 컴포넌트가 하나의 책임만 담당
+ * - 의존성 역전 원칙(DIP): 추상화에 의존, 구체화에 의존하지 않음
+ * - 개방-폐쇄 원칙(OCP): 확장에는 열리고, 수정에는 닫힘
  *
- * Usage:
+ * 특징:
+ * - Builder 패턴 지원
+ * - 컴포넌트 팩토리 주입 가능
+ * - 느슨한 결합 (컴포넌트 간 인터페이스 기반 통신)
+ *
+ * 사용 예시:
  * ```typescript
- * const enemy = new CompositionalEnemyPawn(scene, 'enemy_1', new Vector3(0, 0, 0), {
- *   maxHealth: 100,
- *   walkSpeed: 3,
- *   detectionRange: 10,
- *   attackRange: 2
- * });
- * enemy.activate();
+ * // 1. 기본 사용 (팩토리 낶부 생성)
+ * const enemy = new CompositionalEnemyPawn(scene, 'enemy_1', position, config);
+ *
+ * // 2. Builder 패턴 사용
+ * const enemy = new CompositionalEnemyPawn.Builder(scene, 'enemy_1', position)
+ *   .withHealth({ maxHealth: 100 })
+ *   .withMovement({ walkSpeed: 3 })
+ *   .withAI({ detectionRange: 10, attackRange: 2 })
+ *   .build();
  * ```
  */
 export class CompositionalEnemyPawn extends Pawn implements IEnemyPawn {
   public override mesh: Mesh;
   public headBox: Mesh;
 
-  // Component references for easy access
-  private healthComponent: HealthComponent;
-  private movementComponent: MovementComponent;
-  private aiComponent: AIComponent;
+  // 컴포넌트 참조 (읽기 전용)
+  private _healthComponent: HealthComponent;
+  private _movementComponent: MovementComponent;
+  private _aiComponent: AIComponent;
 
-  // Configuration
-  private config: CompositionalEnemyPawnConfig;
+  // 설정 (불변)
+  private readonly _config: CompositionalEnemyPawnConfig;
 
-  constructor(scene: Scene, id: string, position: Vector3, config: CompositionalEnemyPawnConfig) {
-    // Initialize base Pawn with composition support
+  /**
+   * 기본 생성자
+   */
+  constructor(
+    scene: Scene,
+    id: string,
+    position: Vector3,
+    config: CompositionalEnemyPawnConfig,
+    componentFactories?: {
+      health?: ComponentFactory<HealthComponent>;
+      movement?: ComponentFactory<MovementComponent>;
+      ai?: ComponentFactory<AIComponent>;
+    }
+  ) {
+    // 기본 Pawn 초기화
     super(scene, {
       id,
       type: 'enemy',
       position,
-      maxHealth: config.maxHealth,
-      initialHealth: config.initialHealth ?? config.maxHealth,
+      maxHealth: config.health.maxHealth,
+      initialHealth: config.health.initialHealth ?? config.health.maxHealth,
     });
 
-    // Store config for runtime access
-    this.config = config;
+    this._config = config;
 
-    // Create physics mesh (root collider)
+    // 메시 생성
     this.mesh = this.createPhysicsMesh(id, scene, position);
-
-    // Create head hitbox
     this.headBox = this.createHeadHitbox(id, scene);
 
-    // Initialize components
-    this.healthComponent = this.createHealthComponent(config);
-    this.movementComponent = this.createMovementComponent(scene, config);
-    this.aiComponent = this.createAIComponent(scene, config);
+    // 컴포넌트 생성 (팩토리 주입 또는 기본 생성)
+    this._healthComponent =
+      componentFactories?.health?.(scene) ?? this.createDefaultHealthComponent(config.health);
+    this._movementComponent =
+      componentFactories?.movement?.(scene) ??
+      this.createDefaultMovementComponent(scene, config.movement);
+    this._aiComponent =
+      componentFactories?.ai?.(scene) ?? this.createDefaultAIComponent(scene, config.ai);
 
-    // Add components to pawn
-    this.addComponent(this.healthComponent);
-    this.addComponent(this.movementComponent);
-    this.addComponent(this.aiComponent);
+    // 컴포넌트 등록
+    this.addComponent(this._healthComponent);
+    this.addComponent(this._movementComponent);
+    this.addComponent(this._aiComponent);
 
-    // Setup health event handlers
+    // 이벤트 설정
     this.setupHealthEvents();
 
     logger.info(`Created CompositionalEnemyPawn ${id} at ${position}`);
+  }
+
+  // ============================================
+  // Factory Methods
+  // ============================================
+
+  private createDefaultHealthComponent(config: {
+    maxHealth: number;
+    initialHealth?: number;
+  }): HealthComponent {
+    return new HealthComponent({
+      maxHealth: config.maxHealth,
+      initialHealth: config.initialHealth ?? config.maxHealth,
+    });
+  }
+
+  private createDefaultMovementComponent(scene: Scene, config: MovementConfig): MovementComponent {
+    return new MovementComponent(scene, {
+      walkSpeed: config.walkSpeed,
+      runSpeed: config.runSpeed,
+      acceleration: config.acceleration ?? 10,
+      deceleration: config.deceleration ?? 8,
+      rotationSpeed: config.rotationSpeed ?? 5,
+      canFly: config.canFly ?? false,
+      gravity: config.gravity ?? 9.81,
+    });
+  }
+
+  private createDefaultAIComponent(scene: Scene, config: AIConfig): AIComponent {
+    return new AIComponent(scene, {
+      detectionRange: config.detectionRange,
+      attackRange: config.attackRange,
+      loseInterestRange: config.loseInterestRange,
+      patrolRadius: config.patrolRadius ?? 5,
+      patrolWaitTime: config.patrolWaitTime ?? 2,
+      attackCooldown: config.attackCooldown ?? 1,
+    });
+  }
+
+  // ============================================
+  // Builder Pattern
+  // ============================================
+
+  /**
+   * Builder 패턴 시작
+   */
+  public static Builder(
+    scene: Scene,
+    id: string,
+    position: Vector3
+  ): CompositionalEnemyPawnBuilder {
+    return new CompositionalEnemyPawnBuilder(scene, id, position);
   }
 
   // ============================================
@@ -113,7 +184,6 @@ export class CompositionalEnemyPawn extends Pawn implements IEnemyPawn {
   // ============================================
 
   private createPhysicsMesh(id: string, scene: Scene, position: Vector3): Mesh {
-    // Root Collider (Pivot at feet: 0.0m)
     const mesh = MeshBuilder.CreateBox(
       'enemyRoot_' + id,
       { width: 0.5, height: 2, depth: 0.5 },
@@ -129,13 +199,8 @@ export class CompositionalEnemyPawn extends Pawn implements IEnemyPawn {
   }
 
   private createHeadHitbox(id: string, scene: Scene): Mesh {
-    // Head Hitbox - positioned relative to root
     const headBox = MeshBuilder.CreateBox('headBox_' + id, { size: 0.25 }, scene);
     headBox.parent = this.mesh;
-
-    // Adjust this value to match the visual mesh's head bone position
-    // If root is 2m tall centered at 1m, top is at 2m. Head is likely near 1.75m.
-    // Relative position = 1.75 - 1.0 = 0.75
     headBox.position = new Vector3(0, 1.75, 0);
     headBox.checkCollisions = true;
     headBox.isPickable = true;
@@ -145,54 +210,17 @@ export class CompositionalEnemyPawn extends Pawn implements IEnemyPawn {
   }
 
   // ============================================
-  // Component Creation
-  // ============================================
-
-  private createHealthComponent(config: CompositionalEnemyPawnConfig): HealthComponent {
-    return new HealthComponent({
-      maxHealth: config.maxHealth,
-      initialHealth: config.initialHealth ?? config.maxHealth,
-    });
-  }
-
-  private createMovementComponent(
-    scene: Scene,
-    config: CompositionalEnemyPawnConfig
-  ): MovementComponent {
-    return new MovementComponent(scene, {
-      walkSpeed: config.walkSpeed,
-      runSpeed: config.runSpeed,
-      acceleration: config.acceleration ?? 10,
-      deceleration: config.deceleration ?? 8,
-      rotationSpeed: 5,
-      canFly: false,
-    });
-  }
-
-  private createAIComponent(scene: Scene, config: CompositionalEnemyPawnConfig): AIComponent {
-    return new AIComponent(scene, {
-      detectionRange: config.detectionRange,
-      attackRange: config.attackRange,
-      patrolRadius: config.patrolRadius ?? 5,
-      patrolWaitTime: config.patrolWaitTime ?? 2,
-      attackCooldown: config.attackCooldown ?? 1,
-    });
-  }
-
-  // ============================================
   // Event Setup
   // ============================================
 
   private setupHealthEvents(): void {
-    // Handle death
-    this.healthComponent.onDeath.add((event) => {
+    this._healthComponent.onDeath.add((event) => {
       logger.info(`CompositionalEnemyPawn ${this.id} died. Killer: ${event.killerId ?? 'unknown'}`);
-      this.aiComponent.onDeath();
+      this._aiComponent.onDeath();
       this.onDeath();
     });
 
-    // Handle damage
-    this.healthComponent.onDamageTaken.add((event) => {
+    this._healthComponent.onDamageTaken.add((event) => {
       logger.debug(
         `CompositionalEnemyPawn ${this.id} took ${event.amount} damage from ${event.attackerId ?? 'unknown'}`
       );
@@ -215,10 +243,8 @@ export class CompositionalEnemyPawn extends Pawn implements IEnemyPawn {
   }
 
   public override dispose(): void {
-    // Components are disposed by base Pawn.dispose()
     super.dispose();
 
-    // Dispose additional meshes
     if (this.headBox && !this.headBox.isDisposed()) {
       this.headBox.dispose();
     }
@@ -230,132 +256,100 @@ export class CompositionalEnemyPawn extends Pawn implements IEnemyPawn {
   // IEnemyPawn Implementation
   // ============================================
 
-  /**
-   * Rotate to face a target point
-   */
   public lookAt(targetPoint: Vector3): void {
-    this.movementComponent.lookAt(targetPoint);
+    this._movementComponent.lookAt(targetPoint);
   }
 
-  /**
-   * Move in a direction (used by external controllers)
-   */
   public move(direction: Vector3, speed: number, _deltaTime: number): void {
-    this.movementComponent.move(direction, speed);
+    this._movementComponent.move(direction, speed);
   }
 
   // ============================================
   // Public API
   // ============================================
 
-  /**
-   * Set the target provider function for AI
-   * The provider should return the current target or null
-   */
   public setTargetProvider(provider: () => AITarget | null): void {
-    this.aiComponent.setTargetProvider(provider);
+    this._aiComponent.setTargetProvider(provider);
   }
 
-  /**
-   * Set AI behavior callbacks
-   */
   public setBehaviorCallbacks(callbacks: AIBehaviorCallbacks): void {
-    this.aiComponent.setBehaviorCallbacks(callbacks);
+    this._aiComponent.setBehaviorCallbacks(callbacks);
   }
 
-  /**
-   * Force the AI to target a specific entity
-   */
   public forceTarget(target: AITarget): void {
-    this.aiComponent.forceTarget(target);
+    this._aiComponent.forceTarget(target);
   }
 
-  /**
-   * Clear the current target
-   */
   public clearTarget(): void {
-    this.aiComponent.clearTarget();
+    this._aiComponent.clearTarget();
   }
 
-  /**
-   * Get current AI state
-   */
   public getAIState(): string {
-    return this.aiComponent.getCurrentState();
+    return this._aiComponent.getCurrentState();
   }
 
-  /**
-   * Get current target
-   */
   public getCurrentTarget(): AITarget | null {
-    return this.aiComponent.getCurrentTarget();
+    return this._aiComponent.getCurrentTarget();
   }
 
-  /**
-   * Get distance to current target
-   */
   public getDistanceToTarget(): number {
-    return this.aiComponent.getDistanceToTarget();
+    return this._aiComponent.getDistanceToTarget();
   }
 
-  /**
-   * Check if the pawn is moving
-   */
   public isMoving(): boolean {
-    return this.movementComponent.getIsMoving();
+    return this._movementComponent.getIsMoving();
   }
 
-  /**
-   * Get current velocity
-   */
   public getVelocity(): Vector3 {
-    return this.movementComponent.getVelocity();
+    return this._movementComponent.getVelocity();
   }
 
-  /**
-   * Get current speed
-   */
   public getSpeed(): number {
-    return this.movementComponent.getSpeed();
+    return this._movementComponent.getSpeed();
   }
 
   // ============================================
-  // Event Handlers
+  // Event Handlers (Override 가능)
   // ============================================
 
-  protected onTakeDamage(amount: number, attackerId?: string): void {
-    // Override in subclass or set callback for custom behavior
-    // Example: Alert nearby enemies, play sound, etc.
-    logger.debug(`Enemy ${this.id} took ${amount} damage from ${attackerId ?? 'unknown'}`);
+  protected onTakeDamage(_amount: number, _attackerId?: string): void {
+    // 하위 클래스에서 오버라이드
   }
 
   protected onDeath(): void {
-    // Override in subclass or set callback for custom behavior
-    // Example: Spawn loot, update score, etc.
     logger.info(`Enemy ${this.id} died`);
   }
 
   // ============================================
-  // Convenience Getters
+  // Getters
   // ============================================
 
-  /**
-   * Get the pawn's configuration
-   */
-  public getConfig(): CompositionalEnemyPawnConfig {
-    return this.config;
-  }
-
   public get health(): number {
-    return this.healthComponent.health;
+    return this._healthComponent.health;
   }
 
   public get maxHealth(): number {
-    return this.healthComponent.maxHealth;
+    return this._healthComponent.maxHealth;
   }
 
   public get isDead(): boolean {
-    return this.healthComponent.isDead;
+    return this._healthComponent.isDead;
+  }
+
+  public get healthComponent(): HealthComponent {
+    return this._healthComponent;
+  }
+
+  public get movementComponent(): MovementComponent {
+    return this._movementComponent;
+  }
+
+  public get aiComponent(): AIComponent {
+    return this._aiComponent;
+  }
+
+  public getConfig(): CompositionalEnemyPawnConfig {
+    return this._config;
   }
 
   public override takeDamage(
@@ -364,6 +358,90 @@ export class CompositionalEnemyPawn extends Pawn implements IEnemyPawn {
     part?: string,
     hitPoint?: { x: number; y: number; z: number }
   ): void {
-    this.healthComponent.takeDamage(amount, attackerId, part, hitPoint);
+    this._healthComponent.takeDamage(amount, attackerId, part, hitPoint);
+  }
+}
+
+/**
+ * CompositionalEnemyPawn Builder
+ *
+ * 단계적 생성을 위한 빌더 패턴
+ */
+export class CompositionalEnemyPawnBuilder {
+  private scene: Scene;
+  private id: string;
+  private position: Vector3;
+  private healthConfig?: { maxHealth: number; initialHealth?: number };
+  private movementConfig?: MovementConfig;
+  private aiConfig?: AIConfig;
+  private componentFactories?: {
+    health?: ComponentFactory<HealthComponent>;
+    movement?: ComponentFactory<MovementComponent>;
+    ai?: ComponentFactory<AIComponent>;
+  };
+
+  constructor(scene: Scene, id: string, position: Vector3) {
+    this.scene = scene;
+    this.id = id;
+    this.position = position;
+  }
+
+  /**
+   * Health 설정
+   */
+  public withHealth(config: { maxHealth: number; initialHealth?: number }): this {
+    this.healthConfig = config;
+    return this;
+  }
+
+  /**
+   * Movement 설정
+   */
+  public withMovement(config: MovementConfig): this {
+    this.movementConfig = config;
+    return this;
+  }
+
+  /**
+   * AI 설정
+   */
+  public withAI(config: AIConfig): this {
+    this.aiConfig = config;
+    return this;
+  }
+
+  /**
+   * 컴포넌트 팩토리 주입
+   */
+  public withComponentFactories(factories: {
+    health?: ComponentFactory<HealthComponent>;
+    movement?: ComponentFactory<MovementComponent>;
+    ai?: ComponentFactory<AIComponent>;
+  }): this {
+    this.componentFactories = factories;
+    return this;
+  }
+
+  /**
+   * Pawn 생성
+   */
+  public build(): CompositionalEnemyPawn {
+    if (!this.healthConfig || !this.movementConfig || !this.aiConfig) {
+      throw new Error(
+        'CompositionalEnemyPawnBuilder: All configurations must be set before building'
+      );
+    }
+
+    return new CompositionalEnemyPawn(
+      this.scene,
+      this.id,
+      this.position,
+      {
+        health: this.healthConfig,
+        movement: this.movementConfig,
+        ai: this.aiConfig,
+      },
+      this.componentFactories
+    );
   }
 }
