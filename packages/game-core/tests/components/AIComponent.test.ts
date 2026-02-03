@@ -1,8 +1,16 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NullEngine, Scene, Vector3 } from '@babylonjs/core';
-import { AIComponent, AIConfig, AITarget, AIBehaviorCallbacks } from '../AIComponent.js';
-import { MovementComponent, MovementConfig } from '../MovementComponent.js';
-import { isMovable } from '../interfaces/IMovable.js';
+import {
+  AIComponent,
+  AIConfig,
+  AITarget,
+  AIBehaviorCallbacks,
+} from '../../src/simulation/components/AIComponent.js';
+import {
+  MovementComponent,
+  MovementConfig,
+} from '../../src/simulation/components/MovementComponent.js';
+import { isMovable } from '../../src/simulation/components/interfaces/IMovable.js';
 import { IPawnComponent, IPawn } from '@ante/common';
 
 /**

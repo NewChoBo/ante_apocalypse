@@ -1,7 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NullEngine, Scene, Vector3 } from '@babylonjs/core';
-import { MovementComponent, MovementConfig, MovementState } from '../MovementComponent.js';
-import { IMovable } from '../interfaces/IMovable.js';
+import {
+  MovementComponent,
+  MovementConfig,
+  MovementState,
+} from '../../src/simulation/components/MovementComponent.js';
+import { IMovable } from '../../src/simulation/components/interfaces/IMovable.js';
 import { IPawn } from '@ante/common';
 
 /**
