@@ -370,11 +370,12 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     if (stats.range !== undefined) this.range = stats.range as number;
 
     // Update Core stats
-    if (stats.damage !== undefined) this.stats.damage = stats.damage as number;
-    if (stats.range !== undefined) this.stats.range = stats.range as number;
-    if (stats.magazineSize !== undefined) this.stats.magazineSize = stats.magazineSize as number;
-    if (stats.fireRate !== undefined) this.stats.fireRate = stats.fireRate as number;
-    if (stats.reloadTime !== undefined) this.stats.reloadTime = stats.reloadTime as number;
+    const coreStats = this.stats as any;
+    if (stats.damage !== undefined) coreStats.damage = stats.damage as number;
+    if (stats.range !== undefined) coreStats.range = stats.range as number;
+    if (stats.magazineSize !== undefined) coreStats.magazineSize = stats.magazineSize as number;
+    if (stats.fireRate !== undefined) coreStats.fireRate = stats.fireRate as number;
+    if (stats.reloadTime !== undefined) coreStats.reloadTime = stats.reloadTime as number;
 
     // [신규] 최초 동기화 시 탄약 자동 지급
     if (isInitialSync && (this.stats.magazineSize || 0) > 0) {

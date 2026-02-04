@@ -32,8 +32,9 @@ export class WeaponInventoryComponent {
     // [Authoritative Weapon Stats Sync] - Directly from shared config in monorepo
     logger.info('Applying authoritative weapon configs from shared registry');
     this.weapons.forEach((w) => {
-      if (WeaponRegistry[w.name]) {
-        w.updateStats(WeaponRegistry[w.name]);
+      const stats = WeaponRegistry[w.name];
+      if (stats) {
+        w.updateStats(stats as unknown as Record<string, unknown>);
       }
     });
 

@@ -5,7 +5,7 @@ import { INetworkManager } from '../interfaces/INetworkManager';
 import { BaseEnemyManager, TickManager } from '@ante/game-core';
 import { EventCode } from '@ante/common';
 import { WorldEntityManager } from './WorldEntityManager';
-import { EnemyState } from '@ante/common';
+import { EnemyState, EnemyMovePayload } from '@ante/common';
 import type { GameContext } from '../../types/GameContext';
 
 /**
@@ -17,10 +17,8 @@ export class EnemyManager extends BaseEnemyManager {
   private shadowGenerator: ShadowGenerator;
   private networkManager: INetworkManager;
   private worldManager: WorldEntityManager;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _enemyUpdateObserver: Observer<any> | null = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _eventObserver: Observer<any> | null = null;
+  private _enemyUpdateObserver: Observer<EnemyMovePayload> | null = null;
+  private _eventObserver: Observer<{ code: number; data: unknown; senderId: string }> | null = null;
 
   constructor(
     scene: Scene,
