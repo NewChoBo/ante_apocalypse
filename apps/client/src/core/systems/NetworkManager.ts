@@ -30,13 +30,15 @@ import { ConnectionManager } from '../network/ConnectionManager';
 import { PlayerStateManager } from '../network/PlayerStateManager';
 import { RoomManager } from '../network/RoomManager';
 
+import { INetworkManager } from '../interfaces/INetworkManager';
+
 const logger = new Logger('NetworkManager');
 
 /**
  * 네트워크 관리 Facade 클래스
  * 기존 API를 유지하면서 내부적으로 분리된 Manager들에 위임
  */
-export class NetworkManager implements INetworkAuthority {
+export class NetworkManager implements INetworkAuthority, INetworkManager {
   private static instance: NetworkManager;
   private provider: INetworkProvider;
 

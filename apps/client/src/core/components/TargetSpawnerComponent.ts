@@ -1,7 +1,7 @@
 import { BaseTargetSpawner } from '@ante/game-core';
 import { Scene, Vector3, ShadowGenerator, Observer } from '@babylonjs/core';
 import { TargetPawn, TargetPawnConfig } from '../TargetPawn';
-import { NetworkManager } from '../systems/NetworkManager';
+import { INetworkManager } from '../interfaces/INetworkManager';
 import { WorldEntityManager } from '../systems/WorldEntityManager';
 
 /**
@@ -11,20 +11,23 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
   private scene: Scene;
   private shadowGenerator: ShadowGenerator;
   private worldManager: WorldEntityManager;
-  private networkManager: NetworkManager;
+  private networkManager: INetworkManager;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _spawnObserver: Observer<any> | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _destroyObserver: Observer<any> | null = null;
 
-  constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
-    const netManager = NetworkManager.getInstance();
-    super(netManager); // BaseTargetSpawner
-
+  constructor(
+    scene: Scene,
+    shadowGenerator: ShadowGenerator,
+    networkManager: INetworkManager,
+    worldManager: WorldEntityManager
+  ) {
+    super(networkManager); // BaseTargetSpawner
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
-    this.worldManager = WorldEntityManager.getInstance();
-    this.networkManager = netManager;
+    this.worldManager = worldManager;
+    this.networkManager = networkManager;
 
     this._spawnObserver = this.networkManager.onTargetSpawn.add((data) => {
       // If I am Master, I already spawned it locally via broadcastTargetSpawn logic?
@@ -56,6 +59,7 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
       type: type,
       position: position,
       shadowGenerator: this.shadowGenerator,
+      networkManager: this.networkManager,
       isMoving: isMoving || type === 'moving_target' || type === 'moving',
     };
 

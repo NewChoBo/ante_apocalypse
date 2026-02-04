@@ -1,4 +1,5 @@
 import { Scene, UniversalCamera, Observable } from '@babylonjs/core';
+import { INetworkManager } from '../interfaces/INetworkManager';
 import { IWeapon } from '../../types/IWeapon';
 import { inventoryStore } from '../store/GameStore';
 import { Pistol } from '../../weapons/Pistol';
@@ -20,12 +21,17 @@ export class WeaponInventoryComponent {
   /** 무기가 변경될 때 호출되는 Observable */
   public onWeaponChanged = new Observable<IWeapon>();
 
-  constructor(scene: Scene, camera: UniversalCamera, applyRecoil?: (force: number) => void) {
+  constructor(
+    scene: Scene,
+    camera: UniversalCamera,
+    networkManager: INetworkManager,
+    applyRecoil?: (force: number) => void
+  ) {
     this.weapons = [
-      new Pistol(scene, camera, applyRecoil),
-      new Rifle(scene, camera, applyRecoil),
-      new Knife(scene, camera),
-      new Bat(scene, camera),
+      new Pistol(scene, camera, networkManager, applyRecoil),
+      new Rifle(scene, camera, networkManager, applyRecoil),
+      new Knife(scene, camera, networkManager),
+      new Bat(scene, camera, networkManager),
     ];
 
     // [Authoritative Weapon Stats Sync] - Directly from shared config in monorepo

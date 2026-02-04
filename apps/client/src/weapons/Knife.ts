@@ -2,6 +2,7 @@ import { Scene, UniversalCamera } from '@babylonjs/core';
 import { MeleeWeapon } from './MeleeWeapon';
 import { ProceduralWeaponBuilder } from './ProceduralWeaponBuilder';
 import { MeleeWeaponConfigs } from '../config/WeaponConfig';
+import { INetworkManager } from '../core/interfaces/INetworkManager';
 
 /**
  * 근접 공격용 칼(Knife) 클래스.
@@ -13,8 +14,8 @@ export class Knife extends MeleeWeapon {
 
   protected weaponConfig = MeleeWeaponConfigs.Knife;
 
-  constructor(scene: Scene, camera: UniversalCamera) {
-    super(scene, camera);
+  constructor(scene: Scene, camera: UniversalCamera, networkManager: INetworkManager) {
+    super(scene, camera, networkManager);
     this.createMesh();
   }
 

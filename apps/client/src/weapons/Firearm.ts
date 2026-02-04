@@ -10,7 +10,7 @@ import { Firearm as CoreFirearm } from '@ante/game-core';
 import { GameObservables } from '../core/events/GameObservables';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon';
-import { NetworkManager } from '../core/systems/NetworkManager';
+import { INetworkManager } from '../core/interfaces/INetworkManager';
 import { HitScanSystem, DamageSystem } from '@ante/game-core';
 import { WeaponVisualController } from './WeaponVisualController';
 
@@ -63,6 +63,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     return this.isAiming ? 0.8 : defaultFOV;
   }
 
+  protected networkManager: INetworkManager;
   protected applyRecoilCallback?: (force: number) => void;
 
   protected isFiring = false;
@@ -71,6 +72,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
   constructor(
     scene: Scene,
     camera: UniversalCamera,
+    networkManager: INetworkManager,
     initialAmmo: number,
     reserveAmmo: number,
     applyRecoil?: (force: number) => void
@@ -84,6 +86,8 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
       fireRate: 0.1,
       reloadTime: 1.0,
     });
+
+    this.networkManager = networkManager;
 
     // Initialize visual controller with stopFire callback
     this.visualController = new WeaponVisualController(scene, camera, () => this.stopFire());
@@ -142,7 +146,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
 
     // 네트워크 발사 이벤트 전송
     const muzzle = this.getMuzzleTransform();
-    NetworkManager.getInstance().fire({
+    this.networkManager.fire({
       weaponId: this.name,
       muzzleTransform: {
         position: { x: muzzle.position.x, y: muzzle.position.y, z: muzzle.position.z },
@@ -191,7 +195,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     this.ejectMagazine();
 
     // Notify Server
-    NetworkManager.getInstance().reload(this.name);
+    this.networkManager.reload(this.name);
 
     // Core handles the timer in tick(), but we can also hook into that or just keep visual logic here.
     // However, Core 'reloadLogic' is called when timer finishes.
@@ -288,7 +292,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
         }
       }
 
-      NetworkManager.getInstance().requestHit({
+      this.networkManager.requestHit({
         targetId,
         damage: finalDamage,
         weaponId: this.name,

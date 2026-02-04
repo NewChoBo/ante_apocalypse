@@ -10,17 +10,16 @@ import {
   InputText,
 } from '@babylonjs/gui';
 import { Observer } from '@babylonjs/core';
-import { NetworkManager } from '../core/systems/NetworkManager';
+import { INetworkManager } from '../core/interfaces/INetworkManager';
 import { UIManager, UIScreen } from './UIManager';
-import { RoomInfo } from '@ante/common';
-import { Logger } from '@ante/common';
+import { RoomInfo, Logger } from '@ante/common';
 
 const logger = new Logger('LobbyUI');
 
 export class LobbyUI {
   private container: Container;
   private roomListPanel: StackPanel;
-  private networkManager: NetworkManager;
+  private networkManager: INetworkManager;
   private uiManager: UIManager;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private observers: Observer<any>[] = [];
@@ -31,9 +30,9 @@ export class LobbyUI {
   private readonly FONT_TACTICAL = 'Rajdhani, sans-serif';
   private readonly FONT_MONO = 'Roboto Mono, monospace';
 
-  constructor(uiManager: UIManager) {
+  constructor(uiManager: UIManager, networkManager: INetworkManager) {
     this.uiManager = uiManager;
-    this.networkManager = NetworkManager.getInstance();
+    this.networkManager = networkManager;
     this.container = this.createContainer();
     this.roomListPanel = this.container
       .getDescendants()

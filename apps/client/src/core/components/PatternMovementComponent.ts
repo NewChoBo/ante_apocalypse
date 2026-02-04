@@ -1,7 +1,7 @@
 import { BaseComponent } from '@ante/game-core';
 import { TargetPawn } from '../TargetPawn';
 import { Scene, Vector3 } from '@babylonjs/core';
-import { NetworkManager } from '../systems/NetworkManager';
+import { INetworkManager } from '../interfaces/INetworkManager';
 
 export interface MovementConfig {
   pattern: 'sine_x' | 'sine_y' | 'linear';
@@ -13,10 +13,17 @@ export class PatternMovementComponent extends BaseComponent {
   private targetOwner: TargetPawn;
   private config: MovementConfig;
   private baseLocalPosition: Vector3;
+  private networkManager: INetworkManager;
 
-  constructor(owner: TargetPawn, scene: Scene, config: MovementConfig) {
+  constructor(
+    owner: TargetPawn,
+    scene: Scene,
+    networkManager: INetworkManager,
+    config: MovementConfig
+  ) {
     super(owner, scene);
     this.targetOwner = owner;
+    this.networkManager = networkManager;
     this.config = config;
 
     // 메쉬의 초기 로컬 포지션 기준 (TargetPawn.mesh는 루트)
@@ -30,8 +37,7 @@ export class PatternMovementComponent extends BaseComponent {
   }
 
   public update(_deltaTime: number): void {
-    const netManager = NetworkManager.getInstance();
-    const serverTime = netManager.getServerTime();
+    const serverTime = this.networkManager.getServerTime();
 
     if (this.config.pattern === 'sine_x') {
       const phase = serverTime * this.config.speed;

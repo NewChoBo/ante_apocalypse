@@ -11,6 +11,7 @@ import { UIManager, UIScreen } from '../ui/UIManager';
 import { SceneManager } from './systems/SceneManager';
 import { SessionController } from './systems/SessionController';
 import { NetworkState, Logger } from '@ante/common';
+import { EnemyManager } from './systems/EnemyManager'; // Added import
 
 const logger = new Logger('Game');
 import { NetworkManager } from './systems/NetworkManager';
@@ -75,7 +76,7 @@ export class Game {
 
   private async initMenu(): Promise<void> {
     const { scene, shadowGenerator } = await this.sceneManager.createMenuScene();
-    this.uiManager = UIManager.initialize(scene);
+    this.uiManager = UIManager.initialize(scene, NetworkManager.getInstance());
 
     const levelLoader = new LevelLoader(scene, shadowGenerator);
     await levelLoader.loadLevelData(LEVELS['training_ground']);
@@ -177,7 +178,7 @@ export class Game {
 
     try {
       const { scene, shadowGenerator } = await this.sceneManager.createGameScene();
-      this.uiManager = UIManager.initialize(scene);
+      this.uiManager = UIManager.initialize(scene, NetworkManager.getInstance());
       this.setupUIManagerEvents();
 
       const levelLoader = new LevelLoader(scene, shadowGenerator);
@@ -186,7 +187,22 @@ export class Game {
       // Initialize GameAssets (Audio engines, preload model containers)
       await GameAssets.initialize(scene);
 
-      this.sessionController = new SessionController(scene, this.canvas, shadowGenerator);
+      const worldManager = new WorldEntityManager(NetworkManager.getInstance());
+      const enemyManager = new EnemyManager(
+        scene,
+        shadowGenerator,
+        NetworkManager.getInstance(),
+        worldManager
+      );
+      const pickupManager = new PickupManager(NetworkManager.getInstance());
+
+      this.sessionController = new SessionController(scene, this.canvas, shadowGenerator, {
+        networkManager: NetworkManager.getInstance(),
+        uiManager: this.uiManager,
+        worldManager,
+        enemyManager,
+        pickupManager,
+      });
       await this.sessionController.initialize(levelData, this.playerName);
 
       // Ensure the player camera is active
@@ -258,7 +274,6 @@ export class Game {
     // Reset Managers
     TickManager.getInstance().clear();
     WorldEntityManager.getInstance().clear();
-    PickupManager.getInstance().clear();
     GameAssets.clear();
 
     if (this._playerDiedObserver) {

@@ -1,17 +1,18 @@
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
-import { NetworkManager } from './NetworkManager';
 import { PlayerState } from '@ante/common';
 import { RemotePlayerPawn } from '../RemotePlayerPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { CombatComponent } from '../components/CombatComponent';
 import { WorldEntityManager } from './WorldEntityManager';
 import { playerHealthStore, gameStateStore } from '../store/GameStore';
+import { INetworkManager } from '../interfaces/INetworkManager';
 
 export class MultiplayerSystem {
   private scene: Scene;
   private localPlayer: PlayerPawn;
   private remotePlayers: Map<string, RemotePlayerPawn> = new Map();
-  private networkManager: NetworkManager;
+  private networkManager: INetworkManager;
+  private worldManager: WorldEntityManager;
   private shadowGenerator: ShadowGenerator;
   private lastUpdateTime = 0;
   private updateInterval = 8; // ~128Hz update rate (extremely responsive)
@@ -20,12 +21,15 @@ export class MultiplayerSystem {
     scene: Scene,
     localPlayer: PlayerPawn,
     shadowGenerator: ShadowGenerator,
+    networkManager: INetworkManager,
+    worldManager: WorldEntityManager,
     playerName: string = 'Anonymous'
   ) {
     this.scene = scene;
     this.localPlayer = localPlayer;
     this.shadowGenerator = shadowGenerator;
-    this.networkManager = NetworkManager.getInstance();
+    this.networkManager = networkManager;
+    this.worldManager = worldManager;
 
     this.setupListeners();
     localStorage.setItem('playerName', playerName);
@@ -182,7 +186,7 @@ export class MultiplayerSystem {
     const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, name);
     remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
     this.remotePlayers.set(player.id, remote);
-    WorldEntityManager.getInstance().registerEntity(remote);
+    this.worldManager.register(remote);
   }
 
   public update(): void {

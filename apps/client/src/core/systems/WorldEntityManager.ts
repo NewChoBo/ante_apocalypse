@@ -1,36 +1,28 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { IWorldEntity, WorldEntityManager as BaseEntityManager } from '@ante/game-core';
-import { NetworkManager } from './NetworkManager';
+import { INetworkManager } from '../interfaces/INetworkManager';
 
 /**
  * 전역 엔티티 관리자 (클라이언트 확장).
  * Babylon.js 전용 로직(Observable, Hit 처리 등)을 포함합니다.
  */
 export class WorldEntityManager extends BaseEntityManager {
-  private static clientInstance: WorldEntityManager;
-  private networkManager: NetworkManager;
+  private networkManager: INetworkManager;
 
   // 알림용 옵저버
   public onEntityAdded = new Observable<IWorldEntity>();
   public onEntityRemoved = new Observable<string>();
   public onEntityHit = new Observable<{ id: string; part: string; damage: number }>();
 
-  private constructor() {
+  constructor(networkManager: INetworkManager) {
     super();
-    this.networkManager = NetworkManager.getInstance();
+    this.networkManager = networkManager;
   }
 
   public initialize(): void {
     // We don't bother individual removal because NetworkManager.clearObservers()
     // is called when a session ends, wiping all listeners on its observables.
     this.setupNetworkListeners();
-  }
-
-  public static getInstance(): WorldEntityManager {
-    if (!WorldEntityManager.clientInstance) {
-      WorldEntityManager.clientInstance = new WorldEntityManager();
-    }
-    return WorldEntityManager.clientInstance;
   }
 
   private setupNetworkListeners(): void {

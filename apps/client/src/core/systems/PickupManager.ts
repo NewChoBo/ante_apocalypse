@@ -6,27 +6,18 @@ import { ITickable } from '../interfaces/ITickable';
 import { TickManager } from '../TickManager';
 import { inventoryStore, BagItem } from '../store/GameStore';
 import { GameObservables } from '../events/GameObservables';
-import { NetworkManager } from './NetworkManager';
+import { INetworkManager } from '../interfaces/INetworkManager';
 import { EventCode } from '@ante/common';
 
 export class PickupManager extends BasePickupManager implements ITickable {
-  private static instance: PickupManager;
   private scene: Scene | null = null;
   private player: PlayerPawn | null = null;
   public readonly priority = 30;
-  private networkManager: NetworkManager;
+  private networkManager: INetworkManager;
 
-  private constructor() {
-    const netManager = NetworkManager.getInstance();
-    super(netManager);
-    this.networkManager = netManager;
-  }
-
-  public static getInstance(): PickupManager {
-    if (!PickupManager.instance) {
-      PickupManager.instance = new PickupManager();
-    }
-    return PickupManager.instance;
+  constructor(networkManager: INetworkManager) {
+    super(networkManager);
+    this.networkManager = networkManager;
   }
 
   public initialize(scene: Scene, player: PlayerPawn): void {
@@ -34,7 +25,6 @@ export class PickupManager extends BasePickupManager implements ITickable {
     this.player = player;
 
     this.player = player;
-    this.networkManager = NetworkManager.getInstance();
 
     // Networking
     this.networkManager.onEvent.add((event: { code: number; data: unknown }): void => {

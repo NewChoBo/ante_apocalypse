@@ -2,6 +2,7 @@ import { Scene, UniversalCamera, Vector3, Mesh } from '@babylonjs/core';
 import { BaseWeapon } from './BaseWeapon';
 import { GameObservables } from '../core/events/GameObservables';
 import { MeleeWeaponConfig, toVector3 } from '../config/WeaponConfig';
+import { INetworkManager } from '../core/interfaces/INetworkManager';
 
 /**
  * 근접 무기(Melee Weapons)를 위한 중간 추상 클래스.
@@ -28,8 +29,8 @@ export abstract class MeleeWeapon extends BaseWeapon {
     return defaultFOV;
   }
 
-  constructor(scene: Scene, camera: UniversalCamera) {
-    super(scene, camera);
+  constructor(scene: Scene, camera: UniversalCamera, networkManager: INetworkManager) {
+    super(scene, camera, networkManager);
   }
 
   /**

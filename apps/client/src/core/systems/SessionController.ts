@@ -7,17 +7,37 @@ import { HUD } from '../../ui/HUD';
 import { InventoryUI } from '../../ui/inventory/InventoryUI';
 import { InventoryManager } from '../inventory/InventoryManager';
 import { GlobalInputManager } from './GlobalInputManager';
-import { NetworkManager } from './NetworkManager';
 import { MultiplayerSystem } from './MultiplayerSystem';
 import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
 import { EnemyManager } from './EnemyManager';
-import { EventCode, InitialStatePayload, SpawnTargetPayload } from '@ante/common';
+import { InitialStatePayload, SpawnTargetPayload } from '@ante/common';
 import { WorldSimulation, WaveSurvivalRule } from '@ante/game-core';
 import { WorldEntityManager } from './WorldEntityManager';
 import { GameObservables } from '../events/GameObservables';
 import { GameAssets } from '../GameAssets';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
+import { INetworkManager } from '../interfaces/INetworkManager';
+import { IUIManager } from '../../ui/IUIManager';
+
+/**
+ * 네트워크 에러 헨들러 타입
+ */
+export type ErrorHandler = (error: Error, context: string) => void;
+
+/**
+ * SessionControllerOptions
+ * 의존성 주입을 위한 옵션 인터페이스
+ */
+export interface SessionControllerOptions {
+  networkManager: INetworkManager;
+  uiManager: IUIManager;
+  worldManager: WorldEntityManager;
+  enemyManager: EnemyManager;
+  pickupManager: PickupManager;
+  onError?: ErrorHandler;
+  debug?: boolean;
+}
 
 export class SessionController {
   private scene: Scene;
@@ -35,16 +55,33 @@ export class SessionController {
   private healthUnsub: (() => void) | null = null;
   private _initialStateObserver: Observer<InitialStatePayload> | null = null;
 
-  constructor(scene: Scene, canvas: HTMLCanvasElement, shadowGenerator: ShadowGenerator) {
+  private networkManager: INetworkManager;
+  private uiManager: IUIManager;
+  private worldManager: WorldEntityManager;
+  private pickupManager: PickupManager;
+  private inputManager: GlobalInputManager;
+
+  constructor(
+    scene: Scene,
+    canvas: HTMLCanvasElement,
+    shadowGenerator: ShadowGenerator,
+    options: SessionControllerOptions
+  ) {
     this.scene = scene;
     this.canvas = canvas;
     this.shadowGenerator = shadowGenerator;
+    this.networkManager = options.networkManager;
+    this.uiManager = options.uiManager;
+    this.worldManager = options.worldManager;
+    this.enemyManager = options.enemyManager;
+    this.pickupManager = options.pickupManager;
+    this.inputManager = new GlobalInputManager(this.uiManager);
   }
 
   public async initialize(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
     this.playerPawn = new PlayerPawn(this.scene);
-    WorldEntityManager.getInstance().initialize();
-    WorldEntityManager.getInstance().register(this.playerPawn);
+    this.worldManager.initialize();
+    this.worldManager.register(this.playerPawn);
 
     if (levelData.playerSpawn) {
       this.playerPawn.position = Vector3.FromArray(levelData.playerSpawn);
@@ -69,15 +106,19 @@ export class SessionController {
   }
 
   private setupSystems(levelData: LevelData): void {
-    this.targetSpawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
+    this.targetSpawner = new TargetSpawnerComponent(
+      this.scene,
+      this.shadowGenerator,
+      this.networkManager,
+      this.worldManager
+    );
     // Initial layout is now handled by the authority (server/simulation)
 
     if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
-      this.enemyManager = new EnemyManager(this.scene, this.shadowGenerator);
-      // Spawning is now handled by the authority
+      // enemyManager is now injected via constructor
     }
 
-    PickupManager.getInstance().initialize(this.scene, this.playerPawn!);
+    this.pickupManager.initialize(this.scene, this.playerPawn!);
 
     GameObservables.itemCollection.add((): void => {
       GameAssets.sounds.swipe?.play();
@@ -85,7 +126,7 @@ export class SessionController {
   }
 
   private setupCombat(): void {
-    const combatComp = new CombatComponent(this.playerPawn!, this.scene);
+    const combatComp = new CombatComponent(this.playerPawn!, this.scene, this.networkManager);
     this.playerPawn!.addComponent(combatComp);
 
     this.healthUnsub = playerHealthStore.subscribe((health: number): void => {
@@ -100,7 +141,7 @@ export class SessionController {
     combatComp.onWeaponChanged((newWeapon: { name: string }): void => {
       this.syncInventoryStore();
       if (this.multiplayerSystem) {
-        NetworkManager.getInstance().syncWeapon(newWeapon.name);
+        this.networkManager.syncWeapon(newWeapon.name);
       }
     });
   }
@@ -154,7 +195,7 @@ export class SessionController {
   }
 
   private setupInput(): void {
-    GlobalInputManager.getInstance().initialize(
+    this.inputManager.initialize(
       this.scene,
       this.canvas,
       this.playerPawn!,
@@ -164,11 +205,12 @@ export class SessionController {
   }
 
   private setupMultiplayer(playerName: string): void {
-    const network = NetworkManager.getInstance();
     this.multiplayerSystem = new MultiplayerSystem(
       this.scene,
       this.playerPawn!,
       this.shadowGenerator,
+      this.networkManager,
+      this.worldManager,
       playerName
     );
 
@@ -185,23 +227,15 @@ export class SessionController {
       if (this.enemyManager && this.targetSpawner && !isLocalServerRunning) {
         this.simulation = new WorldSimulation(
           this.enemyManager,
-          PickupManager.getInstance(),
+          this.pickupManager,
           this.targetSpawner,
-          network
+          this.networkManager
         );
         this.simulation.setGameRule(new WaveSurvivalRule());
       }
-
-      if (network.isMasterClient()) {
-        if (this.simulation) {
-          this.simulation.initializeRequest(); // Spawns enemies/targets
-        }
-      } else {
-        network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
-      }
     });
 
-    this._initialStateObserver = network.onInitialStateReceived.add(
+    this._initialStateObserver = this.networkManager.onInitialStateReceived.add(
       (data: InitialStatePayload): void => {
         if (this.enemyManager) {
           this.enemyManager.applyEnemyStates(data.enemies);
@@ -222,8 +256,8 @@ export class SessionController {
       }
     );
 
-    network.onPlayerRespawn.add((data) => {
-      if (data.playerId === network.getSocketId()) {
+    this.networkManager.onPlayerRespawn.add((data) => {
+      if (data.playerId === this.networkManager.getSocketId()) {
         this.isSpectating = false;
         this.spectateMode = 'FREE';
         this.hud?.hideRespawnMessage();
@@ -370,7 +404,7 @@ export class SessionController {
     this.multiplayerSystem?.dispose();
     this.enemyManager?.dispose();
     if (this._initialStateObserver) {
-      NetworkManager.getInstance().onInitialStateReceived.remove(this._initialStateObserver);
+      this.networkManager.onInitialStateReceived.remove(this._initialStateObserver);
       this._initialStateObserver = null;
     }
     // Managers are singletons, cleared in Game.ts for now or we could add clear here

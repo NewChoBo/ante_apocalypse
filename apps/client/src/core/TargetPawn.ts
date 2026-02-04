@@ -4,12 +4,14 @@ import { IWorldEntity } from '@ante/game-core';
 import { TargetMeshComponent } from './components/TargetMeshComponent';
 import { HitReactionComponent } from './components/HitReactionComponent';
 import { PatternMovementComponent } from './components/PatternMovementComponent';
+import { INetworkManager } from './interfaces/INetworkManager';
 
 export interface TargetPawnConfig {
   id: string;
   type: string; // 'static' | 'moving' | 'humanoid' 등
   position: Vector3;
   shadowGenerator: ShadowGenerator;
+  networkManager: INetworkManager;
   isMoving?: boolean;
 }
 
@@ -62,7 +64,7 @@ export class TargetPawn extends BasePawn implements IWorldEntity {
 
     // 3. Movement (선택적)
     if (config.isMoving) {
-      this.movementComponent = new PatternMovementComponent(this, scene, {
+      this.movementComponent = new PatternMovementComponent(this, scene, config.networkManager, {
         pattern: 'sine_x', // 기본값, 필요시 확장
         range: 2,
         speed: 0.002,

@@ -1,4 +1,5 @@
 import { Scene } from '@babylonjs/core';
+import { INetworkManager } from '../interfaces/INetworkManager';
 import { BaseComponent } from './BaseComponent';
 import { WeaponInventoryComponent } from './WeaponInventoryComponent';
 import { IWeapon } from '../../types/IWeapon';
@@ -18,7 +19,7 @@ export class CombatComponent extends BaseComponent {
   private input: WeaponInputComponent;
   private hudSync: HUDSyncComponent;
 
-  constructor(owner: BasePawn, scene: Scene) {
+  constructor(owner: BasePawn, scene: Scene, networkManager: INetworkManager) {
     super(owner, scene);
 
     const cameraComp = owner.getComponent(CameraComponent) as CameraComponent;
@@ -29,8 +30,11 @@ export class CombatComponent extends BaseComponent {
     this.hudSync = new HUDSyncComponent();
 
     // 1. 인벤토리 초기화
-    this.inventory = new WeaponInventoryComponent(scene, cameraComp.camera, (force) =>
-      cameraComp.applyRecoil(force)
+    this.inventory = new WeaponInventoryComponent(
+      scene,
+      cameraComp.camera,
+      networkManager,
+      (force) => cameraComp.applyRecoil(force)
     );
 
     // 무기 변경 시 HUD 동기화 리스너 등록

@@ -1,7 +1,7 @@
 import { Scene, Vector3, ShadowGenerator, Observer } from '@babylonjs/core';
 import { EnemyPawn } from '../EnemyPawn';
 import { PlayerPawn } from '../PlayerPawn';
-import { NetworkManager } from './NetworkManager';
+import { INetworkManager } from '../interfaces/INetworkManager';
 import { BaseEnemyManager } from '@ante/game-core';
 import { EventCode } from '@ante/common';
 import { WorldEntityManager } from './WorldEntityManager';
@@ -14,20 +14,24 @@ import { EnemyState } from '@ante/common';
 export class EnemyManager extends BaseEnemyManager {
   private scene: Scene;
   private shadowGenerator: ShadowGenerator;
-  private networkManager: NetworkManager;
+  private networkManager: INetworkManager;
   private worldManager: WorldEntityManager;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _enemyUpdateObserver: Observer<any> | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _eventObserver: Observer<any> | null = null;
 
-  constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
-    const netManager = NetworkManager.getInstance();
-    super(netManager);
+  constructor(
+    scene: Scene,
+    shadowGenerator: ShadowGenerator,
+    networkManager: INetworkManager,
+    worldManager: WorldEntityManager
+  ) {
+    super(networkManager);
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
-    this.networkManager = netManager;
-    this.worldManager = WorldEntityManager.getInstance();
+    this.networkManager = networkManager;
+    this.worldManager = worldManager;
     this.setupNetworkListeners();
   }
 
