@@ -27,13 +27,53 @@ _(스크린샷 이미지는 나중에 추가될 예정입니다)_
 
 ## 🛠️ 기술 스택
 
-- **Engine**: Three.js
-- **Language**: TypeScript
-- **Bundler**: Vite
-- **Physics**: Rapier.js (예정)
-- **Formatting**: ESLint + Prettier
+- **Engine**: Babylon.js (Three.js에서 마이그레이션)
+- **Language**: TypeScript 5.x
+- **Bundler**: Vite 6.x
+- **Testing**: Vitest with 96.55% coverage
+- **Code Quality**: ESLint + Prettier
+- **Architecture**: DI Container, Composition Pattern
 
-## 🚀 실행 방법 (로컬)
+## 🧪 테스트 & 품질
+
+```bash
+# 단위 테스트 실행
+pnpm test
+
+# 타입 체크
+pnpm check
+
+# 린트
+pnpm lint
+
+# 빌드
+pnpm build
+```
+
+**커버리지 현황:**
+
+- Statements: 96.55%
+- Branches: 100%
+- Functions: 90%
+- Lines: 96.55%
+
+## 📊 리팩토링 성과 (Phase 1-10)
+
+| 지표                | Before | After  | 변화    |
+| ------------------- | ------ | ------ | ------- |
+| **매직 넘버**       | 20+개  | 0개    | ✅ 제거 |
+| **테스트 수**       | 5개    | 38개   | +707%   |
+| **커버리지**        | <1%    | 96.55% | +95%    |
+| **God Classes**     | 3개    | 1개    | -66%    |
+| **유지보수성 점수** | 68/100 | 82/100 | +14     |
+
+### 주요 변경 사항
+
+1. **DI 컨테이너 도입** - 테스트 가능한 의존성 관리
+2. **설정 파일 분리** - MovementConfig, FirearmConfig
+3. **PlayerLifecycleManager** - God Class 분리
+4. **주석 영어화** - 한국어 → 영어 전환
+5. **38개 단위 테스트** - 96.55% 커버리지
 
 ```bash
 # 프로젝트 클론
