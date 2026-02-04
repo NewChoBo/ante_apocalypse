@@ -8,35 +8,17 @@ const logger = new Logger('BasePhotonClient');
 /**
  * Photon JS Library Typed Definitions
  */
-export interface RoomOptions {
+export type RoomOptions = {
   isVisible?: boolean;
   isOpen?: boolean;
   maxPlayers?: number;
   customGameProperties?: { [key: string]: unknown };
   propsListedInLobby?: string[];
-  [key: string]: unknown; // Index signature for flexibility
-}
+  [key: string]: unknown;
+};
 
-export interface PhotonActor {
-  actorNr: number;
-  userId: string;
-  name: string;
-  isLocal: boolean;
-  customProperties: { [key: string]: unknown };
-  setName(name: string): void;
-}
-
-export interface PhotonRoom {
-  name: string;
-  isOpen: boolean;
-  isVisible: boolean;
-  maxPlayers: number;
-  playerCount: number;
-  masterClientId: number;
-  actors: { [key: number]: PhotonActor };
-  customProperties: { [key: string]: unknown };
-  getCustomProperty(key: string): unknown;
-}
+export type PhotonActor = import('photon-realtime').LoadBalancing.Actor;
+export type PhotonRoom = import('photon-realtime').LoadBalancing.Room;
 
 /**
  * Photon JS Library Interface Definition
@@ -44,8 +26,8 @@ export interface PhotonRoom {
 export interface IPhotonClient {
   onStateChange: (state: number) => void;
   onEvent: (code: number, content: unknown, actorNr: number) => void;
-  onActorJoin: (actor: PhotonActor) => void;
-  onActorLeave: (actor: PhotonActor) => void;
+  onActorJoin: (actor: import('photon-realtime').LoadBalancing.Actor) => void;
+  onActorLeave: (actor: import('photon-realtime').LoadBalancing.Actor) => void;
   onRoomListUpdate: (rooms: unknown[]) => void;
   onError: (errorCode: number, errorMsg: string) => void;
   raiseEvent: (
@@ -61,8 +43,8 @@ export interface IPhotonClient {
   isConnectedToMaster: () => boolean;
   isInLobby: () => boolean;
   isJoinedToRoom: () => boolean;
-  myActor: () => PhotonActor;
-  myRoom: () => PhotonRoom;
+  myActor: () => import('photon-realtime').LoadBalancing.Actor;
+  myRoom: () => import('photon-realtime').LoadBalancing.Room;
   loadBalancingPeer: { getServerTime: () => number };
   availableRooms(): unknown[];
   setUserId(userId: string): void;

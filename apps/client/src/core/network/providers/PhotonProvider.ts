@@ -31,9 +31,7 @@ export class PhotonProvider implements INetworkProvider {
   constructor() {
     // browser 환경에서 require('ws') 에러 방지를 위해 WebSocket 구현체 재설정
     if (typeof window !== 'undefined' && 'PhotonPeer' in Photon) {
-      (
-        Photon as unknown as { PhotonPeer: { setWebSocketImpl: (impl: unknown) => void } }
-      ).PhotonPeer.setWebSocketImpl(WebSocket);
+      Photon.PhotonPeer.setWebSocketImpl(WebSocket);
     }
 
     if (!this.appId || this.appId === 'YOUR_APP_ID_HERE') {
