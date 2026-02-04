@@ -3,8 +3,8 @@ import { WorldEntityManager } from '../core/systems/WorldEntityManager';
 import { GameObservables } from '../core/events/GameObservables';
 
 /**
- * 무기의 시각적 기능을 담당하는 컨트롤러 클래스.
- * Mixin 패턴을 대체하는 컴포지션 패턴 구현.
+ * Visual controller class for weapon functionality.
+ * Implements composition pattern as alternative to Mixin.
  */
 export class WeaponVisualController {
   // Visual State
@@ -34,7 +34,7 @@ export class WeaponVisualController {
   }
 
   /**
-   * 무기 메시 설정
+   * Set weapon mesh
    */
   public setWeaponMesh(mesh: AbstractMesh | null): void {
     this.weaponMesh = mesh;
@@ -44,7 +44,7 @@ export class WeaponVisualController {
   }
 
   /**
-   * 현재 idle 상태 저장
+   * Store current idle state
    */
   public setIdleState(): void {
     if (this.weaponMesh) {
@@ -54,23 +54,23 @@ export class WeaponVisualController {
   }
 
   /**
-   * 이동 속도 배율 반환 (기본값)
-   * 하위 클래스에서 오버라이드 가능
+   * Returns movement speed multiplier (default)
+   * Can be overridden in subclasses
    */
   public getMovementSpeedMultiplier(): number {
     return 1.0;
   }
 
   /**
-   * FOV 조정값 반환 (기본값)
-   * 하위 클래스에서 오버라이드 가능
+   * Returns FOV adjustment (default)
+   * Can be overridden in subclasses
    */
   public getDesiredFOV(defaultFOV: number): number {
     return defaultFOV;
   }
 
   /**
-   * 무기 표시
+   * Show weapon
    */
   public show(): void {
     this.isActive = true;
@@ -80,7 +80,7 @@ export class WeaponVisualController {
   }
 
   /**
-   * 무기 숨기기
+   * Hide weapon
    */
   public hide(): void {
     this.isActive = false;
@@ -94,14 +94,14 @@ export class WeaponVisualController {
   }
 
   /**
-   * 조준 상태 설정
+   * Set aiming state
    */
   public setAiming(isAiming: boolean): void {
     this.isAiming = isAiming;
   }
 
   /**
-   * 무기 내리기 애니메이션
+   * Lower weapon animation
    */
   public async lower(): Promise<void> {
     if (this.animState === 'lowering') return;
@@ -120,7 +120,7 @@ export class WeaponVisualController {
   }
 
   /**
-   * 무기 올리기 애니메이션
+   * Raise weapon animation
    */
   public raise(): void {
     this.animState = 'raising';
@@ -129,7 +129,7 @@ export class WeaponVisualController {
   }
 
   /**
-   * 애니메이션 업데이트
+   * Update animations
    */
   public updateAnimations(deltaTime: number): void {
     if (this.animState === 'lowering') {
@@ -151,7 +151,7 @@ export class WeaponVisualController {
   }
 
   /**
-   * 히트 처리
+   * Process hit
    */
   public processHit(pickedMesh: Mesh, pickedPoint: Vector3, damageAmount: number): boolean {
     const metadata = pickedMesh.metadata;

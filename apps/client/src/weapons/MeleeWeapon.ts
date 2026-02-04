@@ -4,20 +4,20 @@ import { GameObservables } from '../core/events/GameObservables';
 import { MeleeWeaponConfig, toVector3 } from '../config/WeaponConfig';
 
 /**
- * 근접 무기(Melee Weapons)를 위한 중간 추상 클래스.
- * 공통된 휘두르기 로직, 애니메이션, 충돌 판정 등을 구현합니다.
+ * Abstract intermediate class for Melee Weapons.
+ * Implements common swing logic, animation, and collision detection.
  */
 export abstract class MeleeWeapon extends BaseWeapon {
   protected isSwinging = false;
   protected lastSwingTime = 0;
 
-  // 애니메이션 상태
+  // Animation state
   protected swingAnimationTimer = 0;
   protected isAnimating = false;
   protected defaultRotation = new Vector3(0, 0, 0);
   protected defaultPosition = new Vector3(0, 0, 0);
 
-  // 무기 설정
+  // Weapon config
   protected abstract weaponConfig: MeleeWeaponConfig;
 
   public getMovementSpeedMultiplier(): number {
@@ -33,8 +33,8 @@ export abstract class MeleeWeapon extends BaseWeapon {
   }
 
   /**
-   * 메시 생성 - 하위 클래스에서 호출
-   * ProceduralWeaponBuilder를 사용하여 메시를 생성하고 설정합니다.
+   * Create mesh - called by subclasses
+   * Uses ProceduralWeaponBuilder to create and configure mesh.
    */
   protected createMeshFromBuilder(builderFn: (scene: Scene) => Mesh | null): void {
     this.weaponMesh = builderFn(this.scene);
@@ -43,13 +43,13 @@ export abstract class MeleeWeapon extends BaseWeapon {
       this.weaponMesh.name = `${this.weaponConfig.name}Mesh_Proc`;
       this.weaponMesh.parent = this.camera;
 
-      // 설정에서 위치/회전 적용
+      // Apply position/rotation from config
       this.weaponMesh.position = toVector3(this.weaponConfig.transform.position);
       this.weaponMesh.rotation = toVector3(this.weaponConfig.transform.rotation);
 
       this.weaponMesh.receiveShadows = true;
 
-      // 기본 상태 저장
+      // Store default state
       this.defaultPosition.copyFrom(this.weaponMesh.position);
       this.defaultRotation.copyFrom(this.weaponMesh.rotation);
 
@@ -58,7 +58,7 @@ export abstract class MeleeWeapon extends BaseWeapon {
     }
   }
 
-  /** 근접 무기 사용 */
+  /** Melee weapon use */
   public fire(): boolean {
     return this.swing();
   }
@@ -66,7 +66,7 @@ export abstract class MeleeWeapon extends BaseWeapon {
   public abstract swing(): boolean;
 
   /**
-   * 공통 휘두르기 로직 시작
+   * Start common swing logic
    */
   protected startSwing(): void {
     this.isSwinging = true;
@@ -91,7 +91,7 @@ export abstract class MeleeWeapon extends BaseWeapon {
   }
 
   /**
-   * 볼륨 기반 근접 공격 판정 (Bounding Box 거리 및 각도 체크)
+   * Volume-based melee hit detection (Bounding Box distance and angle check)
    */
   protected checkMeleeHit(): { targetId: string; part: string; pickedPoint: Vector3 } | null {
     const camPos = this.camera.globalPosition;
@@ -138,10 +138,10 @@ export abstract class MeleeWeapon extends BaseWeapon {
     }
 
     if (closestHit) {
-      // processHit 호출하여 데미지 적용
+      // Apply damage via processHit
       this.processHit(closestHit.mesh, closestHit.point, this.damage);
 
-      // 하위 호환성을 위해 리턴값 형식 유지 (필요하다면)
+      // Maintain return value format for backward compatibility
       return {
         targetId: closestHit.mesh.name,
         part: 'body',
@@ -157,7 +157,7 @@ export abstract class MeleeWeapon extends BaseWeapon {
   }
 
   public stopFire(): void {
-    // 근접 무기는 보통 단발적임
+    // Melee weapons are typically single-hit
   }
 
   public getStats(): Record<string, unknown> {
@@ -169,7 +169,7 @@ export abstract class MeleeWeapon extends BaseWeapon {
   }
 
   /**
-   * 공통 애니메이션 업데이트
+   * Common animation update
    */
   public update(deltaTime: number): void {
     this.updateAnimations(deltaTime);
@@ -182,13 +182,13 @@ export abstract class MeleeWeapon extends BaseWeapon {
       const t = this.swingAnimationTimer / duration;
 
       if (t < 1.0) {
-        // 휘두르기 애니메이션
+        // Swing animation
         const swingAngle = Math.sin(t * Math.PI) * animConfig.swingAngle;
         const forwardOffset = Math.sin(t * Math.PI) * animConfig.forwardOffset;
 
-        // 무기별로 다른 회전 축 적용
+        // Apply different rotation axes per weapon
         if (animConfig.zRotationOffset !== undefined) {
-          // Bat 스타일: Z축 회전 위주
+          // Bat style: Z-axis rotation
           this.weaponMesh.rotation.z =
             this.defaultRotation.z - swingAngle * animConfig.zRotationOffset;
           if (animConfig.xRotationOffset !== undefined) {
@@ -196,12 +196,12 @@ export abstract class MeleeWeapon extends BaseWeapon {
               this.defaultRotation.x + swingAngle * animConfig.xRotationOffset;
           }
         } else {
-          // Knife 스타일: X축 회전
+          // Knife style: X-axis rotation
           this.weaponMesh.rotation.x = this.defaultRotation.x + swingAngle;
           this.weaponMesh.position.z = this.defaultPosition.z + forwardOffset;
         }
       } else {
-        // 애니메이션 종료 - 원위치
+        // Animation end - reset to original position
         this.isAnimating = false;
         this.weaponMesh.rotation.copyFrom(this.defaultRotation);
         this.weaponMesh.position.copyFrom(this.defaultPosition);

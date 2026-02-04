@@ -26,6 +26,6 @@ export abstract class BasePawn extends Pawn implements IPawnInterface, IDestruct
     super(scene, { type: type as any, id });
   }
 
-  /** 하위 클래스에서 구체적인 초기화 로직 구현 */
+  /** Implement concrete initialization logic in subclasses */
   public abstract initialize(scene: Scene): void;
 }

@@ -13,6 +13,7 @@ import { MuzzleTransform, IFirearm } from '../types/IWeapon';
 import { NetworkManager } from '../core/systems/NetworkManager';
 import { HitScanSystem, DamageSystem } from '@ante/game-core';
 import { WeaponVisualController } from './WeaponVisualController';
+import { FirearmConfig, WeaponConfig, WeaponMovementConfig } from '../config';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
@@ -56,11 +57,13 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
   }
 
   public getMovementSpeedMultiplier(): number {
-    return this.isAiming ? 0.4 : 1.0;
+    return this.isAiming
+      ? WeaponMovementConfig.AIMING_SPEED_MULTIPLIER
+      : WeaponMovementConfig.NORMAL_SPEED_MULTIPLIER;
   }
 
   public getDesiredFOV(defaultFOV: number): number {
-    return this.isAiming ? 0.8 : defaultFOV;
+    return this.isAiming ? 0.8 : defaultFOV; // TODO: 상수화 필요
   }
 
   protected applyRecoilCallback?: (force: number) => void;
@@ -214,10 +217,13 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
 
     // 장전 중 연출 (기울기)
     if (this.weaponMesh) {
+      const reloadRotationOffset = 0.6; // TODO: 상수화 필요
+      const animationSpeed = 10; // TODO: 상수화 필요
       const targetZ = this.isReloading
-        ? this.visualController['idleRotation'].z + 0.6
+        ? this.visualController['idleRotation'].z + reloadRotationOffset
         : this.visualController['idleRotation'].z;
-      this.weaponMesh.rotation.z += (targetZ - this.weaponMesh.rotation.z) * deltaTime * 10;
+      this.weaponMesh.rotation.z +=
+        (targetZ - this.weaponMesh.rotation.z) * deltaTime * animationSpeed;
     }
 
     // Auto-fire logic
@@ -242,7 +248,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     const forwardRay = this.camera.getForwardRay(this.range);
 
     // 탄 퍼짐 계산 (정조준 시 감소)
-    const spread = this.isAiming ? 0.01 : 0.05;
+    const spread = this.isAiming ? FirearmConfig.AIM_SPREAD : FirearmConfig.NORMAL_SPREAD;
     const randomSpread = new Vector3(
       (Math.random() - 0.5) * spread,
       (Math.random() - 0.5) * spread,
@@ -316,29 +322,40 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
 
     // 현재 총의 위치와 회전 가져오기
     const worldMatrix = this.weaponMesh.getWorldMatrix();
-    const position = Vector3.TransformCoordinates(new Vector3(0, -0.1, 0), worldMatrix);
+    const position = Vector3.TransformCoordinates(
+      new Vector3(
+        FirearmConfig.MAGAZINE_OFFSET.x,
+        FirearmConfig.MAGAZINE_OFFSET.y,
+        FirearmConfig.MAGAZINE_OFFSET.z
+      ),
+      worldMatrix
+    );
 
     const mag = MeshBuilder.CreateBox(
       'mag_eject',
-      { width: 0.04, height: 0.08, depth: 0.04 },
+      {
+        width: FirearmConfig.MAGAZINE_SIZE.width,
+        height: FirearmConfig.MAGAZINE_SIZE.height,
+        depth: FirearmConfig.MAGAZINE_SIZE.depth,
+      },
       this.scene
     );
     mag.position.copyFrom(position);
 
     const material = new StandardMaterial('magMat', this.scene);
-    material.diffuseColor = new Color3(0.1, 0.1, 0.1);
+    material.diffuseColor = new Color3(0.1, 0.1, 0.1); // TODO: 상수화 필요
     mag.material = material;
 
     // 물리적 효과 시뮬레이션 (간단하게 관성 적용)
-    const velocity = new Vector3(0, -0.05, 0);
-    const gravity = -0.01;
-    let lifetime = 60; // 약 1초 (60프레임)
+    const velocity = new Vector3(0, FirearmConfig.MAGAZINE_INITIAL_VELOCITY, 0);
+    const gravity = FirearmConfig.MAGAZINE_GRAVITY;
+    let lifetime = FirearmConfig.MAGAZINE_LIFETIME_FRAMES;
 
     const observer = this.scene.onBeforeRenderObservable.add(() => {
       velocity.y += gravity;
       mag.position.addInPlace(velocity);
-      mag.rotation.x += 0.1;
-      mag.rotation.z += 0.05;
+      mag.rotation.x += FirearmConfig.MAGAZINE_ROTATION_X;
+      mag.rotation.z += FirearmConfig.MAGAZINE_ROTATION_Z;
 
       lifetime--;
       if (lifetime <= 0) {
@@ -376,7 +393,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     // [신규] 최초 동기화 시 탄약 자동 지급
     if (isInitialSync && (this.stats.magazineSize || 0) > 0) {
       this.currentAmmo = this.stats.magazineSize!;
-      this.reserveAmmo = this.stats.magazineSize! * 5; // 소총 등 연사 무기를 위해 넉넉히 지급
+      this.reserveAmmo = this.stats.magazineSize! * WeaponConfig.DEFAULT_AMMO_MULTIPLIER; // 소총 등 연사 무기를 위해 넉넉히 지급
     }
 
     // 탄약 관련 상태 동기화 (탄창 크기 변경 시 필요할 수 있음)

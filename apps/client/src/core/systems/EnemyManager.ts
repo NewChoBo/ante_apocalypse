@@ -8,8 +8,8 @@ import { WorldEntityManager } from './WorldEntityManager';
 import { EnemyState } from '@ante/common';
 
 /**
- * 적(Enemy) 실체의 생성 및 AI 업데이트를 담당합니다.
- * 실제 피격 처리는 WorldEntityManager에서 수행됩니다.
+ * Handles Enemy entity creation and AI updates.
+ * Hit processing is handled by WorldEntityManager.
  */
 export class EnemyManager extends BaseEnemyManager {
   private scene: Scene;
@@ -68,7 +68,7 @@ export class EnemyManager extends BaseEnemyManager {
     const enemy = new EnemyPawn(this.scene, position, this.shadowGenerator, id);
     this.pawns.set(id, enemy);
 
-    // WorldManager에 등록하여 전역 피격 및 관리가 가능하게 함
+    // Register with WorldManager for global hit processing and management
     this.worldManager.registerEntity(enemy);
 
     this.onEnemySpawned(id, enemy, target);
@@ -81,9 +81,9 @@ export class EnemyManager extends BaseEnemyManager {
 
     this.pawns.forEach((pawn, id) => {
       const enemy = pawn as EnemyPawn;
-      // 사망 혹은 제거 체크 (Visual only)
+      // Check for death or removal (Visual only)
       if (enemy.isDead || enemy.mesh.isDisposed()) {
-        // 제거 처리
+        // Handle removal
         this.worldManager.removeEntity(id);
         this.pawns.delete(id);
         this.unregisterAI(id);

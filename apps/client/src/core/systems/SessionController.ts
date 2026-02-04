@@ -12,7 +12,6 @@ import { GlobalInputManager } from './GlobalInputManager';
 import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
 import { EnemyManager } from './EnemyManager';
-import { WorldEntityManager } from './WorldEntityManager';
 import { GameObservables } from '../events/GameObservables';
 import { GameAssets } from '../GameAssets';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
@@ -25,6 +24,7 @@ import {
   StateTransitionError,
 } from './SessionStateMachine';
 import { SessionEvents, sessionEvents } from '../events/SessionEvents';
+import { PlayerLifecycleManager, PlayerLifecycleConfig } from './PlayerLifecycleManager';
 
 // Lazy imports to avoid circular dependencies
 import type { MultiplayerSystem } from './MultiplayerSystem';
@@ -32,29 +32,29 @@ import type { MultiplayerSystem } from './MultiplayerSystem';
 const logger = new Logger('SessionController');
 
 /**
- * 네트워크 에러 헨들러 타입
+ * Network error handler type
  */
 type ErrorHandler = (error: Error, context: string) => void;
 
 /**
  * SessionControllerOptions
- * 의존성 주입을 위한 옵션 인터페이스
+ * Option interface for dependency injection
  */
 export interface SessionControllerOptions {
-  /** 네트워크 서비스 인스턴스 */
+  /** Network service instance */
   networkService?: ISessionNetworkService;
-  /** 커스텀 에러 핸들러 */
+  /** Custom error handler */
   onError?: ErrorHandler;
-  /** 디버그 모드 */
+  /** Debug mode */
   debug?: boolean;
 }
 
 /**
- * 개선된 SessionController
- * - 의존성 주입 지원
- * - 상태 머신 통합
- * - 이벤트 기반 아키텍처
- * - 포괄적인 에러 핸들링
+ * Improved SessionController
+ * - Dependency injection support
+ * - State machine integration
+ * - Event-based architecture
+ * - Comprehensive error handling
  */
 export class SessionController {
   // Core Dependencies
@@ -72,6 +72,7 @@ export class SessionController {
   private events: SessionEvents;
 
   // Game Objects
+  private playerLifecycleManager: PlayerLifecycleManager | null = null;
   private playerPawn: PlayerPawn | null = null;
   private playerController: PlayerController | null = null;
   private multiplayerSystem: MultiplayerSystem | null = null;
@@ -179,31 +180,33 @@ export class SessionController {
   }
 
   /**
-   * 플레이어 초기화
+   * Initialize player - delegates to PlayerLifecycleManager
    */
   private async initializePlayer(levelData: LevelData): Promise<void> {
     try {
-      this.playerPawn = new PlayerPawn(this.scene);
-      WorldEntityManager.getInstance().initialize();
-      WorldEntityManager.getInstance().register(this.playerPawn);
+      const config: PlayerLifecycleConfig = {
+        scene: this.scene,
+        canvas: this.canvas,
+        levelData,
+        playerName: 'player1',
+      };
 
-      if (levelData.playerSpawn) {
-        this.playerPawn.position = Vector3.FromArray(levelData.playerSpawn);
-      } else {
-        this.playerPawn.position = new Vector3(0, 1.75, -5);
-      }
+      this.playerLifecycleManager = new PlayerLifecycleManager(config);
+      await this.playerLifecycleManager.initialize();
 
-      this.playerController = new PlayerController('player1', this.canvas);
-      this.playerController.possess(this.playerPawn);
+      // Get references from lifecycle manager
+      this.playerPawn = this.playerLifecycleManager.getPlayerPawn();
+      this.playerController = this.playerLifecycleManager.getPlayerController();
+      this.hud = this.playerLifecycleManager.getHUD();
 
-      this.hud = new HUD();
+      // Note: WorldEntityManager registration is handled by PlayerLifecycleManager
     } catch (error) {
       throw new Error(`Failed to initialize player: ${(error as Error).message}`);
     }
   }
 
   /**
-   * 시스템 초기화
+   * Initialize systems
    */
   private async initializeSystems(levelData: LevelData): Promise<void> {
     try {
@@ -224,7 +227,7 @@ export class SessionController {
   }
 
   /**
-   * 전투 시스템 설정
+   * Setup combat system
    */
   private setupCombat(): void {
     try {
@@ -483,7 +486,7 @@ export class SessionController {
   }
 
   /**
-   * 로컬 플레이어 리스폰 처리
+   * Handle local player respawn
    */
   private handleLocalPlayerRespawn(): void {
     this.isSpectating = false;
@@ -496,7 +499,7 @@ export class SessionController {
   }
 
   /**
-   * 초기화 에러 처리
+   * Handle initialization error
    */
   private handleInitializationError(error: Error): void {
     logger.error('Session initialization failed:', error);
@@ -506,7 +509,7 @@ export class SessionController {
   }
 
   /**
-   * 상태 변경 핸들러
+   * Handle state change
    */
   private handleStateChange(event: StateTransitionEvent): void {
     logger.debug(`State changed: ${event.from} -> ${event.to}`);
@@ -524,16 +527,16 @@ export class SessionController {
   }
 
   /**
-   * 에러 상태 처리
+   * Handle error state
    */
   private handleErrorState(): void {
     logger.error('Session entered error state');
-    // 에러 상태에서 복구 시도 또는 정리
+    // Attempt recovery or cleanup from error state
     this.dispose();
   }
 
   /**
-   * 인벤토리 스토어 동기화
+   * Sync inventory store
    */
   private syncInventoryStore(): void {
     try {

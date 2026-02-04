@@ -4,6 +4,7 @@ import { MovementComponent } from '@ante/game-core';
 import { CombatComponent } from './CombatComponent';
 import { CameraComponent } from './CameraComponent';
 import type { BasePawn } from '../BasePawn';
+import { MovementConfig } from '../../config';
 
 export interface MovementInput {
   forward: boolean;
@@ -17,29 +18,30 @@ export interface MovementInput {
 }
 
 /**
- * CharacterMovementComponent - 캐릭터 특유의 이동 컴포넌트
+ * CharacterMovementComponent - Character-specific movement component
  *
- * MovementComponent를 composition으로 사용하여:
- * - 입력 기반 이동 처리
- * - 점프/크라우칭 지원
- * - 애니메이션 동기화
- * - 중력 적용
+ * Uses MovementComponent via composition pattern for:
+ * - Input-based movement
+ * - Jump/crouch support
+ * - Animation sync
+ * - Gravity application
  */
 export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
   public readonly componentId: string;
   public readonly componentType = 'CharacterMovement';
   public isActive = true;
 
-  // MovementComponent 인스턴스 (composition)
+  // MovementComponent instance (composition)
   private readonly movement: MovementComponent;
 
-  // 캐릭터 특수 설정
-  private readonly walkSpeed = 6;
-  private readonly runSpeed = 6 * 1.6;
-  private readonly crouchMultiplier = 0.5;
-  private readonly jumpForce = 9;
+  // Character-specific config (magic numbers replaced with constants)
+  private readonly walkSpeed = MovementConfig.WALK_SPEED;
+  private readonly runSpeed: number =
+    MovementConfig.WALK_SPEED * MovementConfig.RUN_SPEED_MULTIPLIER;
+  private readonly crouchMultiplier = MovementConfig.CROUCH_MULTIPLIER;
+  private readonly jumpForce = MovementConfig.JUMP_FORCE;
 
-  // 캐릭터 상태
+  // Character state
   private velocityY = 0;
   private isGrounded = false;
   private isRunning = false;
@@ -51,7 +53,7 @@ export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
     this.componentId =
       config?.componentId ?? `character_movement_${Math.random().toString(36).substr(2, 9)}`;
     this.movement = new MovementComponent({} as Scene, {
-      walkSpeed: this.walkSpeed,
+      walkSpeed: this.walkSpeed as 6,
       runSpeed: this.runSpeed,
       componentId: `movement_${this.componentId}`,
     });
@@ -80,37 +82,37 @@ export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
     return this.pawn?.mesh as AbstractMesh | null;
   }
 
-  /** MovementComponent에 위임 */
+  /** Delegates to MovementComponent */
   public move(direction: Vector3, speed?: number): void {
     this.movement.move(direction, speed);
   }
 
-  /** MovementComponent에 위임 */
+  /** Delegates to MovementComponent */
   public stop(): void {
     this.movement.stop();
   }
 
-  /** MovementComponent에 위임 */
+  /** Delegates to MovementComponent */
   public lookAt(targetPoint: Vector3): void {
     this.movement.lookAt(targetPoint);
   }
 
-  /** MovementComponent에 위임 */
+  /** Delegates to MovementComponent */
   public teleport(position: Vector3): void {
     this.movement.teleport(position);
   }
 
-  /** MovementComponent에 위임 */
+  /** Delegates to MovementComponent */
   public getVelocity(): Vector3 {
     return this.movement.getVelocity();
   }
 
-  /** MovementComponent에 위임 */
+  /** Delegates to MovementComponent */
   public getSpeed(): number {
     return this.movement.getSpeed();
   }
 
-  /** MovementComponent에 위임 */
+  /** Delegates to MovementComponent */
   public getIsMoving(): boolean {
     return this.movement.getIsMoving();
   }
@@ -121,12 +123,12 @@ export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
     this.movement.setRunning(running);
   }
 
-  /** MovementComponent에 위임 */
-  public getState() {
+  /** Delegates to MovementComponent */
+  public getState(): ReturnType<MovementComponent['getState']> {
     return this.movement.getState();
   }
 
-  /** 입력 데이터에 기반해 이동 처리 */
+  /** Handle movement based on input data */
   public handleMovement(input: MovementInput, deltaTime: number): void {
     const pawn = this.pawn;
     if (!pawn) return;
@@ -142,8 +144,8 @@ export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
     const weapon = combatComp?.getCurrentWeapon();
     const weaponSpeedMult = weapon?.getMovementSpeedMultiplier() ?? 1.0;
 
-    // 이동 속도 결정
-    let speed = this.walkSpeed;
+    // Determine movement speed
+    let speed: number = this.walkSpeed;
     if (input.crouch && this.isGrounded) {
       speed = this.walkSpeed * this.crouchMultiplier;
     } else if (input.aim && this.isGrounded) {
@@ -155,7 +157,7 @@ export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
       this.isRunning = false;
     }
 
-    // 방향 계산
+    // Calculate direction
     const mesh = this.mesh;
     if (!mesh) return;
 
@@ -173,7 +175,7 @@ export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
       this.movement.move(moveDirection, speed);
     }
 
-    // 점프 처리
+    // Jump handling
     if (this.isGrounded && input.jump && !input.crouch) {
       this.velocityY = this.jumpForce;
       this.isGrounded = false;
@@ -181,7 +183,7 @@ export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
   }
 
   private handleGhostMovement(input: MovementInput, deltaTime: number): void {
-    const ghostSpeed = this.walkSpeed * 2.0;
+    const ghostSpeed = this.walkSpeed * MovementConfig.GHOST_SPEED_MULTIPLIER;
     const pawn = this.pawn;
     if (!pawn) return;
 
@@ -208,7 +210,7 @@ export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
     }
   }
 
-  /** 업데이트 루프 */
+  /** Update loop */
   public update(deltaTime: number): void {
     const pawn = this.pawn;
     if (!pawn || !pawn.isDead) {
@@ -220,13 +222,13 @@ export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
     const mesh = this.mesh;
     if (!mesh) return;
 
-    // 간단한 중력 적용
-    this.velocityY += -25 * deltaTime;
+    // Apply gravity
+    this.velocityY += MovementConfig.GRAVITY * deltaTime;
 
     const velocity = new Vector3(0, this.velocityY * deltaTime, 0);
     mesh.moveWithCollisions(velocity);
 
-    // 지면 감지 (단순화)
+    // Ground detection
     if (mesh.position.y <= 0) {
       mesh.position.y = 0;
       this.velocityY = 0;
@@ -234,7 +236,7 @@ export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
     }
   }
 
-  /** 현재 속도 상태 반환 */
+  /** Returns current movement state */
   public getCharacterState(): {
     velocityY: number;
     isGrounded: boolean;

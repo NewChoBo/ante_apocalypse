@@ -1,12 +1,12 @@
 import { Scene, MeshBuilder, Vector3, StandardMaterial, Color3, Mesh } from '@babylonjs/core';
 
 /**
- * 메시 파트 타입 정의
+ * Mesh part type definition
  */
 type MeshPartType = 'cylinder' | 'box' | 'sphere';
 
 /**
- * 메시 파트 설정 인터페이스
+ * Mesh part config interface
  */
 interface MeshPartConfig {
   type: MeshPartType;
@@ -24,7 +24,7 @@ interface MeshPartConfig {
 }
 
 /**
- * 머티리얼 설정 인터페이스
+ * Material config interface
  */
 interface MaterialConfig {
   diffuseColor: { r: number; g: number; b: number };
@@ -33,7 +33,7 @@ interface MaterialConfig {
 }
 
 /**
- * 무기 메시 설정 인터페이스
+ * Weapon mesh config interface
  */
 export interface WeaponMeshConfig {
   name: string;
@@ -45,12 +45,12 @@ export interface WeaponMeshConfig {
 }
 
 /**
- * 프로시저럴 메시 무기 생성기
- * 정적 메서드를 통해 다양한 근접 무기 메시 프로시저럴 생성 제공
+ * Procedural mesh weapon builder
+ * Provides procedural melee weapon mesh generation via static methods
  */
 export class ProceduralWeaponBuilder {
   /**
-   * 설정 객체를 기반으로 메시 파트 생성
+   * Create mesh part from config
    */
   private static createPart(partConfig: MeshPartConfig, scene: Scene): Mesh {
     let mesh: Mesh;
@@ -153,7 +153,7 @@ export class ProceduralWeaponBuilder {
   }
 
   /**
-   * 설정 기반 무기 메시 생성
+   * Create weapon mesh from config
    */
   public static createFromConfig(config: WeaponMeshConfig, scene: Scene): Mesh | null {
     const meshes: Mesh[] = [];
@@ -185,7 +185,7 @@ export class ProceduralWeaponBuilder {
   }
 
   /**
-   * Knife 메시 생성
+   * Create Knife mesh
    */
   public static createKnife(scene: Scene): Mesh | null {
     const config: WeaponMeshConfig = {
@@ -237,7 +237,7 @@ export class ProceduralWeaponBuilder {
   }
 
   /**
-   * Bat 메시 생성
+   * Create Bat mesh
    */
   public static createBat(scene: Scene): Mesh | null {
     const config: WeaponMeshConfig = {
