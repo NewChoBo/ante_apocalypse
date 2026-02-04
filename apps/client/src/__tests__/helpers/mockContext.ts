@@ -1,5 +1,8 @@
 import { vi } from 'vitest';
 import type { GameContext } from '../../types/GameContext';
+import type { TickManager } from '@ante/game-core';
+import type { INetworkManager } from '../../core/interfaces/INetworkManager';
+import type { WorldEntityManager } from '../../core/systems/WorldEntityManager';
 
 /**
  * 테스트용 Mock GameContext 생성
@@ -10,20 +13,20 @@ export function createMockGameContext(overrides?: Partial<GameContext>): GameCon
       onBeforeRenderObservable: { add: vi.fn(), remove: vi.fn() },
       onAfterRenderObservable: { add: vi.fn(), remove: vi.fn() },
       isDisposed: false,
-    } as any,
+    } as unknown as import('@babylonjs/core').Scene,
 
     camera: {
       position: { copyFrom: vi.fn(), addInPlace: vi.fn() },
       rotation: { set: vi.fn() },
       setTarget: vi.fn(),
-    } as any,
+    } as unknown as import('@babylonjs/core').UniversalCamera,
 
     tickManager: {
       register: vi.fn(),
       unregister: vi.fn(),
       tick: vi.fn(),
       clear: vi.fn(),
-    } as any,
+    } as unknown as TickManager,
 
     networkManager: {
       sendEvent: vi.fn(),
@@ -32,7 +35,7 @@ export function createMockGameContext(overrides?: Partial<GameContext>): GameCon
       disconnect: vi.fn(),
       isMasterClient: vi.fn().mockReturnValue(false),
       getSocketId: vi.fn().mockReturnValue('test-socket-id'),
-    } as any,
+    } as unknown as INetworkManager,
 
     worldManager: {
       register: vi.fn(),
@@ -42,7 +45,7 @@ export function createMockGameContext(overrides?: Partial<GameContext>): GameCon
       initialize: vi.fn(),
       registerEntity: vi.fn(),
       removeEntity: vi.fn(),
-    } as any,
+    } as unknown as WorldEntityManager,
 
     ...overrides,
   } as GameContext;

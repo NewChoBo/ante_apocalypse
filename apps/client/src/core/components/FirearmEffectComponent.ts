@@ -70,10 +70,15 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
 
       // 피치(재생 속도)를 0.9 ~ 1.1 사이로 랜덤화
       const randomRate = 0.9 + Math.random() * 0.2;
-      if (typeof (sound as any).setPlaybackRate === 'function') {
+      // BabylonJS Sound might technically support updateOptions or direct property set depending on version
+      // Safe check for setPlaybackRate existence
+      if (
+        'setPlaybackRate' in sound &&
+        typeof (sound as unknown as Record<string, unknown>).setPlaybackRate === 'function'
+      ) {
         sound.setPlaybackRate(randomRate);
       } else {
-        (sound as any).playbackRate = randomRate;
+        sound.playbackRate = randomRate;
       }
       sound.play();
     }
@@ -99,13 +104,17 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
         flash.position.copyFrom(localPosition);
       }
     } else {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const player = this.owner as any;
-      if (player.camera) {
-        flash.parent = player.camera;
-        // 카메라 기준일 경우 월드 포지션을 로컬로 변환하거나(복잡),
-        // 단순히 카메라 앞(Z+)으로 고정 배치
-        flash.position = new Vector3(0, -0.1, 0.8);
+      const owner = this.owner;
+      // Check if owner has a camera property (e.g. LocalPlayerPawn)
+      if ('camera' in owner) {
+        const camera = (owner as { camera: unknown }).camera;
+
+        if (camera && (camera as { globalPosition?: Vector3 }).globalPosition) {
+          flash.parent = camera as import('@babylonjs/core').Node;
+          flash.position = new Vector3(0, -0.1, 0.8);
+        } else {
+          flash.position = position;
+        }
       } else {
         flash.position = position;
       }

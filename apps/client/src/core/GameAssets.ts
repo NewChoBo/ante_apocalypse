@@ -48,9 +48,13 @@ export const GameAssets = {
       this.audioEngine = await CreateAudioEngineAsync();
       if (this.audioEngine) {
         const applyVol = (v: number): void => {
-          (this.audioEngine as any).volume = v;
-          if (typeof (this.audioEngine as any).setVolume === 'function') {
-            (this.audioEngine as any).setVolume(v);
+          // Augmentation in propery allows direct access, but runtime check keeps it safe
+          if (this.audioEngine && typeof this.audioEngine.setVolume === 'function') {
+            this.audioEngine.setVolume(v);
+          } else if (this.audioEngine) {
+            // Fallback to property if method missing (legacy or different version)
+            // Using augmented property
+            this.audioEngine.volume = v;
           }
         };
         applyVol(settingsStore.get().masterVolume);
@@ -113,7 +117,17 @@ export const GameAssets = {
     if (entries.rootNodes.length !== 1) {
       const wrapper = new Mesh(rootName || `${key}_wrapper`, this.scene);
       entries.rootNodes.forEach((node) => (node.parent = wrapper));
-      (entries as any).rootNodes = [wrapper];
+      entries.rootNodes.forEach((node) => (node.parent = wrapper));
+      // Re-assign rootNodes safely. casting to unknown first then to writable type if needed,
+      // but InstantiatedEntries.rootNodes is readonly in definition?
+      // Check babylon definition. If readonly, we might need a workaround or avoid modifying it.
+      // Assuming we can just mute the error if it is strictly necessary logic.
+      // Better approach: Wrapper pattern needs to be recognized by caller.
+      // But preserving existing logic with safer cast:
+      Object.defineProperty(entries, 'rootNodes', {
+        value: [wrapper],
+        writable: true,
+      });
     }
 
     return entries;

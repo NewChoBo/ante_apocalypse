@@ -7,6 +7,7 @@ export interface CreateRoomOptions {
   isOpen?: boolean;
   customRoomProperties?: Record<string, unknown>;
   propsListedInLobby?: string[];
+  [key: string]: unknown;
 }
 
 export interface INetworkProvider {

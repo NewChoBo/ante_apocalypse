@@ -1,21 +1,54 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import Photon from 'photon-realtime';
 import { Logger } from '@ante/common';
 import { INetworkAuthority } from './INetworkAuthority.js';
 import { NetworkDispatcher } from './NetworkDispatcher.js';
+import { LoadBalancing, ConnectionProtocol, ReceiverGroup } from './PhotonWrapper.js';
 
 const logger = new Logger('BasePhotonClient');
 
 /**
- * Photon JS Library의 최소 인터페이스 정의
+ * Photon JS Library Typed Definitions
  */
-interface IPhotonClient {
+export interface RoomOptions {
+  isVisible?: boolean;
+  isOpen?: boolean;
+  maxPlayers?: number;
+  customGameProperties?: { [key: string]: unknown };
+  propsListedInLobby?: string[];
+  [key: string]: unknown; // Index signature for flexibility
+}
+
+export interface PhotonActor {
+  actorNr: number;
+  userId: string;
+  name: string;
+  isLocal: boolean;
+  customProperties: { [key: string]: unknown };
+  setName(name: string): void;
+}
+
+export interface PhotonRoom {
+  name: string;
+  isOpen: boolean;
+  isVisible: boolean;
+  maxPlayers: number;
+  playerCount: number;
+  masterClientId: number;
+  actors: { [key: number]: PhotonActor };
+  customProperties: { [key: string]: unknown };
+  getCustomProperty(key: string): unknown;
+}
+
+/**
+ * Photon JS Library Interface Definition
+ */
+export interface IPhotonClient {
   onStateChange: (state: number) => void;
-  onEvent: (code: number, content: unknown, actorNr: number) => void;
-  onActorJoin: (actor: { actorNr: number; name?: string }) => void;
-  onActorLeave: (actor: { actorNr: number }) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onEvent: (code: number, content: any, actorNr: number) => void;
+  onActorJoin: (actor: PhotonActor) => void;
+  onActorLeave: (actor: PhotonActor) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onRoomListUpdate: (rooms: any[]) => void;
   onError: (errorCode: number, errorMsg: string) => void;
   raiseEvent: (
     code: number,
@@ -24,20 +57,17 @@ interface IPhotonClient {
   ) => void;
   connectToRegionMaster: (region: string) => void;
   disconnect: () => void;
-  createRoom: (name: string, options?: any) => void;
-  joinRoom: (name: string, options?: any) => void;
+  createRoom: (name: string, options?: RoomOptions) => void;
+  joinRoom: (name: string, options?: RoomOptions) => void;
   leaveRoom: () => void;
   isConnectedToMaster: () => boolean;
   isInLobby: () => boolean;
   isJoinedToRoom: () => boolean;
-  myActor: () => { actorNr: number };
-  myRoom: () => {
-    name: string;
-    masterClientId: number;
-    actors: Record<number, { name: string }>;
-    getCustomProperty: (key: string) => any;
-  };
+  myActor: () => PhotonActor;
+  myRoom: () => PhotonRoom;
   loadBalancingPeer: { getServerTime: () => number };
+  availableRooms(): unknown[];
+  setUserId(userId: string): void;
 }
 
 /**
@@ -46,23 +76,25 @@ interface IPhotonClient {
  */
 export abstract class BasePhotonClient implements INetworkAuthority {
   protected client: IPhotonClient;
+  protected appId: string;
+  protected appVersion: string;
   protected dispatcher: NetworkDispatcher = new NetworkDispatcher();
   protected connectionResolver: (() => void) | null = null;
 
-  // Callbacks for subclasses to implement/override
+  // Event Callbacks
+  public onStateChanged?: (state: number) => void;
   public onActorJoin?: (actorNr: number, name: string) => void;
   public onActorLeave?: (actorNr: number) => void;
+
+  // Callbacks for subclasses
   public onEventReceived?: (code: number, data: unknown, actorNr: number) => void;
-  public onStateChanged?: (state: number) => void;
 
-  constructor(
-    protected appId: string,
-    protected appVersion: string
-  ) {
-    const P = Photon as any;
+  constructor(appId: string, appVersion: string) {
+    this.appId = appId;
+    this.appVersion = appVersion;
 
-    this.client = new P.LoadBalancing.LoadBalancingClient(
-      P.ConnectionProtocol.Wss,
+    this.client = new LoadBalancing.LoadBalancingClient(
+      ConnectionProtocol.Wss,
       this.appId,
       this.appVersion
     );
@@ -70,13 +102,16 @@ export abstract class BasePhotonClient implements INetworkAuthority {
     this.setupBaseListeners();
   }
 
-  private setupBaseListeners(): void {
-    this.client.onStateChange = (state: number): void => {
-      logger.info(`State Changed: ${state}`);
-      this.onStateChanged?.(state);
+  protected setupBaseListeners(): void {
+    this.client.onError = (errorCode: number, errorMsg: string): void => {
+      logger.error(`Photon Error ${errorCode}: ${errorMsg}`);
+    };
 
-      const P = Photon as any;
-      const States = P.LoadBalancing.LoadBalancingClient.State;
+    this.client.onStateChange = (state: number): void => {
+      // logger.info(`State: ${state}`);
+      if (this.onStateChanged) this.onStateChanged(state);
+
+      const States = LoadBalancing.LoadBalancingClient.State;
       if (state === States.JoinedLobby || state === States.ConnectedToMaster) {
         if (this.connectionResolver) {
           logger.info('Connected & Ready.');
@@ -86,56 +121,32 @@ export abstract class BasePhotonClient implements INetworkAuthority {
       }
     };
 
+    this.client.onActorJoin = (actor: PhotonActor): void => {
+      // logger.info(`Actor Joined: ${actor.actorNr} (${actor.name})`);
+      if (this.onActorJoin) this.onActorJoin(actor.actorNr, actor.name);
+    };
+
+    this.client.onActorLeave = (actor: PhotonActor): void => {
+      // logger.info(`Actor Left: ${actor.actorNr}`);
+      if (this.onActorLeave) this.onActorLeave(actor.actorNr);
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.client.onRoomListUpdate = (_rooms: any[]): void => {
+      // no-op by default
+    };
+
     this.client.onEvent = (code: number, content: unknown, actorNr: number): void => {
       this.onEventReceived?.(code, content, actorNr);
-      this.dispatcher.dispatch(code, content as any, actorNr.toString());
-    };
-
-    this.client.onActorJoin = (actor): void => {
-      const myActorNr = this.client.myActor()?.actorNr;
-      if (actor.actorNr !== myActorNr) {
-        this.onActorJoin?.(actor.actorNr, actor.name || 'Anonymous');
-      }
-    };
-
-    this.client.onActorLeave = (actor): void => {
-      this.onActorLeave?.(actor.actorNr);
-    };
-
-    this.client.onError = (errorCode: number, errorMsg: string): void => {
-      logger.error(`Photon Error ${errorCode}: ${errorMsg}`);
+      this.dispatcher.dispatch(code, content, actorNr.toString());
     };
   }
 
-  // INetworkAuthority implementation
+  public abstract getSocketId(): string | undefined;
+
+  // INetworkAuthority implementations
   public abstract isMasterClient(): boolean;
 
-  public getSocketId(): string | undefined {
-    return this.client.myActor()?.actorNr?.toString();
-  }
-
-  public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
-    const P = Photon as any;
-    this.client.raiseEvent(code, data, {
-      receivers: P.LoadBalancing.Constants.ReceiverGroup.Others,
-      cache: reliable ? 1 : 0,
-    });
-  }
-
-  public sendEventToAll(code: number, data: unknown): void {
-    const P = Photon as any;
-    this.client.raiseEvent(code, data, {
-      receivers: P.LoadBalancing.Constants.ReceiverGroup.All,
-    });
-  }
-
-  public sendEventToActor(code: number, data: unknown, targetActorNr: number): void {
-    this.client.raiseEvent(code, data, {
-      targetActors: [targetActorNr],
-    });
-  }
-
-  // Connection lifecycle
   public connect(region: string = 'kr'): Promise<void> {
     logger.info('Connecting to Photon...');
     this.client.connectToRegionMaster(region);
@@ -149,8 +160,70 @@ export abstract class BasePhotonClient implements INetworkAuthority {
     this.client.disconnect();
   }
 
-  // Room management
-  public async createRoom(name: string, options?: any): Promise<void> {
+  public isConnectedToMaster(): boolean {
+    return this.client.isConnectedToMaster();
+  }
+
+  public isInLobby(): boolean {
+    return this.client.isInLobby();
+  }
+
+  public isJoinedToRoom(): boolean {
+    return this.client.isJoinedToRoom();
+  }
+
+  // Common sending methods
+  public sendEventToAll(code: number, data: unknown, reliable: boolean = true): void {
+    this.client.raiseEvent(code, data, {
+      receivers: ReceiverGroup.All,
+      cache: reliable ? 1 : 0,
+    });
+  }
+
+  public abstract sendEvent(code: number, data: unknown, reliable?: boolean): void;
+
+  public sendEventToActor(
+    code: number,
+    data: unknown,
+    targetActorNr: number,
+    reliable: boolean = true
+  ): void {
+    this.client.raiseEvent(code, data, {
+      targetActors: [targetActorNr],
+      cache: reliable ? 1 : 0,
+    });
+  }
+
+  public getRoomActors(): Map<number, { name: string }> {
+    const actors = new Map<number, { name: string }>();
+    if (this.client.isJoinedToRoom()) {
+      const roomActors = this.client.myRoom().actors;
+      for (const key in roomActors) {
+        if (Object.prototype.hasOwnProperty.call(roomActors, key)) {
+          const nr = parseInt(key);
+          const actor = roomActors[nr];
+          actors.set(nr, { name: actor.name });
+        }
+      }
+    }
+    return actors;
+  }
+
+  public getRoomName(): string | null {
+    if (this.client.isJoinedToRoom()) {
+      return this.client.myRoom().name;
+    }
+    return null;
+  }
+
+  public getCurrentRoomProperty<T = unknown>(key: string): T | undefined {
+    if (this.client.isJoinedToRoom()) {
+      return this.client.myRoom().getCustomProperty(key) as T;
+    }
+    return undefined;
+  }
+
+  public async createRoom(name: string, options?: RoomOptions): Promise<void> {
     if (!this.client.isConnectedToMaster() && !this.client.isInLobby()) {
       throw new Error('Cannot create room: Not connected.');
     }
@@ -170,7 +243,6 @@ export abstract class BasePhotonClient implements INetworkAuthority {
     this.client.leaveRoom();
   }
 
-  // State queries
   public getServerTime(): number {
     if (this.client?.loadBalancingPeer?.getServerTime) {
       return this.client.loadBalancingPeer.getServerTime();
@@ -178,31 +250,8 @@ export abstract class BasePhotonClient implements INetworkAuthority {
     return Date.now();
   }
 
-  public isConnectedToMaster(): boolean {
-    return this.client.isConnectedToMaster();
-  }
-
-  public isInLobby(): boolean {
-    return this.client.isInLobby();
-  }
-
-  public isJoinedToRoom(): boolean {
-    return this.client.isJoinedToRoom();
-  }
-
   public getMyActorNr(): number | undefined {
     return this.client.myActor()?.actorNr;
-  }
-
-  public getRoomActors(): Map<number, { name: string }> {
-    const actors = new Map<number, { name: string }>();
-    if (this.isJoinedToRoom()) {
-      const roomActors = this.client.myRoom().actors;
-      for (const nr in roomActors) {
-        actors.set(parseInt(nr), { name: roomActors[nr].name || 'Anonymous' });
-      }
-    }
-    return actors;
   }
 
   public getMasterClientId(): number | undefined {
@@ -212,21 +261,6 @@ export abstract class BasePhotonClient implements INetworkAuthority {
     return undefined;
   }
 
-  public getCurrentRoomProperty(key: string): unknown {
-    if (this.isJoinedToRoom()) {
-      return this.client.myRoom().getCustomProperty(key);
-    }
-    return null;
-  }
-
-  public getRoomName(): string | undefined {
-    if (this.isJoinedToRoom()) {
-      return this.client.myRoom().name;
-    }
-    return undefined;
-  }
-
-  // Dispatcher access for subclasses
   protected getDispatcher(): NetworkDispatcher {
     return this.dispatcher;
   }
