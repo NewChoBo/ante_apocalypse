@@ -1,4 +1,4 @@
-import { Scene, Vector3, ShadowGenerator, Observer } from '@babylonjs/core';
+import { Scene, Vector3, ShadowGenerator, Observer, UniversalCamera } from '@babylonjs/core';
 import { EnemyPawn } from '../EnemyPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { INetworkManager } from '../interfaces/INetworkManager';
@@ -6,6 +6,7 @@ import { BaseEnemyManager, TickManager } from '@ante/game-core';
 import { EventCode } from '@ante/common';
 import { WorldEntityManager } from './WorldEntityManager';
 import { EnemyState } from '@ante/common';
+import type { GameContext } from '../../types/GameContext';
 
 /**
  * 적(Enemy) 실체의 생성 및 AI 업데이트를 담당합니다.
@@ -70,7 +71,15 @@ export class EnemyManager extends BaseEnemyManager {
   }
 
   public createEnemy(id: string, position: Vector3, target?: PlayerPawn): EnemyPawn {
-    const enemy = new EnemyPawn(this.scene, position, this.shadowGenerator, this.tickManager);
+    const context: GameContext = {
+      scene: this.scene,
+      networkManager: this.networkManager,
+      worldManager: this.worldManager,
+      tickManager: this.tickManager,
+      camera: target?.camera as UniversalCamera, // Fallback to provided target's camera
+    };
+
+    const enemy = new EnemyPawn(this.scene, position, this.shadowGenerator, context);
     enemy.id = id;
     this.pawns.set(id, enemy);
 

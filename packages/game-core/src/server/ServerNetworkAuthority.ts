@@ -29,6 +29,7 @@ export class ServerNetworkAuthority extends BasePhotonClient {
   public onFireRequest?: (id: string, origin: Vector3, dir: Vector3, weaponId?: string) => void;
   public onReloadRequest?: (playerId: string, weaponId: string) => void;
   public onHitRequest?: (shooterId: string, data: RequestHitData) => void;
+  public onSyncWeaponRequest?: (playerId: string, weaponId: string) => void;
   public onPlayerDeath?: (targetId: string, attackerId: string) => void;
 
   public getPlayerState(id: string): PlayerState | undefined {
@@ -139,6 +140,9 @@ export class ServerNetworkAuthority extends BasePhotonClient {
       const state = this.getPlayerState(senderId);
       if (state) {
         state.weaponId = syncData.weaponId;
+      }
+      if (this.onSyncWeaponRequest) {
+        this.onSyncWeaponRequest(senderId, syncData.weaponId);
       }
     });
 

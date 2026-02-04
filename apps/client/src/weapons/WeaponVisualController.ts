@@ -1,6 +1,6 @@
 import { Scene, UniversalCamera, Vector3, AbstractMesh, Mesh } from '@babylonjs/core';
-import { WorldEntityManager } from '../core/systems/WorldEntityManager';
 import { GameObservables } from '../core/events/GameObservables';
+import type { GameContext } from '../types/GameContext';
 
 /**
  * 무기의 시각적 기능을 담당하는 컨트롤러 클래스.
@@ -8,10 +8,11 @@ import { GameObservables } from '../core/events/GameObservables';
  */
 export class WeaponVisualController {
   // Visual State
-  public scene: Scene;
-  public camera: UniversalCamera;
   public weaponMesh: AbstractMesh | null = null;
-  private worldManager: WorldEntityManager;
+  private ctx: GameContext;
+
+  // Callback for stopping fire when hiding weapon
+  private onStopFireCallback: (() => void) | null = null;
 
   public isActive = false;
   public isAiming = false;
@@ -25,18 +26,16 @@ export class WeaponVisualController {
   protected idlePosition = new Vector3(0, 0, 0);
   protected idleRotation = new Vector3(0, 0, 0);
 
-  // Callback for stopping fire when hiding weapon
-  private onStopFireCallback: (() => void) | null = null;
+  public get scene(): Scene {
+    return this.ctx.scene;
+  }
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    worldManager: WorldEntityManager,
-    onStopFire?: () => void
-  ) {
-    this.scene = scene;
-    this.camera = camera;
-    this.worldManager = worldManager;
+  public get camera(): UniversalCamera {
+    return this.ctx.camera;
+  }
+
+  constructor(context: GameContext, onStopFire?: () => void) {
+    this.ctx = context;
     this.onStopFireCallback = onStopFire || null;
   }
 
@@ -169,7 +168,7 @@ export class WeaponVisualController {
 
     const part = metadata.bodyPart || metadata.part || 'body';
 
-    this.worldManager.processHit(entityId, damageAmount, part, pickedPoint, false);
+    this.ctx.worldManager.processHit(entityId, damageAmount, part, pickedPoint, false);
 
     GameObservables.targetHit.notifyObservers({
       targetId: entityId,

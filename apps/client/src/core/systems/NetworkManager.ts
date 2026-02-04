@@ -353,8 +353,8 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   }
 
   // === Connection Methods (delegated) ===
-  public connect(userId: string): void {
-    this.connectionManager.connect(userId);
+  public async connect(userId: string): Promise<boolean> {
+    return this.connectionManager.connect(userId);
   }
 
   // === Room Methods (delegated) ===

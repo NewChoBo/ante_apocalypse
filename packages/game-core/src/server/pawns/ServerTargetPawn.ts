@@ -1,31 +1,35 @@
-import { Mesh, MeshBuilder, Scene, Vector3 } from '@babylonjs/core';
+import { Mesh, MeshBuilder, Vector3 } from '@babylonjs/core';
 import { Logger } from '@ante/common';
 import { BasePawn } from '../../simulation/BasePawn.js';
-import { TickManager } from '../../systems/TickManager.js';
+import { ServerGameContext } from '../../types/ServerGameContext.js';
 
 const logger = new Logger('ServerTargetPawn');
 
+/**
+ * 서버측 타겟 Pawn 객체.
+ */
 export class ServerTargetPawn extends BasePawn {
   public override mesh: Mesh;
   public override type = 'target';
 
-  constructor(id: string, scene: Scene, position: Vector3, tickManager: TickManager) {
-    super(scene, tickManager);
+  constructor(
+    id: string,
+    private ctx: ServerGameContext,
+    position: Vector3
+  ) {
+    super(ctx.scene, ctx.tickManager);
     this.id = id;
 
     // Matches Client StaticTarget: Cylinder { height: 0.1, diameter: 1.5 }
-    this.mesh = MeshBuilder.CreateCylinder(id, { height: 0.1, diameter: 1.5 }, scene);
+    this.mesh = MeshBuilder.CreateCylinder(id, { height: 0.1, diameter: 1.5 }, this.ctx.scene);
     this.mesh.rotation.x = Math.PI / 2;
     this.mesh.position.copyFrom(position);
     this.mesh.checkCollisions = true;
     this.mesh.isPickable = true;
 
-    // Key: Metadata must exactly match what the client sends/server expects
-    // Client StaticTarget metadata: { targetId: this.id }
-    // Server validation expects: mesh.metadata.id === data.targetId
     this.mesh.metadata = {
-      id: this.id, // Unified ID field for server validation logic
-      targetId: this.id, // For compatibility/reference
+      id: this.id,
+      targetId: this.id,
       type: 'target',
     };
 
@@ -50,7 +54,7 @@ export class ServerTargetPawn extends BasePawn {
     logger.info(`ServerTargetPawn ${this.id} destroyed.`);
   }
 
-  public override dispose() {
+  public override dispose(): void {
     super.dispose();
   }
 }

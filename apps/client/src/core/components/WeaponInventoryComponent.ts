@@ -1,5 +1,4 @@
-import { Scene, UniversalCamera, Observable } from '@babylonjs/core';
-import { INetworkManager } from '../interfaces/INetworkManager';
+import { Observable } from '@babylonjs/core';
 import { IWeapon } from '../../types/IWeapon';
 import { inventoryStore } from '../store/GameStore';
 import { Pistol } from '../../weapons/Pistol';
@@ -7,8 +6,8 @@ import { Rifle } from '../../weapons/Rifle';
 import { Knife } from '../../weapons/Knife';
 import { Bat } from '../../weapons/Bat';
 import { WeaponRegistry } from '@ante/game-core';
-import { WorldEntityManager } from '../systems/WorldEntityManager';
 import { Logger } from '@ante/common';
+import type { GameContext } from '../../types/GameContext';
 
 const logger = new Logger('WeaponInventory');
 
@@ -22,18 +21,12 @@ export class WeaponInventoryComponent {
   /** 무기가 변경될 때 호출되는 Observable */
   public onWeaponChanged = new Observable<IWeapon>();
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    networkManager: INetworkManager,
-    worldManager: WorldEntityManager,
-    applyRecoil?: (force: number) => void
-  ) {
+  constructor(context: GameContext, applyRecoil?: (force: number) => void) {
     this.weapons = [
-      new Pistol(scene, camera, networkManager, worldManager, applyRecoil),
-      new Rifle(scene, camera, networkManager, worldManager, applyRecoil),
-      new Knife(scene, camera, networkManager, worldManager),
-      new Bat(scene, camera, networkManager, worldManager),
+      new Pistol(context, applyRecoil),
+      new Rifle(context, applyRecoil),
+      new Knife(context),
+      new Bat(context),
     ];
 
     // [Authoritative Weapon Stats Sync] - Directly from shared config in monorepo

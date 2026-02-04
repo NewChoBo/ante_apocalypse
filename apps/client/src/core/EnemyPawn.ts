@@ -1,7 +1,8 @@
 import { Vector3, Scene, ShadowGenerator } from '@babylonjs/core';
 import { CharacterPawn, CharacterPawnConfig } from './CharacterPawn';
-import { IEnemyPawn, TickManager } from '@ante/game-core';
+import { IEnemyPawn } from '@ante/game-core';
 import { EnemyMovementComponent } from './components/EnemyMovementComponent';
+import type { GameContext } from '../types/GameContext';
 
 /**
  * 적 Pawn - CharacterPawn 상속
@@ -21,7 +22,7 @@ export class EnemyPawn extends CharacterPawn implements IEnemyPawn {
     scene: Scene,
     position: Vector3,
     shadowGenerator: ShadowGenerator,
-    tickManager: TickManager
+    context: GameContext
   ) {
     const config: CharacterPawnConfig = {
       assetKey: 'enemy',
@@ -31,7 +32,7 @@ export class EnemyPawn extends CharacterPawn implements IEnemyPawn {
       healthBarStyle: 'enemy',
       showHealthBar: true,
     };
-    super(scene, config, tickManager);
+    super(scene, config, context);
 
     // Enemy-specific: movement with gravity
     this.movementComponent = new EnemyMovementComponent(this, scene);

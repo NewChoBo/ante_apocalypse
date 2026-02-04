@@ -1,16 +1,7 @@
-import {
-  Scene,
-  UniversalCamera,
-  Animation,
-  Mesh,
-  Vector3,
-  MeshBuilder,
-  AbstractMesh,
-} from '@babylonjs/core';
+import { Animation, Mesh, Vector3, MeshBuilder, AbstractMesh } from '@babylonjs/core';
 import { Firearm } from './Firearm';
-import { INetworkManager } from '../core/interfaces/INetworkManager';
 import { GameAssets } from '../core/GameAssets';
-import { WorldEntityManager } from '../core/systems/WorldEntityManager';
+import type { GameContext } from '../types/GameContext';
 
 /**
  * 권총 (Pistol) - 단발
@@ -22,15 +13,9 @@ export class Pistol extends Firearm {
   public firingMode: 'semi' | 'auto' = 'semi';
   public recoilForce = 0.015;
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    networkManager: INetworkManager,
-    worldManager: WorldEntityManager,
-    applyRecoil?: (force: number) => void
-  ) {
+  constructor(context: GameContext, applyRecoil?: (force: number) => void) {
     // 탄약 수량도 서버에서 관리하는 게 좋지만, 일단 기본값으로 초기화
-    super(scene, camera, networkManager, worldManager, 0, 0, applyRecoil);
+    super(context, 0, 0, applyRecoil);
     this.muzzleOffset = new Vector3(0, 0.06, 0.2); // 권총 총구 위치 조정
     this.createWeaponModel();
   }

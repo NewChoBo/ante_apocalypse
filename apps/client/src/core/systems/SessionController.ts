@@ -20,6 +20,8 @@ import { INetworkManager } from '../interfaces/INetworkManager';
 import { IUIManager } from '../../ui/IUIManager';
 import { LocalServerManager } from '../server/LocalServerManager';
 import { GlobalInputManager } from './GlobalInputManager';
+import { CameraComponent } from '../components/CameraComponent';
+import type { GameContext } from '../../types/GameContext';
 
 /**
  * 네트워크 에러 헨들러 타입
@@ -65,6 +67,7 @@ export class SessionController {
   private inputManager: GlobalInputManager;
   private tickManager: TickManager;
   private localServerManager: LocalServerManager;
+  private ctx!: GameContext;
 
   constructor(
     scene: Scene,
@@ -86,7 +89,21 @@ export class SessionController {
   }
 
   public async initialize(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
-    this.playerPawn = new PlayerPawn(this.scene, this.tickManager);
+    this.ctx = {
+      scene: this.scene,
+      camera: null as any,
+      tickManager: this.tickManager,
+      networkManager: this.networkManager,
+      worldManager: this.worldManager,
+    } as GameContext;
+
+    this.playerPawn = new PlayerPawn(this.ctx);
+
+    const camComp = this.playerPawn.getComponent(CameraComponent) as CameraComponent;
+    if (camComp) {
+      this.ctx.camera = camComp.camera;
+    }
+
     this.worldManager.initialize();
     this.worldManager.register(this.playerPawn);
 
@@ -106,47 +123,30 @@ export class SessionController {
     this.setupInventory();
     this.setupInput();
 
-    // Always setup multiplayer in dedicated server architecture
     this.setupMultiplayer(playerName);
-
     this.setupSpectatorInput();
   }
 
   private setupSystems(levelData: LevelData): void {
-    this.targetSpawner = new TargetSpawnerComponent(
-      this.scene,
-      this.shadowGenerator,
-      this.networkManager,
-      this.worldManager,
-      this.tickManager
-    );
-    // Initial layout is now handled by the authority (server/simulation)
-
+    this.targetSpawner = new TargetSpawnerComponent(this.ctx, this.shadowGenerator);
     if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
-      // enemyManager is now injected via constructor
+      // Logic for enemy spawns
     }
-
     this.pickupManager.initialize(this.scene, this.playerPawn!);
-
     GameObservables.itemCollection.add((): void => {
       GameAssets.sounds.swipe?.play();
     });
   }
 
   private setupCombat(): void {
-    const combatComp = new CombatComponent(
-      this.playerPawn!,
-      this.scene,
-      this.networkManager,
-      this.worldManager
-    );
+    const combatComp = new CombatComponent(this.playerPawn!, this.scene, this.ctx);
     this.playerPawn!.addComponent(combatComp);
 
     this.healthUnsub = playerHealthStore.subscribe((health: number): void => {
       if (health <= 0) {
         GameObservables.playerDied.notifyObservers(null);
         this.isSpectating = true;
-        this.spectateMode = 'FREE'; // Default to free look on death
+        this.spectateMode = 'FREE';
         this.hud?.showRespawnCountdown(3);
       }
     });
@@ -222,15 +222,7 @@ export class SessionController {
       playerName
     );
 
-    // Initial State Sync Logic
-    // Initial State Sync Logic
-    // If Master Client (Host), we initialize the world locally (Authoritative)
-    // If Guest, we request initial state.
-
-    // Initialize WorldSimulation with Client managers
-    // Skip if we are running a local server (LogicalServer handles simulation)
     const isLocalServerRunning = this.localServerManager.isServerRunning();
-
     if (this.enemyManager && this.targetSpawner && !isLocalServerRunning) {
       this.simulation = new WorldSimulation(
         this.enemyManager,
@@ -269,8 +261,6 @@ export class SessionController {
         this.hud?.hideRespawnMessage();
       }
     });
-
-    // Request logic moved up
   }
 
   private syncInventoryStore(): void {
@@ -340,12 +330,8 @@ export class SessionController {
 
     const target = players[this.spectateTargetIndex];
     if (target && target.mesh) {
-      // Third person follow logic
       const targetPos = target.mesh.position;
       const followOffset = new Vector3(0, 2.0, -3.0);
-
-      // Rotate offset by target's rotation if you want fixed back-view,
-      // but simple offset is fine for now
       const desiredPos = targetPos.add(followOffset);
       this.playerPawn.mesh.position.copyFrom(desiredPos);
       this.playerPawn.camera.setTarget(targetPos);
@@ -358,10 +344,8 @@ export class SessionController {
       if (!document.pointerLockElement) return;
 
       if (e.button === 0) {
-        // Left Click: Next
         this.cycleSpectateTarget(1);
       } else if (e.button === 2) {
-        // Right Click: Prev
         this.cycleSpectateTarget(-1);
       }
     };
@@ -371,7 +355,7 @@ export class SessionController {
       if (e.code === 'Space' && !e.repeat) {
         this.spectateMode = this.spectateMode === 'FREE' ? 'FOLLOW' : 'FREE';
         if (this.spectateMode === 'FOLLOW') {
-          this.cycleSpectateTarget(0); // Ensure valid target
+          this.cycleSpectateTarget(0);
         }
       }
     };
@@ -379,7 +363,6 @@ export class SessionController {
     window.addEventListener('mousedown', onMouseDown);
     window.addEventListener('keydown', onKeyDown);
 
-    // Cleanup will be needed in dispose
     this._spectatorCleanup = (): void => {
       window.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('keydown', onKeyDown);
@@ -413,6 +396,5 @@ export class SessionController {
       this.networkManager.onInitialStateReceived.remove(this._initialStateObserver);
       this._initialStateObserver = null;
     }
-    // Managers are singletons, cleared in Game.ts for now or we could add clear here
   }
 }

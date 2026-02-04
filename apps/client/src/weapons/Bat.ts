@@ -1,9 +1,7 @@
-import { Scene, UniversalCamera } from '@babylonjs/core';
 import { MeleeWeapon } from './MeleeWeapon';
 import { ProceduralWeaponBuilder } from './ProceduralWeaponBuilder';
 import { MeleeWeaponConfigs } from '../config/WeaponConfig';
-import { INetworkManager } from '../core/interfaces/INetworkManager';
-import { WorldEntityManager } from '../core/systems/WorldEntityManager';
+import type { GameContext } from '../types/GameContext';
 
 /**
  * 야구 방망이 (Bat) - 근접 무기
@@ -16,13 +14,8 @@ export class Bat extends MeleeWeapon {
 
   protected weaponConfig = MeleeWeaponConfigs.Bat;
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    networkManager: INetworkManager,
-    worldManager: WorldEntityManager
-  ) {
-    super(scene, camera, networkManager, worldManager);
+  constructor(context: GameContext) {
+    super(context);
     this.createMesh();
   }
 

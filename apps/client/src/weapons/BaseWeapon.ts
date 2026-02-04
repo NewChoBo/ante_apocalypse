@@ -2,8 +2,7 @@ import { Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
 import { BaseWeapon as CoreBaseWeapon } from '@ante/game-core';
 import { IWeapon } from '../types/IWeapon';
 import { WeaponVisualController } from './WeaponVisualController';
-import { INetworkManager } from '../core/interfaces/INetworkManager';
-import { WorldEntityManager } from '../core/systems/WorldEntityManager';
+import type { GameContext } from '../types/GameContext';
 
 /**
  * 모든 무기의 최상위 추상 클래스.
@@ -43,22 +42,15 @@ export abstract class BaseWeapon extends CoreBaseWeapon implements IWeapon {
     return this.visualController.isAiming;
   }
 
-  protected networkManager: INetworkManager;
+  protected ctx: GameContext;
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    networkManager: INetworkManager,
-    worldManager: WorldEntityManager
-  ) {
+  constructor(context: GameContext) {
     // Pass dummy stats to core
     super('base_weapon', 'local_player', { name: 'Base', damage: 0, range: 0 });
 
-    this.networkManager = networkManager;
+    this.ctx = context;
     // Initialize visual controller with stopFire callback
-    this.visualController = new WeaponVisualController(scene, camera, worldManager, () =>
-      this.stopFire()
-    );
+    this.visualController = new WeaponVisualController(context, () => this.stopFire());
   }
 
   // IWeapon methods - delegate to visual controller

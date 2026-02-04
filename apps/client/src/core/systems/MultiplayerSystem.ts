@@ -7,6 +7,7 @@ import { WorldEntityManager } from './WorldEntityManager';
 import { playerHealthStore, gameStateStore } from '../store/GameStore';
 import { INetworkManager } from '../interfaces/INetworkManager';
 import { TickManager } from '@ante/game-core';
+import type { GameContext } from '../../types/GameContext';
 
 export class MultiplayerSystem {
   private scene: Scene;
@@ -187,13 +188,15 @@ export class MultiplayerSystem {
     if (this.remotePlayers.has(player.id)) return;
 
     const name = player.name || 'Anonymous';
-    const remote = new RemotePlayerPawn(
-      this.scene,
-      player.id,
-      this.shadowGenerator,
-      this.tickManager,
-      name
-    );
+    const context: GameContext = {
+      scene: this.scene,
+      camera: this.localPlayer.camera,
+      networkManager: this.networkManager,
+      worldManager: this.worldManager,
+      tickManager: this.tickManager,
+    };
+
+    const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, context, name);
     remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
     this.remotePlayers.set(player.id, remote);
     this.worldManager.register(remote);

@@ -60,7 +60,7 @@ export interface INetworkManager {
   readonly onTargetSpawn: Observable<SpawnTargetPayload>;
 
   // Methods
-  connect(userId: string): void;
+  connect(userId: string): Promise<boolean>;
   hostGame(roomName: string, mapId: string, gameMode?: string): Promise<boolean>;
   joinGame(roomName: string): Promise<boolean>;
   leaveGame(): void;
