@@ -49,3 +49,64 @@ export function WithStatSync<TBase extends AbstractConstructor, TStats extends R
 
   return Mixin as unknown as TBase & Constructor<IStatSyncMixin<TStats>>;
 }
+
+/**
+ * 상태 머신 기능을 제공하는 Mixin 인터페이스.
+ */
+export interface IFSMMixin<TState extends string> {
+  currentState: TState;
+  canTransitionTo(nextState: TState): boolean;
+  transitionTo(nextState: TState): boolean;
+}
+
+/**
+ * 클래스에 유한 상태 머신(FSM) 기능을 주입하는 Mixin 팩토리 함수.
+ * @param Base 상속받을 베이스 클래스
+ * @param transitions 허용된 상태 전이 규칙 (Record<FromState, ToState[]>)
+ * @param initialState 초기 상태
+ */
+export function WithFSM<TBase extends AbstractConstructor, TState extends string>(
+  Base: TBase,
+  transitions: Record<TState, TState[]>,
+  initialState: TState
+): TBase & Constructor<IFSMMixin<TState>> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  abstract class Mixin extends (Base as any) implements IFSMMixin<TState> {
+    private _currentState: TState = initialState;
+
+    public get currentState(): TState {
+      return this._currentState;
+    }
+
+    /**
+     * 특정 상태로 전이가 가능한지 확인합니다.
+     */
+    public canTransitionTo(nextState: TState): boolean {
+      const allowed = transitions[this._currentState];
+      return allowed ? allowed.includes(nextState) : false;
+    }
+
+    /**
+     * 상태를 변경합니다. 규칙에 어긋나면 무시됩니다.
+     */
+    public transitionTo(nextState: TState): boolean {
+      if (!this.canTransitionTo(nextState)) {
+        return false;
+      }
+
+      const prevState = this._currentState;
+      this._currentState = nextState;
+      this.onStateChanged(nextState, prevState);
+      return true;
+    }
+
+    /**
+     * 상태 변경 후 호출되는 가상 메서드.
+     */
+    protected onStateChanged(_newState: TState, _oldState: TState): void {
+      // 오버라이드용
+    }
+  }
+
+  return Mixin as unknown as TBase & Constructor<IFSMMixin<TState>>;
+}

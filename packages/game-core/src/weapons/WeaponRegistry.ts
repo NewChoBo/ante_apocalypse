@@ -1,13 +1,10 @@
-export interface WeaponStats {
-  name: string;
-  damage: number;
-  range: number;
-  magazineSize?: number;
-  fireRate?: number;
-  reloadTime?: number;
-}
+import { WeaponStats, WeaponRegistrySchema } from '@ante/common';
 
-export const WeaponRegistry: Record<string, WeaponStats> = {
+/**
+ * 런타임에 검증된 무기 데이터 레지스트리.
+ * @ante/common의 Zod 스키마를 사용하여 데이터 무결성을 보장합니다.
+ */
+export const rawWeaponRegistry = {
   Pistol: {
     name: 'Pistol',
     damage: 50,
@@ -28,3 +25,11 @@ export const WeaponRegistry: Record<string, WeaponStats> = {
   Bat: { name: 'Bat', damage: 100, range: 6 },
   Enemy_Melee: { name: 'Enemy_Melee', damage: 10, range: 3 },
 };
+
+/**
+ * Zod를 통해 레지스트리 데이터의 유효성을 검사합니다.
+ * 에러 발생 시 즉시 리포팅하여 잘못된 설정으로 인한 버그를 미연에 방지합니다.
+ */
+export const WeaponRegistry = WeaponRegistrySchema.parse(rawWeaponRegistry);
+
+export type { WeaponStats };

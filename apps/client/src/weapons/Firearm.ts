@@ -11,7 +11,7 @@ import { Firearm as CoreFirearm } from '@ante/game-core';
 import { GameObservables } from '../core/events/GameObservables';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon';
-import { HitScanSystem, DamageSystem } from '@ante/game-core';
+import { HitScanSystem, DamageSystem, WeaponStats } from '@ante/game-core';
 import { WeaponVisualController } from './WeaponVisualController';
 import type { GameContext } from '../types/GameContext';
 
@@ -182,23 +182,17 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
   }
 
   public reload(): void {
-    if (this.isReloading || this.currentAmmo === this.magazineSize || this.reserveAmmo === 0) {
-      return;
-    }
-
-    // Start Core Reload (sets isReloading = true)
+    // Start Core Reload (transitions FSM to 'Reloading')
     super.reload();
 
-    this.isFiring = false;
-    this.onReloadStart();
-    this.ejectMagazine();
+    if (this.currentState === 'Reloading') {
+      this.isFiring = false;
+      this.onReloadStart();
+      this.ejectMagazine();
 
-    // Notify Server
-    this.ctx.networkManager.reload(this.name);
-
-    // Core handles the timer in tick(), but we can also hook into that or just keep visual logic here.
-    // However, Core 'reloadLogic' is called when timer finishes.
-    // We should override 'reloadLogic' to add our visual callbacks.
+      // Notify Server
+      this.ctx.networkManager.reload(this.name);
+    }
   }
 
   public override reloadLogic(): void {
@@ -217,9 +211,10 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
 
     // 장전 중 연출 (기울기)
     if (this.weaponMesh) {
-      const targetZ = this.isReloading
-        ? this.visualController['idleRotation'].z + 0.6
-        : this.visualController['idleRotation'].z;
+      const targetZ =
+        this.currentState === 'Reloading'
+          ? this.visualController['idleRotation'].z + 0.6
+          : this.visualController['idleRotation'].z;
       this.weaponMesh.rotation.z += (targetZ - this.weaponMesh.rotation.z) * deltaTime * 10;
     }
 
@@ -370,12 +365,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     if (stats.range !== undefined) this.range = stats.range as number;
 
     // Update Core stats
-    const coreStats = this.stats as unknown as Record<string, unknown>;
-    if (stats.damage !== undefined) coreStats.damage = stats.damage as number;
-    if (stats.range !== undefined) coreStats.range = stats.range as number;
-    if (stats.magazineSize !== undefined) coreStats.magazineSize = stats.magazineSize as number;
-    if (stats.fireRate !== undefined) coreStats.fireRate = stats.fireRate as number;
-    if (stats.reloadTime !== undefined) coreStats.reloadTime = stats.reloadTime as number;
+    super.updateStats(stats as Partial<WeaponStats>);
 
     // [신규] 최초 동기화 시 탄약 자동 지급
     if (isInitialSync && (this.stats.magazineSize || 0) > 0) {

@@ -11,7 +11,6 @@ export abstract class BaseWeapon {
   // State
   public currentAmmo: number = 0;
   public reserveAmmo: number = 0;
-  public isReloading: boolean = false;
   protected lastFireTime: number = 0;
 
   constructor(id: string, ownerId: string) {
@@ -24,8 +23,10 @@ export abstract class BaseWeapon {
    */
   public abstract stats: any;
 
+  /**
+   * 무기 발향 가능 여부. 하위 클래스(FSM 등)에서 상태에 따라 재정의합니다.
+   */
   public get canFire(): boolean {
-    if (this.isReloading) return false;
     const stats = this.stats;
     if (this.currentAmmo <= 0 && (stats.magazineSize || 0) > 0) return false;
     const now = Date.now() / 1000;
