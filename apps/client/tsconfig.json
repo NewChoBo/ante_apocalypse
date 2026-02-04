@@ -8,5 +8,10 @@
       "@/*": ["src/*"]
     }
   },
-  "include": ["src", "vite.config.ts", "src/types/assets.d.ts"]
+  "include": [
+    "src",
+    "vite.config.ts",
+    "src/types/assets.d.ts",
+    "../../packages/game-core/src/types/photon-realtime.d.ts"
+  ]
 }

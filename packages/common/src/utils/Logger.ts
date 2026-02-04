@@ -1,5 +1,4 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare let process: any;
+declare const process: { versions?: { node?: unknown } };
 
 export enum LogLevel {
   DEBUG = 0,

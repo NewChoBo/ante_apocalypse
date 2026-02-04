@@ -134,14 +134,20 @@ export abstract class BaseEnemyManager {
 
       if (enemy.rotation && enemy.rotation.set) {
         enemy.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
-      } else if ((enemy as any).mesh && (enemy as any).mesh.rotation) {
-        // Fallback for types not fully implementing IEnemyPawn yet (should be resolved by interface update)
-        (enemy as any).mesh.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+      } else if (
+        'mesh' in enemy &&
+        (enemy as { mesh: import('@babylonjs/core').AbstractMesh }).mesh.rotation
+      ) {
+        // Fallback for types that expose mesh but don't have rotation setter directly on pawn
+        (enemy as { mesh: import('@babylonjs/core').AbstractMesh }).mesh.rotation.set(
+          data.rotation.x,
+          data.rotation.y,
+          data.rotation.z
+        );
       }
 
       if (data.isMoving !== undefined) {
-        // IEnemyPawn doesn't have isMoving setter in interface yet, casting for now
-        (enemy as any).isMoving = data.isMoving;
+        enemy.isMoving = data.isMoving;
       }
     }
   }

@@ -1,5 +1,6 @@
 import { Scene, Skeleton, Mesh, MeshBuilder, Vector3, AbstractMesh } from '@babylonjs/core';
 import { Logger } from '@ante/common';
+import { IPawnCore } from '../../types/IPawnCore.js';
 
 const logger = new Logger('MeshUtils');
 
@@ -7,7 +8,7 @@ export interface HeadHitboxOptions {
   size?: number;
   id?: string;
   type?: string;
-  pawn?: any;
+  pawn?: IPawnCore;
 }
 
 export class MeshUtils {

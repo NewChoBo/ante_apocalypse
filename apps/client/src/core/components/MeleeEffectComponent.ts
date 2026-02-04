@@ -1,4 +1,4 @@
-import { Scene } from '@babylonjs/core';
+import { Scene, Sound } from '@babylonjs/core';
 import { BaseWeaponEffectComponent } from './BaseWeaponEffectComponent';
 import { GameAssets } from '../GameAssets';
 import { GameObservables } from '../events/GameObservables';
@@ -10,8 +10,7 @@ import type { BasePawn } from '../BasePawn';
  * 휘두르기 소리(Swipe Sound)를 전담합니다.
  */
 export class MeleeEffectComponent extends BaseWeaponEffectComponent {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private swipeSound: any;
+  private swipeSound: Sound | null = null;
 
   constructor(owner: BasePawn, scene: Scene) {
     super(owner, scene);
