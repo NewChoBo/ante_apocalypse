@@ -42,3 +42,6 @@ export * from './server/pawns/ServerTargetPawn.js';
 // Level logic
 export * from './levels/LevelData.js';
 export * from './levels/ServerLevelLoader.js';
+
+// Utils
+export * from './utils/Mixins.js';

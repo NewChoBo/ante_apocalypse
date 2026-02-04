@@ -370,7 +370,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     if (stats.range !== undefined) this.range = stats.range as number;
 
     // Update Core stats
-    const coreStats = this.stats as any;
+    const coreStats = this.stats as unknown as Record<string, unknown>;
     if (stats.damage !== undefined) coreStats.damage = stats.damage as number;
     if (stats.range !== undefined) coreStats.range = stats.range as number;
     if (stats.magazineSize !== undefined) coreStats.magazineSize = stats.magazineSize as number;

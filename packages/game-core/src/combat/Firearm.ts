@@ -1,7 +1,12 @@
 import { BaseWeapon } from './BaseWeapon';
 import { WeaponStats } from '../weapons/WeaponRegistry';
+import { WithStatSync } from '../utils/Mixins';
 
-export class Firearm extends BaseWeapon {
+/**
+ * Mixin을 적용한 Firearm 클래스.
+ * BaseWeapon의 핵심 로직과 WithStatSync의 데이터 동기화 기능을 결합합니다.
+ */
+export class Firearm extends WithStatSync<typeof BaseWeapon, WeaponStats>(BaseWeapon) {
   public get magazineSize(): number {
     return this.stats.magazineSize || 0;
   }
@@ -16,8 +21,12 @@ export class Firearm extends BaseWeapon {
 
   protected reloadTimer: number = 0;
 
+  public stats: WeaponStats;
+
   constructor(id: string, ownerId: string, stats: WeaponStats) {
-    super(id, ownerId, stats);
+    super(id, ownerId);
+    this.stats = stats;
+    this.currentAmmo = stats.magazineSize || 0;
   }
 
   public reload(): void {
