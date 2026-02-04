@@ -1,5 +1,5 @@
 import { BaseTargetSpawner } from '@ante/game-core';
-import { Scene, Vector3, ShadowGenerator, Observer } from '@babylonjs/core';
+import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
 import { TargetPawn, TargetPawnConfig } from '../TargetPawn';
 import { INetworkManager } from '../interfaces/INetworkManager';
 import { WorldEntityManager } from '../systems/WorldEntityManager';
@@ -14,10 +14,7 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
   private scene: Scene;
   private worldManager: WorldEntityManager;
   private networkManager: INetworkManager;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _spawnObserver: Observer<any> | null = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _destroyObserver: Observer<any> | null = null;
+  private cleanups: (() => void)[] = [];
 
   constructor(context: GameContext, shadowGenerator: ShadowGenerator) {
     super(context.networkManager); // BaseTargetSpawner
@@ -27,7 +24,7 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
     this.worldManager = context.worldManager;
     this.networkManager = context.networkManager;
 
-    this._spawnObserver = this.networkManager.onTargetSpawn.add((data) => {
+    const spawnObserver = this.networkManager.onTargetSpawn.add((data) => {
       // If I am Master, I already spawned it locally via broadcastTargetSpawn logic?
       // No, broadcastTargetSpawn calls spawnTarget.
       // But if loopback is NOT disabled for "Others", I might double spawn?
@@ -36,10 +33,16 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
       const position = new Vector3(data.position.x, data.position.y, data.position.z);
       this.spawnTarget(position, data.isMoving, data.id, data.type);
     });
+    if (spawnObserver) {
+      this.cleanups.push(() => this.networkManager.onTargetSpawn.remove(spawnObserver));
+    }
 
-    this._destroyObserver = this.networkManager.onTargetDestroy.add(() => {
+    const destroyObserver = this.networkManager.onTargetDestroy.add(() => {
       // Respawn logic is now handled by the authority (server/simulation)
     });
+    if (destroyObserver) {
+      this.cleanups.push(() => this.networkManager.onTargetDestroy.remove(destroyObserver));
+    }
   }
 
   /** 개별 타겟 스폰 */
@@ -87,13 +90,7 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
   }
 
   public dispose(): void {
-    if (this._spawnObserver) {
-      this.networkManager.onTargetSpawn.remove(this._spawnObserver);
-      this._spawnObserver = null;
-    }
-    if (this._destroyObserver) {
-      this.networkManager.onTargetDestroy.remove(this._destroyObserver);
-      this._destroyObserver = null;
-    }
+    this.cleanups.forEach((cleanup) => cleanup());
+    this.cleanups = [];
   }
 }

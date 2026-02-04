@@ -9,7 +9,7 @@ import {
   Checkbox,
   InputText,
 } from '@babylonjs/gui';
-import { Observer } from '@babylonjs/core';
+// import removed
 import { INetworkManager } from '../core/interfaces/INetworkManager';
 import { UIManager, UIScreen } from './UIManager';
 import { RoomInfo, Logger } from '@ante/common';
@@ -21,8 +21,7 @@ export class LobbyUI {
   private roomListPanel: StackPanel;
   private networkManager: INetworkManager;
   private uiManager: UIManager;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private observers: Observer<any>[] = [];
+  private cleanups: (() => void)[] = [];
 
   // Visual Constants from UIManager (for consistency)
   private readonly PRIMARY_COLOR = '#ffc400';
@@ -42,11 +41,8 @@ export class LobbyUI {
   }
 
   public dispose(): void {
-    this.observers.forEach((obs) => {
-      this.networkManager.onRoomListUpdated.remove(obs);
-      this.networkManager.onStateChanged.remove(obs);
-    });
-    this.observers = [];
+    this.cleanups.forEach((cleanup) => cleanup());
+    this.cleanups = [];
     this.container.dispose();
   }
 
@@ -154,12 +150,16 @@ export class LobbyUI {
         this.updateRoomList(rooms);
       }
     );
-    if (roomListObserver) this.observers.push(roomListObserver);
+    if (roomListObserver) {
+      this.cleanups.push(() => this.networkManager.onRoomListUpdated.remove(roomListObserver));
+    }
 
     const stateObserver = this.networkManager.onStateChanged.add((state: string): void => {
       this.handleStateChange(state);
     });
-    if (stateObserver) this.observers.push(stateObserver);
+    if (stateObserver) {
+      this.cleanups.push(() => this.networkManager.onStateChanged.remove(stateObserver));
+    }
 
     // Initial fetch from cache
     this.updateRoomList(this.networkManager.getRoomList());
@@ -504,8 +504,8 @@ export class LobbyUI {
           throw new Error('FAILED_TO_ESTABLISH_UPLINK');
         }
       } catch (e: unknown) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        logger.error('Failed to create/join room:', e as any);
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        logger.error('Failed to create/join room:', errorMessage);
         if (checkbox.isChecked) {
           this.networkManager.leaveGame();
         }

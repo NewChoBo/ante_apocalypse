@@ -256,8 +256,12 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
     this.provider.onEvent = (code: number, data: unknown, senderId: string): void => {
       this.onEvent.notifyObservers({ code, data, senderId });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      this.dispatcher.dispatch(code as EventCode, data as any, senderId);
+      // Use internal cast for dynamic dispatch
+      (this.dispatcher.dispatch as (code: EventCode, data: unknown, actorNr: string) => void)(
+        code as EventCode,
+        data,
+        senderId
+      );
     };
 
     this.provider.onMasterClientSwitched = (newMasterId: string): void => {

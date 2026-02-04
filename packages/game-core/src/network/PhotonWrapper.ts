@@ -1,6 +1,6 @@
 import PhotonModule from 'photon-realtime';
 
-export const Photon = PhotonModule as any;
+export const Photon = PhotonModule;
 
 export const LoadBalancing = Photon.LoadBalancing;
 export const ConnectionProtocol = Photon.ConnectionProtocol;

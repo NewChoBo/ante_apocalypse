@@ -30,9 +30,10 @@ export class PhotonProvider implements INetworkProvider {
 
   constructor() {
     // browser 환경에서 require('ws') 에러 방지를 위해 WebSocket 구현체 재설정
-    if (typeof window !== 'undefined' && Photon['PhotonPeer']) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (Photon['PhotonPeer'] as any).setWebSocketImpl(WebSocket);
+    if (typeof window !== 'undefined' && 'PhotonPeer' in Photon) {
+      (
+        Photon as unknown as { PhotonPeer: { setWebSocketImpl: (impl: unknown) => void } }
+      ).PhotonPeer.setWebSocketImpl(WebSocket);
     }
 
     if (!this.appId || this.appId === 'YOUR_APP_ID_HERE') {
@@ -62,8 +63,7 @@ export class PhotonProvider implements INetworkProvider {
       }
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.client.onRoomListUpdate = (rooms: any[]): void => {
+    this.client.onRoomListUpdate = (rooms: unknown[]): void => {
       const roomInfos: RoomInfo[] = mapRoomList(rooms);
       this.onRoomListUpdated?.(roomInfos);
     };
@@ -156,8 +156,7 @@ export class PhotonProvider implements INetworkProvider {
 
   public getRoomList(): Promise<RoomInfo[]> {
     const rooms = this.client.availableRooms();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return Promise.resolve(mapRoomList(rooms as any[]));
+    return Promise.resolve(mapRoomList(rooms));
   }
 
   public leaveRoom(): void {
@@ -231,7 +230,6 @@ export class PhotonProvider implements INetworkProvider {
 
     const rooms = this.client.availableRooms();
     logger.info('Manual room list refresh:', rooms);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.onRoomListUpdated?.(mapRoomList(rooms as any[]));
+    this.onRoomListUpdated?.(mapRoomList(rooms));
   }
 }

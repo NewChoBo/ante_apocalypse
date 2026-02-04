@@ -5,12 +5,34 @@ import { Vector3 } from '@babylonjs/core';
 import { TickManager } from '../systems/TickManager.js';
 import { ITickable } from '../types/ITickable.js';
 
+function isTickable(entity: unknown): entity is ITickable {
+  return (
+    typeof entity === 'object' &&
+    entity !== null &&
+    'tick' in entity &&
+    typeof (entity as ITickable).tick === 'function'
+  );
+}
+
 const logger = new Logger('WorldEntityManager');
 
 /**
  * 전역 엔티티 관리자.
  * 클라이언트와 서버 모두에서 엔티티를 ID 기반으로 추적하고 관리합니다.
  */
+import { ILifecycleAware } from '../types/ILifecycleAware.js';
+
+function isLifecycleAware(entity: unknown): entity is ILifecycleAware {
+  return (
+    typeof entity === 'object' &&
+    entity !== null &&
+    'activate' in entity &&
+    typeof (entity as ILifecycleAware).activate === 'function' &&
+    'deactivate' in entity &&
+    typeof (entity as ILifecycleAware).deactivate === 'function'
+  );
+}
+
 export class WorldEntityManager {
   private entities: Map<string, IWorldEntity> = new Map();
   private tickManager: TickManager;
@@ -30,12 +52,12 @@ export class WorldEntityManager {
 
     // Lifecycle Management
     // If entity has activate() method, allow it to handle its own registration (e.g. BasePawn)
-    if ('activate' in entity && typeof (entity as any).activate === 'function') {
-      (entity as any).activate();
+    if (isLifecycleAware(entity)) {
+      entity.activate();
     }
     // Fallback: Auto-register to TickManager if tickable and not handled by activate
-    else if ('tick' in entity && typeof (entity as any).tick === 'function') {
-      this.tickManager.register(entity as unknown as ITickable);
+    else if (isTickable(entity)) {
+      this.tickManager.register(entity);
     }
   }
 
@@ -46,12 +68,12 @@ export class WorldEntityManager {
     const entity = this.entities.get(id);
     if (entity) {
       // Lifecycle Management
-      if ('deactivate' in entity && typeof (entity as any).deactivate === 'function') {
-        (entity as any).deactivate();
+      if (isLifecycleAware(entity)) {
+        entity.deactivate();
       }
       // Fallback: Unregister from TickManager if tickable
-      else if ('tick' in entity && typeof (entity as any).tick === 'function') {
-        this.tickManager.unregister(entity as unknown as ITickable);
+      else if (isTickable(entity)) {
+        this.tickManager.unregister(entity);
       }
 
       this.entities.delete(id);

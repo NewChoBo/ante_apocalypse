@@ -12,7 +12,7 @@ import {
   SyncWeaponPayload,
   Logger,
 } from '@ante/common';
-import { Vector3, AbstractMesh } from '@babylonjs/core';
+import { Vector3, AbstractMesh, Scene, VertexBuffer, Geometry } from '@babylonjs/core';
 import { WorldEntityManager } from '../simulation/WorldEntityManager.js';
 import { BasePhotonClient } from '../network/BasePhotonClient.js';
 import { IWorldEntity } from '../types/IWorldEntity.js';
@@ -45,6 +45,37 @@ function toNetworkVector3(v: Vector3): NetworkVector3 {
 
 function toBabylonVector3(v: NetworkVector3): Vector3 {
   return new Vector3(v.x, v.y, v.z);
+}
+
+// Server-side mock for AbstractMesh to avoid full dependency or 'unknown' casting
+class ServerMockMesh extends AbstractMesh {
+  constructor(name: string, scene: Scene | null = null) {
+    super(name, scene);
+    this.position = new Vector3(0, 0, 0);
+    this.rotation = new Vector3(0, 0, 0);
+  }
+
+  // Abstract members implementation
+  public _positions: Vector3[] | null = null;
+
+  public get geometry(): Geometry | null {
+    return null;
+  }
+
+  public copyVerticesData(_kind: string, _vertexData: Record<string, Float32Array>): void {
+    // no-op
+  }
+
+  public getVertexBuffer(_kind: string): VertexBuffer | null {
+    return null;
+  }
+
+  public refreshBoundingInfo(
+    _applySkeletonOrOptions: boolean | import('@babylonjs/core').IMeshDataOptions,
+    _applyMorph?: boolean
+  ): AbstractMesh {
+    return this;
+  }
 }
 
 export class ServerNetworkAuthority extends BasePhotonClient {
@@ -152,11 +183,8 @@ export class ServerNetworkAuthority extends BasePhotonClient {
           /* no-op */
         },
         // Mock mesh for server-side logic that doesn't use rendering
-        mesh: {
-          position: new Vector3(0, 0, 0),
-          rotation: new Vector3(0, 0, 0),
-          dispose: () => {},
-        } as unknown as AbstractMesh,
+        // Mock mesh for server-side logic that doesn't use rendering
+        mesh: new ServerMockMesh('server_player_mesh'),
       };
 
       this.entityManager.register(playerEntity);
@@ -206,11 +234,7 @@ export class ServerNetworkAuthority extends BasePhotonClient {
           dispose: (): void => {
             /* no-op */
           },
-          mesh: {
-            position: new Vector3(0, 0, 0),
-            rotation: new Vector3(0, 0, 0),
-            dispose: () => {},
-          } as unknown as AbstractMesh,
+          mesh: new ServerMockMesh('remote_player_mesh'),
         };
 
         this.entityManager.register(newEntity);

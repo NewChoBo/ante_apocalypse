@@ -43,12 +43,10 @@ export interface PhotonRoom {
  */
 export interface IPhotonClient {
   onStateChange: (state: number) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onEvent: (code: number, content: any, actorNr: number) => void;
+  onEvent: (code: number, content: unknown, actorNr: number) => void;
   onActorJoin: (actor: PhotonActor) => void;
   onActorLeave: (actor: PhotonActor) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  onRoomListUpdate: (rooms: any[]) => void;
+  onRoomListUpdate: (rooms: unknown[]) => void;
   onError: (errorCode: number, errorMsg: string) => void;
   raiseEvent: (
     code: number,
@@ -131,8 +129,7 @@ export abstract class BasePhotonClient implements INetworkAuthority {
       if (this.onActorLeave) this.onActorLeave(actor.actorNr);
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.client.onRoomListUpdate = (_rooms: any[]): void => {
+    this.client.onRoomListUpdate = (_rooms: unknown[]): void => {
       // no-op by default
     };
 

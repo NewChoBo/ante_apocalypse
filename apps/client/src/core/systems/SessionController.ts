@@ -91,8 +91,7 @@ export class SessionController {
   public async initialize(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
     this.ctx = {
       scene: this.scene,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      camera: null as any,
+      camera: null as unknown as UniversalCamera,
       tickManager: this.tickManager,
       networkManager: this.networkManager,
       worldManager: this.worldManager,

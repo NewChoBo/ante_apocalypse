@@ -128,9 +128,13 @@ export class MultiplayerSystem {
       (data: { playerId: string; weaponId: string }): void => {
         const remote = this.remotePlayers.get(data.playerId);
         if (remote) {
-          // remote.reload() call if implemented, or just for visual sync
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (remote as any).reload?.(data.weaponId);
+          // If the remote player has a reload method (e.g. for animation), call it
+          if (
+            'reload' in remote &&
+            typeof (remote as unknown as { reload: (id: string) => void }).reload === 'function'
+          ) {
+            (remote as unknown as { reload: (id: string) => void }).reload(data.weaponId);
+          }
         }
       }
     );

@@ -9,7 +9,7 @@ import {
   Container,
   Slider,
 } from '@babylonjs/gui';
-import { Scene, Observable, Observer } from '@babylonjs/core';
+import { Scene, Observable } from '@babylonjs/core';
 import { LobbyUI } from './LobbyUI';
 import { settingsStore } from '../core/store/SettingsStore';
 import { NetworkState, Logger } from '@ante/common';
@@ -37,8 +37,7 @@ export class UIManager implements IUIManager {
   public currentScreen: UIScreen = UIScreen.NONE;
   private previousScreen: UIScreen = UIScreen.MAIN_MENU;
   private lobbyUI: LobbyUI | null = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private observers: Observer<any>[] = [];
+  private cleanups: (() => void)[] = [];
 
   // Visual Constants
   private readonly PRIMARY_COLOR = '#ffc400';
@@ -89,7 +88,9 @@ export class UIManager implements IUIManager {
         }
       }
     });
-    if (stateObserver) this.observers.push(stateObserver);
+    if (stateObserver) {
+      this.cleanups.push(() => this.networkManager.onStateChanged.remove(stateObserver));
+    }
   }
 
   /**
@@ -472,9 +473,9 @@ export class UIManager implements IUIManager {
     if (canvas) {
       // In modern browsers, requestPointerLock returns a promise
       try {
-        const promise = canvas.requestPointerLock() as unknown as Promise<void>;
-        if (promise && promise.catch) {
-          promise.catch((e: Error) => {
+        const result = canvas.requestPointerLock() as unknown;
+        if (result instanceof Promise) {
+          result.catch((e: Error) => {
             if (e.name !== 'SecurityError') {
               logger.warn(`PointerLock request failed: ${e.message}`);
             }
@@ -542,10 +543,8 @@ export class UIManager implements IUIManager {
     }
 
     // Clean up observers
-    this.observers.forEach((obs) => {
-      this.networkManager.onStateChanged.remove(obs);
-    });
-    this.observers = [];
+    this.cleanups.forEach((cleanup) => cleanup());
+    this.cleanups = [];
 
     this.ui.dispose();
   }

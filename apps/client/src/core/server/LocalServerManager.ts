@@ -61,15 +61,16 @@ export class LocalServerManager {
       }
 
       // server-side logic which is separate.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const serverEntityManager = new WorldEntityManager(null as any, null as any); // Server-side manager (no networking/tick internally needed for authority? wait)
+      const serverEntityManager = new WorldEntityManager(
+        null as unknown as import('../interfaces/INetworkManager').INetworkManager,
+        null as unknown as import('@ante/game-core').TickManager
+      ); // Server-side manager (no networking/tick internally needed for authority? wait)
       // Actually Server side manager needs its own logic.
       // But in this monorepo, WorldEntityManager might be shared or divergent.
       this.networkAuthority = new ServerNetworkAuthority(
         appId,
         appVersion,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        serverEntityManager as any
+        serverEntityManager as unknown as WorldEntityManager
       );
       await this.networkAuthority.connect();
 

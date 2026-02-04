@@ -1,15 +1,11 @@
-import Photon from 'photon-realtime';
+import { Photon } from './PhotonWrapper.js';
 import { NetworkState } from '@ante/common';
 
 /**
  * Maps Photon internal state numbers to NetworkState enum.
  */
 export function mapPhotonState(photonState: number): NetworkState {
-  // Access static property dynamically to avoid import issues
-  const LoadBalancingClient = (
-    Photon as unknown as { LoadBalancing: { LoadBalancingClient: { State: any } } }
-  ).LoadBalancing.LoadBalancingClient;
-  const States = LoadBalancingClient.State;
+  const States = Photon.LoadBalancing.LoadBalancingClient.State;
   switch (photonState) {
     case States.Uninitialized:
     case States.Disconnected:
