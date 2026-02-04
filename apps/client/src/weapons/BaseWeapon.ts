@@ -1,5 +1,5 @@
-import { Scene, UniversalCamera, Vector3 } from '@babylonjs/core';
-import { BaseWeapon as CoreBaseWeapon } from '@ante/game-core';
+import { Scene, UniversalCamera, Vector3, AbstractMesh } from '@babylonjs/core';
+import { BaseWeapon as CoreBaseWeapon, WeaponStats } from '@ante/game-core';
 import { IWeapon } from '../types/IWeapon';
 import { WeaponVisualController } from './WeaponVisualController';
 import type { GameContext } from '../types/GameContext';
@@ -26,11 +26,11 @@ export abstract class BaseWeapon extends CoreBaseWeapon implements IWeapon {
     return this.visualController.camera;
   }
 
-  public get weaponMesh() {
+  public get weaponMesh(): AbstractMesh | null {
     return this.visualController.weaponMesh;
   }
 
-  public set weaponMesh(mesh) {
+  public set weaponMesh(mesh: AbstractMesh | null) {
     this.visualController.weaponMesh = mesh;
   }
 
@@ -91,10 +91,9 @@ export abstract class BaseWeapon extends CoreBaseWeapon implements IWeapon {
   public abstract getStats(): Record<string, unknown>;
 
   // updateStats with default implementation
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public updateStats(stats: Partial<Record<string, any>>): void {
-    if (stats.damage !== undefined) this.damage = stats.damage as number;
-    if (stats.range !== undefined) this.range = stats.range as number;
+  public updateStats(stats: Partial<WeaponStats>): void {
+    if (stats.damage !== undefined) this.damage = stats.damage;
+    if (stats.range !== undefined) this.range = stats.range;
   }
 
   // dispose with default implementation

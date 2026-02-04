@@ -128,8 +128,8 @@ export class LogicalServer {
       this.processSyncWeapon(playerId, weaponId);
 
     this.networkManager.onPlayerDeath = (targetId: string, _attackerId: string): void => {
-      if (this.simulation['gameRule']) {
-        const decision = this.simulation['gameRule'].onPlayerDeath(this.simulation, targetId);
+      if (this.simulation.gameRule) {
+        const decision = this.simulation.gameRule.onPlayerDeath(this.simulation, targetId);
         if (decision.action === 'respawn') {
           const delayMs = decision.delay * 1000;
           logger.info(`Player ${targetId} will respawn in ${decision.delay}s`);

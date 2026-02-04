@@ -18,8 +18,6 @@ import {
   TargetHitPayload,
   TargetDestroyPayload,
   SpawnTargetPayload,
-  SyncWeaponPayload,
-  MovePayload,
   EnemyDestroyPayload,
   PickupDestroyPayload,
   RespawnEventData,
@@ -141,8 +139,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   }
 
   private setupDispatcher(): void {
-    this.dispatcher.register(EventCode.FIRE, (data: unknown, senderId: string): void => {
-      const fireData = data as FireEventData;
+    this.dispatcher.register(EventCode.FIRE, (fireData, senderId): void => {
       this.onPlayerFired.notifyObservers({
         playerId: senderId,
         weaponId: fireData.weaponId,
@@ -150,25 +147,23 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
       });
     });
 
-    this.dispatcher.register(EventCode.HIT, (data: unknown): void => {
-      this.onPlayerHit.notifyObservers(data as HitEventData);
+    this.dispatcher.register(EventCode.HIT, (data): void => {
+      this.onPlayerHit.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.DESTROY_ENEMY, (data: unknown): void => {
-      this.onEnemyDestroyed.notifyObservers(data as EnemyDestroyPayload);
+    this.dispatcher.register(EventCode.DESTROY_ENEMY, (data): void => {
+      this.onEnemyDestroyed.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.DESTROY_PICKUP, (data: unknown): void => {
-      this.onPickupDestroyed.notifyObservers(data as PickupDestroyPayload);
+    this.dispatcher.register(EventCode.DESTROY_PICKUP, (data): void => {
+      this.onPickupDestroyed.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.SYNC_WEAPON, (data: unknown, senderId: string): void => {
-      const syncData = data as SyncWeaponPayload;
+    this.dispatcher.register(EventCode.SYNC_WEAPON, (syncData, senderId): void => {
       this.playerStateManager.updatePlayer(senderId, { weaponId: syncData.weaponId });
     });
 
-    this.dispatcher.register(EventCode.MOVE, (data: unknown, senderId: string): void => {
-      const moveData = data as MovePayload;
+    this.dispatcher.register(EventCode.MOVE, (moveData, senderId): void => {
       const player = this.playerStateManager.getPlayer(senderId);
       if (player) {
         const isMe = senderId === this.getSocketId();
@@ -189,47 +184,43 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
       }
     });
 
-    this.dispatcher.register(EventCode.ENEMY_MOVE, (data: unknown): void => {
-      this.onEnemyUpdated.notifyObservers(data as EnemyMovePayload);
+    this.dispatcher.register(EventCode.ENEMY_MOVE, (data): void => {
+      this.onEnemyUpdated.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.TARGET_HIT, (data: unknown): void => {
-      this.onTargetHit.notifyObservers(data as TargetHitPayload);
+    this.dispatcher.register(EventCode.TARGET_HIT, (data): void => {
+      this.onTargetHit.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.PLAYER_DEATH, (data: unknown): void => {
-      this.onPlayerDied.notifyObservers(data as DeathEventData);
+    this.dispatcher.register(EventCode.PLAYER_DEATH, (data): void => {
+      this.onPlayerDied.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.RESPAWN, (data: unknown): void => {
-      this.onPlayerRespawn.notifyObservers(data as RespawnEventData);
+    this.dispatcher.register(EventCode.RESPAWN, (data): void => {
+      this.onPlayerRespawn.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.GAME_END, (data: unknown): void => {
-      this.onGameEnd.notifyObservers(data as GameEndEventData);
+    this.dispatcher.register(EventCode.GAME_END, (data): void => {
+      this.onGameEnd.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.TARGET_DESTROY, (data: unknown): void => {
-      this.onTargetDestroy.notifyObservers(data as TargetDestroyPayload);
+    this.dispatcher.register(EventCode.TARGET_DESTROY, (data): void => {
+      this.onTargetDestroy.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.RELOAD, (data: unknown): void => {
-      this.onPlayerReloaded.notifyObservers(data as { playerId: string; weaponId: string });
+    this.dispatcher.register(EventCode.RELOAD, (data): void => {
+      this.onPlayerReloaded.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.SPAWN_TARGET, (data: unknown): void => {
-      this.onTargetSpawn.notifyObservers(data as SpawnTargetPayload);
+    this.dispatcher.register(EventCode.SPAWN_TARGET, (data): void => {
+      this.onTargetSpawn.notifyObservers(data);
     });
 
-    this.dispatcher.register(
-      EventCode.REQ_INITIAL_STATE,
-      (_data: unknown, senderId: string): void => {
-        this.onInitialStateRequested.notifyObservers({ senderId });
-      }
-    );
+    this.dispatcher.register(EventCode.REQ_INITIAL_STATE, (_data, senderId): void => {
+      this.onInitialStateRequested.notifyObservers({ senderId });
+    });
 
-    this.dispatcher.register(EventCode.INITIAL_STATE, (data: unknown): void => {
-      const stateData = data as InitialStatePayload;
+    this.dispatcher.register(EventCode.INITIAL_STATE, (stateData): void => {
       this.onInitialStateReceived.notifyObservers({
         players: stateData.players,
         enemies: stateData.enemies,
@@ -265,7 +256,8 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
     this.provider.onEvent = (code: number, data: unknown, senderId: string): void => {
       this.onEvent.notifyObservers({ code, data, senderId });
-      this.dispatcher.dispatch(code, data, senderId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      this.dispatcher.dispatch(code as EventCode, data as any, senderId);
     };
 
     this.provider.onMasterClientSwitched = (newMasterId: string): void => {

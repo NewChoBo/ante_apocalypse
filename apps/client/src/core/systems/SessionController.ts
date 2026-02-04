@@ -91,6 +91,7 @@ export class SessionController {
   public async initialize(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
     this.ctx = {
       scene: this.scene,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       camera: null as any,
       tickManager: this.tickManager,
       networkManager: this.networkManager,
@@ -162,7 +163,7 @@ export class SessionController {
   private setupInventory(): void {
     this.inventoryUI = new InventoryUI(
       {
-        onEquipWeapon: async (_slot, id) => {
+        onEquipWeapon: async (_slot, id): Promise<void> => {
           const combat = this.playerPawn?.getComponent(CombatComponent);
           if (combat && id) await combat.equipWeapon(id);
         },

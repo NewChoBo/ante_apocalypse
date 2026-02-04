@@ -91,7 +91,8 @@ export abstract class BasePawn implements IPawnCore, ITickable {
 
   /** 특정 타입의 컴포넌트 찾기 */
   /** 특정 타입의 컴포넌트 찾기 */
-  public getComponent<T extends BaseComponent>(type: new (...args: any[]) => T): T | undefined {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public getComponent<T extends BaseComponent>(type: new (...args: any) => T): T | undefined {
     return this.components.find((c) => c instanceof type) as T | undefined;
   }
 

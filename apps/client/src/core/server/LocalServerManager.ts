@@ -60,12 +60,15 @@ export class LocalServerManager {
         throw new Error('Missing Photon App ID or Version in environment variables.');
       }
 
+      // server-side logic which is separate.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const serverEntityManager = new WorldEntityManager(null as any, null as any); // Server-side manager (no networking/tick internally needed for authority? wait)
       // Actually Server side manager needs its own logic.
       // But in this monorepo, WorldEntityManager might be shared or divergent.
       this.networkAuthority = new ServerNetworkAuthority(
         appId,
         appVersion,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         serverEntityManager as any
       );
       await this.networkAuthority.connect();
@@ -90,7 +93,9 @@ export class LocalServerManager {
 
       // 3.5 Load Level Data
       const currentMapId =
-        mapId || this.networkAuthority.getCurrentRoomProperty('mapId') || 'training_ground';
+        mapId ||
+        (this.networkAuthority.getCurrentRoomProperty('mapId') as string) ||
+        'training_ground';
       const levelData = LEVELS[currentMapId];
       if (levelData) {
         this.logicalServer.loadLevel(levelData);

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import Photon from 'photon-realtime';
@@ -8,12 +9,43 @@ import { NetworkDispatcher } from './NetworkDispatcher.js';
 const logger = new Logger('BasePhotonClient');
 
 /**
+ * Photon JS Library의 최소 인터페이스 정의
+ */
+interface IPhotonClient {
+  onStateChange: (state: number) => void;
+  onEvent: (code: number, content: unknown, actorNr: number) => void;
+  onActorJoin: (actor: { actorNr: number; name?: string }) => void;
+  onActorLeave: (actor: { actorNr: number }) => void;
+  onError: (errorCode: number, errorMsg: string) => void;
+  raiseEvent: (
+    code: number,
+    data: unknown,
+    options?: { receivers?: number; cache?: number; targetActors?: number[] }
+  ) => void;
+  connectToRegionMaster: (region: string) => void;
+  disconnect: () => void;
+  createRoom: (name: string, options?: any) => void;
+  joinRoom: (name: string, options?: any) => void;
+  leaveRoom: () => void;
+  isConnectedToMaster: () => boolean;
+  isInLobby: () => boolean;
+  isJoinedToRoom: () => boolean;
+  myActor: () => { actorNr: number };
+  myRoom: () => {
+    name: string;
+    masterClientId: number;
+    actors: Record<number, { name: string }>;
+    getCustomProperty: (key: string) => any;
+  };
+  loadBalancingPeer: { getServerTime: () => number };
+}
+
+/**
  * Abstract base class for Photon Realtime clients.
  * Shared between Client (PhotonProvider) and Server (ServerNetworkAuthority).
  */
 export abstract class BasePhotonClient implements INetworkAuthority {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  protected client: any; // Photon.LoadBalancing.LoadBalancingClient
+  protected client: IPhotonClient;
   protected dispatcher: NetworkDispatcher = new NetworkDispatcher();
   protected connectionResolver: (() => void) | null = null;
 
@@ -27,10 +59,10 @@ export abstract class BasePhotonClient implements INetworkAuthority {
     protected appId: string,
     protected appVersion: string
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.client = new (Photon as any).LoadBalancing.LoadBalancingClient(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (Photon as any).ConnectionProtocol.Wss,
+    const P = Photon as any;
+
+    this.client = new P.LoadBalancing.LoadBalancingClient(
+      P.ConnectionProtocol.Wss,
       this.appId,
       this.appVersion
     );
@@ -43,8 +75,8 @@ export abstract class BasePhotonClient implements INetworkAuthority {
       logger.info(`State Changed: ${state}`);
       this.onStateChanged?.(state);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const States = (Photon as any).LoadBalancing.LoadBalancingClient.State;
+      const P = Photon as any;
+      const States = P.LoadBalancing.LoadBalancingClient.State;
       if (state === States.JoinedLobby || state === States.ConnectedToMaster) {
         if (this.connectionResolver) {
           logger.info('Connected & Ready.');
@@ -56,19 +88,17 @@ export abstract class BasePhotonClient implements INetworkAuthority {
 
     this.client.onEvent = (code: number, content: unknown, actorNr: number): void => {
       this.onEventReceived?.(code, content, actorNr);
-      this.dispatcher.dispatch(code, content, actorNr.toString());
+      this.dispatcher.dispatch(code, content as any, actorNr.toString());
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.client.onActorJoin = (actor: any): void => {
+    this.client.onActorJoin = (actor): void => {
       const myActorNr = this.client.myActor()?.actorNr;
       if (actor.actorNr !== myActorNr) {
         this.onActorJoin?.(actor.actorNr, actor.name || 'Anonymous');
       }
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.client.onActorLeave = (actor: any): void => {
+    this.client.onActorLeave = (actor): void => {
       this.onActorLeave?.(actor.actorNr);
     };
 
@@ -85,17 +115,17 @@ export abstract class BasePhotonClient implements INetworkAuthority {
   }
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
+    const P = Photon as any;
     this.client.raiseEvent(code, data, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.Others,
+      receivers: P.LoadBalancing.Constants.ReceiverGroup.Others,
       cache: reliable ? 1 : 0,
     });
   }
 
   public sendEventToAll(code: number, data: unknown): void {
+    const P = Photon as any;
     this.client.raiseEvent(code, data, {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      receivers: (Photon as any).LoadBalancing.Constants.ReceiverGroup.All,
+      receivers: P.LoadBalancing.Constants.ReceiverGroup.All,
     });
   }
 
@@ -182,7 +212,7 @@ export abstract class BasePhotonClient implements INetworkAuthority {
     return undefined;
   }
 
-  public getCurrentRoomProperty(key: string): any {
+  public getCurrentRoomProperty(key: string): unknown {
     if (this.isJoinedToRoom()) {
       return this.client.myRoom().getCustomProperty(key);
     }
