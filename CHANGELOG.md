@@ -80,7 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Files Changed
 
-### Added (9 files)
+### Added (10 files)
 
 - `apps/client/src/config/FirearmConfig.ts`
 - `apps/client/src/config/MovementConfig.ts`
@@ -91,6 +91,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `apps/client/src/core/di/ServiceRegistration.ts`
 - `apps/client/src/core/di/__tests__/DIContainer.test.ts`
 - `apps/client/src/core/systems/PlayerLifecycleManager.ts`
+- `apps/client/vitest.config.ts`
 
 ### Modified (10 files)
 
