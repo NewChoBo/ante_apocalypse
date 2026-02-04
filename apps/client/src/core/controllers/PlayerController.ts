@@ -1,6 +1,7 @@
 import { BaseController } from './BaseController';
 import { IPawn } from '../../types/IPawn';
 import { PlayerPawn } from '../PlayerPawn';
+import { TickManager } from '../TickManager';
 
 /**
  * 실제 플레이어의 입력을 처리하는 컨트롤러.
@@ -21,8 +22,8 @@ export class PlayerController extends BaseController {
   private canvas: HTMLCanvasElement;
   private isInputBlocked = false;
 
-  constructor(id: string, canvas: HTMLCanvasElement) {
-    super(id);
+  constructor(id: string, canvas: HTMLCanvasElement, tickManager: TickManager) {
+    super(id, tickManager);
     this.canvas = canvas;
     this.setupInputEvents();
   }

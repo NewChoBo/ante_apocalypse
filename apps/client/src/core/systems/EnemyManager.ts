@@ -2,7 +2,7 @@ import { Scene, Vector3, ShadowGenerator, Observer } from '@babylonjs/core';
 import { EnemyPawn } from '../EnemyPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { INetworkManager } from '../interfaces/INetworkManager';
-import { BaseEnemyManager } from '@ante/game-core';
+import { BaseEnemyManager, TickManager } from '@ante/game-core';
 import { EventCode } from '@ante/common';
 import { WorldEntityManager } from './WorldEntityManager';
 import { EnemyState } from '@ante/common';
@@ -25,9 +25,10 @@ export class EnemyManager extends BaseEnemyManager {
     scene: Scene,
     shadowGenerator: ShadowGenerator,
     networkManager: INetworkManager,
-    worldManager: WorldEntityManager
+    worldManager: WorldEntityManager,
+    tickManager: TickManager
   ) {
-    super(networkManager);
+    super(networkManager, tickManager);
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
     this.networkManager = networkManager;
@@ -69,7 +70,7 @@ export class EnemyManager extends BaseEnemyManager {
   }
 
   public createEnemy(id: string, position: Vector3, target?: PlayerPawn): EnemyPawn {
-    const enemy = new EnemyPawn(this.scene, position, this.shadowGenerator);
+    const enemy = new EnemyPawn(this.scene, position, this.shadowGenerator, this.tickManager);
     enemy.id = id;
     this.pawns.set(id, enemy);
 

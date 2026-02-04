@@ -13,6 +13,7 @@ import { MuzzleTransform, IFirearm } from '../types/IWeapon';
 import { INetworkManager } from '../core/interfaces/INetworkManager';
 import { HitScanSystem, DamageSystem } from '@ante/game-core';
 import { WeaponVisualController } from './WeaponVisualController';
+import { WorldEntityManager } from '../core/systems/WorldEntityManager';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
@@ -73,6 +74,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     scene: Scene,
     camera: UniversalCamera,
     networkManager: INetworkManager,
+    worldManager: WorldEntityManager,
     initialAmmo: number,
     reserveAmmo: number,
     applyRecoil?: (force: number) => void
@@ -90,7 +92,9 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     this.networkManager = networkManager;
 
     // Initialize visual controller with stopFire callback
-    this.visualController = new WeaponVisualController(scene, camera, () => this.stopFire());
+    this.visualController = new WeaponVisualController(scene, camera, worldManager, () =>
+      this.stopFire()
+    );
 
     // Manual setup for client-side legacy compatibility (until subclasses fully move to stats)
     this.currentAmmo = initialAmmo;

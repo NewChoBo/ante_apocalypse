@@ -2,6 +2,7 @@ import { Mesh, MeshBuilder, Scene, Vector3 } from '@babylonjs/core';
 import { Logger } from '@ante/common';
 import { BasePawn } from '../../simulation/BasePawn.js';
 import { IEnemyPawn } from '../../types/IEnemyPawn.js';
+import { TickManager } from '../../systems/TickManager.js';
 
 const logger = new Logger('ServerEnemyPawn');
 
@@ -10,8 +11,8 @@ export class ServerEnemyPawn extends BasePawn implements IEnemyPawn {
   public headBox: Mesh;
   public override type = 'enemy';
 
-  constructor(id: string, scene: Scene, position: Vector3) {
-    super(scene);
+  constructor(id: string, scene: Scene, position: Vector3, tickManager: TickManager) {
+    super(scene, tickManager);
     this.id = id;
 
     // 1. Root Collider (Pivot at feet: 0.0m)

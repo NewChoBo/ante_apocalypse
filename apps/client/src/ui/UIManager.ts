@@ -29,7 +29,6 @@ export enum UIScreen {
 }
 
 export class UIManager implements IUIManager {
-  private static instance: UIManager;
   public ui: AdvancedDynamicTexture;
 
   // UI Containers
@@ -58,7 +57,7 @@ export class UIManager implements IUIManager {
 
   private networkManager: INetworkManager;
 
-  private constructor(scene: Scene, networkManager: INetworkManager) {
+  constructor(scene: Scene, networkManager: INetworkManager) {
     this.networkManager = networkManager;
     this.ui = AdvancedDynamicTexture.CreateFullscreenUI('UI', true, scene);
     this.createScreens();
@@ -91,21 +90,6 @@ export class UIManager implements IUIManager {
       }
     });
     if (stateObserver) this.observers.push(stateObserver);
-  }
-
-  public static initialize(scene: Scene, networkManager: INetworkManager): UIManager {
-    if (UIManager.instance) {
-      UIManager.instance.dispose();
-    }
-    UIManager.instance = new UIManager(scene, networkManager);
-    return UIManager.instance;
-  }
-
-  public static getInstance(): UIManager {
-    if (!UIManager.instance) {
-      throw new Error('UIManager not initialized. Call initialize() first.');
-    }
-    return UIManager.instance;
   }
 
   /**

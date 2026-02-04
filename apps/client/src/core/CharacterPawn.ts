@@ -10,7 +10,7 @@ import {
 import { BasePawn } from './BasePawn';
 import { Logger } from '@ante/common';
 import { HealthBarComponent } from './components/HealthBarComponent';
-import { SkeletonAnimationComponent } from '@ante/game-core';
+import { SkeletonAnimationComponent, TickManager } from '@ante/game-core';
 import { CharacterModelLoader } from './components/CharacterModelLoader';
 
 const logger = new Logger('CharacterPawn');
@@ -47,8 +47,8 @@ export abstract class CharacterPawn extends BasePawn {
 
   protected config: CharacterPawnConfig;
 
-  constructor(scene: Scene, config: CharacterPawnConfig) {
-    super(scene);
+  constructor(scene: Scene, config: CharacterPawnConfig, tickManager: TickManager) {
+    super(scene, tickManager);
     this.config = config;
 
     this.damageProfile = {

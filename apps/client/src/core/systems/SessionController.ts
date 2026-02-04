@@ -6,19 +6,20 @@ import { CombatComponent } from '../components/CombatComponent';
 import { HUD } from '../../ui/HUD';
 import { InventoryUI } from '../../ui/inventory/InventoryUI';
 import { InventoryManager } from '../inventory/InventoryManager';
-import { GlobalInputManager } from './GlobalInputManager';
 import { MultiplayerSystem } from './MultiplayerSystem';
 import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
 import { EnemyManager } from './EnemyManager';
 import { InitialStatePayload, SpawnTargetPayload } from '@ante/common';
-import { WorldSimulation, WaveSurvivalRule } from '@ante/game-core';
+import { WorldSimulation, WaveSurvivalRule, TickManager } from '@ante/game-core';
 import { WorldEntityManager } from './WorldEntityManager';
 import { GameObservables } from '../events/GameObservables';
 import { GameAssets } from '../GameAssets';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
 import { INetworkManager } from '../interfaces/INetworkManager';
 import { IUIManager } from '../../ui/IUIManager';
+import { LocalServerManager } from '../server/LocalServerManager';
+import { GlobalInputManager } from './GlobalInputManager';
 
 /**
  * 네트워크 에러 헨들러 타입
@@ -35,6 +36,8 @@ export interface SessionControllerOptions {
   worldManager: WorldEntityManager;
   enemyManager: EnemyManager;
   pickupManager: PickupManager;
+  tickManager: TickManager;
+  localServerManager: LocalServerManager;
   onError?: ErrorHandler;
   debug?: boolean;
 }
@@ -60,6 +63,8 @@ export class SessionController {
   private worldManager: WorldEntityManager;
   private pickupManager: PickupManager;
   private inputManager: GlobalInputManager;
+  private tickManager: TickManager;
+  private localServerManager: LocalServerManager;
 
   constructor(
     scene: Scene,
@@ -75,11 +80,13 @@ export class SessionController {
     this.worldManager = options.worldManager;
     this.enemyManager = options.enemyManager;
     this.pickupManager = options.pickupManager;
+    this.tickManager = options.tickManager;
+    this.localServerManager = options.localServerManager;
     this.inputManager = new GlobalInputManager(this.uiManager);
   }
 
   public async initialize(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
-    this.playerPawn = new PlayerPawn(this.scene);
+    this.playerPawn = new PlayerPawn(this.scene, this.tickManager);
     this.worldManager.initialize();
     this.worldManager.register(this.playerPawn);
 
@@ -89,10 +96,10 @@ export class SessionController {
       this.playerPawn.position = new Vector3(0, 1.75, -5);
     }
 
-    this.playerController = new PlayerController('player1', this.canvas);
+    this.playerController = new PlayerController('player1', this.canvas, this.tickManager);
     this.playerController.possess(this.playerPawn);
 
-    this.hud = new HUD();
+    this.hud = new HUD(this.uiManager);
 
     this.setupSystems(levelData);
     this.setupCombat();
@@ -110,7 +117,8 @@ export class SessionController {
       this.scene,
       this.shadowGenerator,
       this.networkManager,
-      this.worldManager
+      this.worldManager,
+      this.tickManager
     );
     // Initial layout is now handled by the authority (server/simulation)
 
@@ -126,7 +134,12 @@ export class SessionController {
   }
 
   private setupCombat(): void {
-    const combatComp = new CombatComponent(this.playerPawn!, this.scene, this.networkManager);
+    const combatComp = new CombatComponent(
+      this.playerPawn!,
+      this.scene,
+      this.networkManager,
+      this.worldManager
+    );
     this.playerPawn!.addComponent(combatComp);
 
     this.healthUnsub = playerHealthStore.subscribe((health: number): void => {
@@ -147,44 +160,38 @@ export class SessionController {
   }
 
   private setupInventory(): void {
-    this.inventoryUI = new InventoryUI({
-      onEquipWeapon: (slot: number, weaponId: string | null): void => {
-        const state = inventoryStore.get();
-        const slots = [...state.weaponSlots];
-        slots[slot] = weaponId;
-        inventoryStore.setKey('weaponSlots', slots);
-
-        if (weaponId) {
+    this.inventoryUI = new InventoryUI(
+      {
+        onEquipWeapon: async (_slot, id) => {
           const combat = this.playerPawn?.getComponent(CombatComponent);
-          (combat as CombatComponent)?.equipWeapon(weaponId);
-        }
-      },
-      onUseItem: (itemId: string): void => {
-        if (this.playerPawn) {
-          InventoryManager.useItem(itemId, this.playerPawn);
-          this.syncInventoryStore();
-        }
-      },
-      onDropItem: (itemId: string): void => {
-        if (!this.playerPawn) return;
-        const state = inventoryStore.get();
-        const bag = [...state.bagItems];
-        const itemIndex = bag.findIndex((i) => i.id === itemId);
-
-        if (itemIndex !== -1) {
-          const item = bag[itemIndex];
-          if (item.count > 1) {
-            bag[itemIndex] = { ...item, count: item.count - 1 };
-          } else {
-            bag.splice(itemIndex, 1);
+          if (combat && id) await combat.equipWeapon(id);
+        },
+        onUseItem: (id): void => {
+          if (this.playerPawn) {
+            InventoryManager.useItem(id, this.playerPawn);
+            this.syncInventoryStore();
           }
-          inventoryStore.setKey('bagItems', bag);
+        },
+        onDropItem: (id): void => {
+          if (!this.playerPawn) return;
+          const state = inventoryStore.get();
+          const bag = [...state.bagItems];
+          const itemIndex = bag.findIndex((i) => i.id === id);
 
-          // Dropping items should be handled by authority (server/simulation)
-          // const dropPos = this.playerPawn.mesh.position.clone();
-        }
+          if (itemIndex !== -1) {
+            const item = bag[itemIndex];
+            if (item.count > 1) {
+              bag[itemIndex] = { ...item, count: item.count - 1 };
+            } else {
+              bag.splice(itemIndex, 1);
+            }
+            inventoryStore.setKey('bagItems', bag);
+          }
+          this.syncInventoryStore();
+        },
       },
-    });
+      this.uiManager
+    );
     this.syncInventoryStore();
   }
 
@@ -211,6 +218,7 @@ export class SessionController {
       this.shadowGenerator,
       this.networkManager,
       this.worldManager,
+      this.tickManager,
       playerName
     );
 
@@ -221,19 +229,17 @@ export class SessionController {
 
     // Initialize WorldSimulation with Client managers
     // Skip if we are running a local server (LogicalServer handles simulation)
-    import('../server/LocalServerManager').then(({ LocalServerManager }) => {
-      const isLocalServerRunning = LocalServerManager.getInstance().isServerRunning();
+    const isLocalServerRunning = this.localServerManager.isServerRunning();
 
-      if (this.enemyManager && this.targetSpawner && !isLocalServerRunning) {
-        this.simulation = new WorldSimulation(
-          this.enemyManager,
-          this.pickupManager,
-          this.targetSpawner,
-          this.networkManager
-        );
-        this.simulation.setGameRule(new WaveSurvivalRule());
-      }
-    });
+    if (this.enemyManager && this.targetSpawner && !isLocalServerRunning) {
+      this.simulation = new WorldSimulation(
+        this.enemyManager,
+        this.pickupManager,
+        this.targetSpawner,
+        this.networkManager
+      );
+      this.simulation.setGameRule(new WaveSurvivalRule());
+    }
 
     this._initialStateObserver = this.networkManager.onInitialStateReceived.add(
       (data: InitialStatePayload): void => {

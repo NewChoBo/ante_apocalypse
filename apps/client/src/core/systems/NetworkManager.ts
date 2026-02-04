@@ -39,8 +39,8 @@ const logger = new Logger('NetworkManager');
  * 기존 API를 유지하면서 내부적으로 분리된 Manager들에 위임
  */
 export class NetworkManager implements INetworkAuthority, INetworkManager {
-  private static instance: NetworkManager;
   private provider: INetworkProvider;
+  private localServerManager: LocalServerManager;
 
   // Sub-managers
   private connectionManager: ConnectionManager;
@@ -100,8 +100,9 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   public onTargetDestroy = new Observable<TargetDestroyPayload>();
   public onTargetSpawn = new Observable<SpawnTargetPayload>();
 
-  private constructor() {
+  constructor(localServerManager: LocalServerManager) {
     this.provider = new PhotonProvider();
+    this.localServerManager = localServerManager;
 
     // Initialize sub-managers
     this.connectionManager = new ConnectionManager(this.provider);
@@ -132,13 +133,6 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     // this.onPlayersList.clear(); - Already cleared above
 
     this.playerStateManager.clearObservers();
-  }
-
-  public static getInstance(): NetworkManager {
-    if (!NetworkManager.instance) {
-      NetworkManager.instance = new NetworkManager();
-    }
-    return NetworkManager.instance;
   }
 
   public setLocalServer(server: LogicalServer | null): void {
@@ -302,10 +296,10 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
     // 2. 로컬 서버 시작 (Start Local Server)
     logger.info(`HostGame: Starting Local Server for ${roomName}`);
-    await LocalServerManager.getInstance().startSession(roomName, mapId, gameMode);
+    await this.localServerManager.startSession(roomName, mapId, gameMode);
 
     // 3. 서버 인스턴스 등록 (Register Server Instance)
-    this.setLocalServer(LocalServerManager.getInstance().getLogicalServer());
+    this.setLocalServer(this.localServerManager.getLogicalServer());
 
     return true;
   }
@@ -329,9 +323,9 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
    */
   public leaveGame(): void {
     // 1. 내가 서버를 돌리고 있었다면 종료
-    if (LocalServerManager.getInstance().isServerRunning()) {
+    if (this.localServerManager.isServerRunning()) {
       logger.info('LeaveGame: Stopping Local Server...');
-      LocalServerManager.getInstance().stopSession();
+      this.localServerManager.stopSession();
       this.setLocalServer(null);
     }
 
@@ -349,13 +343,13 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     if (!roomName) return;
 
     // 이미 서버가 돌고 있으면 패스
-    if (LocalServerManager.getInstance().isServerRunning()) return;
+    if (this.localServerManager.isServerRunning()) return;
 
     logger.info('HandleTakeover: Taking over host duties...');
-    await LocalServerManager.getInstance().takeover(roomName);
+    await this.localServerManager.takeover(roomName);
 
     // 서버 인스턴스 등록
-    this.setLocalServer(LocalServerManager.getInstance().getLogicalServer());
+    this.setLocalServer(this.localServerManager.getLogicalServer());
   }
 
   // === Connection Methods (delegated) ===

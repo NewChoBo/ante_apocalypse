@@ -3,6 +3,7 @@ import { BaseWeapon as CoreBaseWeapon } from '@ante/game-core';
 import { IWeapon } from '../types/IWeapon';
 import { WeaponVisualController } from './WeaponVisualController';
 import { INetworkManager } from '../core/interfaces/INetworkManager';
+import { WorldEntityManager } from '../core/systems/WorldEntityManager';
 
 /**
  * 모든 무기의 최상위 추상 클래스.
@@ -44,13 +45,20 @@ export abstract class BaseWeapon extends CoreBaseWeapon implements IWeapon {
 
   protected networkManager: INetworkManager;
 
-  constructor(scene: Scene, camera: UniversalCamera, networkManager: INetworkManager) {
+  constructor(
+    scene: Scene,
+    camera: UniversalCamera,
+    networkManager: INetworkManager,
+    worldManager: WorldEntityManager
+  ) {
     // Pass dummy stats to core
     super('base_weapon', 'local_player', { name: 'Base', damage: 0, range: 0 });
 
     this.networkManager = networkManager;
     // Initialize visual controller with stopFire callback
-    this.visualController = new WeaponVisualController(scene, camera, () => this.stopFire());
+    this.visualController = new WeaponVisualController(scene, camera, worldManager, () =>
+      this.stopFire()
+    );
   }
 
   // IWeapon methods - delegate to visual controller

@@ -19,7 +19,7 @@ import { IWorldEntity } from '../types/IWorldEntity.js';
 const logger = new Logger('ServerNetworkAuthority');
 
 export class ServerNetworkAuthority extends BasePhotonClient {
-  private entityManager: WorldEntityManager = WorldEntityManager.getInstance();
+  private entityManager: WorldEntityManager;
 
   // External callbacks
   public onPlayerJoin?: (id: string) => void;
@@ -47,8 +47,9 @@ export class ServerNetworkAuthority extends BasePhotonClient {
     this.sendEventToAll(code, data);
   }
 
-  constructor(appId: string, appVersion: string) {
+  constructor(appId: string, appVersion: string, entityManager: WorldEntityManager) {
     super(appId, appVersion);
+    this.entityManager = entityManager;
 
     this.setupDispatcher();
     this.setupServerCallbacks();

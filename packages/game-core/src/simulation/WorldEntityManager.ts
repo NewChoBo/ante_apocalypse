@@ -12,16 +12,11 @@ const logger = new Logger('WorldEntityManager');
  * 클라이언트와 서버 모두에서 엔티티를 ID 기반으로 추적하고 관리합니다.
  */
 export class WorldEntityManager {
-  private static instance: WorldEntityManager;
   private entities: Map<string, IWorldEntity> = new Map();
+  private tickManager: TickManager;
 
-  protected constructor() {}
-
-  public static getInstance(): WorldEntityManager {
-    if (!WorldEntityManager.instance) {
-      WorldEntityManager.instance = new WorldEntityManager();
-    }
-    return WorldEntityManager.instance;
+  constructor(tickManager: TickManager) {
+    this.tickManager = tickManager;
   }
 
   /**
@@ -40,7 +35,7 @@ export class WorldEntityManager {
     }
     // Fallback: Auto-register to TickManager if tickable and not handled by activate
     else if ('tick' in entity && typeof (entity as any).tick === 'function') {
-      TickManager.getInstance().register(entity as unknown as ITickable);
+      this.tickManager.register(entity as unknown as ITickable);
     }
   }
 
@@ -56,7 +51,7 @@ export class WorldEntityManager {
       }
       // Fallback: Unregister from TickManager if tickable
       else if ('tick' in entity && typeof (entity as any).tick === 'function') {
-        TickManager.getInstance().unregister(entity as unknown as ITickable);
+        this.tickManager.unregister(entity as unknown as ITickable);
       }
 
       this.entities.delete(id);

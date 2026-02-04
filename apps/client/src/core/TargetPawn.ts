@@ -5,6 +5,7 @@ import { TargetMeshComponent } from './components/TargetMeshComponent';
 import { HitReactionComponent } from './components/HitReactionComponent';
 import { PatternMovementComponent } from './components/PatternMovementComponent';
 import { INetworkManager } from './interfaces/INetworkManager';
+import { TickManager } from '@ante/game-core';
 
 export interface TargetPawnConfig {
   id: string;
@@ -12,6 +13,7 @@ export interface TargetPawnConfig {
   position: Vector3;
   shadowGenerator: ShadowGenerator;
   networkManager: INetworkManager;
+  tickManager: TickManager;
   isMoving?: boolean;
 }
 
@@ -35,7 +37,7 @@ export class TargetPawn extends BasePawn implements IWorldEntity {
   public movementComponent: PatternMovementComponent | null = null;
 
   constructor(scene: Scene, config: TargetPawnConfig) {
-    super(scene);
+    super(scene, config.tickManager);
     this.id = config.id;
     this.type = config.type;
 

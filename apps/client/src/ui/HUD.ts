@@ -2,7 +2,7 @@ import { ammoStore, playerHealthStore, AmmoState } from '../core/store/GameStore
 import { GameObservables } from '../core/events/GameObservables';
 import { Observer } from '@babylonjs/core';
 import { AdvancedDynamicTexture, TextBlock, Rectangle, Control } from '@babylonjs/gui';
-import { UIManager } from './UIManager';
+import { IUIManager } from './IUIManager';
 
 export class HUD {
   private ui: AdvancedDynamicTexture;
@@ -31,8 +31,8 @@ export class HUD {
   private expandTimeout: ReturnType<typeof setTimeout> | undefined;
   private previousHealth: number = 100;
 
-  constructor() {
-    this.ui = UIManager.getInstance().getTexture();
+  constructor(uiManager: IUIManager) {
+    this.ui = uiManager.getTexture();
     this.createHUD();
     this.setupSubscriptions();
   }

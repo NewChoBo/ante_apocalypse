@@ -3,6 +3,7 @@ import { Scene, Vector3, ShadowGenerator, Observer } from '@babylonjs/core';
 import { TargetPawn, TargetPawnConfig } from '../TargetPawn';
 import { INetworkManager } from '../interfaces/INetworkManager';
 import { WorldEntityManager } from '../systems/WorldEntityManager';
+import { TickManager } from '@ante/game-core';
 
 /**
  * 타겟의 스폰 및 리스폰 로직을 담당하는 컴포넌트.
@@ -12,6 +13,7 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
   private shadowGenerator: ShadowGenerator;
   private worldManager: WorldEntityManager;
   private networkManager: INetworkManager;
+  private tickManager: TickManager;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private _spawnObserver: Observer<any> | null = null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -21,13 +23,15 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
     scene: Scene,
     shadowGenerator: ShadowGenerator,
     networkManager: INetworkManager,
-    worldManager: WorldEntityManager
+    worldManager: WorldEntityManager,
+    tickManager: TickManager
   ) {
     super(networkManager); // BaseTargetSpawner
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
     this.worldManager = worldManager;
     this.networkManager = networkManager;
+    this.tickManager = tickManager;
 
     this._spawnObserver = this.networkManager.onTargetSpawn.add((data) => {
       // If I am Master, I already spawned it locally via broadcastTargetSpawn logic?
@@ -60,6 +64,7 @@ export class TargetSpawnerComponent extends BaseTargetSpawner {
       position: position,
       shadowGenerator: this.shadowGenerator,
       networkManager: this.networkManager,
+      tickManager: this.tickManager,
       isMoving: isMoving || type === 'moving_target' || type === 'moving',
     };
 

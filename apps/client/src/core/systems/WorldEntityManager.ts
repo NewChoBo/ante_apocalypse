@@ -1,5 +1,9 @@
 import { Observable, Vector3 } from '@babylonjs/core';
-import { IWorldEntity, WorldEntityManager as BaseEntityManager } from '@ante/game-core';
+import {
+  IWorldEntity,
+  WorldEntityManager as BaseEntityManager,
+  TickManager,
+} from '@ante/game-core';
 import { INetworkManager } from '../interfaces/INetworkManager';
 
 /**
@@ -14,8 +18,8 @@ export class WorldEntityManager extends BaseEntityManager {
   public onEntityRemoved = new Observable<string>();
   public onEntityHit = new Observable<{ id: string; part: string; damage: number }>();
 
-  constructor(networkManager: INetworkManager) {
-    super();
+  constructor(networkManager: INetworkManager, tickManager: TickManager) {
+    super(tickManager);
     this.networkManager = networkManager;
   }
 

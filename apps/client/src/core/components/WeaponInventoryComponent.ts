@@ -7,6 +7,7 @@ import { Rifle } from '../../weapons/Rifle';
 import { Knife } from '../../weapons/Knife';
 import { Bat } from '../../weapons/Bat';
 import { WeaponRegistry } from '@ante/game-core';
+import { WorldEntityManager } from '../systems/WorldEntityManager';
 import { Logger } from '@ante/common';
 
 const logger = new Logger('WeaponInventory');
@@ -25,13 +26,14 @@ export class WeaponInventoryComponent {
     scene: Scene,
     camera: UniversalCamera,
     networkManager: INetworkManager,
+    worldManager: WorldEntityManager,
     applyRecoil?: (force: number) => void
   ) {
     this.weapons = [
-      new Pistol(scene, camera, networkManager, applyRecoil),
-      new Rifle(scene, camera, networkManager, applyRecoil),
-      new Knife(scene, camera, networkManager),
-      new Bat(scene, camera, networkManager),
+      new Pistol(scene, camera, networkManager, worldManager, applyRecoil),
+      new Rifle(scene, camera, networkManager, worldManager, applyRecoil),
+      new Knife(scene, camera, networkManager, worldManager),
+      new Bat(scene, camera, networkManager, worldManager),
     ];
 
     // [Authoritative Weapon Stats Sync] - Directly from shared config in monorepo

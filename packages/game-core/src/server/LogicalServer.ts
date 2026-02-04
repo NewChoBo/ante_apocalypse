@@ -12,6 +12,7 @@ import { ServerEnemyManager } from './managers/ServerEnemyManager.js';
 import { ServerPickupManager } from './managers/ServerPickupManager.js';
 import { ServerTargetSpawner } from './managers/ServerTargetSpawner.js';
 import { ServerPlayerPawn } from './pawns/ServerPlayerPawn.js';
+import { TickManager } from '../systems/TickManager.js';
 import { IServerAssetLoader } from './IServerAssetLoader.js';
 import { LevelData } from '../levels/LevelData.js';
 import { ServerLevelLoader } from '../levels/ServerLevelLoader.js';
@@ -40,6 +41,7 @@ export class LogicalServer {
   private simulation: WorldSimulation;
   private enemyManager: ServerEnemyManager;
   private targetSpawner: ServerTargetSpawner;
+  private tickManager: TickManager;
 
   // 플레이어 ID와 물리 메쉬(Hitbox) 매핑
   private playerPawns: Map<string, ServerPlayerPawn> = new Map();
@@ -57,13 +59,16 @@ export class LogicalServer {
     this.engine = new NullEngine();
     this.scene = new Scene(this.engine);
 
+    this.tickManager = new TickManager();
+
     // 시뮬레이션 엔진 초기화
     this.enemyManager = new ServerEnemyManager(
       this.networkManager,
       this.scene,
+      this.tickManager,
       () => this.playerPawns
     );
-    this.targetSpawner = new ServerTargetSpawner(this.networkManager, this.scene);
+    this.targetSpawner = new ServerTargetSpawner(this.networkManager, this.scene, this.tickManager);
 
     this.simulation = new WorldSimulation(
       this.enemyManager,
@@ -170,7 +175,7 @@ export class LogicalServer {
       const deltaTime = (currentTime - lastClock) / 1000;
       lastClock = currentTime;
 
-      this.playerPawns.forEach((pawn) => pawn.tick(deltaTime));
+      this.tickManager.tick(deltaTime);
       this.scene.render();
 
       if (currentTime - lastTickTime >= tickInterval) {
@@ -190,7 +195,13 @@ export class LogicalServer {
     if (this.playerPawns.has(id)) return;
 
     // Use ServerPlayerPawn which loads the mesh via AssetLoader
-    const pawn = new ServerPlayerPawn(id, this.scene, new Vector3(0, 1.75, 0), this.assetLoader);
+    const pawn = new ServerPlayerPawn(
+      id,
+      this.scene,
+      new Vector3(0, 1.75, 0),
+      this.tickManager,
+      this.assetLoader
+    );
     this.playerPawns.set(id, pawn);
   }
 

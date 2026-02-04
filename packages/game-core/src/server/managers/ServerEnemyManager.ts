@@ -4,6 +4,7 @@ import { BaseEnemyManager } from '../../systems/BaseEnemyManager.js';
 import { ServerEnemyPawn } from '../pawns/ServerEnemyPawn.js';
 import { ServerNetworkAuthority } from '../ServerNetworkAuthority.js';
 import { ServerPlayerPawn } from '../pawns/ServerPlayerPawn.js';
+import { TickManager } from '../../systems/TickManager.js';
 
 export class ServerEnemyManager extends BaseEnemyManager {
   private scene: Scene;
@@ -11,9 +12,10 @@ export class ServerEnemyManager extends BaseEnemyManager {
   constructor(
     authority: ServerNetworkAuthority,
     scene: Scene,
+    tickManager: TickManager,
     private getPlayers: () => Map<string, ServerPlayerPawn>
   ) {
-    super(authority);
+    super(authority, tickManager);
     this.scene = scene;
   }
 
@@ -24,7 +26,8 @@ export class ServerEnemyManager extends BaseEnemyManager {
     const pawn = new ServerEnemyPawn(
       id,
       this.scene,
-      new Vector3(position.x, position.y, position.z)
+      new Vector3(position.x, position.y, position.z),
+      this.tickManager
     );
     this.pawns.set(id, pawn);
 

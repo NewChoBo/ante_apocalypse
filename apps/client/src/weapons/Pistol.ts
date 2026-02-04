@@ -10,6 +10,7 @@ import {
 import { Firearm } from './Firearm';
 import { INetworkManager } from '../core/interfaces/INetworkManager';
 import { GameAssets } from '../core/GameAssets';
+import { WorldEntityManager } from '../core/systems/WorldEntityManager';
 
 /**
  * 권총 (Pistol) - 단발
@@ -25,10 +26,11 @@ export class Pistol extends Firearm {
     scene: Scene,
     camera: UniversalCamera,
     networkManager: INetworkManager,
+    worldManager: WorldEntityManager,
     applyRecoil?: (force: number) => void
   ) {
     // 탄약 수량도 서버에서 관리하는 게 좋지만, 일단 기본값으로 초기화
-    super(scene, camera, networkManager, 0, 0, applyRecoil);
+    super(scene, camera, networkManager, worldManager, 0, 0, applyRecoil);
     this.muzzleOffset = new Vector3(0, 0.06, 0.2); // 권총 총구 위치 조정
     this.createWeaponModel();
   }

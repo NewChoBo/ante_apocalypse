@@ -11,7 +11,7 @@ import {
   StackPanel,
 } from '@babylonjs/gui';
 import { Observer, Scene } from '@babylonjs/core';
-import { UIManager } from '../UIManager';
+import { IUIManager } from '../IUIManager';
 import { UI_CONFIG, InventoryCallbacks } from './Config';
 import { InventoryTooltip } from './Tooltip';
 import { InventoryContextMenu } from './ContextMenu';
@@ -32,9 +32,9 @@ export class InventoryUI {
   private unsub: (() => void) | null = null;
   private pointerObserver: Observer<Scene> | null = null;
 
-  constructor(callbacks: InventoryCallbacks) {
+  constructor(callbacks: InventoryCallbacks, uiManager: IUIManager) {
     this.callbacks = callbacks;
-    this.ui = UIManager.getInstance().getTexture();
+    this.ui = uiManager.getTexture();
 
     this.container = this.createInventoryWindow();
     this.tooltip = new InventoryTooltip(this.ui);

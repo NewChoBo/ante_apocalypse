@@ -3,6 +3,7 @@ import { INetworkAuthority } from '../network/INetworkAuthority';
 import { EventCode } from '@ante/common';
 import { AIController } from '../controllers/AIController';
 import { IEnemyPawn } from '../types/IEnemyPawn';
+import { TickManager } from './TickManager.js';
 
 /**
  * 적(Enemy)의 생성 및 통제 권한을 관리하는 베이스 시스템.
@@ -15,7 +16,10 @@ export abstract class BaseEnemyManager {
 
   protected pawns: Map<string, IEnemyPawn> = new Map();
 
-  constructor(protected authority: INetworkAuthority) {}
+  constructor(
+    protected authority: INetworkAuthority,
+    protected tickManager: TickManager
+  ) {}
 
   /**
    * 엔티티 업데이트 주기에 따라 동기화 패킷을 보낼지 결정.

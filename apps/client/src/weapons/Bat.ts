@@ -3,6 +3,7 @@ import { MeleeWeapon } from './MeleeWeapon';
 import { ProceduralWeaponBuilder } from './ProceduralWeaponBuilder';
 import { MeleeWeaponConfigs } from '../config/WeaponConfig';
 import { INetworkManager } from '../core/interfaces/INetworkManager';
+import { WorldEntityManager } from '../core/systems/WorldEntityManager';
 
 /**
  * 야구 방망이 (Bat) - 근접 무기
@@ -15,8 +16,13 @@ export class Bat extends MeleeWeapon {
 
   protected weaponConfig = MeleeWeaponConfigs.Bat;
 
-  constructor(scene: Scene, camera: UniversalCamera, networkManager: INetworkManager) {
-    super(scene, camera, networkManager);
+  constructor(
+    scene: Scene,
+    camera: UniversalCamera,
+    networkManager: INetworkManager,
+    worldManager: WorldEntityManager
+  ) {
+    super(scene, camera, networkManager, worldManager);
     this.createMesh();
   }
 

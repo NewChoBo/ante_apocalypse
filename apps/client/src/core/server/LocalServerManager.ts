@@ -1,6 +1,7 @@
 import { LogicalServer, ServerNetworkAuthority } from '@ante/game-core';
 import { BrowserAssetLoader } from './BrowserAssetLoader';
 import { Logger } from '@ante/common';
+import { WorldEntityManager } from '../systems/WorldEntityManager';
 
 import { LevelData } from '@ante/game-core';
 
@@ -15,19 +16,11 @@ const LEVELS: Record<string, LevelData> = {
 const logger = new Logger('LocalServerManager');
 
 export class LocalServerManager {
-  private static instance: LocalServerManager;
   private logicalServer: LogicalServer | null = null;
   private networkAuthority: ServerNetworkAuthority | null = null;
   private isRunning = false;
 
-  private constructor() {}
-
-  public static getInstance(): LocalServerManager {
-    if (!LocalServerManager.instance) {
-      LocalServerManager.instance = new LocalServerManager();
-    }
-    return LocalServerManager.instance;
-  }
+  constructor() {}
 
   public async takeover(roomName: string): Promise<void> {
     if (this.isRunning) {
@@ -67,7 +60,14 @@ export class LocalServerManager {
         throw new Error('Missing Photon App ID or Version in environment variables.');
       }
 
-      this.networkAuthority = new ServerNetworkAuthority(appId, appVersion);
+      const serverEntityManager = new WorldEntityManager(null as any, null as any); // Server-side manager (no networking/tick internally needed for authority? wait)
+      // Actually Server side manager needs its own logic.
+      // But in this monorepo, WorldEntityManager might be shared or divergent.
+      this.networkAuthority = new ServerNetworkAuthority(
+        appId,
+        appVersion,
+        serverEntityManager as any
+      );
       await this.networkAuthority.connect();
 
       // 2. Create OR Join Room

@@ -6,6 +6,7 @@ import { CombatComponent } from '../components/CombatComponent';
 import { WorldEntityManager } from './WorldEntityManager';
 import { playerHealthStore, gameStateStore } from '../store/GameStore';
 import { INetworkManager } from '../interfaces/INetworkManager';
+import { TickManager } from '@ante/game-core';
 
 export class MultiplayerSystem {
   private scene: Scene;
@@ -13,6 +14,7 @@ export class MultiplayerSystem {
   private remotePlayers: Map<string, RemotePlayerPawn> = new Map();
   private networkManager: INetworkManager;
   private worldManager: WorldEntityManager;
+  private tickManager: TickManager;
   private shadowGenerator: ShadowGenerator;
   private lastUpdateTime = 0;
   private updateInterval = 8; // ~128Hz update rate (extremely responsive)
@@ -23,6 +25,7 @@ export class MultiplayerSystem {
     shadowGenerator: ShadowGenerator,
     networkManager: INetworkManager,
     worldManager: WorldEntityManager,
+    tickManager: TickManager,
     playerName: string = 'Anonymous'
   ) {
     this.scene = scene;
@@ -30,6 +33,7 @@ export class MultiplayerSystem {
     this.shadowGenerator = shadowGenerator;
     this.networkManager = networkManager;
     this.worldManager = worldManager;
+    this.tickManager = tickManager;
 
     this.setupListeners();
     localStorage.setItem('playerName', playerName);
@@ -107,7 +111,7 @@ export class MultiplayerSystem {
     this.networkManager.onPlayerLeft.add((id: string): void => {
       const remote = this.remotePlayers.get(id);
       if (remote) {
-        WorldEntityManager.getInstance().unregister(id);
+        this.worldManager.unregister(id);
         this.remotePlayers.delete(id);
       }
     });
@@ -183,7 +187,13 @@ export class MultiplayerSystem {
     if (this.remotePlayers.has(player.id)) return;
 
     const name = player.name || 'Anonymous';
-    const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, name);
+    const remote = new RemotePlayerPawn(
+      this.scene,
+      player.id,
+      this.shadowGenerator,
+      this.tickManager,
+      name
+    );
     remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
     this.remotePlayers.set(player.id, remote);
     this.worldManager.register(remote);

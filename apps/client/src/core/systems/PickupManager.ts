@@ -15,9 +15,12 @@ export class PickupManager extends BasePickupManager implements ITickable {
   public readonly priority = 30;
   private networkManager: INetworkManager;
 
-  constructor(networkManager: INetworkManager) {
+  private tickManager: TickManager;
+
+  constructor(networkManager: INetworkManager, tickManager: TickManager) {
     super(networkManager);
     this.networkManager = networkManager;
+    this.tickManager = tickManager;
   }
 
   public initialize(scene: Scene, player: PlayerPawn): void {
@@ -42,7 +45,7 @@ export class PickupManager extends BasePickupManager implements ITickable {
     });
 
     // 게임 재시작 시 TickManager가 초기화되므로 다시 등록해야 함
-    TickManager.getInstance().register(this);
+    this.tickManager.register(this);
   }
 
   private handleSpawnEvent(data: {

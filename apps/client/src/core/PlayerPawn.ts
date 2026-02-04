@@ -6,6 +6,7 @@ import {
   Animation as BabylonAnimation,
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
+import { TickManager } from '@ante/game-core';
 import { Logger } from '@ante/common';
 
 const logger = new Logger('PlayerPawn');
@@ -42,8 +43,8 @@ export class PlayerPawn extends BasePawn {
   private movementComponent: CharacterMovementComponent;
   private cameraComponent: CameraComponent;
 
-  constructor(scene: Scene) {
-    super(scene);
+  constructor(scene: Scene, tickManager: TickManager) {
+    super(scene, tickManager);
     this.id = 'player_local'; // Local player ID
     this.damageProfile = {
       multipliers: { head: 2.0, body: 1.0 },

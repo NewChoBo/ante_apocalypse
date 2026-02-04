@@ -1,6 +1,7 @@
 import { Mesh, MeshBuilder, Scene, Vector3 } from '@babylonjs/core';
 import { Logger } from '@ante/common';
 import { BasePawn } from '../../simulation/BasePawn.js';
+import { TickManager } from '../../systems/TickManager.js';
 
 const logger = new Logger('ServerTargetPawn');
 
@@ -8,8 +9,8 @@ export class ServerTargetPawn extends BasePawn {
   public override mesh: Mesh;
   public override type = 'target';
 
-  constructor(id: string, scene: Scene, position: Vector3) {
-    super(scene);
+  constructor(id: string, scene: Scene, position: Vector3, tickManager: TickManager) {
+    super(scene, tickManager);
     this.id = id;
 
     // Matches Client StaticTarget: Cylinder { height: 0.1, diameter: 1.5 }

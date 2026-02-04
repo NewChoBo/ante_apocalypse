@@ -9,6 +9,7 @@ import { FirearmEffectComponent } from './FirearmEffectComponent';
 import { MeleeEffectComponent } from './MeleeEffectComponent';
 import { ImpactEffectComponent } from './ImpactEffectComponent';
 import { CameraComponent } from './CameraComponent';
+import { WorldEntityManager } from '../systems/WorldEntityManager';
 import type { BasePawn } from '../BasePawn';
 
 /**
@@ -19,7 +20,12 @@ export class CombatComponent extends BaseComponent {
   private input: WeaponInputComponent;
   private hudSync: HUDSyncComponent;
 
-  constructor(owner: BasePawn, scene: Scene, networkManager: INetworkManager) {
+  constructor(
+    owner: BasePawn,
+    scene: Scene,
+    networkManager: INetworkManager,
+    worldManager: WorldEntityManager
+  ) {
     super(owner, scene);
 
     const cameraComp = owner.getComponent(CameraComponent) as CameraComponent;
@@ -34,6 +40,7 @@ export class CombatComponent extends BaseComponent {
       scene,
       cameraComp.camera,
       networkManager,
+      worldManager,
       (force) => cameraComp.applyRecoil(force)
     );
 

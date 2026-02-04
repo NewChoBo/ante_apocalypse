@@ -1,6 +1,7 @@
 import { Mesh, MeshBuilder, Scene, Vector3, AbstractMesh, Skeleton } from '@babylonjs/core';
 import { Logger } from '@ante/common';
 import { BasePawn } from '../../simulation/BasePawn.js';
+import { TickManager } from '../../systems/TickManager.js';
 import { IServerAssetLoader } from '../IServerAssetLoader.js';
 import { SkeletonAnimationComponent } from '../../simulation/components/SkeletonAnimationComponent.js';
 import { MeshUtils } from '../../simulation/utils/MeshUtils.js';
@@ -26,9 +27,10 @@ export class ServerPlayerPawn extends BasePawn {
     id: string,
     scene: Scene,
     position: Vector3,
+    tickManager: TickManager,
     private assetLoader: IServerAssetLoader
   ) {
-    super(scene);
+    super(scene, tickManager);
     this.id = id;
 
     // 1. Root Collider (Pivot at feet: 0.0m)

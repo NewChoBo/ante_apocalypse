@@ -2,8 +2,7 @@ import { Engine, Vector3, UniversalCamera, Observer } from '@babylonjs/core';
 import { gameStateStore } from './store/GameStore';
 import { GameObservables } from './events/GameObservables';
 import { LevelLoader } from './systems/LevelLoader';
-import { LevelData } from '@ante/game-core';
-import { TickManager } from './TickManager';
+import { LevelData, TickManager as CoreTickManager } from '@ante/game-core';
 import { GameAssets } from './GameAssets';
 import { WorldEntityManager } from './systems/WorldEntityManager';
 import { PickupManager } from './systems/PickupManager';
@@ -12,6 +11,7 @@ import { SceneManager } from './systems/SceneManager';
 import { SessionController } from './systems/SessionController';
 import { NetworkState, Logger } from '@ante/common';
 import { EnemyManager } from './systems/EnemyManager'; // Added import
+import { LocalServerManager } from './server/LocalServerManager';
 
 const logger = new Logger('Game');
 import { NetworkManager } from './systems/NetworkManager';
@@ -30,6 +30,9 @@ export class Game {
   private sceneManager!: SceneManager;
   private sessionController: SessionController | null = null;
   private uiManager!: UIManager;
+  private tickManager: CoreTickManager;
+  private networkManager: NetworkManager;
+  private localServerManager: LocalServerManager;
 
   private isRunning = false;
   private isLoading = false;
@@ -52,6 +55,10 @@ export class Game {
     };
 
     // Input handling delegated to GlobalInputManager (in-game) and UIManager (menu)
+
+    this.tickManager = new CoreTickManager();
+    this.localServerManager = new LocalServerManager();
+    this.networkManager = new NetworkManager(this.localServerManager);
 
     this.initCanvas();
     this.initEngine();
@@ -76,7 +83,7 @@ export class Game {
 
   private async initMenu(): Promise<void> {
     const { scene, shadowGenerator } = await this.sceneManager.createMenuScene();
-    this.uiManager = UIManager.initialize(scene, NetworkManager.getInstance());
+    this.uiManager = new UIManager(scene, this.networkManager);
 
     const levelLoader = new LevelLoader(scene, shadowGenerator);
     await levelLoader.loadLevelData(LEVELS['training_ground']);
@@ -104,12 +111,12 @@ export class Game {
 
     this.uiManager.onStartMultiplayer.add(() => {
       // Start connection to Network (Photon)
-      NetworkManager.getInstance().connect(this.playerName);
+      this.networkManager.connect(this.playerName);
       this.uiManager.showScreen(UIScreen.LOBBY);
     });
 
     // Listen for room join
-    const nm = NetworkManager.getInstance();
+    const nm = this.networkManager;
     if (this._networkStateObserver) {
       nm.onStateChanged.remove(this._networkStateObserver);
       this._networkStateObserver = null;
@@ -130,7 +137,7 @@ export class Game {
     });
 
     this.uiManager.onLogout.add(() => {
-      NetworkManager.getInstance().leaveRoom();
+      this.networkManager.leaveRoom();
       this.uiManager.showScreen(UIScreen.LOGIN);
     });
 
@@ -166,7 +173,7 @@ export class Game {
 
     // Use map selected from UI (or synchronized from room)
     let mapKey = this.uiManager.getSelectedMap();
-    const syncedMap = NetworkManager.getInstance().getMapId();
+    const syncedMap = this.networkManager.getMapId();
     if (syncedMap) {
       mapKey = syncedMap;
       logger.info(`Using synchronized map: ${mapKey}`);
@@ -178,7 +185,7 @@ export class Game {
 
     try {
       const { scene, shadowGenerator } = await this.sceneManager.createGameScene();
-      this.uiManager = UIManager.initialize(scene, NetworkManager.getInstance());
+      this.uiManager = new UIManager(scene, this.networkManager);
       this.setupUIManagerEvents();
 
       const levelLoader = new LevelLoader(scene, shadowGenerator);
@@ -187,21 +194,24 @@ export class Game {
       // Initialize GameAssets (Audio engines, preload model containers)
       await GameAssets.initialize(scene);
 
-      const worldManager = new WorldEntityManager(NetworkManager.getInstance());
+      const worldManager = new WorldEntityManager(this.networkManager, this.tickManager);
       const enemyManager = new EnemyManager(
         scene,
         shadowGenerator,
-        NetworkManager.getInstance(),
-        worldManager
+        this.networkManager,
+        worldManager,
+        this.tickManager
       );
-      const pickupManager = new PickupManager(NetworkManager.getInstance());
+      const pickupManager = new PickupManager(this.networkManager, this.tickManager);
 
       this.sessionController = new SessionController(scene, this.canvas, shadowGenerator, {
-        networkManager: NetworkManager.getInstance(),
+        networkManager: this.networkManager,
         uiManager: this.uiManager,
         worldManager,
         enemyManager,
         pickupManager,
+        tickManager: this.tickManager,
+        localServerManager: this.localServerManager,
       });
       await this.sessionController.initialize(levelData, this.playerName);
 
@@ -262,7 +272,7 @@ export class Game {
   public quitToMenu(): void {
     this.isRunning = false;
 
-    NetworkManager.getInstance().leaveGame();
+    this.networkManager.leaveGame();
 
     this.uiManager.showScreen(UIScreen.NONE); // Cleanup current
     this.uiManager.exitPointerLock();
@@ -272,8 +282,7 @@ export class Game {
     this.sessionController = null;
 
     // Reset Managers
-    TickManager.getInstance().clear();
-    WorldEntityManager.getInstance().clear();
+    this.tickManager.clear();
     GameAssets.clear();
 
     if (this._playerDiedObserver) {
@@ -284,7 +293,7 @@ export class Game {
     // Clean up network listener
     // Clean up network listener
     if (this._networkStateObserver) {
-      NetworkManager.getInstance().onStateChanged.remove(this._networkStateObserver);
+      this.networkManager.onStateChanged.remove(this._networkStateObserver);
       this._networkStateObserver = null;
       logger.info('Removed NetworkState observer in Game');
     }
@@ -293,7 +302,7 @@ export class Game {
   }
 
   private update(deltaTime: number): void {
-    TickManager.getInstance().tick(deltaTime);
+    this.tickManager.tick(deltaTime);
     this.sessionController?.update(deltaTime);
   }
 }
