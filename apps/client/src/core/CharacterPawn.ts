@@ -69,6 +69,7 @@ export abstract class CharacterPawn extends Pawn {
     this.mesh.metadata = { type: config.type, pawn: this };
 
     // Setup damage profile (for compatibility)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (this as any).damageProfile = {
       multipliers: { head: 2.0, body: 1.0 },
       defaultMultiplier: 1.0,

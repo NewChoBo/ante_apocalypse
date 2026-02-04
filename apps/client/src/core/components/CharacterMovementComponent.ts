@@ -61,6 +61,7 @@ export class CharacterMovementComponent implements IPawnComponent<BasePawn> {
 
   public onAttach(pawn: BasePawn): void {
     this.owner = pawn;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.movement.onAttach(pawn as any);
   }
 

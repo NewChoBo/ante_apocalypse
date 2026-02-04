@@ -127,6 +127,7 @@ export class RemotePlayerPawn extends CharacterPawn {
     const animComp =
       this.getComponent<import('@ante/game-core').SkeletonAnimationComponent>('SkeletonAnimation');
     if (animComp && 'setHeadPitch' in animComp) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (animComp as any).setHeadPitch(this.interpolation.getTargetPitch());
     }
   }
@@ -163,6 +164,7 @@ export class RemotePlayerPawn extends CharacterPawn {
     const animComp =
       this.getComponent<import('@ante/game-core').SkeletonAnimationComponent>('SkeletonAnimation');
     if (animComp && 'stopAnimation' in animComp) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (animComp as any).stopAnimation();
     }
 
@@ -194,6 +196,7 @@ export class RemotePlayerPawn extends CharacterPawn {
     const animComp =
       this.getComponent<import('@ante/game-core').SkeletonAnimationComponent>('SkeletonAnimation');
     if (animComp && 'playAnimation' in animComp) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (animComp as any).playAnimation('idle');
     }
     logger.info(`Respawned.`);

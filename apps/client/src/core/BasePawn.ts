@@ -23,6 +23,7 @@ export abstract class BasePawn extends Pawn implements IPawnInterface, IDestruct
   public controllerId: string | null = null;
 
   constructor(scene: Scene, type: string, id?: string) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     super(scene, { type: type as any, id });
   }
 

@@ -25,6 +25,7 @@ export abstract class BaseWeapon extends CoreBaseWeapon implements IWeapon {
     return this.visualController.camera;
   }
 
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   public get weaponMesh() {
     return this.visualController.weaponMesh;
   }

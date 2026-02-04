@@ -40,6 +40,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     return this.visualController.camera;
   }
 
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
   public get weaponMesh() {
     return this.visualController.weaponMesh;
   }

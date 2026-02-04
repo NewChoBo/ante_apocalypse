@@ -190,6 +190,7 @@ export class PlayerPawn extends BasePawn {
       this.corpseMesh.rotation.copyFrom(this.mesh.rotation);
 
       // Add a 0-health bar to the corpse
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       this.corpseHealthBar = new HealthBarComponent({ mesh: this.corpseMesh } as any, this.scene, {
         style: 'player',
         width: 1.0,

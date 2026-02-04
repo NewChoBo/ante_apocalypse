@@ -48,8 +48,11 @@ export const GameAssets = {
       this.audioEngine = await CreateAudioEngineAsync();
       if (this.audioEngine) {
         const applyVol = (v: number): void => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (this.audioEngine as any).volume = v;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if (typeof (this.audioEngine as any).setVolume === 'function') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (this.audioEngine as any).setVolume(v);
           }
         };
@@ -113,6 +116,7 @@ export const GameAssets = {
     if (entries.rootNodes.length !== 1) {
       const wrapper = new Mesh(rootName || `${key}_wrapper`, this.scene);
       entries.rootNodes.forEach((node) => (node.parent = wrapper));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (entries as any).rootNodes = [wrapper];
     }
 

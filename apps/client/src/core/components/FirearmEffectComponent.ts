@@ -70,11 +70,13 @@ export class FirearmEffectComponent extends BaseWeaponEffectComponent {
     if (sound) {
       this.gunshotSound = sound;
 
-      // 피치(재생 속도)를 0.9 ~ 1.1 사이로 랜덤화
+      // Randomize pitch (playback rate) between 0.9 and 1.1
       const randomRate = 0.9 + Math.random() * 0.2;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if (typeof (sound as any).setPlaybackRate === 'function') {
         sound.setPlaybackRate(randomRate);
       } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (sound as any).playbackRate = randomRate;
       }
       sound.play();

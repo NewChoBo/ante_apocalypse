@@ -29,6 +29,7 @@ export class EnemyPawn extends CharacterPawn implements IEnemyPawn {
     };
     super(scene, config);
     if (id) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (this as any).id = id;
     }
 
