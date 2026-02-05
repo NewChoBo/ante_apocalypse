@@ -1,6 +1,6 @@
 import type { Scene } from '@babylonjs/core';
 import type { TickManager } from '../systems/TickManager';
-import type { ServerNetworkAuthority } from '../server/ServerNetworkAuthority';
+import type { IServerNetworkAuthority } from '../server/IServerNetworkAuthority';
 import type { WorldEntityManager } from '../simulation/WorldEntityManager';
 
 /**
@@ -14,7 +14,7 @@ export interface ServerGameContext {
   tickManager: TickManager;
 
   /** 네트워크 서버 권한체 */
-  networkManager: ServerNetworkAuthority;
+  networkManager: IServerNetworkAuthority;
 
   /** 월드 엔티티 관리 */
   worldManager: WorldEntityManager;

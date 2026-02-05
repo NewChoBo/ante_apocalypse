@@ -292,7 +292,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
     // 2. 로컬 서버 시작 (Start Local Server)
     logger.info(`HostGame: Starting Local Server for ${roomName}`);
-    await this.localServerManager.startSession(roomName, mapId, gameMode);
+    await this.localServerManager.startSession(this, roomName, mapId, gameMode);
 
     // 3. 서버 인스턴스 등록 (Register Server Instance)
     this.setLocalServer(this.localServerManager.getLogicalServer());
@@ -306,6 +306,10 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   public async joinGame(roomName: string): Promise<boolean> {
     const joined = await this.roomManager.joinRoom(roomName);
     if (!joined) return false;
+
+    // Request initial state from Master Client
+    logger.info(`Requesting Initial State for room ${roomName}...`);
+    this.provider.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
 
     // 혹시 들어가자마자 방장인 경우 (방이 비어있었을 때 등) 체크
     if (this.isMasterClient()) {
@@ -342,7 +346,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     if (this.localServerManager.isServerRunning()) return;
 
     logger.info('HandleTakeover: Taking over host duties...');
-    await this.localServerManager.takeover(roomName);
+    await this.localServerManager.takeover(this, roomName);
 
     // 서버 인스턴스 등록
     this.setLocalServer(this.localServerManager.getLogicalServer());
@@ -412,11 +416,12 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     if (myId) {
       const payload = this.playerStateManager.createMovePayload(myId, data.position, data.rotation);
 
-      // Short-circuit for Master Client
+      // Always send network event for guests to see
+      this.provider.sendEvent(EventCode.MOVE, payload, false);
+
+      // Also update local server directly for zero-latency authority if hosting
       if (this.isMasterClient() && this.localServer) {
         this.localServer.updatePlayerPawn(myId, data.position, data.rotation);
-      } else {
-        this.provider.sendEvent(EventCode.MOVE, payload, false);
       }
     }
   }
@@ -433,6 +438,10 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
       direction: { x: number; y: number; z: number };
     };
   }): void {
+    // Send network event first
+    this.provider.sendEvent(EventCode.FIRE, fireData, true);
+
+    // Direct local server update
     if (this.isMasterClient() && this.localServer && fireData.muzzleTransform) {
       this.localServer.processFireEvent(
         this.getSocketId()!,
@@ -441,7 +450,6 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
         fireData.weaponId
       );
     }
-    this.provider.sendEvent(EventCode.FIRE, fireData, true);
   }
 
   public reload(weaponId: string): void {
@@ -453,18 +461,18 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   }
 
   public syncWeapon(weaponId: string): void {
+    this.provider.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
+
     if (this.isMasterClient() && this.localServer) {
       this.localServer.processSyncWeapon(this.getSocketId()!, weaponId);
-    } else {
-      this.provider.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
     }
   }
 
   public requestHit(hitData: RequestHitData): void {
+    this.provider.sendEvent(EventCode.REQUEST_HIT, hitData, true);
+
     if (this.isMasterClient() && this.localServer) {
       this.localServer.processHitRequest(this.getSocketId()!, hitData);
-    } else {
-      this.provider.sendEvent(EventCode.REQUEST_HIT, hitData, true);
     }
   }
 

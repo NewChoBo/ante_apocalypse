@@ -1,5 +1,5 @@
 import { NullEngine, Scene, ArcRotateCamera, Vector3 } from '@babylonjs/core';
-import { ServerNetworkAuthority } from './ServerNetworkAuthority.js';
+import { IServerNetworkAuthority } from './IServerNetworkAuthority.js';
 import { RequestHitData, Vector3 as commonVector3, Logger, EventCode } from '@ante/common';
 import { WorldSimulation } from '../simulation/WorldSimulation.js';
 import { IGameRule } from '../rules/IGameRule.js';
@@ -7,7 +7,6 @@ import { WaveSurvivalRule } from '../rules/WaveSurvivalRule.js';
 import { ShootingRangeRule } from '../rules/ShootingRangeRule.js';
 import { DeathmatchRule } from '../rules/DeathmatchRule.js';
 import { HitRegistrationSystem } from '../systems/HitRegistrationSystem.js';
-
 import { ServerEnemyManager } from './managers/ServerEnemyManager.js';
 import { ServerPickupManager } from './managers/ServerPickupManager.js';
 import { ServerTargetSpawner } from './managers/ServerTargetSpawner.js';
@@ -32,7 +31,7 @@ export interface LogicalServerOptions {
 }
 
 export class LogicalServer {
-  private networkManager: ServerNetworkAuthority;
+  private networkManager: IServerNetworkAuthority;
   private assetLoader: IServerAssetLoader;
   private isRunning = false;
   private isTakeover: boolean;
@@ -50,7 +49,7 @@ export class LogicalServer {
   private levelLoader: ServerLevelLoader;
 
   constructor(
-    networkManager: ServerNetworkAuthority,
+    networkManager: IServerNetworkAuthority,
     assetLoader: IServerAssetLoader,
     options?: LogicalServerOptions
   ) {
@@ -98,8 +97,8 @@ export class LogicalServer {
   }
 
   private setupNetworkEvents(): void {
-    this.networkManager.onPlayerJoin = (id: string): void => {
-      this.createPlayerPawn(id);
+    this.networkManager.onPlayerJoin = (id: string, name: string): void => {
+      this.createPlayerPawn(id, name);
       if (!this.isTakeover && this.playerPawns.size === 1) {
         this.simulation.initializeRequest();
       }
@@ -136,6 +135,22 @@ export class LogicalServer {
 
           setTimeout(() => {
             const spawnPos = decision.position || { x: 0, y: 1.75, z: 0 };
+
+            // Server-side state reset
+            const pawn = this.playerPawns.get(targetId);
+            if (pawn) {
+              pawn.health = 100; // or maxHealth
+              pawn.isDead = false; // Fix: Logic required this reset to allow damage again
+              this.updatePlayerPawn(
+                targetId,
+                { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z },
+                null as any
+              );
+              logger.info(
+                `Server-side Pawn ${targetId} revived at ${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z}`
+              );
+            }
+
             this.networkManager.broadcastRespawn(targetId, spawnPos);
           }, delayMs);
         }
@@ -161,7 +176,7 @@ export class LogicalServer {
     this.isRunning = true;
 
     let lastTickTime = performance.now();
-    const tickInterval = 7.8; // 128Hz
+    const tickInterval = 50; // 20Hz network update rate (improved from 128Hz)
     let lastClock = performance.now();
 
     this.engine.runRenderLoop(() => {
@@ -187,10 +202,11 @@ export class LogicalServer {
     this.levelLoader.loadLevelData(data);
   }
 
-  private createPlayerPawn(id: string): void {
+  private createPlayerPawn(id: string, name: string): void {
     if (this.playerPawns.has(id)) return;
 
     const pawn = new ServerPlayerPawn(id, this.ctx, new Vector3(0, 1.75, 0), this.assetLoader);
+    pawn.name = name; // Assign proper name for isServerPlayerEntity check
     this.playerPawns.set(id, pawn);
     this.worldManager.register(pawn);
   }

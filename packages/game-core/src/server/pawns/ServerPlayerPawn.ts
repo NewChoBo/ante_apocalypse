@@ -20,6 +20,7 @@ export class ServerPlayerPawn extends BasePawn {
   public skeleton: Skeleton | null = null;
   public headBox: Mesh | null = null;
   public override type = 'player';
+  public name: string = 'Unknown';
 
   public weapons: Map<string, BaseWeapon> = new Map();
   public currentWeapon: BaseWeapon | null = null;

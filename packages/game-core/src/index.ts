@@ -35,6 +35,7 @@ export * from './rules/DeathmatchRule.js';
 export * from './server/IServerAssetLoader.js';
 export * from './server/LogicalServer.js';
 export * from './server/ServerNetworkAuthority.js';
+export * from './server/IServerNetworkAuthority.js';
 export * from './server/pawns/ServerPlayerPawn.js';
 export * from './server/pawns/ServerEnemyPawn.js';
 export * from './server/pawns/ServerTargetPawn.js';

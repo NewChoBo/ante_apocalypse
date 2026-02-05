@@ -1,11 +1,13 @@
 import {
   LogicalServer,
-  ServerNetworkAuthority,
+  IServerNetworkAuthority,
   TickManager,
   WorldEntityManager as CoreWorldEntityManager,
 } from '@ante/game-core';
 import { BrowserAssetLoader } from './BrowserAssetLoader';
 import { Logger } from '@ante/common';
+import { ClientHostNetworkAdapter } from './ClientHostNetworkAdapter';
+import type { NetworkManager } from '../systems/NetworkManager';
 
 import { LevelData } from '@ante/game-core';
 
@@ -21,12 +23,12 @@ const logger = new Logger('LocalServerManager');
 
 export class LocalServerManager {
   private logicalServer: LogicalServer | null = null;
-  private networkAuthority: ServerNetworkAuthority | null = null;
+  private networkAuthority: ClientHostNetworkAdapter | IServerNetworkAuthority | null = null;
   private isRunning = false;
 
   constructor() {}
 
-  public async takeover(roomName: string): Promise<void> {
+  public async takeover(networkManager: NetworkManager, roomName: string): Promise<void> {
     if (this.isRunning) {
       logger.warn('Local Server is already running (Takeover ignored).');
       return;
@@ -35,14 +37,20 @@ export class LocalServerManager {
     logger.info(`Taking over Host Duties for Room: ${roomName}`);
 
     // Pass 'true' to skip Room Creation and just Join
-    await this.internalStart(roomName, true);
+    await this.internalStart(networkManager, roomName, true);
   }
 
-  public async startSession(roomName: string, mapId: string, gameMode: string): Promise<void> {
-    await this.internalStart(roomName, false, mapId, gameMode);
+  public async startSession(
+    networkManager: NetworkManager,
+    roomName: string,
+    mapId: string,
+    gameMode: string
+  ): Promise<void> {
+    await this.internalStart(networkManager, roomName, false, mapId, gameMode);
   }
 
   private async internalStart(
+    networkManager: NetworkManager,
     roomName: string,
     isTakeover: boolean,
     mapId?: string,
@@ -56,37 +64,24 @@ export class LocalServerManager {
     logger.info(`Starting Local Server Session... Room: ${roomName} (Takeover: ${isTakeover})`);
 
     try {
-      // 1. Initialize Network Authority (Server Connection)
-      const appId = import.meta.env.VITE_PHOTON_APP_ID;
-      const appVersion = import.meta.env.VITE_PHOTON_APP_VERSION;
-
-      if (!appId || !appVersion) {
-        throw new Error('Missing Photon App ID or Version in environment variables.');
-      }
-
+      // 1. Initialize Network Authority (using Host connection)
       // server-side logic which is separate.
       const serverTickManager = new TickManager();
       const serverEntityManager = new CoreWorldEntityManager(serverTickManager);
 
-      this.networkAuthority = new ServerNetworkAuthority(appId, appVersion, serverEntityManager);
-      await this.networkAuthority.connect();
+      this.networkAuthority = new ClientHostNetworkAdapter(networkManager, serverEntityManager);
 
-      // 2. Create OR Join Room
-      if (isTakeover) {
-        // Just join the existing room as a Server Peer
-        // Note: We might need to handle 'Server' naming collision if old server is ghosting.
-        // ServerNetworkAuthority handles naming usually?
-        await this.networkAuthority.joinGameRoom(roomName);
-      } else {
-        if (!mapId) throw new Error('MapID required for new session');
-        await this.networkAuthority.createGameRoom(roomName, mapId);
-      }
+      // Note: We don't need to connect or create room, as Host Client already did it.
+      // But we might need to register existing actors if we are late-starting?
+      // The Adapter handles 'onPlayerJoin' via NetworkManager listeners.
 
       // 3. Initialize Logical Server
       const assetLoader = new BrowserAssetLoader();
       this.logicalServer = new LogicalServer(this.networkAuthority, assetLoader, {
         isTakeover,
         gameMode,
+        tickManager: serverTickManager,
+        worldManager: serverEntityManager,
       });
 
       // 3.5 Load Level Data
@@ -104,6 +99,10 @@ export class LocalServerManager {
       // 4. Start Simulation
       this.logicalServer.start();
 
+      // 5. Register Existing Actors (Crucial for Host visibility)
+      // Since Host joined room BEFORE starting LocalServer, we must manually inject them now.
+      this.networkAuthority.registerAllActors();
+
       this.isRunning = true;
       logger.info('Local Server Session Started (Takeover Complete).');
     } catch (e) {
@@ -119,7 +118,7 @@ export class LocalServerManager {
       this.logicalServer = null;
     }
     if (this.networkAuthority) {
-      this.networkAuthority.disconnect();
+      (this.networkAuthority as any).disconnect?.();
       this.networkAuthority = null;
     }
     this.isRunning = false;

@@ -7,7 +7,10 @@ import { WorldEntityManager } from './WorldEntityManager';
 import { playerHealthStore, gameStateStore } from '../store/GameStore';
 import { INetworkManager } from '../interfaces/INetworkManager';
 import { TickManager } from '@ante/game-core';
+import { Logger } from '@ante/common';
 import type { GameContext } from '../../types/GameContext';
+
+const logger = new Logger('MultiplayerSystem');
 
 export class MultiplayerSystem {
   private scene: Scene;
@@ -90,6 +93,9 @@ export class MultiplayerSystem {
     });
 
     this.networkManager.onInitialStateReceived.add((data: { players: PlayerState[] }): void => {
+      logger.info(
+        `MultiplayerSystem: Received INITIAL_STATE with ${data.players.length} players. My ID: ${this.networkManager.getSocketId()}`
+      );
       this.applyPlayerStates(data.players);
     });
 

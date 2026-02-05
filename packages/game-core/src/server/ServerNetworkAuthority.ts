@@ -77,11 +77,13 @@ class ServerMockMesh extends AbstractMesh {
   }
 }
 
-export class ServerNetworkAuthority extends BasePhotonClient {
+import { IServerNetworkAuthority } from './IServerNetworkAuthority.js';
+
+export class ServerNetworkAuthority extends BasePhotonClient implements IServerNetworkAuthority {
   private entityManager: WorldEntityManager;
 
   // External callbacks
-  public onPlayerJoin?: (id: string) => void;
+  public onPlayerJoin?: (id: string, name: string) => void;
   public onPlayerLeave?: (id: string) => void;
   public onPlayerMove?: (id: string, pos: NetworkVector3, rot: NetworkVector3) => void;
 
@@ -189,7 +191,7 @@ export class ServerNetworkAuthority extends BasePhotonClient {
       this.entityManager.register(playerEntity);
     }
 
-    if (this.onPlayerJoin) this.onPlayerJoin(id);
+    if (this.onPlayerJoin) this.onPlayerJoin(id, name);
   }
 
   private setupDispatcher(): void {
@@ -207,11 +209,11 @@ export class ServerNetworkAuthority extends BasePhotonClient {
       const entity = this.entityManager.getEntity(senderId);
 
       if (!entity) {
-        if (this.onPlayerJoin) this.onPlayerJoin(senderId);
-
         const actors = this.getRoomActors();
         const actorNr = parseInt(senderId);
         const name = actors.get(actorNr)?.name || 'Unknown';
+
+        if (this.onPlayerJoin) this.onPlayerJoin(senderId, name);
 
         const newEntity: ServerPlayerEntity = {
           id: senderId,
