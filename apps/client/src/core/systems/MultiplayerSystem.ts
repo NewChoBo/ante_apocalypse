@@ -62,6 +62,13 @@ export class MultiplayerSystem {
           remote.updateNetworkState(p.position, p.rotation);
           if (p.weaponId) remote.updateWeapon(p.weaponId);
           if (p.health !== undefined) remote.updateHealth(p.health);
+
+          // Sync Death State
+          if (p.isDead === true && !remote.isDead) remote.die();
+          if (p.isDead === false && remote.isDead) {
+            const pos = new Vector3(p.position.x, p.position.y, p.position.z);
+            remote.respawn(pos);
+          }
         } else {
           this.spawnRemotePlayer(p);
         }
@@ -74,9 +81,21 @@ export class MultiplayerSystem {
           if (healthDiff > 2) {
             this.localPlayer.health = p.health;
             playerHealthStore.set(p.health);
-            if (p.health <= 0 && !this.localPlayer.isDead) {
-              this.localPlayer.die();
-            }
+          }
+
+          // [Death Sync]
+          // If server says we are dead, ensure we die locally
+          if ((p.isDead === true || p.health <= 0) && !this.localPlayer.isDead) {
+            this.localPlayer.die();
+          }
+
+          // [Respawn Sync]
+          // If server says we are alive (and healthy), ensure we respawn locally
+          if (p.isDead === false && p.health > 0 && this.localPlayer.isDead) {
+            logger.info('State Sync forced Respawn for Local Player');
+            const pos = new Vector3(p.position.x, p.position.y, p.position.z);
+            this.localPlayer.respawn(pos);
+            gameStateStore.set('PLAYING');
           }
         }
       }
@@ -93,9 +112,9 @@ export class MultiplayerSystem {
     });
 
     this.networkManager.onInitialStateReceived.add((data: { players: PlayerState[] }): void => {
-      logger.info(
-        `MultiplayerSystem: Received INITIAL_STATE with ${data.players.length} players. My ID: ${this.networkManager.getSocketId()}`
-      );
+      // logger.info(
+      //   `MultiplayerSystem: Received INITIAL_STATE with ${data.players.length} players. My ID: ${this.networkManager.getSocketId()}`
+      // );
       this.applyPlayerStates(data.players);
     });
 

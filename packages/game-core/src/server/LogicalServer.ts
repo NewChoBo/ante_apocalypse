@@ -126,36 +126,8 @@ export class LogicalServer {
     this.networkManager.onSyncWeaponRequest = (playerId: string, weaponId: string): void =>
       this.processSyncWeapon(playerId, weaponId);
 
-    this.networkManager.onPlayerDeath = (targetId: string, _attackerId: string): void => {
-      if (this.simulation.gameRule) {
-        const decision = this.simulation.gameRule.onPlayerDeath(this.simulation, targetId);
-        if (decision.action === 'respawn') {
-          const delayMs = decision.delay * 1000;
-          logger.info(`Player ${targetId} will respawn in ${decision.delay}s`);
-
-          setTimeout(() => {
-            const spawnPos = decision.position || { x: 0, y: 1.75, z: 0 };
-
-            // Server-side state reset
-            const pawn = this.playerPawns.get(targetId);
-            if (pawn) {
-              pawn.health = 100; // or maxHealth
-              pawn.isDead = false; // Fix: Logic required this reset to allow damage again
-              this.updatePlayerPawn(
-                targetId,
-                { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z },
-                null as any
-              );
-              logger.info(
-                `Server-side Pawn ${targetId} revived at ${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z}`
-              );
-            }
-
-            this.networkManager.broadcastRespawn(targetId, spawnPos);
-          }, delayMs);
-        }
-      }
-    };
+    this.networkManager.onPlayerDeath = (targetId: string, attackerId: string): void =>
+      this.handlePlayerDeath(targetId, attackerId);
   }
 
   private createGameRule(mode: string): IGameRule {
@@ -277,13 +249,35 @@ export class LogicalServer {
         );
 
         if (validation.isValid) {
-          const targetState = this.networkManager.getPlayerState(data.targetId);
+          const pawn = this.playerPawns.get(data.targetId);
           let newHealth = 0;
-          if (targetState) {
-            newHealth = Math.max(0, targetState.health - data.damage);
+          let wasAlive = false;
+
+          // Player Logic
+          if (pawn) {
+            newHealth = Math.max(0, pawn.health - data.damage);
+            wasAlive = !pawn.isDead;
+            pawn.health = newHealth;
+
+            // Trigger valid death
+            if (newHealth <= 0 && wasAlive) {
+              pawn.isDead = true;
+              this.handlePlayerDeath(data.targetId, shooterId);
+              // Broadcast Death Event separately or let handlePlayerDeath do it?
+              // Usually we broadcast death AND hit, or just death.
+              // For now, let's keep hit broadcast, and handlePlayerDeath broadcasts death.
+              this.networkManager.broadcastDeath(data.targetId, shooterId);
+            }
+          }
+          // Generic State (Enemy/Target fallback)
+          else {
+            const targetState = this.networkManager.getPlayerState(data.targetId);
+            if (targetState) {
+              newHealth = Math.max(0, targetState.health - data.damage);
+            }
           }
 
-          const isPlayer = this.playerPawns.has(data.targetId);
+          const isPlayer = !!pawn;
           const eventCode = isPlayer ? EventCode.HIT : EventCode.TARGET_HIT;
 
           this.networkManager.broadcastHit(
@@ -297,6 +291,37 @@ export class LogicalServer {
             eventCode
           );
         }
+      }
+    }
+  }
+
+  private handlePlayerDeath(targetId: string, _attackerId: string): void {
+    if (this.simulation.gameRule) {
+      const decision = this.simulation.gameRule.onPlayerDeath(this.simulation, targetId);
+      if (decision.action === 'respawn') {
+        const delayMs = decision.delay * 1000;
+        logger.info(`Player ${targetId} died. Respawning in ${decision.delay}s`);
+
+        setTimeout(() => {
+          const spawnPos = decision.position || { x: 0, y: 1.75, z: 0 };
+
+          // Server-side state reset
+          const pawn = this.playerPawns.get(targetId);
+          if (pawn) {
+            pawn.health = 100; // or maxHealth
+            pawn.isDead = false;
+            this.updatePlayerPawn(
+              targetId,
+              { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z },
+              null as any
+            );
+            logger.info(
+              `Server-side Pawn ${targetId} revived at ${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z}`
+            );
+          }
+
+          this.networkManager.broadcastRespawn(targetId, spawnPos);
+        }, delayMs);
       }
     }
   }

@@ -255,6 +255,7 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
             rotation: { x: e.rotation.x, y: e.rotation.y, z: e.rotation.z },
             weaponId: e.weaponId || 'Pistol',
             health: e.health,
+            isDead: e.isDead,
           });
         }
       }

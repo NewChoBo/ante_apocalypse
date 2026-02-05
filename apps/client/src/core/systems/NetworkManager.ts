@@ -415,14 +415,8 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     const myId = this.getSocketId();
     if (myId) {
       const payload = this.playerStateManager.createMovePayload(myId, data.position, data.rotation);
-
-      // Always send network event for guests to see
-      this.provider.sendEvent(EventCode.MOVE, payload, false);
-
-      // Also update local server directly for zero-latency authority if hosting
-      if (this.isMasterClient() && this.localServer) {
-        this.localServer.updatePlayerPawn(myId, data.position, data.rotation);
-      }
+      // Unified: Host loopback handles local server update via ClientHostNetworkAdapter
+      this.sendEvent(EventCode.MOVE, payload, false);
     }
   }
 
@@ -438,18 +432,8 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
       direction: { x: number; y: number; z: number };
     };
   }): void {
-    // Send network event first
-    this.provider.sendEvent(EventCode.FIRE, fireData, true);
-
-    // Direct local server update
-    if (this.isMasterClient() && this.localServer && fireData.muzzleTransform) {
-      this.localServer.processFireEvent(
-        this.getSocketId()!,
-        fireData.muzzleTransform.position,
-        fireData.muzzleTransform.direction,
-        fireData.weaponId
-      );
-    }
+    // Unified: Host loopback handles local server update
+    this.sendEvent(EventCode.FIRE, fireData, true);
   }
 
   public reload(weaponId: string): void {
@@ -457,27 +441,42 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     if (!myId) return;
 
     const payload = { playerId: myId, weaponId };
-    this.provider.sendEvent(EventCode.RELOAD, payload, true);
+    this.sendEvent(EventCode.RELOAD, payload, true);
   }
 
   public syncWeapon(weaponId: string): void {
-    this.provider.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
-
-    if (this.isMasterClient() && this.localServer) {
-      this.localServer.processSyncWeapon(this.getSocketId()!, weaponId);
-    }
+    // Unified: Host loopback handles local server update
+    this.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
   }
 
   public requestHit(hitData: RequestHitData): void {
-    this.provider.sendEvent(EventCode.REQUEST_HIT, hitData, true);
-
-    if (this.isMasterClient() && this.localServer) {
-      this.localServer.processHitRequest(this.getSocketId()!, hitData);
-    }
+    // Unified: Host loopback handles local server update
+    this.sendEvent(EventCode.REQUEST_HIT, hitData, true);
   }
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
     this.provider.sendEvent(code, data, reliable);
+
+    // [Unified Host Logic]
+    // If we are the Host, the network event won't come back to us (ReceiverGroup.Others).
+    // So we manually loopback the event to our own listeners (Adapter -> LogicalServer).
+    if (this.isMasterClient()) {
+      const myId = this.getSocketId();
+      if (myId) {
+        // 1. Notify Observers (ClientHostNetworkAdapter listens here)
+        this.onEvent.notifyObservers({ code, data, senderId: myId });
+
+        // 2. Dispatch to internal handlers (e.g., specific event observables)
+        // Use loose casting to access protected dispatch method if needed,
+        // or ensure setupProviderListeners logic is duplicated here safely.
+        // Actually, the provider.onEvent handler does exactly this:
+        (this.dispatcher.dispatch as (code: EventCode, data: unknown, actorNr: string) => void)(
+          code as EventCode,
+          data,
+          myId
+        );
+      }
+    }
   }
 
   // === Utility Methods ===

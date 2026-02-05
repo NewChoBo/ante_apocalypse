@@ -55,6 +55,7 @@ export interface PlayerState {
   weaponId: string;
   name: string;
   health: number;
+  isDead?: boolean;
 }
 
 export interface MovePayload {

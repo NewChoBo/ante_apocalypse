@@ -209,6 +209,17 @@ export class HUD {
         this.crosshair.height = '8px';
       }, 150);
     });
+
+    // Game State (Respawn UI)
+    import('../core/store/GameStore').then(({ gameStateStore }) => {
+      gameStateStore.subscribe((state) => {
+        if (state === 'DEAD') {
+          this.showRespawnCountdown(5); // Default to server's 5s
+        } else if (state === 'PLAYING') {
+          this.hideRespawnMessage();
+        }
+      });
+    });
   }
 
   public dispose(): void {
