@@ -1,7 +1,11 @@
-import { LogicalServer, ServerNetworkAuthority } from '@ante/game-core';
+import {
+  LogicalServer,
+  ServerNetworkAuthority,
+  TickManager,
+  WorldEntityManager as CoreWorldEntityManager,
+} from '@ante/game-core';
 import { BrowserAssetLoader } from './BrowserAssetLoader';
 import { Logger } from '@ante/common';
-import { WorldEntityManager } from '../systems/WorldEntityManager';
 
 import { LevelData } from '@ante/game-core';
 
@@ -61,17 +65,10 @@ export class LocalServerManager {
       }
 
       // server-side logic which is separate.
-      const serverEntityManager = new WorldEntityManager(
-        null as unknown as import('../interfaces/INetworkManager').INetworkManager,
-        null as unknown as import('@ante/game-core').TickManager
-      ); // Server-side manager (no networking/tick internally needed for authority? wait)
-      // Actually Server side manager needs its own logic.
-      // But in this monorepo, WorldEntityManager might be shared or divergent.
-      this.networkAuthority = new ServerNetworkAuthority(
-        appId,
-        appVersion,
-        serverEntityManager as unknown as WorldEntityManager
-      );
+      const serverTickManager = new TickManager();
+      const serverEntityManager = new CoreWorldEntityManager(serverTickManager);
+
+      this.networkAuthority = new ServerNetworkAuthority(appId, appVersion, serverEntityManager);
       await this.networkAuthority.connect();
 
       // 2. Create OR Join Room

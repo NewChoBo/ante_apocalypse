@@ -1,4 +1,3 @@
-// Removed unused Photon import
 import {
   EventCode,
   PlayerState as NetworkPlayerState,
