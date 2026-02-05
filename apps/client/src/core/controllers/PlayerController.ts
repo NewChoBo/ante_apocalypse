@@ -127,12 +127,10 @@ export class PlayerController extends BaseController {
 
   public setInputBlocked(blocked: boolean): void {
     this.isInputBlocked = blocked;
-    if (blocked) {
-      // 입력 차단 시 모든 키 해제
-      Object.keys(this.keys).forEach((k) => (this.keys[k as keyof typeof this.keys] = false));
-      this.mouseDelta.x = 0;
-      this.mouseDelta.y = 0;
-    }
+    // Always clear keys when block state changes to prevent stuck inputs
+    Object.keys(this.keys).forEach((k) => (this.keys[k as keyof typeof this.keys] = false));
+    this.mouseDelta.x = 0;
+    this.mouseDelta.y = 0;
   }
 
   public tick(deltaTime: number): void {

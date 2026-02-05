@@ -99,6 +99,7 @@ export abstract class BaseWeapon
   public abstract stopFire(): void;
   public abstract update(deltaTime: number): void;
   public abstract addAmmo(amount: number): void;
+  public abstract reset(): void;
   public abstract getStats(): Record<string, unknown>;
 
   /**

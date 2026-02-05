@@ -209,4 +209,27 @@ export class PlayerPawn extends BasePawn {
     playerHealthStore.set(100);
     logger.info('Respawned');
   }
+
+  /**
+   * 완전한 상태 초기화 (사망 후 부활 시 사용)
+   * - 위치/체력/충돌 복구 (respawn)
+   * - 인벤토리 초기화
+   * - 무기/탄약 초기화
+   */
+  public fullReset(position: Vector3): void {
+    // 1. 기본 부활 (위치, 시체 제거, 물리)
+    this.respawn(position);
+
+    // 2. 인벤토리 비우기
+    const { InventoryManager } = require('./inventory/InventoryManager'); // 순환 참조 방지 (지연 로딩)
+    InventoryManager.clear();
+
+    // 3. 전투 시스템 초기화 (무기 리셋 & 탄약 복구)
+    const combat = this.getComponent(CombatComponent) as CombatComponent;
+    if (combat) {
+      combat.reset();
+    }
+
+    logger.info('Full Reset Complete');
+  }
 }

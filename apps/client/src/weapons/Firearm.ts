@@ -357,6 +357,18 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     }
   }
 
+  public reset(): void {
+    this.isFiring = false;
+    this.currentState = 'Idle';
+
+    // Restore Ammo completely
+    if ((this.stats.magazineSize || 0) > 0) {
+      this.currentAmmo = this.stats.magazineSize!;
+      this.reserveAmmo = this.stats.magazineSize! * 5;
+      this.updateAmmoStore();
+    }
+  }
+
   public updateStats(stats: Partial<Record<string, unknown>>): void {
     const isInitialSync = this.magazineSize === 0;
 

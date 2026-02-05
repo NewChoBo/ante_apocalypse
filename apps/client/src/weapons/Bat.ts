@@ -28,4 +28,12 @@ export class Bat extends MeleeWeapon {
     this.startSwing();
     return true;
   }
+
+  public addAmmo(amount: number): void {
+    // Melee weapons don't use ammo
+  }
+
+  public reset(): void {
+    // Melee weapons have no state to reset
+  }
 }

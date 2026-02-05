@@ -144,10 +144,20 @@ export class SessionController {
 
     this.healthUnsub = playerHealthStore.subscribe((health: number): void => {
       if (health <= 0) {
-        GameObservables.playerDied.notifyObservers(null);
-        this.isSpectating = true;
-        this.spectateMode = 'FREE';
-        this.hud?.showRespawnCountdown(3);
+        if (!this.isSpectating) {
+          GameObservables.playerDied.notifyObservers(null);
+          this.isSpectating = true;
+          this.spectateMode = 'FREE';
+          this.hud?.showRespawnCountdown(3);
+        }
+      } else {
+        // [Fix] If health restored via State Sync (without Respawn Event), ensure we exit spectator mode
+        if (this.isSpectating) {
+          this.isSpectating = false;
+          this.spectateTargetIndex = -1;
+          this.hud?.hideRespawnMessage();
+          this.playerController?.setInputBlocked(false);
+        }
       }
     });
 
@@ -258,7 +268,18 @@ export class SessionController {
       if (data.playerId === this.networkManager.getSocketId()) {
         this.isSpectating = false;
         this.spectateMode = 'FREE';
+        this.spectateTargetIndex = -1;
         this.hud?.hideRespawnMessage();
+
+        const spawnPos = data.position
+          ? new Vector3(data.position.x, data.position.y, data.position.z)
+          : new Vector3(0, 2, 0);
+
+        // Perform Full Reset (restore health, physics, clear inventory, reset combat)
+        this.playerPawn?.fullReset(spawnPos);
+
+        // Ensure input block is released
+        this.playerController?.setInputBlocked(false);
       }
     });
   }

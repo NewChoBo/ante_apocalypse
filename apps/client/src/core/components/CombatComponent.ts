@@ -88,6 +88,10 @@ export class CombatComponent extends BaseComponent {
     this.inventory.addAmmoToAll(amount);
   }
 
+  public reset(): void {
+    this.inventory.reset();
+  }
+
   public dispose(): void {
     super.dispose();
     this.inventory.dispose();
