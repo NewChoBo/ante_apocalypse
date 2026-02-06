@@ -359,7 +359,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
 
   public reset(): void {
     this.isFiring = false;
-    this.currentState = 'Idle';
+    this.currentState = 'Ready';
 
     // Restore Ammo completely
     if ((this.stats.magazineSize || 0) > 0) {

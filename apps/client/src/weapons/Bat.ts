@@ -29,7 +29,7 @@ export class Bat extends MeleeWeapon {
     return true;
   }
 
-  public addAmmo(amount: number): void {
+  public addAmmo(_amount: number): void {
     // Melee weapons don't use ammo
   }
 
