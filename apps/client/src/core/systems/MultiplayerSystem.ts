@@ -12,6 +12,19 @@ import type { GameContext } from '../../types/GameContext';
 
 const logger = new Logger('MultiplayerSystem');
 
+interface IReloadable {
+  reload(weaponId: string): void;
+}
+
+function isReloadable(obj: unknown): obj is IReloadable {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'reload' in obj &&
+    typeof (obj as { reload: unknown }).reload === 'function'
+  );
+}
+
 export class MultiplayerSystem {
   private scene: Scene;
   private localPlayer: PlayerPawn;
@@ -154,10 +167,8 @@ export class MultiplayerSystem {
         if (String(data.playerId) === String(this.networkManager.getSocketId())) return;
 
         const remote = this.remotePlayers.get(data.playerId);
-        if (remote) {
-          if (typeof (remote as any).reload === 'function') {
-            (remote as any).reload(data.weaponId);
-          }
+        if (remote && isReloadable(remote)) {
+          remote.reload(data.weaponId);
         }
       }
     );

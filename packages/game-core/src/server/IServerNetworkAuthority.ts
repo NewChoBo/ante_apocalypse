@@ -4,8 +4,9 @@ import {
   PlayerState as NetworkPlayerState,
   Vector3 as NetworkVector3,
 } from '@ante/common';
+import { INetworkAuthority } from '../network/INetworkAuthority.js';
 
-export interface IServerNetworkAuthority {
+export interface IServerNetworkAuthority extends INetworkAuthority {
   // Connection / Status
   getSocketId(): string | undefined;
   isMasterClient(): boolean;

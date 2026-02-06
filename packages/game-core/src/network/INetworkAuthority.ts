@@ -11,12 +11,13 @@ export interface INetworkAuthority {
   sendEvent(code: number, data: unknown, reliable?: boolean): void;
 
   // Lifecycle (optional for implementations that manage connection externally)
-  connect?(...args: any[]): any;
-  disconnect?(): void;
+  // Lifecycle (optional for implementations that manage connection externally)
+  connect?(...args: unknown[]): void | Promise<void | boolean>;
+  disconnect?(): void | Promise<void>;
 
   // Room management (optional)
-  createRoom?(...args: any[]): any;
-  joinRoom?(...args: any[]): any;
+  createRoom?(...args: unknown[]): void | Promise<void | boolean>;
+  joinRoom?(...args: unknown[]): void | Promise<void | boolean>;
 
   // State queries (optional)
   getServerTime?(): number;

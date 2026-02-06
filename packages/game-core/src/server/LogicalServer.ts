@@ -313,7 +313,7 @@ export class LogicalServer {
             this.updatePlayerPawn(
               targetId,
               { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z },
-              null as any
+              { x: 0, y: 0, z: 0 }
             );
             logger.info(
               `Server-side Pawn ${targetId} revived at ${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z}`

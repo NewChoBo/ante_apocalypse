@@ -8,14 +8,22 @@ import type { GameContext } from '../types/GameContext';
  * 칼보다 공격력이 높고 사거리가 길지만, 공격 속도가 느림
  */
 export class Bat extends MeleeWeapon {
-  public name = 'Bat';
-  public damage = 0;
-  public range = 0;
-
   protected weaponConfig = MeleeWeaponConfigs.Bat;
 
   constructor(context: GameContext) {
     super(context);
+    this.stats = {
+      name: this.weaponConfig.name,
+      damage: this.weaponConfig.damage,
+      range: this.weaponConfig.range,
+      fireRate: this.weaponConfig.animation.duration,
+      magazineSize: 0,
+      reloadTime: 0,
+    };
+    this.name = this.stats.name!;
+    this.damage = this.stats.damage!;
+    this.range = this.stats.range!;
+
     this.createMesh();
   }
 

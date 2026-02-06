@@ -359,7 +359,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
 
   public reset(): void {
     this.isFiring = false;
-    this.currentState = 'Ready';
+    this.transitionTo('Ready');
 
     // Restore Ammo completely
     if ((this.stats.magazineSize || 0) > 0) {
@@ -369,7 +369,7 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
     }
   }
 
-  public updateStats(stats: Partial<Record<string, unknown>>): void {
+  public override updateStats(stats: Partial<Record<string, unknown>>): void {
     const isInitialSync = this.magazineSize === 0;
 
     // Update local properties

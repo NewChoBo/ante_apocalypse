@@ -27,7 +27,7 @@ const logger = new Logger('RemotePlayerPawn');
 export class RemotePlayerPawn extends CharacterPawn {
   public type = 'remote_player';
   public id: string;
-  public playerName: string;
+  // name property is inherited from BasePawn
 
   // Player-specific components
   private interpolation: NetworkInterpolationComponent;
@@ -57,7 +57,7 @@ export class RemotePlayerPawn extends CharacterPawn {
     super(scene, config, context);
 
     this.id = id;
-    this.playerName = name;
+    this.name = name;
     this.shadowGenerator = shadowGenerator;
 
     // Override mesh setup for remote player
@@ -253,6 +253,11 @@ export class RemotePlayerPawn extends CharacterPawn {
     }
 
     this.muzzleFlash.createFlash(flashPos);
+  }
+
+  public reload(weaponId: string): void {
+    logger.info(`Player ${this.id} is reloading ${weaponId}`);
+    // Future: Play reload animation or sound
   }
 
   public override dispose(): void {

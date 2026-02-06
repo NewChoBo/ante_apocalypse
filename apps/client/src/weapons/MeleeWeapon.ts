@@ -1,4 +1,5 @@
 import { Scene, Vector3, Mesh } from '@babylonjs/core';
+import { WeaponStats } from '@ante/game-core';
 import { BaseWeapon } from './BaseWeapon';
 import { GameObservables } from '../core/events/GameObservables';
 import { MeleeWeaponConfig, toVector3 } from '../config/WeaponConfig';
@@ -9,6 +10,14 @@ import type { GameContext } from '../types/GameContext';
  * 공통된 휘두르기 로직, 애니메이션, 충돌 판정 등을 구현합니다.
  */
 export abstract class MeleeWeapon extends BaseWeapon {
+  public override stats: WeaponStats = {
+    name: '',
+    damage: 0,
+    range: 0,
+    fireRate: 0.5,
+    magazineSize: 0,
+    reloadTime: 0,
+  };
   protected isSwinging = false;
   protected lastSwingTime = 0;
 

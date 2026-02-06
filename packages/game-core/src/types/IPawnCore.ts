@@ -6,6 +6,8 @@ import { BaseComponent } from '../simulation/BaseComponent.js';
  */
 export interface IPawnCore extends IWorldEntity {
   addComponent(component: BaseComponent): void;
-  getComponent<T extends BaseComponent>(type: new (...args: any[]) => T): T | undefined;
+  getComponent<T extends BaseComponent, A extends unknown[]>(
+    type: new (...args: A) => T
+  ): T | undefined;
   die(): void;
 }

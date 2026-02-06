@@ -12,6 +12,7 @@ export abstract class BasePawn implements IPawnCore, ITickable {
   public abstract mesh: Mesh | AbstractMesh;
   public abstract type: string;
   public id: string = '';
+  public name: string = '';
   public health: number = 100;
   public maxHealth: number = 100;
   public isActive: boolean = false;
@@ -90,8 +91,9 @@ export abstract class BasePawn implements IPawnCore, ITickable {
   }
 
   /** 특정 타입의 컴포넌트 찾기 */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public getComponent<T extends BaseComponent>(type: new (...args: any[]) => T): T | undefined {
+  public getComponent<T extends BaseComponent, A extends unknown[]>(
+    type: new (...args: A) => T
+  ): T | undefined {
     return this.components.find((c) => c instanceof type) as T | undefined;
   }
 

@@ -1,8 +1,11 @@
 import XMLHttpRequest from 'xhr2';
 
 // Polyfills for Photon in Node.js environment
-(global as any).WebSocket = WebSocket as any;
-(global as any).XMLHttpRequest = XMLHttpRequest;
+Object.defineProperty(globalThis, 'WebSocket', {
+  value: (globalThis as Record<string, unknown>).WebSocket,
+  writable: true,
+});
+Object.defineProperty(globalThis, 'XMLHttpRequest', { value: XMLHttpRequest, writable: true });
 
 import { Logger } from '@ante/common';
 import { ServerApp } from './ServerApp.ts';

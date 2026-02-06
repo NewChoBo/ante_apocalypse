@@ -17,6 +17,11 @@ export interface IWorldEntity {
 
   /** 위치 정보 */
   position: Vector3;
+  /** 회전 정보 */
+  rotation: Vector3;
+
+  /** 엔티티 이름 */
+  name: string;
 
   /** 엔티티 타입 (enemy, target, player 등) */
   type: string;

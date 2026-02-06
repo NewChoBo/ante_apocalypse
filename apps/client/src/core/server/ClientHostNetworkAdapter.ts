@@ -8,6 +8,10 @@ import {
   EventCode,
   DeathEventData,
   Logger,
+  MovePayload,
+  FireEventData,
+  SyncWeaponPayload,
+  ReloadEventData,
 } from '@ante/common';
 import { NetworkManager } from '../systems/NetworkManager';
 
@@ -58,14 +62,14 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   private handleRawEvent(code: number, data: unknown, senderId: string): void {
     switch (code) {
       case EventCode.MOVE: {
-        const moveData = data as any;
+        const moveData = data as MovePayload;
         if (this.onPlayerMove) {
           this.onPlayerMove(senderId, moveData.position, moveData.rotation);
         }
         break;
       }
       case EventCode.FIRE: {
-        const fireData = data as any;
+        const fireData = data as FireEventData;
         if (this.onFireRequest && fireData.muzzleTransform) {
           this.onFireRequest(
             senderId,
@@ -77,21 +81,21 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
         break;
       }
       case EventCode.SYNC_WEAPON: {
-        const syncData = data as any;
+        const syncData = data as SyncWeaponPayload;
         if (this.onSyncWeaponRequest) {
           this.onSyncWeaponRequest(senderId, syncData.weaponId);
         }
         break;
       }
       case EventCode.RELOAD: {
-        const reloadData = data as any;
+        const reloadData = data as ReloadEventData;
         if (reloadData.playerId === senderId && this.onReloadRequest) {
           this.onReloadRequest(senderId, reloadData.weaponId);
         }
         break;
       }
       case EventCode.REQUEST_HIT: {
-        const hitData = data as any;
+        const hitData = data as RequestHitData;
         if (this.onHitRequest) {
           this.onHitRequest(senderId, hitData);
         }
@@ -161,7 +165,7 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
 
     for (const entity of entities) {
       if (entity.type === 'remote_player' || entity.type === 'player') {
-        const e = entity as any;
+        const e = entity;
         if (e.position && e.rotation && e.name) {
           players.push({
             id: entity.id,
@@ -236,16 +240,15 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   public getPlayerState(id: string): NetworkPlayerState | undefined {
-    // Read from Server EntityManager
     const entity = this.entityManager.getEntity(id);
     if (entity && (entity.type === 'player' || entity.type === 'remote_player')) {
-      const e = entity as any;
+      const e = entity;
       return {
         id: e.id,
-        name: e.name,
+        name: e.name || 'Anonymous',
         position: { x: e.position.x, y: e.position.y, z: e.position.z },
         rotation: { x: e.rotation.x, y: e.rotation.y, z: e.rotation.z },
-        weaponId: e.weaponId,
+        weaponId: e.weaponId || 'Pistol',
         health: e.health,
       };
     }
