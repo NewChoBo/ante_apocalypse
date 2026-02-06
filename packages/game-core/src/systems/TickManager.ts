@@ -4,20 +4,12 @@ import { ITickable } from '../types/ITickable.js';
  * 게임 내 모든 ITickable 객체를 관리하고 매 프레임 업데이트를 수행하는 매니저.
  */
 export class TickManager {
-  private static instance: TickManager;
   private tickables: ITickable[] = [];
   private isTicking: boolean = false;
   private pendingAdditions: ITickable[] = [];
   private pendingRemovals: ITickable[] = [];
 
-  private constructor() {}
-
-  public static getInstance(): TickManager {
-    if (!TickManager.instance) {
-      TickManager.instance = new TickManager();
-    }
-    return TickManager.instance;
-  }
+  constructor() {}
 
   /** 업데이트 대상 등록 */
   public register(tickable: ITickable): void {

@@ -49,12 +49,7 @@ export class RoomManager {
    * 현재 룸 떠나기
    */
   public leaveRoom(): void {
-    // Stop local server if running (host leaving room)
-    void import('../server/LocalServerManager').then(({ LocalServerManager }) => {
-      if (LocalServerManager.getInstance().isServerRunning()) {
-        LocalServerManager.getInstance().stopSession();
-      }
-    });
+    // LocalServerManager logic moved to NetworkManager
     this.provider.disconnect();
   }
 

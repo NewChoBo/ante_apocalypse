@@ -123,4 +123,15 @@ export class InventoryManager {
     const newBagItems = state.bagItems.filter((i) => i.id !== itemId);
     inventoryStore.setKey('bagItems', newBagItems);
   }
+
+  /**
+   * 인벤토리 전체 초기화 (부활/게임오버 시 사용)
+   */
+  static clear(): void {
+    inventoryStore.set({
+      bagItems: [],
+      weaponSlots: [null, null, null, null],
+      maxBagSlots: 16,
+    });
+  }
 }

@@ -16,19 +16,20 @@ export class ConnectionManager {
   /**
    * 네트워크 연결 시작
    */
-  public async connect(userId: string): Promise<void> {
+  public async connect(userId: string): Promise<boolean> {
     // Prevent redundant connection attempts
     if (
       this.currentState !== NetworkState.Disconnected &&
       this.currentState !== NetworkState.Error
     ) {
-      return;
+      return false;
     }
 
     try {
-      await this.provider.connect(userId);
+      return await this.provider.connect(userId);
     } catch {
       // Connection failure handled via onStateChanged
+      return false;
     }
   }
 

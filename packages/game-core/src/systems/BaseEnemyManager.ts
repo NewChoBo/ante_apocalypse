@@ -3,6 +3,7 @@ import { INetworkAuthority } from '../network/INetworkAuthority';
 import { EventCode } from '@ante/common';
 import { AIController } from '../controllers/AIController';
 import { IEnemyPawn } from '../types/IEnemyPawn';
+import { TickManager } from './TickManager.js';
 
 /**
  * 적(Enemy)의 생성 및 통제 권한을 관리하는 베이스 시스템.
@@ -15,7 +16,10 @@ export abstract class BaseEnemyManager {
 
   protected pawns: Map<string, IEnemyPawn> = new Map();
 
-  constructor(protected authority: INetworkAuthority) {}
+  constructor(
+    protected authority: INetworkAuthority,
+    protected tickManager: TickManager
+  ) {}
 
   /**
    * 엔티티 업데이트 주기에 따라 동기화 패킷을 보낼지 결정.
@@ -130,14 +134,20 @@ export abstract class BaseEnemyManager {
 
       if (enemy.rotation && enemy.rotation.set) {
         enemy.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
-      } else if ((enemy as any).mesh && (enemy as any).mesh.rotation) {
-        // Fallback for types not fully implementing IEnemyPawn yet (should be resolved by interface update)
-        (enemy as any).mesh.rotation.set(data.rotation.x, data.rotation.y, data.rotation.z);
+      } else if (
+        'mesh' in enemy &&
+        (enemy as { mesh: import('@babylonjs/core').AbstractMesh }).mesh.rotation
+      ) {
+        // Fallback for types that expose mesh but don't have rotation setter directly on pawn
+        (enemy as { mesh: import('@babylonjs/core').AbstractMesh }).mesh.rotation.set(
+          data.rotation.x,
+          data.rotation.y,
+          data.rotation.z
+        );
       }
 
       if (data.isMoving !== undefined) {
-        // IEnemyPawn doesn't have isMoving setter in interface yet, casting for now
-        (enemy as any).isMoving = data.isMoving;
+        enemy.isMoving = data.isMoving;
       }
     }
   }

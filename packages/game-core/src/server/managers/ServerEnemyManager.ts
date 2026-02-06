@@ -1,35 +1,29 @@
-import { Scene, Vector3, AbstractMesh } from '@babylonjs/core';
+import { Vector3, AbstractMesh } from '@babylonjs/core';
 import { Vector3 as commonVector3 } from '@ante/common';
 import { BaseEnemyManager } from '../../systems/BaseEnemyManager.js';
 import { ServerEnemyPawn } from '../pawns/ServerEnemyPawn.js';
-import { ServerNetworkAuthority } from '../ServerNetworkAuthority.js';
 import { ServerPlayerPawn } from '../pawns/ServerPlayerPawn.js';
+import { ServerGameContext } from '../../types/ServerGameContext.js';
 
+/**
+ * 서버측 적(Enemy) 관리자.
+ */
 export class ServerEnemyManager extends BaseEnemyManager {
-  private scene: Scene;
-
   constructor(
-    authority: ServerNetworkAuthority,
-    scene: Scene,
+    private ctx: ServerGameContext,
     private getPlayers: () => Map<string, ServerPlayerPawn>
   ) {
-    super(authority);
-    this.scene = scene;
+    super(ctx.networkManager, ctx.tickManager);
   }
 
   public override requestSpawnEnemy(id: string, position: commonVector3): boolean {
     if (!super.requestSpawnEnemy(id, new Vector3(position.x, position.y, position.z))) return false;
 
     // Create server-side representation
-    const pawn = new ServerEnemyPawn(
-      id,
-      this.scene,
-      new Vector3(position.x, position.y, position.z)
-    );
+    const pawn = new ServerEnemyPawn(id, this.ctx, new Vector3(position.x, position.y, position.z));
     this.pawns.set(id, pawn);
 
-    // [New] Register AI
-    // Simple logic: Target the first available player
+    // Register AI
     const players = this.getPlayers();
     const target = players.values().next().value;
     this.onEnemySpawned(id, pawn, target);

@@ -9,22 +9,19 @@ import {
   Checkbox,
   InputText,
 } from '@babylonjs/gui';
-import { Observer } from '@babylonjs/core';
-import { NetworkManager } from '../core/systems/NetworkManager';
+// import removed
+import { INetworkManager } from '../core/interfaces/INetworkManager';
 import { UIManager, UIScreen } from './UIManager';
-import { RoomInfo } from '@ante/common';
-import { LocalServerManager } from '../core/server/LocalServerManager';
-import { Logger } from '@ante/common';
+import { RoomInfo, Logger } from '@ante/common';
 
 const logger = new Logger('LobbyUI');
 
 export class LobbyUI {
   private container: Container;
   private roomListPanel: StackPanel;
-  private networkManager: NetworkManager;
+  private networkManager: INetworkManager;
   private uiManager: UIManager;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private observers: Observer<any>[] = [];
+  private cleanups: (() => void)[] = [];
 
   // Visual Constants from UIManager (for consistency)
   private readonly PRIMARY_COLOR = '#ffc400';
@@ -32,9 +29,9 @@ export class LobbyUI {
   private readonly FONT_TACTICAL = 'Rajdhani, sans-serif';
   private readonly FONT_MONO = 'Roboto Mono, monospace';
 
-  constructor(uiManager: UIManager) {
+  constructor(uiManager: UIManager, networkManager: INetworkManager) {
     this.uiManager = uiManager;
-    this.networkManager = NetworkManager.getInstance();
+    this.networkManager = networkManager;
     this.container = this.createContainer();
     this.roomListPanel = this.container
       .getDescendants()
@@ -44,11 +41,8 @@ export class LobbyUI {
   }
 
   public dispose(): void {
-    this.observers.forEach((obs) => {
-      this.networkManager.onRoomListUpdated.remove(obs);
-      this.networkManager.onStateChanged.remove(obs);
-    });
-    this.observers = [];
+    this.cleanups.forEach((cleanup) => cleanup());
+    this.cleanups = [];
     this.container.dispose();
   }
 
@@ -142,7 +136,7 @@ export class LobbyUI {
     backBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
     backBtn.top = '-40px';
     backBtn.onPointerUpObservable.add(() => {
-      LocalServerManager.getInstance().stopSession(); // Ensure local server stops if we leave lobby
+      // Local Server should be stopped by now if we are in Lobby
       this.uiManager.showScreen(UIScreen.MAIN_MENU);
     });
     content.addControl(backBtn);
@@ -156,12 +150,16 @@ export class LobbyUI {
         this.updateRoomList(rooms);
       }
     );
-    if (roomListObserver) this.observers.push(roomListObserver);
+    if (roomListObserver) {
+      this.cleanups.push(() => this.networkManager.onRoomListUpdated.remove(roomListObserver));
+    }
 
     const stateObserver = this.networkManager.onStateChanged.add((state: string): void => {
       this.handleStateChange(state);
     });
-    if (stateObserver) this.observers.push(stateObserver);
+    if (stateObserver) {
+      this.cleanups.push(() => this.networkManager.onStateChanged.remove(stateObserver));
+    }
 
     // Initial fetch from cache
     this.updateRoomList(this.networkManager.getRoomList());
@@ -284,7 +282,7 @@ export class LobbyUI {
     joinBtn.thickness = 1;
     joinBtn.fontFamily = this.FONT_TACTICAL;
     joinBtn.onPointerUpObservable.add(() => {
-      this.networkManager.joinRoom(room.name);
+      this.networkManager.joinGame(room.name);
     });
     stack.addControl(joinBtn);
 
@@ -494,9 +492,8 @@ export class LobbyUI {
       try {
         let success = false;
         if (checkbox.isChecked) {
-          logger.info('Creating Local Server Session...');
-          await LocalServerManager.getInstance().startSession(roomName, mapId, gameMode);
-          success = await this.networkManager.joinRoom(roomName);
+          logger.info('Creating Local Server Session (HostGame)...');
+          success = await this.networkManager.hostGame(roomName, mapId, gameMode);
         } else {
           success = await this.networkManager.createRoom(roomName, mapId);
         }
@@ -507,10 +504,10 @@ export class LobbyUI {
           throw new Error('FAILED_TO_ESTABLISH_UPLINK');
         }
       } catch (e: unknown) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        logger.error('Failed to create/join room:', e as any);
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        logger.error('Failed to create/join room:', errorMessage);
         if (checkbox.isChecked) {
-          LocalServerManager.getInstance().stopSession();
+          this.networkManager.leaveGame();
         }
         initBtn.isEnabled = true;
         initBtn.textBlock!.text = 'INITIATE';

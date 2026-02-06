@@ -9,6 +9,7 @@ import { MeleeEffectComponent } from './MeleeEffectComponent';
 import { ImpactEffectComponent } from './ImpactEffectComponent';
 import { CameraComponent } from './CameraComponent';
 import type { BasePawn } from '../BasePawn';
+import type { GameContext } from '../../types/GameContext';
 
 /**
  * 캐릭터의 무기 인벤토리, 입력, UI 동기화를 조율하는 컴포넌트.
@@ -18,7 +19,7 @@ export class CombatComponent extends BaseComponent {
   private input: WeaponInputComponent;
   private hudSync: HUDSyncComponent;
 
-  constructor(owner: BasePawn, scene: Scene) {
+  constructor(owner: BasePawn, scene: Scene, context: GameContext) {
     super(owner, scene);
 
     const cameraComp = owner.getComponent(CameraComponent) as CameraComponent;
@@ -28,12 +29,9 @@ export class CombatComponent extends BaseComponent {
 
     this.hudSync = new HUDSyncComponent();
 
-    // 1. 인벤토리 초기화 (점수 콜백을 hudSync에 연결)
-    this.inventory = new WeaponInventoryComponent(
-      scene,
-      cameraComp.camera,
-      (points) => this.hudSync.updateScore(points),
-      (force) => cameraComp.applyRecoil(force)
+    // 1. 인벤토리 초기화
+    this.inventory = new WeaponInventoryComponent(context, (force) =>
+      cameraComp.applyRecoil(force)
     );
 
     // 무기 변경 시 HUD 동기화 리스너 등록
@@ -88,6 +86,10 @@ export class CombatComponent extends BaseComponent {
 
   public addAmmoToAll(amount: number): void {
     this.inventory.addAmmoToAll(amount);
+  }
+
+  public reset(): void {
+    this.inventory.reset();
   }
 
   public dispose(): void {

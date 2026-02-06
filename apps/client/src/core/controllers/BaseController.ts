@@ -10,11 +10,13 @@ export abstract class BaseController implements ITickable {
   public id: string;
   public readonly priority = 10;
   protected possessedPawn: IPawn | null = null;
+  protected tickManager: TickManager;
 
-  constructor(id: string) {
+  constructor(id: string, tickManager: TickManager) {
     this.id = id;
+    this.tickManager = tickManager;
     // TickManager에 자동 등록
-    TickManager.getInstance().register(this);
+    this.tickManager.register(this);
   }
 
   /** ITickable 인터페이스 구현 (하위 클래스에서 상속받아 구현) */
@@ -44,6 +46,6 @@ export abstract class BaseController implements ITickable {
 
   /** 리소스 해제 시 호출 (필요한 경우) */
   public dispose(): void {
-    TickManager.getInstance().unregister(this);
+    this.tickManager.unregister(this);
   }
 }

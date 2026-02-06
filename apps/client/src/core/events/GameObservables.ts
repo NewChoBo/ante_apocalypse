@@ -6,7 +6,6 @@ import { MuzzleTransform } from '../../types/IWeapon';
  */
 export interface TargetDestroyedInfo {
   targetId: string;
-  points: number;
   position: Vector3;
 }
 

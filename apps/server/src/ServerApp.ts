@@ -1,5 +1,10 @@
 import { Logger } from '@ante/common';
-import { ServerNetworkAuthority, LogicalServer } from '@ante/game-core';
+import {
+  ServerNetworkAuthority,
+  LogicalServer,
+  TickManager,
+  WorldEntityManager,
+} from '@ante/game-core';
 import { ServerApi } from './ServerApi.js';
 import { NodeAssetLoader } from './NodeAssetLoader.js';
 
@@ -15,10 +20,16 @@ export class ServerApp {
     const appId = process.env.VITE_PHOTON_APP_ID || '';
     const appVersion = process.env.VITE_PHOTON_APP_VERSION || '1.0.0';
 
-    this.networkManager = new ServerNetworkAuthority(appId, appVersion);
+    const tickManager = new TickManager();
+    const worldManager = new WorldEntityManager(tickManager);
+
+    this.networkManager = new ServerNetworkAuthority(appId, appVersion, worldManager);
     this.api = new ServerApi(this.networkManager);
     this.assetLoader = new NodeAssetLoader();
-    this.gameInstance = new LogicalServer(this.networkManager, this.assetLoader);
+    this.gameInstance = new LogicalServer(this.networkManager, this.assetLoader, {
+      tickManager,
+      worldManager,
+    });
   }
 
   public async start(): Promise<void> {

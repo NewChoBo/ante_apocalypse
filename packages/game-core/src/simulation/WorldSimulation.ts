@@ -16,10 +16,13 @@ export class WorldSimulation {
     private authority: INetworkAuthority
   ) {}
 
-  private gameRule: IGameRule | null = null;
+  private _gameRule: IGameRule | null = null;
+  public get gameRule(): IGameRule | null {
+    return this._gameRule;
+  }
 
   public setGameRule(rule: IGameRule): void {
-    this.gameRule = rule;
+    this._gameRule = rule;
   }
 
   /**
@@ -31,16 +34,16 @@ export class WorldSimulation {
     // TODO: AI 업데이트, 물리 시뮬레이션 등 서버 전용 로직 통합
     // 현재는 각 매니저의 helper들을 호출하는 용도로 사용 가능
 
-    if (this.gameRule) {
-      this.gameRule.onUpdate(this, _deltaTime);
+    if (this._gameRule) {
+      this._gameRule.onUpdate(this, _deltaTime);
     }
   }
 
   public initializeRequest(): void {
     if (!this.authority.isMasterClient()) return;
 
-    if (this.gameRule) {
-      this.gameRule.onInitialize(this);
+    if (this._gameRule) {
+      this._gameRule.onInitialize(this);
     }
   }
 }

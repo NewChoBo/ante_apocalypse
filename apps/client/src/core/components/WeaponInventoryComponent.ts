@@ -1,4 +1,4 @@
-import { Scene, UniversalCamera, Observable } from '@babylonjs/core';
+import { Observable } from '@babylonjs/core';
 import { IWeapon } from '../../types/IWeapon';
 import { inventoryStore } from '../store/GameStore';
 import { Pistol } from '../../weapons/Pistol';
@@ -7,6 +7,7 @@ import { Knife } from '../../weapons/Knife';
 import { Bat } from '../../weapons/Bat';
 import { WeaponRegistry } from '@ante/game-core';
 import { Logger } from '@ante/common';
+import type { GameContext } from '../../types/GameContext';
 
 const logger = new Logger('WeaponInventory');
 
@@ -20,24 +21,20 @@ export class WeaponInventoryComponent {
   /** 무기가 변경될 때 호출되는 Observable */
   public onWeaponChanged = new Observable<IWeapon>();
 
-  constructor(
-    scene: Scene,
-    camera: UniversalCamera,
-    onScore: (points: number) => void,
-    applyRecoil?: (force: number) => void
-  ) {
+  constructor(context: GameContext, applyRecoil?: (force: number) => void) {
     this.weapons = [
-      new Pistol(scene, camera, onScore, applyRecoil),
-      new Rifle(scene, camera, onScore, applyRecoil),
-      new Knife(scene, camera, onScore),
-      new Bat(scene, camera, onScore),
+      new Pistol(context, applyRecoil),
+      new Rifle(context, applyRecoil),
+      new Knife(context),
+      new Bat(context),
     ];
 
     // [Authoritative Weapon Stats Sync] - Directly from shared config in monorepo
     logger.info('Applying authoritative weapon configs from shared registry');
     this.weapons.forEach((w) => {
-      if (WeaponRegistry[w.name]) {
-        w.updateStats(WeaponRegistry[w.name]);
+      const stats = WeaponRegistry[w.name];
+      if (stats) {
+        w.updateStats(stats as unknown as Record<string, unknown>);
       }
     });
 
@@ -97,6 +94,22 @@ export class WeaponInventoryComponent {
 
   public addAmmoToAll(amount: number): void {
     this.weapons.forEach((w) => w.addAmmo(amount));
+  }
+
+  public reset(): void {
+    // 1. Reset all weapons (restore ammo)
+    this.weapons.forEach((w) => w.reset?.());
+
+    // 2. Force switch to default weapon (Pistol at index 0)
+    // We do this silently or with animation, but for reset it's better to be instant.
+    this.isSwitching = false;
+    this.currentWeapon.hide();
+
+    this.currentWeaponIndex = 0;
+    this.currentWeapon.show();
+    this.currentWeapon.raise();
+
+    this.onWeaponChanged.notifyObservers(this.currentWeapon);
   }
 
   public dispose(): void {

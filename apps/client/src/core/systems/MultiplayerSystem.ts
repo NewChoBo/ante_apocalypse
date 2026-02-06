@@ -1,17 +1,24 @@
 import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
-import { NetworkManager } from './NetworkManager';
 import { PlayerState } from '@ante/common';
 import { RemotePlayerPawn } from '../RemotePlayerPawn';
 import { PlayerPawn } from '../PlayerPawn';
 import { CombatComponent } from '../components/CombatComponent';
 import { WorldEntityManager } from './WorldEntityManager';
 import { playerHealthStore, gameStateStore } from '../store/GameStore';
+import { INetworkManager } from '../interfaces/INetworkManager';
+import { TickManager } from '@ante/game-core';
+import { Logger } from '@ante/common';
+import type { GameContext } from '../../types/GameContext';
+
+const logger = new Logger('MultiplayerSystem');
 
 export class MultiplayerSystem {
   private scene: Scene;
   private localPlayer: PlayerPawn;
   private remotePlayers: Map<string, RemotePlayerPawn> = new Map();
-  private networkManager: NetworkManager;
+  private networkManager: INetworkManager;
+  private worldManager: WorldEntityManager;
+  private tickManager: TickManager;
   private shadowGenerator: ShadowGenerator;
   private lastUpdateTime = 0;
   private updateInterval = 8; // ~128Hz update rate (extremely responsive)
@@ -20,12 +27,17 @@ export class MultiplayerSystem {
     scene: Scene,
     localPlayer: PlayerPawn,
     shadowGenerator: ShadowGenerator,
+    networkManager: INetworkManager,
+    worldManager: WorldEntityManager,
+    tickManager: TickManager,
     playerName: string = 'Anonymous'
   ) {
     this.scene = scene;
     this.localPlayer = localPlayer;
     this.shadowGenerator = shadowGenerator;
-    this.networkManager = NetworkManager.getInstance();
+    this.networkManager = networkManager;
+    this.worldManager = worldManager;
+    this.tickManager = tickManager;
 
     this.setupListeners();
     localStorage.setItem('playerName', playerName);
@@ -44,12 +56,20 @@ export class MultiplayerSystem {
 
   public applyPlayerStates(states: PlayerState[]): void {
     states.forEach((p) => {
-      if (p.id !== this.networkManager.getSocketId()) {
-        const remote = this.remotePlayers.get(p.id);
+      // String comparison is crucial here because Photon often sends IDs as numbers
+      if (String(p.id) !== String(this.networkManager.getSocketId())) {
+        const remote = this.remotePlayers.get(String(p.id));
         if (remote) {
           remote.updateNetworkState(p.position, p.rotation);
           if (p.weaponId) remote.updateWeapon(p.weaponId);
           if (p.health !== undefined) remote.updateHealth(p.health);
+
+          // Sync Death State
+          if (p.isDead === true && !remote.isDead) remote.die();
+          if (p.isDead === false && remote.isDead) {
+            const pos = new Vector3(p.position.x, p.position.y, p.position.z);
+            remote.respawn(pos);
+          }
         } else {
           this.spawnRemotePlayer(p);
         }
@@ -62,9 +82,21 @@ export class MultiplayerSystem {
           if (healthDiff > 2) {
             this.localPlayer.health = p.health;
             playerHealthStore.set(p.health);
-            if (p.health <= 0 && !this.localPlayer.isDead) {
-              this.localPlayer.die();
-            }
+          }
+
+          // [Death Sync]
+          // If server says we are dead, ensure we die locally
+          if ((p.isDead === true || p.health <= 0) && !this.localPlayer.isDead) {
+            this.localPlayer.die();
+          }
+
+          // [Respawn Sync]
+          // If server says we are alive (and healthy), ensure we respawn locally
+          if (p.isDead === false && p.health > 0 && this.localPlayer.isDead) {
+            logger.info('State Sync forced Respawn for Local Player');
+            const pos = new Vector3(p.position.x, p.position.y, p.position.z);
+            this.localPlayer.respawn(pos);
+            gameStateStore.set('PLAYING');
           }
         }
       }
@@ -74,7 +106,7 @@ export class MultiplayerSystem {
   private setupListeners(): void {
     this.networkManager.onPlayersList.add((players: PlayerState[]): void => {
       players.forEach((p: PlayerState): void => {
-        if (p.id !== this.networkManager.getSocketId()) {
+        if (String(p.id) !== String(this.networkManager.getSocketId())) {
           this.spawnRemotePlayer(p);
         }
       });
@@ -85,7 +117,7 @@ export class MultiplayerSystem {
     });
 
     this.networkManager.onPlayerJoined.add((player: PlayerState): void => {
-      if (player.id !== this.networkManager.getSocketId()) {
+      if (String(player.id) !== String(this.networkManager.getSocketId())) {
         this.spawnRemotePlayer(player);
       }
     });
@@ -103,12 +135,14 @@ export class MultiplayerSystem {
     this.networkManager.onPlayerLeft.add((id: string): void => {
       const remote = this.remotePlayers.get(id);
       if (remote) {
-        WorldEntityManager.getInstance().unregister(id);
+        this.worldManager.unregister(id);
         this.remotePlayers.delete(id);
       }
     });
 
     this.networkManager.onPlayerFired.add((data: import('@ante/common').FireEventData): void => {
+      if (String(data.playerId) === String(this.networkManager.getSocketId())) return;
+
       const remote = this.remotePlayers.get(data.playerId);
       if (remote) {
         remote.fire(data.weaponId, data.muzzleTransform);
@@ -117,11 +151,13 @@ export class MultiplayerSystem {
 
     this.networkManager.onPlayerReloaded.add(
       (data: { playerId: string; weaponId: string }): void => {
+        if (String(data.playerId) === String(this.networkManager.getSocketId())) return;
+
         const remote = this.remotePlayers.get(data.playerId);
         if (remote) {
-          // remote.reload() call if implemented, or just for visual sync
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (remote as any).reload?.(data.weaponId);
+          if (typeof (remote as any).reload === 'function') {
+            (remote as any).reload(data.weaponId);
+          }
         }
       }
     );
@@ -176,13 +212,23 @@ export class MultiplayerSystem {
   }
 
   private spawnRemotePlayer(player: PlayerState): void {
-    if (this.remotePlayers.has(player.id)) return;
+    const playerId = String(player.id);
+    if (this.remotePlayers.has(playerId)) return;
+    if (playerId === String(this.networkManager.getSocketId())) return; // Double check
 
     const name = player.name || 'Anonymous';
-    const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, name);
+    const context: GameContext = {
+      scene: this.scene,
+      camera: this.localPlayer.camera,
+      networkManager: this.networkManager,
+      worldManager: this.worldManager,
+      tickManager: this.tickManager,
+    };
+
+    const remote = new RemotePlayerPawn(this.scene, playerId, this.shadowGenerator, context, name);
     remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
-    this.remotePlayers.set(player.id, remote);
-    WorldEntityManager.getInstance().registerEntity(remote);
+    this.remotePlayers.set(playerId, remote);
+    this.worldManager.register(remote);
   }
 
   public update(): void {

@@ -2,6 +2,7 @@ import { Observable, Vector3 } from '@babylonjs/core';
 import { INetworkProvider } from '../network/INetworkProvider';
 import { PhotonProvider } from '../network/providers/PhotonProvider';
 import { INetworkAuthority, NetworkDispatcher, LogicalServer } from '@ante/game-core';
+import { LocalServerManager } from '../server/LocalServerManager';
 import {
   RoomInfo,
   NetworkState,
@@ -17,8 +18,6 @@ import {
   TargetHitPayload,
   TargetDestroyPayload,
   SpawnTargetPayload,
-  SyncWeaponPayload,
-  MovePayload,
   EnemyDestroyPayload,
   PickupDestroyPayload,
   RespawnEventData,
@@ -29,22 +28,23 @@ import { ConnectionManager } from '../network/ConnectionManager';
 import { PlayerStateManager } from '../network/PlayerStateManager';
 import { RoomManager } from '../network/RoomManager';
 
+import { INetworkManager } from '../interfaces/INetworkManager';
+
 const logger = new Logger('NetworkManager');
 
 /**
  * 네트워크 관리 Facade 클래스
  * 기존 API를 유지하면서 내부적으로 분리된 Manager들에 위임
  */
-export class NetworkManager implements INetworkAuthority {
-  private static instance: NetworkManager;
+export class NetworkManager implements INetworkAuthority, INetworkManager {
   private provider: INetworkProvider;
+  private localServerManager: LocalServerManager;
 
   // Sub-managers
   private connectionManager: ConnectionManager;
   private playerStateManager: PlayerStateManager;
   private roomManager: RoomManager;
   private dispatcher: NetworkDispatcher = new NetworkDispatcher();
-  private localServer: LogicalServer | null = null;
 
   // Player Observables (delegated from PlayerStateManager)
   public get onPlayerJoined(): Observable<PlayerState> {
@@ -97,8 +97,9 @@ export class NetworkManager implements INetworkAuthority {
   public onTargetDestroy = new Observable<TargetDestroyPayload>();
   public onTargetSpawn = new Observable<SpawnTargetPayload>();
 
-  private constructor() {
+  constructor(localServerManager: LocalServerManager) {
     this.provider = new PhotonProvider();
+    this.localServerManager = localServerManager;
 
     // Initialize sub-managers
     this.connectionManager = new ConnectionManager(this.provider);
@@ -131,47 +132,36 @@ export class NetworkManager implements INetworkAuthority {
     this.playerStateManager.clearObservers();
   }
 
-  public static getInstance(): NetworkManager {
-    if (!NetworkManager.instance) {
-      NetworkManager.instance = new NetworkManager();
-    }
-    return NetworkManager.instance;
-  }
-
-  public setLocalServer(server: LogicalServer | null): void {
-    this.localServer = server;
-    logger.info(`LocalServer ${server ? 'registered' : 'unregistered'} in NetworkManager`);
+  public setLocalServer(_server: LogicalServer | null): void {
+    logger.info(`LocalServer ${_server ? 'registered' : 'unregistered'} in NetworkManager`);
   }
 
   private setupDispatcher(): void {
-    this.dispatcher.register(EventCode.FIRE, (data: unknown, senderId: string): void => {
-      const fireData = data as FireEventData;
+    this.dispatcher.register(EventCode.FIRE, (fireData, senderId): void => {
       this.onPlayerFired.notifyObservers({
-        playerId: senderId,
+        playerId: fireData.playerId || senderId,
         weaponId: fireData.weaponId,
         muzzleTransform: fireData.muzzleTransform,
       });
     });
 
-    this.dispatcher.register(EventCode.HIT, (data: unknown): void => {
-      this.onPlayerHit.notifyObservers(data as HitEventData);
+    this.dispatcher.register(EventCode.HIT, (data): void => {
+      this.onPlayerHit.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.DESTROY_ENEMY, (data: unknown): void => {
-      this.onEnemyDestroyed.notifyObservers(data as EnemyDestroyPayload);
+    this.dispatcher.register(EventCode.DESTROY_ENEMY, (data): void => {
+      this.onEnemyDestroyed.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.DESTROY_PICKUP, (data: unknown): void => {
-      this.onPickupDestroyed.notifyObservers(data as PickupDestroyPayload);
+    this.dispatcher.register(EventCode.DESTROY_PICKUP, (data): void => {
+      this.onPickupDestroyed.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.SYNC_WEAPON, (data: unknown, senderId: string): void => {
-      const syncData = data as SyncWeaponPayload;
+    this.dispatcher.register(EventCode.SYNC_WEAPON, (syncData, senderId): void => {
       this.playerStateManager.updatePlayer(senderId, { weaponId: syncData.weaponId });
     });
 
-    this.dispatcher.register(EventCode.MOVE, (data: unknown, senderId: string): void => {
-      const moveData = data as MovePayload;
+    this.dispatcher.register(EventCode.MOVE, (moveData, senderId): void => {
       const player = this.playerStateManager.getPlayer(senderId);
       if (player) {
         const isMe = senderId === this.getSocketId();
@@ -192,47 +182,43 @@ export class NetworkManager implements INetworkAuthority {
       }
     });
 
-    this.dispatcher.register(EventCode.ENEMY_MOVE, (data: unknown): void => {
-      this.onEnemyUpdated.notifyObservers(data as EnemyMovePayload);
+    this.dispatcher.register(EventCode.ENEMY_MOVE, (data): void => {
+      this.onEnemyUpdated.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.TARGET_HIT, (data: unknown): void => {
-      this.onTargetHit.notifyObservers(data as TargetHitPayload);
+    this.dispatcher.register(EventCode.TARGET_HIT, (data): void => {
+      this.onTargetHit.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.PLAYER_DEATH, (data: unknown): void => {
-      this.onPlayerDied.notifyObservers(data as DeathEventData);
+    this.dispatcher.register(EventCode.PLAYER_DEATH, (data): void => {
+      this.onPlayerDied.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.RESPAWN, (data: unknown): void => {
-      this.onPlayerRespawn.notifyObservers(data as RespawnEventData);
+    this.dispatcher.register(EventCode.RESPAWN, (data): void => {
+      this.onPlayerRespawn.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.GAME_END, (data: unknown): void => {
-      this.onGameEnd.notifyObservers(data as GameEndEventData);
+    this.dispatcher.register(EventCode.GAME_END, (data): void => {
+      this.onGameEnd.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.TARGET_DESTROY, (data: unknown): void => {
-      this.onTargetDestroy.notifyObservers(data as TargetDestroyPayload);
+    this.dispatcher.register(EventCode.TARGET_DESTROY, (data): void => {
+      this.onTargetDestroy.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.RELOAD, (data: unknown): void => {
-      this.onPlayerReloaded.notifyObservers(data as { playerId: string; weaponId: string });
+    this.dispatcher.register(EventCode.RELOAD, (data): void => {
+      this.onPlayerReloaded.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.SPAWN_TARGET, (data: unknown): void => {
-      this.onTargetSpawn.notifyObservers(data as SpawnTargetPayload);
+    this.dispatcher.register(EventCode.SPAWN_TARGET, (data): void => {
+      this.onTargetSpawn.notifyObservers(data);
     });
 
-    this.dispatcher.register(
-      EventCode.REQ_INITIAL_STATE,
-      (_data: unknown, senderId: string): void => {
-        this.onInitialStateRequested.notifyObservers({ senderId });
-      }
-    );
+    this.dispatcher.register(EventCode.REQ_INITIAL_STATE, (_data, senderId): void => {
+      this.onInitialStateRequested.notifyObservers({ senderId });
+    });
 
-    this.dispatcher.register(EventCode.INITIAL_STATE, (data: unknown): void => {
-      const stateData = data as InitialStatePayload;
+    this.dispatcher.register(EventCode.INITIAL_STATE, (stateData): void => {
       this.onInitialStateReceived.notifyObservers({
         players: stateData.players,
         enemies: stateData.enemies,
@@ -268,7 +254,12 @@ export class NetworkManager implements INetworkAuthority {
 
     this.provider.onEvent = (code: number, data: unknown, senderId: string): void => {
       this.onEvent.notifyObservers({ code, data, senderId });
-      this.dispatcher.dispatch(code, data, senderId);
+      // Use internal cast for dynamic dispatch
+      (this.dispatcher.dispatch as (code: EventCode, data: unknown, actorNr: string) => void)(
+        code as EventCode,
+        data,
+        senderId
+      );
     };
 
     this.provider.onMasterClientSwitched = (newMasterId: string): void => {
@@ -276,19 +267,92 @@ export class NetworkManager implements INetworkAuthority {
       if (myId === newMasterId) {
         // INetworkProvider 인터페이스를 통해 room name 획득
         const roomName = this.provider.getCurrentRoomName?.();
-        if (roomName) {
-          logger.info(`I AM THE NEW HOST - Triggering Takeover for Room: ${roomName}`);
-          import('../server/LocalServerManager').then(({ LocalServerManager }) => {
-            LocalServerManager.getInstance().takeover(roomName);
-          });
-        }
+        this.handleTakeover(roomName || null);
       }
     };
   }
 
+  // =================================================================
+  // [New] Centralized Session Management (Host, Join, Leave, Takeover)
+  // =================================================================
+
+  /**
+   * 게임 호스팅 (방 생성 + 로컬 서버 시작)
+   */
+  public async hostGame(
+    roomName: string,
+    mapId: string,
+    gameMode: string = 'deathmatch'
+  ): Promise<boolean> {
+    // 1. 방 생성 (Create Room)
+    const created = await this.roomManager.createRoom(roomName, mapId);
+    if (!created) return false;
+
+    // 2. 로컬 서버 시작 (Start Local Server)
+    logger.info(`HostGame: Starting Local Server for ${roomName}`);
+    await this.localServerManager.startSession(this, roomName, mapId, gameMode);
+
+    // 3. 서버 인스턴스 등록 (Register Server Instance)
+    this.setLocalServer(this.localServerManager.getLogicalServer());
+
+    return true;
+  }
+
+  /**
+   * 게임 참가 (방 참가 only)
+   */
+  public async joinGame(roomName: string): Promise<boolean> {
+    const joined = await this.roomManager.joinRoom(roomName);
+    if (!joined) return false;
+
+    // Request initial state from Master Client
+    logger.info(`Requesting Initial State for room ${roomName}...`);
+    this.provider.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
+
+    // 혹시 들어가자마자 방장인 경우 (방이 비어있었을 때 등) 체크
+    if (this.isMasterClient()) {
+      await this.handleTakeover(roomName);
+    }
+    return true;
+  }
+
+  /**
+   * 게임 떠나기 (서버 종료 + 방 나가기 통합)
+   */
+  public leaveGame(): void {
+    // 1. 내가 서버를 돌리고 있었다면 종료
+    if (this.localServerManager.isServerRunning()) {
+      logger.info('LeaveGame: Stopping Local Server...');
+      this.localServerManager.stopSession();
+      this.setLocalServer(null);
+    }
+
+    // 2. 방 나가기
+    this.roomManager.leaveRoom();
+
+    // 3. 옵저버 정리
+    this.clearObservers();
+  }
+
+  /**
+   * [Internal] 호스트 권한 위임 처리
+   */
+  private async handleTakeover(roomName: string | null): Promise<void> {
+    if (!roomName) return;
+
+    // 이미 서버가 돌고 있으면 패스
+    if (this.localServerManager.isServerRunning()) return;
+
+    logger.info('HandleTakeover: Taking over host duties...');
+    await this.localServerManager.takeover(this, roomName);
+
+    // 서버 인스턴스 등록
+    this.setLocalServer(this.localServerManager.getLogicalServer());
+  }
+
   // === Connection Methods (delegated) ===
-  public connect(userId: string): void {
-    this.connectionManager.connect(userId);
+  public async connect(userId: string): Promise<boolean> {
+    return this.connectionManager.connect(userId);
   }
 
   // === Room Methods (delegated) ===
@@ -349,13 +413,8 @@ export class NetworkManager implements INetworkAuthority {
     const myId = this.getSocketId();
     if (myId) {
       const payload = this.playerStateManager.createMovePayload(myId, data.position, data.rotation);
-
-      // Short-circuit for Master Client
-      if (this.isMasterClient() && this.localServer) {
-        this.localServer.updatePlayerPawn(myId, data.position, data.rotation);
-      } else {
-        this.provider.sendEvent(EventCode.MOVE, payload, false);
-      }
+      // Unified: Host loopback handles local server update via ClientHostNetworkAdapter
+      this.sendEvent(EventCode.MOVE, payload, false);
     }
   }
 
@@ -371,15 +430,8 @@ export class NetworkManager implements INetworkAuthority {
       direction: { x: number; y: number; z: number };
     };
   }): void {
-    if (this.isMasterClient() && this.localServer && fireData.muzzleTransform) {
-      this.localServer.processFireEvent(
-        this.getSocketId()!,
-        fireData.muzzleTransform.position,
-        fireData.muzzleTransform.direction,
-        fireData.weaponId
-      );
-    }
-    this.provider.sendEvent(EventCode.FIRE, fireData, true);
+    // Redirection: Send to Master for authoritative broadcast
+    this.sendToMaster(EventCode.FIRE, fireData, true);
   }
 
   public reload(weaponId: string): void {
@@ -387,27 +439,60 @@ export class NetworkManager implements INetworkAuthority {
     if (!myId) return;
 
     const payload = { playerId: myId, weaponId };
-    this.provider.sendEvent(EventCode.RELOAD, payload, true);
+    this.sendToMaster(EventCode.RELOAD, payload, true);
   }
 
   public syncWeapon(weaponId: string): void {
-    if (this.isMasterClient() && this.localServer) {
-      this.localServer.processSyncWeapon(this.getSocketId()!, weaponId);
-    } else {
-      this.provider.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
-    }
+    // Redirection: Send to Master for authoritative broadcast
+    this.sendToMaster(EventCode.SYNC_WEAPON, { weaponId }, true);
   }
 
   public requestHit(hitData: RequestHitData): void {
-    if (this.isMasterClient() && this.localServer) {
-      this.localServer.processHitRequest(this.getSocketId()!, hitData);
-    } else {
-      this.provider.sendEvent(EventCode.REQUEST_HIT, hitData, true);
-    }
+    // Redirection: Send to Master for authoritative broadcast
+    this.sendToMaster(EventCode.REQUEST_HIT, hitData, true);
   }
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
     this.provider.sendEvent(code, data, reliable);
+
+    // Host broadcast loopback
+    if (this.isMasterClient()) {
+      this.loopback(code, data, true);
+    }
+  }
+
+  /**
+   * Send an event ONLY to the Master Client (Host).
+   * If the caller is the Master Client, it loops back locally as a REQUEST.
+   */
+  public sendToMaster(code: number, data: unknown, reliable: boolean = true): void {
+    if (this.isMasterClient()) {
+      this.loopback(code, data, false);
+    } else {
+      this.provider.sendEventToMaster(code, data, reliable);
+    }
+  }
+
+  /**
+   * Locally dispatch an event to observers and dispatcher handlers.
+   * @param isBroadcast If true, this is a downstream broadcast (no re-processing by server adapter).
+   *                    If false, this is an upstream request (triggers server adapter).
+   */
+  private loopback(code: number, data: unknown, isBroadcast: boolean = false): void {
+    const myId = this.getSocketId();
+    if (myId) {
+      // 1. Notify Observers (Server adapter listens here for REQUESTS)
+      if (!isBroadcast) {
+        this.onEvent.notifyObservers({ code, data, senderId: myId });
+      }
+
+      // 2. Dispatch to internal handlers (Client systems)
+      (this.dispatcher.dispatch as (code: EventCode, data: unknown, actorNr: string) => void)(
+        code as EventCode,
+        data,
+        myId
+      );
+    }
   }
 
   // === Utility Methods ===

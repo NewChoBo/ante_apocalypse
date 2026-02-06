@@ -26,20 +26,23 @@ export abstract class BasePawn implements IPawnCore, ITickable {
     return this.mesh.rotation;
   }
 
-  constructor(protected scene: Scene) {
+  constructor(
+    protected scene: Scene,
+    protected tickManager: TickManager
+  ) {
     // TickManager registration moved to explicit activation or WorldEntityManager
   }
 
   public activate(): void {
     if (this.isActive) return;
     this.isActive = true;
-    TickManager.getInstance().register(this);
+    this.tickManager.register(this);
   }
 
   public deactivate(): void {
     if (!this.isActive) return;
     this.isActive = false;
-    TickManager.getInstance().unregister(this);
+    this.tickManager.unregister(this);
   }
 
   /** ITickable 인터페이스 구현 */
@@ -87,7 +90,7 @@ export abstract class BasePawn implements IPawnCore, ITickable {
   }
 
   /** 특정 타입의 컴포넌트 찾기 */
-  /** 특정 타입의 컴포넌트 찾기 */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public getComponent<T extends BaseComponent>(type: new (...args: any[]) => T): T | undefined {
     return this.components.find((c) => c instanceof type) as T | undefined;
   }
@@ -109,7 +112,7 @@ export abstract class BasePawn implements IPawnCore, ITickable {
 
   /** 리소스 해제 */
   public dispose(): void {
-    TickManager.getInstance().unregister(this);
+    this.tickManager.unregister(this);
 
     for (const component of this.components) {
       component.dispose();

@@ -11,6 +11,7 @@ import {
   DynamicTexture,
 } from '@babylonjs/core';
 import { CharacterPawn, CharacterPawnConfig } from './CharacterPawn';
+import type { GameContext } from '../types/GameContext';
 import { GameAssets } from './GameAssets';
 import { Logger } from '@ante/common';
 
@@ -42,6 +43,7 @@ export class RemotePlayerPawn extends CharacterPawn {
     scene: Scene,
     id: string,
     shadowGenerator: ShadowGenerator,
+    context: GameContext,
     name: string = 'Unknown'
   ) {
     const config: CharacterPawnConfig = {
@@ -52,7 +54,7 @@ export class RemotePlayerPawn extends CharacterPawn {
       healthBarStyle: 'player',
       showHealthBar: true,
     };
-    super(scene, config);
+    super(scene, config, context);
 
     this.id = id;
     this.playerName = name;

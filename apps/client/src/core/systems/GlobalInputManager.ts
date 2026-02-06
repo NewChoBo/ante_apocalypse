@@ -3,25 +3,21 @@ import { PlayerPawn } from '../PlayerPawn';
 import { PlayerController } from '../controllers/PlayerController';
 import { InventoryUI } from '../../ui/inventory/InventoryUI';
 import { gameStateStore } from '../store/GameStore';
-import { UIManager, UIScreen } from '../../ui/UIManager';
+import { IUIManager } from '../../ui/IUIManager';
+import { UIScreen } from '../../ui/UIManager';
 
 export class GlobalInputManager {
-  private static instance: GlobalInputManager;
   private scene: Scene | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private playerPawn: PlayerPawn | null = null;
   private playerController: PlayerController | null = null;
   private inventoryUI: InventoryUI | null = null;
+  private uiManager: IUIManager;
 
   private isInitialized = false;
 
-  private constructor() {}
-
-  public static getInstance(): GlobalInputManager {
-    if (!GlobalInputManager.instance) {
-      GlobalInputManager.instance = new GlobalInputManager();
-    }
-    return GlobalInputManager.instance;
+  constructor(uiManager: IUIManager) {
+    this.uiManager = uiManager;
   }
 
   public initialize(
@@ -80,7 +76,7 @@ export class GlobalInputManager {
     if (e.code === 'Escape') {
       if (isGameOver) return;
 
-      const ui = UIManager.getInstance();
+      const ui = this.uiManager;
       if (ui) {
         if (ui.currentScreen === UIScreen.SETTINGS) {
           // If we are in game (which we are if GlobalInputManager is active), return to PAUSE

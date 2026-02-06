@@ -1,15 +1,16 @@
 import express from 'express';
 import cors from 'cors';
+import { Server } from 'http';
 import { ServerNetworkAuthority } from '@ante/game-core';
 import { WeaponRegistry } from '@ante/game-core';
-import { Logger } from '@ante/common';
+import { Logger, getErrorMessage } from '@ante/common';
 
 const logger = new Logger('ServerApi');
 
 export class ServerApi {
   private app: express.Application;
   private port = 3000;
-  private server: any; // http.Server
+  private server: Server | null = null;
   private networkManager: ServerNetworkAuthority;
 
   constructor(networkManager: ServerNetworkAuthority) {
@@ -22,7 +23,7 @@ export class ServerApi {
   }
 
   private setupRoutes(): void {
-    this.app.post('/create-room', async (req, res) => {
+    this.app.post('/create-room', async (req, res): Promise<void> => {
       const { mapId, playerName } = req.body;
       const roomName = `SQUAD_${playerName?.toUpperCase() || 'UNKNOWN'}_${Math.floor(Math.random() * 1000)}`;
 
@@ -35,10 +36,11 @@ export class ServerApi {
           success: true,
           roomName: roomName,
         });
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error);
         res.status(500).json({
           success: false,
-          error: error.message,
+          error: errorMessage,
         });
       }
     });
@@ -46,7 +48,7 @@ export class ServerApi {
     this.app.get('/status', (_req, res) => {
       res.json({
         status: 'running',
-        room: (this.networkManager as any).currentRoomName || 'Lobby',
+        room: this.networkManager.getRoomName() || 'Lobby',
       });
     });
 

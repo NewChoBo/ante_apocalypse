@@ -9,11 +9,13 @@ import {
   Container,
   Slider,
 } from '@babylonjs/gui';
-import { Scene, Observable, Observer } from '@babylonjs/core';
+import { Scene, Observable } from '@babylonjs/core';
 import { LobbyUI } from './LobbyUI';
-import { NetworkManager } from '../core/systems/NetworkManager';
 import { settingsStore } from '../core/store/SettingsStore';
 import { NetworkState, Logger } from '@ante/common';
+import { INetworkManager } from '../core/interfaces/INetworkManager';
+
+import { IUIManager } from './IUIManager';
 
 const logger = new Logger('UIManager');
 
@@ -26,8 +28,7 @@ export enum UIScreen {
   NONE = 'NONE',
 }
 
-export class UIManager {
-  private static instance: UIManager;
+export class UIManager implements IUIManager {
   public ui: AdvancedDynamicTexture;
 
   // UI Containers
@@ -36,8 +37,7 @@ export class UIManager {
   public currentScreen: UIScreen = UIScreen.NONE;
   private previousScreen: UIScreen = UIScreen.MAIN_MENU;
   private lobbyUI: LobbyUI | null = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private observers: Observer<any>[] = [];
+  private cleanups: (() => void)[] = [];
 
   // Visual Constants
   private readonly PRIMARY_COLOR = '#ffc400';
@@ -54,7 +54,10 @@ export class UIManager {
 
   private selectedMap = 'training_ground';
 
-  private constructor(scene: Scene) {
+  private networkManager: INetworkManager;
+
+  constructor(scene: Scene, networkManager: INetworkManager) {
+    this.networkManager = networkManager;
     this.ui = AdvancedDynamicTexture.CreateFullscreenUI('UI', true, scene);
     this.createScreens();
     this.setupNetworkListeners();
@@ -75,8 +78,7 @@ export class UIManager {
   }
 
   private setupNetworkListeners(): void {
-    const network = NetworkManager.getInstance();
-    const stateObserver = network.onStateChanged.add((state: string): void => {
+    const stateObserver = this.networkManager.onStateChanged.add((state: string): void => {
       // Safety check: if UI texture is disposed, don't try to add notifications
       if (this.ui && this.ui.getScene()) {
         if (state === NetworkState.Disconnected || state === NetworkState.Error) {
@@ -86,22 +88,9 @@ export class UIManager {
         }
       }
     });
-    if (stateObserver) this.observers.push(stateObserver);
-  }
-
-  public static initialize(scene: Scene): UIManager {
-    if (UIManager.instance) {
-      UIManager.instance.dispose();
+    if (stateObserver) {
+      this.cleanups.push(() => this.networkManager.onStateChanged.remove(stateObserver));
     }
-    UIManager.instance = new UIManager(scene);
-    return UIManager.instance;
-  }
-
-  public static getInstance(): UIManager {
-    if (!UIManager.instance) {
-      throw new Error('UIManager not initialized. Call initialize() first.');
-    }
-    return UIManager.instance;
   }
 
   /**
@@ -270,7 +259,7 @@ export class UIManager {
   }
 
   private createLobbyScreen(): Container {
-    this.lobbyUI = new LobbyUI(this);
+    this.lobbyUI = new LobbyUI(this, this.networkManager);
     const container = this.lobbyUI.getContainer();
     this.ui.addControl(container);
     return container;
@@ -484,9 +473,9 @@ export class UIManager {
     if (canvas) {
       // In modern browsers, requestPointerLock returns a promise
       try {
-        const promise = canvas.requestPointerLock() as unknown as Promise<void>;
-        if (promise && promise.catch) {
-          promise.catch((e: Error) => {
+        const result = canvas.requestPointerLock() as unknown;
+        if (result instanceof Promise) {
+          result.catch((e: Error) => {
             if (e.name !== 'SecurityError') {
               logger.warn(`PointerLock request failed: ${e.message}`);
             }
@@ -554,10 +543,8 @@ export class UIManager {
     }
 
     // Clean up observers
-    this.observers.forEach((obs) => {
-      NetworkManager.getInstance().onStateChanged.remove(obs);
-    });
-    this.observers = [];
+    this.cleanups.forEach((cleanup) => cleanup());
+    this.cleanups = [];
 
     this.ui.dispose();
   }

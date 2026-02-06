@@ -32,8 +32,7 @@ export class HealthBarComponent extends BaseComponent {
       yOffset?: number;
     } = {}
   ) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    super(owner as any, scene);
+    super(owner as unknown as import('@ante/game-core').IPawnCore, scene);
     this.style = options.style ?? 'player';
     this.width = options.width ?? 1.5;
     this.height = options.height ?? 0.2;

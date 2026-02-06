@@ -6,18 +6,43 @@ import { CombatComponent } from '../components/CombatComponent';
 import { HUD } from '../../ui/HUD';
 import { InventoryUI } from '../../ui/inventory/InventoryUI';
 import { InventoryManager } from '../inventory/InventoryManager';
-import { GlobalInputManager } from './GlobalInputManager';
-import { NetworkManager } from './NetworkManager';
 import { MultiplayerSystem } from './MultiplayerSystem';
 import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
 import { EnemyManager } from './EnemyManager';
-import { EventCode, InitialStatePayload, SpawnTargetPayload } from '@ante/common';
-import { WorldSimulation, WaveSurvivalRule } from '@ante/game-core';
+import { InitialStatePayload, SpawnTargetPayload } from '@ante/common';
+import { WorldSimulation, WaveSurvivalRule, TickManager } from '@ante/game-core';
 import { WorldEntityManager } from './WorldEntityManager';
 import { GameObservables } from '../events/GameObservables';
 import { GameAssets } from '../GameAssets';
 import { playerHealthStore, inventoryStore } from '../store/GameStore';
+import { INetworkManager } from '../interfaces/INetworkManager';
+import { IUIManager } from '../../ui/IUIManager';
+import { LocalServerManager } from '../server/LocalServerManager';
+import { GlobalInputManager } from './GlobalInputManager';
+import { CameraComponent } from '../components/CameraComponent';
+import type { GameContext } from '../../types/GameContext';
+
+/**
+ * 네트워크 에러 헨들러 타입
+ */
+export type ErrorHandler = (error: Error, context: string) => void;
+
+/**
+ * SessionControllerOptions
+ * 의존성 주입을 위한 옵션 인터페이스
+ */
+export interface SessionControllerOptions {
+  networkManager: INetworkManager;
+  uiManager: IUIManager;
+  worldManager: WorldEntityManager;
+  enemyManager: EnemyManager;
+  pickupManager: PickupManager;
+  tickManager: TickManager;
+  localServerManager: LocalServerManager;
+  onError?: ErrorHandler;
+  debug?: boolean;
+}
 
 export class SessionController {
   private scene: Scene;
@@ -35,16 +60,52 @@ export class SessionController {
   private healthUnsub: (() => void) | null = null;
   private _initialStateObserver: Observer<InitialStatePayload> | null = null;
 
-  constructor(scene: Scene, canvas: HTMLCanvasElement, shadowGenerator: ShadowGenerator) {
+  private networkManager: INetworkManager;
+  private uiManager: IUIManager;
+  private worldManager: WorldEntityManager;
+  private pickupManager: PickupManager;
+  private inputManager: GlobalInputManager;
+  private tickManager: TickManager;
+  private localServerManager: LocalServerManager;
+  private ctx!: GameContext;
+
+  constructor(
+    scene: Scene,
+    canvas: HTMLCanvasElement,
+    shadowGenerator: ShadowGenerator,
+    options: SessionControllerOptions
+  ) {
     this.scene = scene;
     this.canvas = canvas;
     this.shadowGenerator = shadowGenerator;
+    this.networkManager = options.networkManager;
+    this.uiManager = options.uiManager;
+    this.worldManager = options.worldManager;
+    this.enemyManager = options.enemyManager;
+    this.pickupManager = options.pickupManager;
+    this.tickManager = options.tickManager;
+    this.localServerManager = options.localServerManager;
+    this.inputManager = new GlobalInputManager(this.uiManager);
   }
 
   public async initialize(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
-    this.playerPawn = new PlayerPawn(this.scene);
-    WorldEntityManager.getInstance().initialize();
-    WorldEntityManager.getInstance().register(this.playerPawn);
+    this.ctx = {
+      scene: this.scene,
+      camera: null as unknown as UniversalCamera,
+      tickManager: this.tickManager,
+      networkManager: this.networkManager,
+      worldManager: this.worldManager,
+    } as GameContext;
+
+    this.playerPawn = new PlayerPawn(this.ctx);
+
+    const camComp = this.playerPawn.getComponent(CameraComponent) as CameraComponent;
+    if (camComp) {
+      this.ctx.camera = camComp.camera;
+    }
+
+    this.worldManager.initialize();
+    this.worldManager.register(this.playerPawn);
 
     if (levelData.playerSpawn) {
       this.playerPawn.position = Vector3.FromArray(levelData.playerSpawn);
@@ -52,98 +113,95 @@ export class SessionController {
       this.playerPawn.position = new Vector3(0, 1.75, -5);
     }
 
-    this.playerController = new PlayerController('player1', this.canvas);
+    this.playerController = new PlayerController('player1', this.canvas, this.tickManager);
     this.playerController.possess(this.playerPawn);
 
-    this.hud = new HUD();
+    this.hud = new HUD(this.uiManager);
 
     this.setupSystems(levelData);
     this.setupCombat();
     this.setupInventory();
     this.setupInput();
 
-    // Always setup multiplayer in dedicated server architecture
     this.setupMultiplayer(playerName);
-
     this.setupSpectatorInput();
   }
 
   private setupSystems(levelData: LevelData): void {
-    this.targetSpawner = new TargetSpawnerComponent(this.scene, this.shadowGenerator);
-    // Initial layout is now handled by the authority (server/simulation)
-
+    this.targetSpawner = new TargetSpawnerComponent(this.ctx, this.shadowGenerator);
     if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
-      this.enemyManager = new EnemyManager(this.scene, this.shadowGenerator);
-      // Spawning is now handled by the authority
+      // Logic for enemy spawns
     }
-
-    PickupManager.getInstance().initialize(this.scene, this.playerPawn!);
-
+    this.pickupManager.initialize(this.scene, this.playerPawn!);
     GameObservables.itemCollection.add((): void => {
       GameAssets.sounds.swipe?.play();
     });
   }
 
   private setupCombat(): void {
-    const combatComp = new CombatComponent(this.playerPawn!, this.scene);
+    const combatComp = new CombatComponent(this.playerPawn!, this.scene, this.ctx);
     this.playerPawn!.addComponent(combatComp);
 
     this.healthUnsub = playerHealthStore.subscribe((health: number): void => {
       if (health <= 0) {
-        GameObservables.playerDied.notifyObservers(null);
-        this.isSpectating = true;
-        this.spectateMode = 'FREE'; // Default to free look on death
-        this.hud?.showRespawnCountdown(3);
+        if (!this.isSpectating) {
+          GameObservables.playerDied.notifyObservers(null);
+          this.isSpectating = true;
+          this.spectateMode = 'FREE';
+          this.hud?.showRespawnCountdown(3);
+        }
+      } else {
+        // [Fix] If health restored via State Sync (without Respawn Event), ensure we exit spectator mode
+        if (this.isSpectating) {
+          this.isSpectating = false;
+          this.spectateTargetIndex = -1;
+          this.hud?.hideRespawnMessage();
+          this.playerController?.setInputBlocked(false);
+        }
       }
     });
 
     combatComp.onWeaponChanged((newWeapon: { name: string }): void => {
       this.syncInventoryStore();
       if (this.multiplayerSystem) {
-        NetworkManager.getInstance().syncWeapon(newWeapon.name);
+        this.networkManager.syncWeapon(newWeapon.name);
       }
     });
   }
 
   private setupInventory(): void {
-    this.inventoryUI = new InventoryUI({
-      onEquipWeapon: (slot: number, weaponId: string | null): void => {
-        const state = inventoryStore.get();
-        const slots = [...state.weaponSlots];
-        slots[slot] = weaponId;
-        inventoryStore.setKey('weaponSlots', slots);
-
-        if (weaponId) {
+    this.inventoryUI = new InventoryUI(
+      {
+        onEquipWeapon: async (_slot, id): Promise<void> => {
           const combat = this.playerPawn?.getComponent(CombatComponent);
-          (combat as CombatComponent)?.equipWeapon(weaponId);
-        }
-      },
-      onUseItem: (itemId: string): void => {
-        if (this.playerPawn) {
-          InventoryManager.useItem(itemId, this.playerPawn);
-          this.syncInventoryStore();
-        }
-      },
-      onDropItem: (itemId: string): void => {
-        if (!this.playerPawn) return;
-        const state = inventoryStore.get();
-        const bag = [...state.bagItems];
-        const itemIndex = bag.findIndex((i) => i.id === itemId);
-
-        if (itemIndex !== -1) {
-          const item = bag[itemIndex];
-          if (item.count > 1) {
-            bag[itemIndex] = { ...item, count: item.count - 1 };
-          } else {
-            bag.splice(itemIndex, 1);
+          if (combat && id) await combat.equipWeapon(id);
+        },
+        onUseItem: (id): void => {
+          if (this.playerPawn) {
+            InventoryManager.useItem(id, this.playerPawn);
+            this.syncInventoryStore();
           }
-          inventoryStore.setKey('bagItems', bag);
+        },
+        onDropItem: (id): void => {
+          if (!this.playerPawn) return;
+          const state = inventoryStore.get();
+          const bag = [...state.bagItems];
+          const itemIndex = bag.findIndex((i) => i.id === id);
 
-          // Dropping items should be handled by authority (server/simulation)
-          // const dropPos = this.playerPawn.mesh.position.clone();
-        }
+          if (itemIndex !== -1) {
+            const item = bag[itemIndex];
+            if (item.count > 1) {
+              bag[itemIndex] = { ...item, count: item.count - 1 };
+            } else {
+              bag.splice(itemIndex, 1);
+            }
+            inventoryStore.setKey('bagItems', bag);
+          }
+          this.syncInventoryStore();
+        },
       },
-    });
+      this.uiManager
+    );
     this.syncInventoryStore();
   }
 
@@ -154,7 +212,7 @@ export class SessionController {
   }
 
   private setupInput(): void {
-    GlobalInputManager.getInstance().initialize(
+    this.inputManager.initialize(
       this.scene,
       this.canvas,
       this.playerPawn!,
@@ -164,44 +222,28 @@ export class SessionController {
   }
 
   private setupMultiplayer(playerName: string): void {
-    const network = NetworkManager.getInstance();
     this.multiplayerSystem = new MultiplayerSystem(
       this.scene,
       this.playerPawn!,
       this.shadowGenerator,
+      this.networkManager,
+      this.worldManager,
+      this.tickManager,
       playerName
     );
 
-    // Initial State Sync Logic
-    // Initial State Sync Logic
-    // If Master Client (Host), we initialize the world locally (Authoritative)
-    // If Guest, we request initial state.
+    const isLocalServerRunning = this.localServerManager.isServerRunning();
+    if (this.enemyManager && this.targetSpawner && !isLocalServerRunning) {
+      this.simulation = new WorldSimulation(
+        this.enemyManager,
+        this.pickupManager,
+        this.targetSpawner,
+        this.networkManager
+      );
+      this.simulation.setGameRule(new WaveSurvivalRule());
+    }
 
-    // Initialize WorldSimulation with Client managers
-    // Skip if we are running a local server (LogicalServer handles simulation)
-    import('../server/LocalServerManager').then(({ LocalServerManager }) => {
-      const isLocalServerRunning = LocalServerManager.getInstance().isServerRunning();
-
-      if (this.enemyManager && this.targetSpawner && !isLocalServerRunning) {
-        this.simulation = new WorldSimulation(
-          this.enemyManager,
-          PickupManager.getInstance(),
-          this.targetSpawner,
-          network
-        );
-        this.simulation.setGameRule(new WaveSurvivalRule());
-      }
-
-      if (network.isMasterClient()) {
-        if (this.simulation) {
-          this.simulation.initializeRequest(); // Spawns enemies/targets
-        }
-      } else {
-        network.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
-      }
-    });
-
-    this._initialStateObserver = network.onInitialStateReceived.add(
+    this._initialStateObserver = this.networkManager.onInitialStateReceived.add(
       (data: InitialStatePayload): void => {
         if (this.enemyManager) {
           this.enemyManager.applyEnemyStates(data.enemies);
@@ -222,15 +264,24 @@ export class SessionController {
       }
     );
 
-    network.onPlayerRespawn.add((data) => {
-      if (data.playerId === network.getSocketId()) {
+    this.networkManager.onPlayerRespawn.add((data) => {
+      if (data.playerId === this.networkManager.getSocketId()) {
         this.isSpectating = false;
         this.spectateMode = 'FREE';
+        this.spectateTargetIndex = -1;
         this.hud?.hideRespawnMessage();
+
+        const spawnPos = data.position
+          ? new Vector3(data.position.x, data.position.y, data.position.z)
+          : new Vector3(0, 2, 0);
+
+        // Perform Full Reset (restore health, physics, clear inventory, reset combat)
+        this.playerPawn?.fullReset(spawnPos);
+
+        // Ensure input block is released
+        this.playerController?.setInputBlocked(false);
       }
     });
-
-    // Request logic moved up
   }
 
   private syncInventoryStore(): void {
@@ -300,12 +351,8 @@ export class SessionController {
 
     const target = players[this.spectateTargetIndex];
     if (target && target.mesh) {
-      // Third person follow logic
       const targetPos = target.mesh.position;
       const followOffset = new Vector3(0, 2.0, -3.0);
-
-      // Rotate offset by target's rotation if you want fixed back-view,
-      // but simple offset is fine for now
       const desiredPos = targetPos.add(followOffset);
       this.playerPawn.mesh.position.copyFrom(desiredPos);
       this.playerPawn.camera.setTarget(targetPos);
@@ -318,10 +365,8 @@ export class SessionController {
       if (!document.pointerLockElement) return;
 
       if (e.button === 0) {
-        // Left Click: Next
         this.cycleSpectateTarget(1);
       } else if (e.button === 2) {
-        // Right Click: Prev
         this.cycleSpectateTarget(-1);
       }
     };
@@ -331,7 +376,7 @@ export class SessionController {
       if (e.code === 'Space' && !e.repeat) {
         this.spectateMode = this.spectateMode === 'FREE' ? 'FOLLOW' : 'FREE';
         if (this.spectateMode === 'FOLLOW') {
-          this.cycleSpectateTarget(0); // Ensure valid target
+          this.cycleSpectateTarget(0);
         }
       }
     };
@@ -339,7 +384,6 @@ export class SessionController {
     window.addEventListener('mousedown', onMouseDown);
     window.addEventListener('keydown', onKeyDown);
 
-    // Cleanup will be needed in dispose
     this._spectatorCleanup = (): void => {
       window.removeEventListener('mousedown', onMouseDown);
       window.removeEventListener('keydown', onKeyDown);
@@ -370,9 +414,8 @@ export class SessionController {
     this.multiplayerSystem?.dispose();
     this.enemyManager?.dispose();
     if (this._initialStateObserver) {
-      NetworkManager.getInstance().onInitialStateReceived.remove(this._initialStateObserver);
+      this.networkManager.onInitialStateReceived.remove(this._initialStateObserver);
       this._initialStateObserver = null;
     }
-    // Managers are singletons, cleared in Game.ts for now or we could add clear here
   }
 }

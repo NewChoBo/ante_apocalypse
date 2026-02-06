@@ -48,10 +48,8 @@ export class WeaponInputComponent {
         break;
       case 'KeyR': {
         const weapon = this.inventory.currentWeapon;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const firearm = weapon as any;
-        if (firearm.reload && typeof firearm.reload === 'function') {
-          firearm.reload();
+        if ('reload' in weapon && typeof (weapon as { reload: () => void }).reload === 'function') {
+          (weapon as { reload: () => void }).reload();
         }
         break;
       }

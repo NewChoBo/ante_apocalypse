@@ -4,6 +4,7 @@ import { IWorldEntity } from '@ante/game-core';
 import { TargetMeshComponent } from './components/TargetMeshComponent';
 import { HitReactionComponent } from './components/HitReactionComponent';
 import { PatternMovementComponent } from './components/PatternMovementComponent';
+import type { GameContext } from '../types/GameContext';
 
 export interface TargetPawnConfig {
   id: string;
@@ -32,8 +33,8 @@ export class TargetPawn extends BasePawn implements IWorldEntity {
   public hitReactionComponent: HitReactionComponent;
   public movementComponent: PatternMovementComponent | null = null;
 
-  constructor(scene: Scene, config: TargetPawnConfig) {
-    super(scene);
+  constructor(scene: Scene, context: GameContext, config: TargetPawnConfig) {
+    super(scene, context);
     this.id = config.id;
     this.type = config.type;
 
@@ -62,7 +63,7 @@ export class TargetPawn extends BasePawn implements IWorldEntity {
 
     // 3. Movement (선택적)
     if (config.isMoving) {
-      this.movementComponent = new PatternMovementComponent(this, scene, {
+      this.movementComponent = new PatternMovementComponent(this, scene, context, {
         pattern: 'sine_x', // 기본값, 필요시 확장
         range: 2,
         speed: 0.002,

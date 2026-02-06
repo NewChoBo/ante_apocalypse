@@ -6,6 +6,8 @@ export * from './types/ITickable.js';
 export * from './network/INetworkAuthority.js';
 export * from './network/BasePhotonClient.js';
 export * from './network/PhotonUtils.js';
+export * from './network/PhotonWrapper.js';
+
 export * from './systems/BaseEnemyManager.js';
 export * from './systems/BasePickupManager.js';
 export * from './systems/BaseTargetSpawner.js';
@@ -33,6 +35,7 @@ export * from './rules/DeathmatchRule.js';
 export * from './server/IServerAssetLoader.js';
 export * from './server/LogicalServer.js';
 export * from './server/ServerNetworkAuthority.js';
+export * from './server/IServerNetworkAuthority.js';
 export * from './server/pawns/ServerPlayerPawn.js';
 export * from './server/pawns/ServerEnemyPawn.js';
 export * from './server/pawns/ServerTargetPawn.js';
@@ -40,3 +43,6 @@ export * from './server/pawns/ServerTargetPawn.js';
 // Level logic
 export * from './levels/LevelData.js';
 export * from './levels/ServerLevelLoader.js';
+
+// Utils
+export * from './utils/Mixins.js';
