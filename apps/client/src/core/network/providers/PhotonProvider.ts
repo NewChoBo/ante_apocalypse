@@ -168,6 +168,13 @@ export class PhotonProvider implements INetworkProvider {
     });
   }
 
+  public sendEventToMaster(code: number, data: unknown, reliable: boolean = true): void {
+    this.client.raiseEvent(code, data, {
+      receivers: ReceiverGroup.MasterClient,
+      cache: reliable ? 1 : 0,
+    });
+  }
+
   public getLocalPlayerId(): string | null {
     return this.client.myActor()?.actorNr?.toString() || null;
   }

@@ -13,7 +13,7 @@ interface MeshOwner extends BasePawn {
 export class NetworkInterpolationComponent extends BaseComponent {
   private targetPosition: Vector3;
   private targetRotation: Vector3;
-  private lerpSpeed = 10;
+  private lerpSpeed = 25;
   private _isMoving = false;
   private ownerMesh: Mesh;
 
@@ -49,18 +49,23 @@ export class NetworkInterpolationComponent extends BaseComponent {
     const mesh = this.ownerMesh;
     if (!mesh) return;
 
-    // 1. Calculate movement state
-    const posDiff = Vector3.Distance(mesh.position, this.targetPosition);
-    this._isMoving = posDiff > 0.02;
+    const currentDist = Vector3.Distance(mesh.position, this.targetPosition);
+    this._isMoving = currentDist > 0.02;
 
-    // 2. Position Interpolation
-    mesh.position = Vector3.Lerp(
-      mesh.position,
-      this.targetPosition,
-      Math.min(1.0, deltaTime * this.lerpSpeed)
-    );
+    // Snap to position if difference is too large (e.g. Teleport or Spawn)
+    if (currentDist > 3.0) {
+      mesh.position.copyFrom(this.targetPosition);
+      this._isMoving = false;
+    } else {
+      // Position Interpolation
+      mesh.position = Vector3.Lerp(
+        mesh.position,
+        this.targetPosition,
+        Math.min(1.0, deltaTime * this.lerpSpeed)
+      );
+    }
 
-    // 3. Yaw (Y) Rotation Interpolation
+    // Yaw (Y) Rotation Interpolation
     const targetYaw = this.targetRotation.y;
     let diffYaw = targetYaw - mesh.rotation.y;
 

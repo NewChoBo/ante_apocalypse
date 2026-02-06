@@ -40,25 +40,15 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   private setupListeners(): void {
-    // 1. Connection / Room Events from NetworkManager
     this.networkManager.onPlayerJoined.add((player) => {
-      // logger.info(\`HostAdapter: Player Joined \${player.id}\`);
       if (this.onPlayerJoin) this.onPlayerJoin(player.id, player.name);
-      // We also need to ensure they are registered in the Entity Manager for LogicalServer?
-      // LogicalServer does this on its own via onPlayerJoin callback.
     });
 
     this.networkManager.onPlayerLeft.add((id) => {
-      // logger.info(\`HostAdapter: Player Left \${id}\`);
       if (this.onPlayerLeave) this.onPlayerLeave(id);
     });
 
-    // 2. Game Events from NetworkManager Observables
-    // Note: NetworkManager already filters own events usually?
-    // But for LogicalServer, we need ALL relevant inputs.
-
-    // Move is tricky. NetworkManager handles standard interpolation.
-    // logicalServer needs raw updates for hitboxes.
+    // logicalServer needs raw updates for hitboxes/validation
     this.networkManager.onEvent.add(({ code, data, senderId }) => {
       // Dispatch via internal logic mapping
       this.handleRawEvent(code, data, senderId);
@@ -66,10 +56,9 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   private handleRawEvent(code: number, data: unknown, senderId: string): void {
-    // We can use the same dispatch logic as ServerNetworkAuthority or manual mapping.
     switch (code) {
       case EventCode.MOVE: {
-        const moveData = data as any; // Cast for now
+        const moveData = data as any;
         if (this.onPlayerMove) {
           this.onPlayerMove(senderId, moveData.position, moveData.rotation);
         }
@@ -110,7 +99,6 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
       }
       case EventCode.REQ_INITIAL_STATE: {
         logger.info(`HostAdapter: Received Initial State Request from ${senderId}`);
-        // Send RELIABLE response to ensure joining player gets the state
         this.broadcastState([], true);
         break;
       }
@@ -128,18 +116,13 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   public async createGameRoom(_name?: string, _mapId?: string): Promise<void> {
-    // The Host Client (NetworkManager) creates the room.
-    // This adapter is used when the room already exists or is being created by the host.
-    // So this might be a no-op or just verification.
     if (!this.networkManager.isMasterClient()) {
       throw new Error('ClientHostNetworkAdapter requires Client to be Master.');
     }
-    // We assume room is already created by NetworkManager.hostGame() sequence.
     logger.info('createGameRoom called on Adapter - interacting with existing room.');
   }
 
   public async joinGameRoom(_name: string): Promise<void> {
-    // Similarly, we assume we are already in.
     logger.info('joinGameRoom called on Adapter - interacting with existing room.');
   }
 
@@ -159,69 +142,8 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
-    // 1. Send to others via Network
+    // [Unified]: NetworkManager handles central loopback via sendEvent
     this.networkManager.sendEvent(code, data, reliable);
-
-    // 2. Loopback to Self (Host needs to process these authoritative events too)
-
-    // Dispatch to specific observables expected by MultiplayerSystem/Game
-    switch (code) {
-      case EventCode.PLAYER_DEATH:
-        this.networkManager.onPlayerDied.notifyObservers(data as any);
-        break;
-      case EventCode.RESPAWN:
-        this.networkManager.onPlayerRespawn.notifyObservers(data as any);
-        break;
-      case EventCode.HIT:
-        this.networkManager.onPlayerHit.notifyObservers(data as any);
-        break;
-      case EventCode.FIRE:
-        this.networkManager.onPlayerFired.notifyObservers(data as any);
-        break;
-      case EventCode.RELOAD:
-        this.networkManager.onPlayerReloaded.notifyObservers(data as any);
-        break;
-      case EventCode.SYNC_WEAPON:
-        // Sync weapon might need internal state update? NetworkManager handles it via dispatcher usually.
-        // But here we might just notify? NetworkManager doesn't have onWeaponSync observable...
-        // It uses dispatcher register func.
-        // So for dispatcher-only events, we might miss them unless we touch dispatcher or use specialized methods.
-        // However, SYNC_WEAPON is crucial for loadout.
-        break;
-
-      case EventCode.ENEMY_MOVE:
-        this.networkManager.onEnemyUpdated.notifyObservers(data as any);
-        break;
-      case EventCode.ENEMY_HIT:
-        this.networkManager.onEnemyHit.notifyObservers(data as any);
-        break;
-      case EventCode.DESTROY_ENEMY:
-        this.networkManager.onEnemyDestroyed.notifyObservers(data as any);
-        break;
-
-      case EventCode.TARGET_HIT:
-        this.networkManager.onTargetHit.notifyObservers(data as any);
-        break;
-      case EventCode.TARGET_DESTROY:
-        this.networkManager.onTargetDestroy.notifyObservers(data as any);
-        break;
-      case EventCode.SPAWN_TARGET:
-        this.networkManager.onTargetSpawn.notifyObservers(data as any);
-        break;
-
-      case EventCode.DESTROY_PICKUP:
-        this.networkManager.onPickupDestroyed.notifyObservers(data as any);
-        break;
-
-      case EventCode.INITIAL_STATE:
-        // Host typically doesn't need its own initial state loopbacked usually,
-        // as it HAS the state. But MultiplayerSystem might expect it to initialize?
-        // MultiplayerSystem.onInitialStateReceived calls applyPlayerStates.
-        // If Host calls this, it might re-apply states.
-        // Likely safe or harmless, but helpful for consistency.
-        this.networkManager.onInitialStateReceived.notifyObservers(data as any);
-        break;
-    }
   }
 
   public broadcastState(
@@ -234,19 +156,12 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
     }[] = [],
     reliable: boolean = false
   ): void {
-    // We need to implement the same logic as ServerNetworkAuthority.broadcastState
-    // Gathering player states from entityManager?
-    // The entityManager passed to constructor IS the Server one.
-    // So we can read from it.
-
     const entities = this.entityManager.getAllEntities();
     const players: NetworkPlayerState[] = [];
 
-    // Helper to identify ServerPlayerEntity type (duck typing or shared helper)
-    // We duplicate simple logic here or expose helper from game-core.
     for (const entity of entities) {
       if (entity.type === 'remote_player' || entity.type === 'player') {
-        const e = entity as any; // Cast to ServerPlayerEntity-like
+        const e = entity as any;
         if (e.position && e.rotation && e.name) {
           players.push({
             id: entity.id,

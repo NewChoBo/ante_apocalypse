@@ -45,7 +45,6 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   private playerStateManager: PlayerStateManager;
   private roomManager: RoomManager;
   private dispatcher: NetworkDispatcher = new NetworkDispatcher();
-  private localServer: LogicalServer | null = null;
 
   // Player Observables (delegated from PlayerStateManager)
   public get onPlayerJoined(): Observable<PlayerState> {
@@ -133,15 +132,14 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     this.playerStateManager.clearObservers();
   }
 
-  public setLocalServer(server: LogicalServer | null): void {
-    this.localServer = server;
-    logger.info(`LocalServer ${server ? 'registered' : 'unregistered'} in NetworkManager`);
+  public setLocalServer(_server: LogicalServer | null): void {
+    logger.info(`LocalServer ${_server ? 'registered' : 'unregistered'} in NetworkManager`);
   }
 
   private setupDispatcher(): void {
     this.dispatcher.register(EventCode.FIRE, (fireData, senderId): void => {
       this.onPlayerFired.notifyObservers({
-        playerId: senderId,
+        playerId: fireData.playerId || senderId,
         weaponId: fireData.weaponId,
         muzzleTransform: fireData.muzzleTransform,
       });
@@ -432,8 +430,8 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
       direction: { x: number; y: number; z: number };
     };
   }): void {
-    // Unified: Host loopback handles local server update
-    this.sendEvent(EventCode.FIRE, fireData, true);
+    // Redirection: Send to Master for authoritative broadcast
+    this.sendToMaster(EventCode.FIRE, fireData, true);
   }
 
   public reload(weaponId: string): void {
@@ -441,41 +439,59 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     if (!myId) return;
 
     const payload = { playerId: myId, weaponId };
-    this.sendEvent(EventCode.RELOAD, payload, true);
+    this.sendToMaster(EventCode.RELOAD, payload, true);
   }
 
   public syncWeapon(weaponId: string): void {
-    // Unified: Host loopback handles local server update
-    this.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
+    // Redirection: Send to Master for authoritative broadcast
+    this.sendToMaster(EventCode.SYNC_WEAPON, { weaponId }, true);
   }
 
   public requestHit(hitData: RequestHitData): void {
-    // Unified: Host loopback handles local server update
-    this.sendEvent(EventCode.REQUEST_HIT, hitData, true);
+    // Redirection: Send to Master for authoritative broadcast
+    this.sendToMaster(EventCode.REQUEST_HIT, hitData, true);
   }
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
     this.provider.sendEvent(code, data, reliable);
 
-    // [Unified Host Logic]
-    // If we are the Host, the network event won't come back to us (ReceiverGroup.Others).
-    // So we manually loopback the event to our own listeners (Adapter -> LogicalServer).
+    // Host broadcast loopback
     if (this.isMasterClient()) {
-      const myId = this.getSocketId();
-      if (myId) {
-        // 1. Notify Observers (ClientHostNetworkAdapter listens here)
-        this.onEvent.notifyObservers({ code, data, senderId: myId });
+      this.loopback(code, data, true);
+    }
+  }
 
-        // 2. Dispatch to internal handlers (e.g., specific event observables)
-        // Use loose casting to access protected dispatch method if needed,
-        // or ensure setupProviderListeners logic is duplicated here safely.
-        // Actually, the provider.onEvent handler does exactly this:
-        (this.dispatcher.dispatch as (code: EventCode, data: unknown, actorNr: string) => void)(
-          code as EventCode,
-          data,
-          myId
-        );
+  /**
+   * Send an event ONLY to the Master Client (Host).
+   * If the caller is the Master Client, it loops back locally as a REQUEST.
+   */
+  public sendToMaster(code: number, data: unknown, reliable: boolean = true): void {
+    if (this.isMasterClient()) {
+      this.loopback(code, data, false);
+    } else {
+      this.provider.sendEventToMaster(code, data, reliable);
+    }
+  }
+
+  /**
+   * Locally dispatch an event to observers and dispatcher handlers.
+   * @param isBroadcast If true, this is a downstream broadcast (no re-processing by server adapter).
+   *                    If false, this is an upstream request (triggers server adapter).
+   */
+  private loopback(code: number, data: unknown, isBroadcast: boolean = false): void {
+    const myId = this.getSocketId();
+    if (myId) {
+      // 1. Notify Observers (Server adapter listens here for REQUESTS)
+      if (!isBroadcast) {
+        this.onEvent.notifyObservers({ code, data, senderId: myId });
       }
+
+      // 2. Dispatch to internal handlers (Client systems)
+      (this.dispatcher.dispatch as (code: EventCode, data: unknown, actorNr: string) => void)(
+        code as EventCode,
+        data,
+        myId
+      );
     }
   }
 

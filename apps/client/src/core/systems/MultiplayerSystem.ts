@@ -56,8 +56,9 @@ export class MultiplayerSystem {
 
   public applyPlayerStates(states: PlayerState[]): void {
     states.forEach((p) => {
-      if (p.id !== this.networkManager.getSocketId()) {
-        const remote = this.remotePlayers.get(p.id);
+      // String comparison is crucial here because Photon often sends IDs as numbers
+      if (String(p.id) !== String(this.networkManager.getSocketId())) {
+        const remote = this.remotePlayers.get(String(p.id));
         if (remote) {
           remote.updateNetworkState(p.position, p.rotation);
           if (p.weaponId) remote.updateWeapon(p.weaponId);
@@ -105,21 +106,18 @@ export class MultiplayerSystem {
   private setupListeners(): void {
     this.networkManager.onPlayersList.add((players: PlayerState[]): void => {
       players.forEach((p: PlayerState): void => {
-        if (p.id !== this.networkManager.getSocketId()) {
+        if (String(p.id) !== String(this.networkManager.getSocketId())) {
           this.spawnRemotePlayer(p);
         }
       });
     });
 
     this.networkManager.onInitialStateReceived.add((data: { players: PlayerState[] }): void => {
-      // logger.info(
-      //   `MultiplayerSystem: Received INITIAL_STATE with ${data.players.length} players. My ID: ${this.networkManager.getSocketId()}`
-      // );
       this.applyPlayerStates(data.players);
     });
 
     this.networkManager.onPlayerJoined.add((player: PlayerState): void => {
-      if (player.id !== this.networkManager.getSocketId()) {
+      if (String(player.id) !== String(this.networkManager.getSocketId())) {
         this.spawnRemotePlayer(player);
       }
     });
@@ -143,6 +141,8 @@ export class MultiplayerSystem {
     });
 
     this.networkManager.onPlayerFired.add((data: import('@ante/common').FireEventData): void => {
+      if (String(data.playerId) === String(this.networkManager.getSocketId())) return;
+
       const remote = this.remotePlayers.get(data.playerId);
       if (remote) {
         remote.fire(data.weaponId, data.muzzleTransform);
@@ -151,14 +151,12 @@ export class MultiplayerSystem {
 
     this.networkManager.onPlayerReloaded.add(
       (data: { playerId: string; weaponId: string }): void => {
+        if (String(data.playerId) === String(this.networkManager.getSocketId())) return;
+
         const remote = this.remotePlayers.get(data.playerId);
         if (remote) {
-          // If the remote player has a reload method (e.g. for animation), call it
-          if (
-            'reload' in remote &&
-            typeof (remote as unknown as { reload: (id: string) => void }).reload === 'function'
-          ) {
-            (remote as unknown as { reload: (id: string) => void }).reload(data.weaponId);
+          if (typeof (remote as any).reload === 'function') {
+            (remote as any).reload(data.weaponId);
           }
         }
       }
@@ -214,7 +212,9 @@ export class MultiplayerSystem {
   }
 
   private spawnRemotePlayer(player: PlayerState): void {
-    if (this.remotePlayers.has(player.id)) return;
+    const playerId = String(player.id);
+    if (this.remotePlayers.has(playerId)) return;
+    if (playerId === String(this.networkManager.getSocketId())) return; // Double check
 
     const name = player.name || 'Anonymous';
     const context: GameContext = {
@@ -225,9 +225,9 @@ export class MultiplayerSystem {
       tickManager: this.tickManager,
     };
 
-    const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, context, name);
+    const remote = new RemotePlayerPawn(this.scene, playerId, this.shadowGenerator, context, name);
     remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
-    this.remotePlayers.set(player.id, remote);
+    this.remotePlayers.set(playerId, remote);
     this.worldManager.register(remote);
   }
 
