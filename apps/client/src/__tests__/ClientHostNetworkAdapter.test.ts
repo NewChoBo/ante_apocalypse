@@ -95,4 +95,24 @@ describe('ClientHostNetworkAdapter.dispose', () => {
     expect(onJoin).toHaveBeenCalledTimes(1);
     expect(onMove).toHaveBeenCalledTimes(1);
   });
+
+  it('ignores authority loopback sender events', () => {
+    const { stub, onEvent } = createNetworkManagerStub();
+    const worldManager = new WorldEntityManager(new TickManager());
+    const adapter = new ClientHostNetworkAdapter(stub as unknown as NetworkManager, worldManager);
+    const onMove = vi.fn();
+    adapter.onPlayerMove = onMove;
+
+    onEvent.notifyObservers({
+      code: EventCode.MOVE,
+      data: {
+        position: { x: 9, y: 9, z: 9 },
+        rotation: { x: 0, y: 1, z: 0 },
+        weaponId: 'Pistol',
+      },
+      senderId: NetworkManager.AUTHORITY_LOOPBACK_SENDER_ID,
+    });
+
+    expect(onMove).not.toHaveBeenCalled();
+  });
 });
