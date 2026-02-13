@@ -1,11 +1,11 @@
 import { Mesh, UniversalCamera, Vector3, Animation as BabylonAnimation } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { Logger } from '@ante/common';
-import { CharacterMovementComponent, MovementInput } from './components/CharacterMovementComponent';
-import { CameraComponent } from './components/CameraComponent';
-import { CombatComponent } from './components/CombatComponent';
+import { CharacterMovementComponent, MovementInput } from './components/movement/CharacterMovementComponent';
+import { CameraComponent } from './components/movement/CameraComponent';
+import { CombatComponent } from './components/combat/CombatComponent';
 import { GameAssets } from './GameAssets';
-import { HealthBarComponent } from './components/HealthBarComponent';
+import { HealthBarComponent } from './components/character/HealthBarComponent';
 import { playerHealthStore } from './store/GameStore';
 import { InventoryManager } from './inventory/InventoryManager';
 import type { GameContext } from '../types/GameContext';
@@ -233,3 +233,4 @@ export class PlayerPawn extends BasePawn {
     logger.info('Full Reset Complete');
   }
 }
+

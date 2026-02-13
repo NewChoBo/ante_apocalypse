@@ -9,9 +9,9 @@ import {
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { Logger } from '@ante/common';
-import { HealthBarComponent } from './components/HealthBarComponent';
+import { HealthBarComponent } from './components/character/HealthBarComponent';
 import { SkeletonAnimationComponent } from '@ante/game-core';
-import { CharacterModelLoader } from './components/CharacterModelLoader';
+import { CharacterModelLoader } from './components/character/CharacterModelLoader';
 import type { GameContext } from '../types/GameContext';
 
 const logger = new Logger('CharacterPawn');
@@ -179,3 +179,4 @@ export abstract class CharacterPawn extends BasePawn {
     this.healthBarComponent?.updateHealth(health);
   }
 }
+

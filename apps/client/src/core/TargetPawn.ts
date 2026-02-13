@@ -1,9 +1,9 @@
 import { Mesh, Vector3, Scene, ShadowGenerator, MeshBuilder } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { IWorldEntity } from '@ante/game-core';
-import { TargetMeshComponent } from './components/TargetMeshComponent';
-import { HitReactionComponent } from './components/HitReactionComponent';
-import { PatternMovementComponent } from './components/PatternMovementComponent';
+import { TargetMeshComponent } from './components/target/TargetMeshComponent';
+import { HitReactionComponent } from './components/target/HitReactionComponent';
+import { PatternMovementComponent } from './components/movement/PatternMovementComponent';
 import type { GameContext } from '../types/GameContext';
 
 export interface TargetPawnConfig {
@@ -126,3 +126,4 @@ export class TargetPawn extends BasePawn implements IWorldEntity {
     super.dispose();
   }
 }
+

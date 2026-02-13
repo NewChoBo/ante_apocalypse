@@ -7,7 +7,7 @@ import { MultiplayerSystem } from '../MultiplayerSystem';
 import { WorldEntityManager } from '../WorldEntityManager';
 import { EnemyManager } from '../EnemyManager';
 import { PickupManager } from '../PickupManager';
-import { TargetSpawnerComponent } from '../../components/TargetSpawnerComponent';
+import { TargetSpawnerComponent } from '../../components/target/TargetSpawnerComponent';
 import { LocalServerManager } from '../../server/LocalServerManager';
 
 interface MultiplayerSessionServiceDeps {
@@ -135,3 +135,4 @@ export class MultiplayerSessionService {
     );
   }
 }
+

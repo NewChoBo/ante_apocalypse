@@ -2,12 +2,12 @@ import { Scene, Vector3, ShadowGenerator, UniversalCamera, Observer } from '@bab
 import { PlayerPawn } from '../PlayerPawn';
 import { PlayerController } from '../controllers/PlayerController';
 import { LevelData } from '@ante/game-core';
-import { CombatComponent } from '../components/CombatComponent';
+import { CombatComponent } from '../components/combat/CombatComponent';
 import { HUD } from '../../ui/HUD';
 import { InventoryUI } from '../../ui/inventory/InventoryUI';
 import { MultiplayerSystem } from './MultiplayerSystem';
 import { PickupManager } from './PickupManager';
-import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
+import { TargetSpawnerComponent } from '../components/target/TargetSpawnerComponent';
 import { EnemyManager } from './EnemyManager';
 import { TickManager } from '@ante/game-core';
 import { WorldEntityManager } from './WorldEntityManager';
@@ -18,7 +18,7 @@ import { INetworkManager } from '../interfaces/INetworkManager';
 import { IUIManager } from '../../ui/IUIManager';
 import { LocalServerManager } from '../server/LocalServerManager';
 import { GlobalInputManager } from './GlobalInputManager';
-import { CameraComponent } from '../components/CameraComponent';
+import { CameraComponent } from '../components/movement/CameraComponent';
 import { SpectatorManager } from './session/SpectatorManager';
 import { InventorySyncService } from './session/InventorySyncService';
 import { MultiplayerSessionService } from './session/MultiplayerSessionService';
@@ -235,3 +235,4 @@ export class SessionController {
     }
   }
 }
+

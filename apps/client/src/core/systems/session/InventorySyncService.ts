@@ -1,4 +1,4 @@
-import { CombatComponent } from '../../components/CombatComponent';
+import { CombatComponent } from '../../components/combat/CombatComponent';
 import { InventoryManager } from '../../inventory/InventoryManager';
 import { PlayerPawn } from '../../PlayerPawn';
 import { inventoryStore } from '../../store/GameStore';
@@ -77,3 +77,4 @@ export class InventorySyncService {
     inventoryStore.setKey('bagItems', bag);
   }
 }
+

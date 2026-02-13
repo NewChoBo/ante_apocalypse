@@ -2,7 +2,7 @@ import { Scene, Vector3, ShadowGenerator } from '@babylonjs/core';
 import { PlayerState } from '@ante/common';
 import { RemotePlayerPawn } from '../RemotePlayerPawn';
 import { PlayerPawn } from '../PlayerPawn';
-import { CombatComponent } from '../components/CombatComponent';
+import { CombatComponent } from '../components/combat/CombatComponent';
 import { WorldEntityManager } from './WorldEntityManager';
 import { playerHealthStore, gameStateStore } from '../store/GameStore';
 import { INetworkManager } from '../interfaces/INetworkManager';
@@ -267,3 +267,4 @@ export class MultiplayerSystem {
     this.remotePlayers.clear();
   }
 }
+

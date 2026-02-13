@@ -15,8 +15,8 @@ import type { GameContext } from '../types/GameContext';
 import { GameAssets } from './GameAssets';
 import { Logger } from '@ante/common';
 
-import { NetworkInterpolationComponent } from './components/NetworkInterpolationComponent';
-import { MuzzleFlashComponent } from './components/MuzzleFlashComponent';
+import { NetworkInterpolationComponent } from './components/movement/NetworkInterpolationComponent';
+import { MuzzleFlashComponent } from './components/combat/MuzzleFlashComponent';
 
 const logger = new Logger('RemotePlayerPawn');
 
@@ -266,3 +266,4 @@ export class RemotePlayerPawn extends CharacterPawn {
     if (this._nameLabel) this._nameLabel.dispose();
   }
 }
+

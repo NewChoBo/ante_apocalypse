@@ -1,7 +1,7 @@
 import { Vector3, Scene, ShadowGenerator } from '@babylonjs/core';
 import { CharacterPawn, CharacterPawnConfig } from './CharacterPawn';
 import { IEnemyPawn } from '@ante/game-core';
-import { EnemyMovementComponent } from './components/EnemyMovementComponent';
+import { EnemyMovementComponent } from './components/movement/EnemyMovementComponent';
 import type { GameContext } from '../types/GameContext';
 
 /**
@@ -56,3 +56,4 @@ export class EnemyPawn extends CharacterPawn implements IEnemyPawn {
     this.movementComponent.move(direction, speed, deltaTime);
   }
 }
+
