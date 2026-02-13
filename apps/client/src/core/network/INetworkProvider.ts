@@ -20,7 +20,6 @@ export interface INetworkProvider {
   joinRoom(roomId: string): Promise<boolean>;
   getRoomList(): Promise<RoomInfo[]>;
   sendEvent(code: number, data: unknown, reliable: boolean): void;
-  sendEventToMaster(code: number, data: unknown, reliable: boolean): void;
   getLocalPlayerId(): string | null;
   getServerTime(): number;
 

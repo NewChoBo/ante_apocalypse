@@ -71,9 +71,6 @@ export interface IWeapon {
 
   /** 리소스 해제 */
   dispose(): void;
-
-  /** 상태 초기화 (탄약 복구 등) */
-  reset?(): void;
 }
 
 /**
