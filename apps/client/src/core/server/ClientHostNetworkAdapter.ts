@@ -1,5 +1,9 @@
 import { Observer } from '@babylonjs/core';
-import { IServerNetworkAuthority, WorldEntityManager } from '@ante/game-core';
+import {
+  IServerNetworkAuthority,
+  WorldEntityManager,
+  isRequestEventCode as isRequestTransportEventCode,
+} from '@ante/game-core';
 import {
   HitEventData,
   RequestHitData,
@@ -13,7 +17,6 @@ import {
   FireEventData,
   SyncWeaponPayload,
   ReloadEventData,
-  isRequestEventCode,
 } from '@ante/common';
 import { NetworkManager } from '../systems/NetworkManager';
 
@@ -143,7 +146,7 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
     if (senderId === NetworkManager.AUTHORITY_LOOPBACK_SENDER_ID) {
       return;
     }
-    if (!isRequestEventCode(code)) return;
+    if (!isRequestTransportEventCode(code)) return;
 
     switch (code) {
       case EventCode.MOVE: {
@@ -231,6 +234,10 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
     this.networkManager.broadcastAuthorityEvent(code, data, reliable);
   }
 
+  public sendRequest(code: number, data: unknown, reliable: boolean = true): void {
+    this.networkManager.sendRequest(code, data, reliable);
+  }
+
   public broadcastState(
     enemyStates: {
       id: string;
@@ -279,11 +286,11 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
       );
     }
 
-    this.networkManager.sendEvent(EventCode.INITIAL_STATE, payload, reliable);
+    this.sendEvent(EventCode.INITIAL_STATE, payload, reliable);
   }
 
   public broadcastHit(hitData: HitEventData, code: number = EventCode.HIT): void {
-    this.networkManager.sendEvent(code, hitData, true);
+    this.sendEvent(code, hitData, true);
   }
 
   public broadcastDeath(targetId: string, attackerId: string): void {
@@ -291,7 +298,7 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
       targetId,
       attackerId,
     };
-    this.networkManager.sendEvent(EventCode.PLAYER_DEATH, payload, true);
+    this.sendEvent(EventCode.PLAYER_DEATH, payload, true);
     if (this.onPlayerDeath) this.onPlayerDeath(targetId, attackerId);
   }
 
@@ -300,11 +307,11 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
       playerId,
       position,
     };
-    this.networkManager.sendEvent(EventCode.RESPAWN, payload, true);
+    this.sendEvent(EventCode.RESPAWN, payload, true);
   }
 
   public broadcastReload(playerId: string, weaponId: string): void {
-    this.networkManager.sendEvent(
+    this.sendEvent(
       EventCode.RELOAD,
       {
         playerId,

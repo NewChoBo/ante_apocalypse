@@ -1,58 +1,77 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NetworkManager } from '../core/systems/NetworkManager';
-import { INetworkProvider } from '../core/network/INetworkProvider';
+import {
+  INetworkProvider,
+  NetworkProviderEvent,
+  NetworkProviderSubscriber,
+} from '../core/network/INetworkProvider';
 import { LocalServerManager } from '../core/server/LocalServerManager';
 import { EventCode } from '@ante/common';
 
-function createProviderMock(master: boolean): INetworkProvider {
-  return {
+interface ProviderMockBundle {
+  provider: INetworkProvider;
+  emit: (event: NetworkProviderEvent) => void;
+  publish: ReturnType<typeof vi.fn>;
+}
+
+function createProviderMock(master: boolean): ProviderMockBundle {
+  const subscribers = new Set<NetworkProviderSubscriber>();
+  const publish = vi.fn();
+
+  const provider: INetworkProvider = {
     connect: vi.fn().mockResolvedValue(true),
     disconnect: vi.fn(),
     leaveRoom: vi.fn(),
     createRoom: vi.fn().mockResolvedValue(true),
     joinRoom: vi.fn().mockResolvedValue(true),
     getRoomList: vi.fn().mockResolvedValue([]),
-    sendEvent: vi.fn(),
-    sendEventToMaster: vi.fn(),
+    publish,
+    subscribe: vi.fn((handler: NetworkProviderSubscriber) => {
+      subscribers.add(handler);
+      return () => subscribers.delete(handler);
+    }),
     getLocalPlayerId: vi.fn().mockReturnValue(master ? '1' : '2'),
     getServerTime: vi.fn().mockReturnValue(0),
     isMasterClient: vi.fn().mockReturnValue(master),
     getActors: vi.fn().mockReturnValue(new Map()),
     getCurrentRoomProperty: vi.fn().mockReturnValue(null),
-    onStateChanged: undefined,
-    onEvent: undefined,
-    onPlayerJoined: undefined,
-    onPlayerLeft: undefined,
-    onMasterClientSwitched: undefined,
-    onRoomListUpdated: undefined,
+    getCurrentRoomName: vi.fn().mockReturnValue('room'),
+  };
+
+  return {
+    provider,
+    emit: (event: NetworkProviderEvent): void => {
+      subscribers.forEach((subscriber) => subscriber(event));
+    },
+    publish,
   };
 }
 
 describe('NetworkManager request routing', () => {
   it('routes request events to master only for non-master clients', () => {
-    const provider = createProviderMock(false);
+    const { provider, publish } = createProviderMock(false);
     const manager = new NetworkManager(new LocalServerManager(), provider);
 
     manager.fire({ weaponId: 'Pistol' });
 
-    expect(provider.sendEventToMaster).toHaveBeenCalledTimes(1);
-    expect(provider.sendEventToMaster).toHaveBeenCalledWith(
-      EventCode.FIRE,
-      { weaponId: 'Pistol' },
-      true
-    );
-    expect(provider.sendEvent).not.toHaveBeenCalled();
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledWith({
+      kind: 'request',
+      code: EventCode.FIRE,
+      data: { weaponId: 'Pistol' },
+      reliable: true,
+    });
   });
 
   it('loops request events locally when client is master', () => {
-    const provider = createProviderMock(true);
+    const { provider, publish } = createProviderMock(true);
     const manager = new NetworkManager(new LocalServerManager(), provider);
     const observer = vi.fn();
     manager.onEvent.add(observer);
 
     manager.reload('Pistol');
 
-    expect(provider.sendEventToMaster).not.toHaveBeenCalled();
+    expect(publish).not.toHaveBeenCalled();
     expect(observer).toHaveBeenCalledTimes(1);
     expect(observer.mock.calls[0][0]).toMatchObject({
       code: EventCode.RELOAD,
@@ -61,42 +80,50 @@ describe('NetworkManager request routing', () => {
   });
 
   it('does not dispatch request events when master receives them from provider', () => {
-    const provider = createProviderMock(true);
+    const { provider, emit } = createProviderMock(true);
     const manager = new NetworkManager(new LocalServerManager(), provider);
     const rawObserver = vi.fn();
     const reloadObserver = vi.fn();
     manager.onEvent.add(rawObserver);
     manager.onPlayerReloaded.add(reloadObserver);
 
-    provider.onEvent?.(
-      EventCode.RELOAD,
-      {
-        playerId: '2',
-        weaponId: 'Rifle',
+    emit({
+      type: 'transport',
+      event: {
+        kind: 'request',
+        code: EventCode.RELOAD,
+        data: {
+          playerId: '2',
+          weaponId: 'Rifle',
+        },
+        senderId: '2',
       },
-      '2'
-    );
+    });
 
     expect(rawObserver).toHaveBeenCalledTimes(1);
     expect(reloadObserver).not.toHaveBeenCalled();
   });
 
   it('dispatches non-request events when master receives them from provider', () => {
-    const provider = createProviderMock(true);
+    const { provider, emit } = createProviderMock(true);
     const manager = new NetworkManager(new LocalServerManager(), provider);
     const hitObserver = vi.fn();
     manager.onPlayerHit.add(hitObserver);
 
-    provider.onEvent?.(
-      EventCode.HIT,
-      {
-        targetId: '2',
-        attackerId: '1',
-        damage: 25,
-        newHealth: 75,
+    emit({
+      type: 'transport',
+      event: {
+        kind: 'authority',
+        code: EventCode.HIT,
+        data: {
+          targetId: '2',
+          attackerId: '1',
+          damage: 25,
+          newHealth: 75,
+        },
+        senderId: '1',
       },
-      '1'
-    );
+    });
 
     expect(hitObserver).toHaveBeenCalledTimes(1);
     expect(hitObserver.mock.calls[0][0]).toMatchObject({
@@ -108,19 +135,23 @@ describe('NetworkManager request routing', () => {
   });
 
   it('uses payload playerId for authoritative fire broadcasts', () => {
-    const provider = createProviderMock(false);
+    const { provider, emit } = createProviderMock(false);
     const manager = new NetworkManager(new LocalServerManager(), provider);
     const firedObserver = vi.fn();
     manager.onPlayerFired.add(firedObserver);
 
-    provider.onEvent?.(
-      EventCode.FIRE,
-      {
-        playerId: '7',
-        weaponId: 'Rifle',
+    emit({
+      type: 'transport',
+      event: {
+        kind: 'request',
+        code: EventCode.FIRE,
+        data: {
+          playerId: '7',
+          weaponId: 'Rifle',
+        },
+        senderId: '1',
       },
-      '1'
-    );
+    });
 
     expect(firedObserver).toHaveBeenCalledTimes(1);
     expect(firedObserver.mock.calls[0][0]).toMatchObject({
@@ -130,18 +161,22 @@ describe('NetworkManager request routing', () => {
   });
 
   it('falls back to senderId when fire payload has no playerId', () => {
-    const provider = createProviderMock(false);
+    const { provider, emit } = createProviderMock(false);
     const manager = new NetworkManager(new LocalServerManager(), provider);
     const firedObserver = vi.fn();
     manager.onPlayerFired.add(firedObserver);
 
-    provider.onEvent?.(
-      EventCode.FIRE,
-      {
-        weaponId: 'Pistol',
+    emit({
+      type: 'transport',
+      event: {
+        kind: 'request',
+        code: EventCode.FIRE,
+        data: {
+          weaponId: 'Pistol',
+        },
+        senderId: '1',
       },
-      '1'
-    );
+    });
 
     expect(firedObserver).toHaveBeenCalledTimes(1);
     expect(firedObserver.mock.calls[0][0]).toMatchObject({
@@ -151,7 +186,7 @@ describe('NetworkManager request routing', () => {
   });
 
   it('dispatches authoritative non-request events locally for master broadcasts', () => {
-    const provider = createProviderMock(true);
+    const { provider, publish } = createProviderMock(true);
     const manager = new NetworkManager(new LocalServerManager(), provider);
     const hitObserver = vi.fn();
     manager.onPlayerHit.add(hitObserver);
@@ -167,7 +202,18 @@ describe('NetworkManager request routing', () => {
       true
     );
 
-    expect(provider.sendEvent).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenCalledWith({
+      kind: 'authority',
+      code: EventCode.HIT,
+      data: {
+        targetId: '2',
+        attackerId: '1',
+        damage: 15,
+        newHealth: 85,
+      },
+      reliable: true,
+    });
     expect(hitObserver).toHaveBeenCalledTimes(1);
     expect(hitObserver.mock.calls[0][0]).toMatchObject({
       targetId: '2',

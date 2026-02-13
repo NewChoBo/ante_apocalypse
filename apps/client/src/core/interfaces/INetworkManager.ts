@@ -85,6 +85,7 @@ export interface INetworkManager {
   reload(weaponId: string): void;
   syncWeapon(weaponId: string): void;
   requestHit(hitData: RequestHitData): void;
+  sendRequest(code: number, data: unknown, reliable?: boolean): void;
   sendEvent(code: number, data: unknown, reliable?: boolean): void;
   getSocketId(): string | undefined;
   getServerTime(): number;

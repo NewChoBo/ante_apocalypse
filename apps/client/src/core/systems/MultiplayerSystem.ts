@@ -9,6 +9,7 @@ import { INetworkManager } from '../interfaces/INetworkManager';
 import { TickManager } from '@ante/game-core';
 import { Logger } from '@ante/common';
 import type { GameContext } from '../../types/GameContext';
+import { normalizePlayerId, isSamePlayerId } from '../network/identity';
 
 const logger = new Logger('MultiplayerSystem');
 
@@ -56,10 +57,10 @@ export class MultiplayerSystem {
 
   public applyPlayerStates(states: PlayerState[]): void {
     states.forEach((p) => {
-      const playerId = String(p.id);
-      const localId = String(this.networkManager.getSocketId());
+      const playerId = normalizePlayerId(p.id);
+      const localId = normalizePlayerId(this.networkManager.getSocketId());
 
-      if (playerId !== localId) {
+      if (!isSamePlayerId(playerId, localId)) {
         const remote = this.remotePlayers.get(playerId);
         if (remote) {
           remote.updateNetworkState(p.position, p.rotation);
@@ -108,7 +109,7 @@ export class MultiplayerSystem {
   private setupListeners(): void {
     this.networkManager.onPlayersList.add((players: PlayerState[]): void => {
       players.forEach((p: PlayerState): void => {
-        if (String(p.id) !== String(this.networkManager.getSocketId())) {
+        if (!isSamePlayerId(p.id, this.networkManager.getSocketId())) {
           this.spawnRemotePlayer(p);
         }
       });
@@ -122,13 +123,13 @@ export class MultiplayerSystem {
     });
 
     this.networkManager.onPlayerJoined.add((player: PlayerState): void => {
-      if (String(player.id) !== String(this.networkManager.getSocketId())) {
+      if (!isSamePlayerId(player.id, this.networkManager.getSocketId())) {
         this.spawnRemotePlayer(player);
       }
     });
 
     this.networkManager.onPlayerUpdated.add((player: PlayerState): void => {
-      const remote = this.remotePlayers.get(String(player.id));
+      const remote = this.remotePlayers.get(normalizePlayerId(player.id));
       if (remote) {
         remote.updateNetworkState(player.position, player.rotation);
         if (player.weaponId) {
@@ -138,17 +139,18 @@ export class MultiplayerSystem {
     });
 
     this.networkManager.onPlayerLeft.add((id: string): void => {
-      const remote = this.remotePlayers.get(String(id));
+      const normalizedId = normalizePlayerId(id);
+      const remote = this.remotePlayers.get(normalizedId);
       if (remote) {
-        this.worldManager.unregister(String(id));
-        this.remotePlayers.delete(String(id));
+        this.worldManager.unregister(normalizedId);
+        this.remotePlayers.delete(normalizedId);
       }
     });
 
     this.networkManager.onPlayerFired.add((data: import('@ante/common').FireEventData): void => {
-      if (String(data.playerId) === String(this.networkManager.getSocketId())) return;
+      if (isSamePlayerId(data.playerId, this.networkManager.getSocketId())) return;
 
-      const remote = this.remotePlayers.get(String(data.playerId));
+      const remote = this.remotePlayers.get(normalizePlayerId(data.playerId));
       if (remote) {
         remote.fire(data.weaponId, data.muzzleTransform);
       }
@@ -156,9 +158,9 @@ export class MultiplayerSystem {
 
     this.networkManager.onPlayerReloaded.add(
       (data: { playerId: string; weaponId: string }): void => {
-        if (String(data.playerId) === String(this.networkManager.getSocketId())) return;
+        if (isSamePlayerId(data.playerId, this.networkManager.getSocketId())) return;
 
-        const remote = this.remotePlayers.get(String(data.playerId));
+        const remote = this.remotePlayers.get(normalizePlayerId(data.playerId));
         if (remote) {
           // If the remote player has a reload method (e.g. for animation), call it
           if (
@@ -221,9 +223,9 @@ export class MultiplayerSystem {
   }
 
   private spawnRemotePlayer(player: PlayerState): void {
-    const playerId = String(player.id);
+    const playerId = normalizePlayerId(player.id);
     if (this.remotePlayers.has(playerId)) return;
-    if (playerId === String(this.networkManager.getSocketId())) return;
+    if (isSamePlayerId(playerId, this.networkManager.getSocketId())) return;
 
     const name = player.name || 'Anonymous';
     const context: GameContext = {

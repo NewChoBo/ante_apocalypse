@@ -2,6 +2,20 @@ import { Observable } from '@babylonjs/core';
 import { INetworkProvider } from './INetworkProvider';
 import { NetworkState } from '@ante/common';
 
+export interface ReconnectPolicy {
+  enabled: boolean;
+  delayMs: number;
+  resolveUserId: () => string;
+}
+
+function createDefaultReconnectPolicy(): ReconnectPolicy {
+  return {
+    enabled: true,
+    delayMs: 3000,
+    resolveUserId: () => localStorage.getItem('playerName') || 'COMMANDER',
+  };
+}
+
 /**
  * 네트워크 연결 및 재연결 로직을 담당하는 클래스
  */
@@ -10,8 +24,11 @@ export class ConnectionManager {
   public onStateChanged = new Observable<NetworkState>();
 
   private reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private readonly reconnectPolicy: ReconnectPolicy;
 
-  constructor(private provider: INetworkProvider) {}
+  constructor(private provider: INetworkProvider, reconnectPolicy?: Partial<ReconnectPolicy>) {
+    this.reconnectPolicy = { ...createDefaultReconnectPolicy(), ...reconnectPolicy };
+  }
 
   /**
    * 네트워크 연결 시작
@@ -58,9 +75,10 @@ export class ConnectionManager {
    * 자동 재연결 스케줄링
    */
   private scheduleReconnect(): void {
-    this.clearReconnectTimer();
+    if (!this.reconnectPolicy.enabled) return;
 
-    const userId = localStorage.getItem('playerName') || 'COMMANDER';
+    this.clearReconnectTimer();
+    const userId = this.reconnectPolicy.resolveUserId();
 
     this.reconnectTimeoutId = setTimeout((): void => {
       if (
@@ -69,7 +87,7 @@ export class ConnectionManager {
       ) {
         this.connect(userId);
       }
-    }, 3000);
+    }, this.reconnectPolicy.delayMs);
   }
 
   /**

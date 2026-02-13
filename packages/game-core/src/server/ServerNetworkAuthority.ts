@@ -11,11 +11,11 @@ import {
   SyncWeaponPayload,
   ReloadEventData,
   Logger,
-  isRequestEventCode,
 } from '@ante/common';
 import { Vector3, AbstractMesh, Scene, VertexBuffer, Geometry } from '@babylonjs/core';
 import { WorldEntityManager } from '../simulation/WorldEntityManager.js';
 import { BasePhotonClient } from '../network/BasePhotonClient.js';
+import { isRequestEventCode } from '../network/contracts/TransportEvent.js';
 import { IWorldEntity } from '../types/IWorldEntity.js';
 
 const logger = new Logger('ServerNetworkAuthority');

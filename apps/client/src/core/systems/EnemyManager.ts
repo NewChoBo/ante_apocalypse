@@ -42,7 +42,7 @@ export class EnemyManager extends BaseEnemyManager {
 
     // onEnemyHit is now handled by WorldEntityManager
 
-    this.networkManager.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
+    this.networkManager.sendRequest(EventCode.REQ_INITIAL_STATE, {}, true);
 
     this._eventObserver = this.networkManager.onEvent.add(
       (event: { code: number; data: unknown }): void => {

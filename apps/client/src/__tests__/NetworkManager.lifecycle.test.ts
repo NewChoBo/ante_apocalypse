@@ -1,30 +1,46 @@
 import { describe, expect, it, vi } from 'vitest';
 import { EventCode, NetworkState, RoomInfo } from '@ante/common';
 import { NetworkManager } from '../core/systems/NetworkManager';
-import { INetworkProvider } from '../core/network/INetworkProvider';
+import {
+  INetworkProvider,
+  NetworkProviderEvent,
+  NetworkProviderSubscriber,
+} from '../core/network/INetworkProvider';
 import { LocalServerManager } from '../core/server/LocalServerManager';
 
-function createProviderMock(master: boolean = false): INetworkProvider {
-  return {
+interface ProviderMockBundle {
+  provider: INetworkProvider;
+  emit: (event: NetworkProviderEvent) => void;
+}
+
+function createProviderMock(master: boolean = false): ProviderMockBundle {
+  const subscribers = new Set<NetworkProviderSubscriber>();
+
+  const provider: INetworkProvider = {
     connect: vi.fn().mockResolvedValue(true),
     disconnect: vi.fn(),
     leaveRoom: vi.fn(),
     createRoom: vi.fn().mockResolvedValue(true),
     joinRoom: vi.fn().mockResolvedValue(true),
     getRoomList: vi.fn().mockResolvedValue([]),
-    sendEvent: vi.fn(),
-    sendEventToMaster: vi.fn(),
+    publish: vi.fn(),
+    subscribe: vi.fn((handler: NetworkProviderSubscriber) => {
+      subscribers.add(handler);
+      return () => subscribers.delete(handler);
+    }),
     getLocalPlayerId: vi.fn().mockReturnValue(master ? '1' : '2'),
     getServerTime: vi.fn().mockReturnValue(0),
     isMasterClient: vi.fn().mockReturnValue(master),
     getActors: vi.fn().mockReturnValue(new Map()),
     getCurrentRoomProperty: vi.fn().mockReturnValue(null),
-    onStateChanged: undefined,
-    onEvent: undefined,
-    onPlayerJoined: undefined,
-    onPlayerLeft: undefined,
-    onMasterClientSwitched: undefined,
-    onRoomListUpdated: undefined,
+    getCurrentRoomName: vi.fn().mockReturnValue('room'),
+  };
+
+  return {
+    provider,
+    emit: (event: NetworkProviderEvent): void => {
+      subscribers.forEach((subscriber) => subscriber(event));
+    },
   };
 }
 
@@ -61,14 +77,17 @@ function sampleRoomList(): RoomInfo[] {
 
 describe('NetworkManager lifecycle', () => {
   it('publishes player snapshots when players join and leave', () => {
-    const provider = createProviderMock(false);
+    const { provider, emit } = createProviderMock(false);
     const { manager: localServerManager } = createLocalServerManagerMock(false);
     const manager = new NetworkManager(localServerManager, provider);
     const listObserver = vi.fn();
     manager.onPlayersList.add(listObserver);
 
-    provider.onPlayerJoined?.({ userId: '2', name: 'remote', isMaster: false });
-    provider.onPlayerLeft?.('2');
+    emit({
+      type: 'playerJoined',
+      user: { userId: '2', name: 'remote', isMaster: false },
+    });
+    emit({ type: 'playerLeft', userId: '2' });
 
     expect(listObserver).toHaveBeenCalledTimes(2);
     expect(listObserver.mock.calls[0][0]).toHaveLength(1);
@@ -76,7 +95,7 @@ describe('NetworkManager lifecycle', () => {
   });
 
   it('clearObservers(session) keeps global observers and clears session observers', () => {
-    const provider = createProviderMock(false);
+    const { provider, emit } = createProviderMock(false);
     const { manager: localServerManager } = createLocalServerManagerMock(false);
     const manager = new NetworkManager(localServerManager, provider);
     const stateObserver = vi.fn();
@@ -89,18 +108,22 @@ describe('NetworkManager lifecycle', () => {
 
     manager.clearObservers('session');
 
-    provider.onStateChanged?.(NetworkState.InLobby);
-    provider.onRoomListUpdated?.(sampleRoomList());
-    provider.onEvent?.(
-      EventCode.HIT,
-      {
-        targetId: '2',
-        attackerId: '1',
-        damage: 10,
-        newHealth: 90,
+    emit({ type: 'stateChanged', state: NetworkState.InLobby });
+    emit({ type: 'roomListUpdated', rooms: sampleRoomList() });
+    emit({
+      type: 'transport',
+      event: {
+        kind: 'authority',
+        code: EventCode.HIT,
+        data: {
+          targetId: '2',
+          attackerId: '1',
+          damage: 10,
+          newHealth: 90,
+        },
+        senderId: '1',
       },
-      '1'
-    );
+    });
 
     expect(stateObserver).toHaveBeenCalledTimes(1);
     expect(roomObserver).toHaveBeenCalledTimes(1);
@@ -108,7 +131,7 @@ describe('NetworkManager lifecycle', () => {
   });
 
   it('clearObservers(all) clears global observers and dispatcher handlers', () => {
-    const provider = createProviderMock(false);
+    const { provider, emit } = createProviderMock(false);
     const { manager: localServerManager } = createLocalServerManagerMock(false);
     const manager = new NetworkManager(localServerManager, provider);
     const stateObserver = vi.fn();
@@ -121,18 +144,22 @@ describe('NetworkManager lifecycle', () => {
 
     manager.clearObservers('all');
 
-    provider.onStateChanged?.(NetworkState.InLobby);
-    provider.onRoomListUpdated?.(sampleRoomList());
-    provider.onEvent?.(
-      EventCode.HIT,
-      {
-        targetId: '2',
-        attackerId: '1',
-        damage: 10,
-        newHealth: 90,
+    emit({ type: 'stateChanged', state: NetworkState.InLobby });
+    emit({ type: 'roomListUpdated', rooms: sampleRoomList() });
+    emit({
+      type: 'transport',
+      event: {
+        kind: 'authority',
+        code: EventCode.HIT,
+        data: {
+          targetId: '2',
+          attackerId: '1',
+          damage: 10,
+          newHealth: 90,
+        },
+        senderId: '1',
       },
-      '1'
-    );
+    });
 
     expect(stateObserver).not.toHaveBeenCalled();
     expect(roomObserver).not.toHaveBeenCalled();
@@ -140,7 +167,7 @@ describe('NetworkManager lifecycle', () => {
   });
 
   it('dispose stops local server when running and disconnects provider', () => {
-    const provider = createProviderMock(false);
+    const { provider } = createProviderMock(false);
     const { manager: localServerManager, stopSession } = createLocalServerManagerMock(true);
     const manager = new NetworkManager(localServerManager, provider);
 

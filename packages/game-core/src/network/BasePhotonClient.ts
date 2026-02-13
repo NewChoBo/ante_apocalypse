@@ -159,6 +159,10 @@ export abstract class BasePhotonClient implements INetworkAuthority {
     });
   }
 
+  public sendRequest(code: number, data: unknown, reliable: boolean = true): void {
+    this.sendEvent(code, data, reliable);
+  }
+
   public abstract sendEvent(code: number, data: unknown, reliable?: boolean): void;
 
   public sendEventToActor(
