@@ -24,6 +24,8 @@ import { InventorySyncService } from './session/InventorySyncService';
 import { MultiplayerSessionService } from './session/MultiplayerSessionService';
 import type { GameContext } from '../../types/GameContext';
 import { InventoryManager } from '../inventory/InventoryManager';
+import type { DeathEventData } from '@ante/common';
+import { isSamePlayerId } from '../network/identity';
 
 /**
  * 네트워크 에러 헨들러 타입
@@ -59,6 +61,7 @@ export class SessionController {
   private targetSpawner: TargetSpawnerComponent | null = null;
   private healthUnsub: (() => void) | null = null;
   private _itemCollectionObserver: Observer<{ itemId: string; position: Vector3 }> | null = null;
+  private playerDeathObserver: Observer<DeathEventData> | null = null;
 
   private networkManager: INetworkManager;
   private uiManager: IUIManager;
@@ -172,6 +175,13 @@ export class SessionController {
         this.spectatorManager.onHealthChanged(health);
       });
     }
+
+    if (!this.playerDeathObserver) {
+      this.playerDeathObserver = this.networkManager.onPlayerDied.add((data: DeathEventData): void => {
+        if (!isSamePlayerId(data.targetId, this.networkManager.getSocketId())) return;
+        this.spectatorManager.onLocalDeath(data.respawnDelaySeconds);
+      });
+    }
   }
 
   private setupInventory(): void {
@@ -264,6 +274,10 @@ export class SessionController {
 
   public dispose(): void {
     this.healthUnsub?.();
+    if (this.playerDeathObserver) {
+      this.networkManager.onPlayerDied.remove(this.playerDeathObserver);
+      this.playerDeathObserver = null;
+    }
     this.spectatorManager.dispose();
     this.inputManager.dispose();
     this.playerController?.dispose();

@@ -137,6 +137,25 @@ describe('SpectatorManager', (): void => {
     expect(copyFrom.mock.calls[0][0]).toMatchObject({ x: 10, y: 3, z: 1 });
     expect(setTarget.mock.calls[0][0]).toBe(remotePosition);
   });
+
+  it('uses server-provided respawn countdown when local death event is received', (): void => {
+    const showRespawnCountdown = vi.fn<(seconds: number) => void>();
+    const manager = new SpectatorManager({
+      getMultiplayerSystem: (): MultiplayerSystem | null => null,
+      getPlayerPawn: (): PlayerPawn | null => null,
+      getPlayerController: (): PlayerController | null => null,
+      getHud: (): HUD =>
+        ({
+          showRespawnCountdown,
+          hideRespawnMessage: vi.fn(),
+        } as unknown as HUD),
+      emitPlayerDied: vi.fn(),
+    });
+
+    manager.onLocalDeath(5);
+
+    expect(showRespawnCountdown).toHaveBeenCalledWith(5);
+  });
 });
 
 

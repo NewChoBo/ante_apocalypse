@@ -19,6 +19,23 @@ interface SpectatorManagerDeps {
 
 type WindowLike = Pick<Window, 'addEventListener' | 'removeEventListener'>;
 
+const noopWindowRef: WindowLike = {
+  addEventListener: (): void => undefined,
+  removeEventListener: (): void => undefined,
+};
+
+function resolveDefaultWindowRef(): WindowLike {
+  const candidate = (globalThis as { window?: WindowLike }).window;
+  if (
+    candidate &&
+    typeof candidate.addEventListener === 'function' &&
+    typeof candidate.removeEventListener === 'function'
+  ) {
+    return candidate;
+  }
+  return noopWindowRef;
+}
+
 export class SpectatorManager {
   private isSpectating = false;
   private spectateMode: SpectateMode = 'FREE';
@@ -27,7 +44,7 @@ export class SpectatorManager {
 
   constructor(
     private readonly deps: SpectatorManagerDeps,
-    private readonly windowRef: WindowLike = window
+    private readonly windowRef: WindowLike = resolveDefaultWindowRef()
   ) {}
 
   public initializeInput(): void {
@@ -65,17 +82,7 @@ export class SpectatorManager {
 
   public onHealthChanged(health: number): void {
     if (health <= 0) {
-      if (this.isSpectating) return;
-      this.isSpectating = true;
-      this.spectateMode = 'FREE';
-      this.spectateTargetIndex = -1;
-      const emitPlayerDied =
-        this.deps.emitPlayerDied ??
-        ((): void => {
-          GameObservables.playerDied.notifyObservers(null);
-        });
-      emitPlayerDied();
-      this.deps.getHud()?.showRespawnCountdown(3);
+      this.onLocalDeath();
       return;
     }
 
@@ -86,6 +93,31 @@ export class SpectatorManager {
     this.spectateTargetIndex = -1;
     this.deps.getHud()?.hideRespawnMessage();
     this.deps.getPlayerController()?.setInputBlocked(false);
+  }
+
+  public onLocalDeath(respawnDelaySeconds?: number): void {
+    const countdownSeconds =
+      typeof respawnDelaySeconds === 'number' ? Math.max(0, Math.floor(respawnDelaySeconds)) : 3;
+
+    if (!this.isSpectating) {
+      this.isSpectating = true;
+      this.spectateMode = 'FREE';
+      this.spectateTargetIndex = -1;
+      const emitPlayerDied =
+        this.deps.emitPlayerDied ??
+        ((): void => {
+          GameObservables.playerDied.notifyObservers(null);
+        });
+      emitPlayerDied();
+    } else if (typeof respawnDelaySeconds !== 'number') {
+      return;
+    }
+
+    if (countdownSeconds > 0) {
+      this.deps.getHud()?.showRespawnCountdown(countdownSeconds);
+    } else {
+      this.deps.getHud()?.hideRespawnMessage();
+    }
   }
 
   public onLocalRespawn(position?: { x: number; y: number; z: number }): void {

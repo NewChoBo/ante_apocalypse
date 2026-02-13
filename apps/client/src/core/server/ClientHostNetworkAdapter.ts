@@ -19,6 +19,7 @@ import {
   ReloadEventData,
 } from '@ante/common';
 import { NetworkManager } from '../systems/NetworkManager';
+import { isSamePlayerId } from '../network/identity';
 
 const logger = new Logger('ClientHostNetworkAdapter');
 
@@ -177,7 +178,7 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
       }
       case EventCode.RELOAD: {
         if (!isReloadEventData(data)) return;
-        if (data.playerId === senderId && this.onReloadRequest) {
+        if (isSamePlayerId(data.playerId, senderId) && this.onReloadRequest) {
           this.onReloadRequest(senderId, data.weaponId);
         }
         break;
@@ -293,10 +294,11 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
     this.sendEvent(code, hitData, true);
   }
 
-  public broadcastDeath(targetId: string, attackerId: string): void {
+  public broadcastDeath(targetId: string, attackerId: string, respawnDelaySeconds?: number): void {
     const payload: DeathEventData = {
       targetId,
       attackerId,
+      respawnDelaySeconds,
     };
     this.sendEvent(EventCode.PLAYER_DEATH, payload, true);
     if (this.onPlayerDeath) this.onPlayerDeath(targetId, attackerId);

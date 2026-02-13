@@ -19,6 +19,7 @@ import {
   PlayerInfo,
 } from '@ante/common';
 import { PlayerStateManager } from '../PlayerStateManager';
+import { isSamePlayerId } from '../identity';
 
 export class NetworkEventRouter {
   private readonly dispatcher = new NetworkDispatcher();
@@ -151,7 +152,7 @@ export class NetworkEventRouter {
       const player = this.playerStateManager.getPlayer(senderId);
       if (!player) return;
 
-      const isLocal = senderId === this.getSocketId();
+      const isLocal = isSamePlayerId(senderId, this.getSocketId());
       if (isLocal) {
         const dist = Vector3.Distance(
           new Vector3(player.position.x, player.position.y, player.position.z),

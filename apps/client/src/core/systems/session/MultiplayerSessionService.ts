@@ -9,6 +9,7 @@ import { EnemyManager } from '../EnemyManager';
 import { PickupManager } from '../PickupManager';
 import { TargetSpawnerComponent } from '../../components/target/TargetSpawnerComponent';
 import { LocalServerManager } from '../../server/LocalServerManager';
+import { isSamePlayerId } from '../../network/identity';
 
 interface MultiplayerSessionServiceDeps {
   scene: Scene;
@@ -131,7 +132,7 @@ export class MultiplayerSessionService {
 
     this.playerRespawnObserver = this.deps.networkManager.onPlayerRespawn.add(
       (data: RespawnEventData): void => {
-        if (data.playerId === this.deps.networkManager.getSocketId()) {
+        if (isSamePlayerId(data.playerId, this.deps.networkManager.getSocketId())) {
           this.deps.onLocalRespawn(data.position);
         }
       }

@@ -273,7 +273,11 @@ export class LogicalServer {
             // Trigger valid death
             if (newHealth <= 0 && wasAlive) {
               pawn.isDead = true;
-              this.networkManager.broadcastDeath(data.targetId, shooterId);
+              const respawnDelaySeconds =
+                this.simulation.gameRule?.allowRespawn === true
+                  ? this.simulation.gameRule.respawnDelay
+                  : 0;
+              this.networkManager.broadcastDeath(data.targetId, shooterId, respawnDelaySeconds);
             }
           }
           // Generic State (Enemy/Target fallback)

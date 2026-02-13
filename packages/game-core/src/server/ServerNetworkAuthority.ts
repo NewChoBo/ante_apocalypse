@@ -444,11 +444,12 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
     }
   }
 
-  public broadcastDeath(targetId: string, attackerId: string): void {
+  public broadcastDeath(targetId: string, attackerId: string, respawnDelaySeconds?: number): void {
     logger.info(`💀 Player ${targetId} was killed by ${attackerId}`);
     const payload: DeathEventData = {
       targetId,
       attackerId,
+      respawnDelaySeconds,
     };
     this.sendEventToAll(EventCode.PLAYER_DEATH, payload);
 

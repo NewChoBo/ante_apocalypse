@@ -180,13 +180,13 @@ export class MultiplayerSystem {
 
     this.networkManager.onPlayerHit.add((data: import('@ante/common').HitEventData): void => {
       // 서버로부터 받은 '확정된 체력(newHealth)'을 우선적으로 사용
-      if (data.targetId === this.networkManager.getSocketId()) {
+      if (isSamePlayerId(data.targetId, this.networkManager.getSocketId())) {
         // Local player update
         this.localPlayer.health = data.newHealth;
         playerHealthStore.set(data.newHealth);
         if (data.newHealth <= 0) this.localPlayer.die();
       } else {
-        const remote = this.remotePlayers.get(data.targetId);
+        const remote = this.remotePlayers.get(normalizePlayerId(data.targetId));
         if (remote) {
           remote.updateHealth(data.newHealth);
         }
@@ -194,10 +194,10 @@ export class MultiplayerSystem {
     });
 
     this.networkManager.onPlayerDied.add((data: import('@ante/common').DeathEventData): void => {
-      if (data.targetId === this.networkManager.getSocketId()) {
+      if (isSamePlayerId(data.targetId, this.networkManager.getSocketId())) {
         this.localPlayer.die();
       } else {
-        const remote = this.remotePlayers.get(data.targetId);
+        const remote = this.remotePlayers.get(normalizePlayerId(data.targetId));
         if (remote) {
           remote.die();
         }

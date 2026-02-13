@@ -35,6 +35,7 @@ import { NetworkSessionService } from '../network/services/NetworkSessionService
 import { NetworkLifecycleService } from '../network/services/NetworkLifecycleService';
 import { AuthorityDispatchService } from '../network/services/AuthorityDispatchService';
 import { NetworkProviderEvent } from '../network/INetworkProvider';
+import { isSamePlayerId } from '../network/identity';
 
 const logger = new Logger('NetworkManager');
 
@@ -236,7 +237,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
         return;
       case 'masterClientSwitched': {
         const myId = this.getSocketId();
-        if (myId !== event.newMasterId) return;
+        if (!isSamePlayerId(myId, event.newMasterId)) return;
         const roomName = this.provider.getCurrentRoomName?.() || null;
         void this.sessionService.handleTakeover(roomName);
       }

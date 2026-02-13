@@ -26,7 +26,7 @@ export interface IServerNetworkAuthority extends INetworkAuthority {
     }[]
   ): void;
   broadcastHit(hitData: HitEventData, code?: number): void;
-  broadcastDeath(targetId: string, attackerId: string): void;
+  broadcastDeath(targetId: string, attackerId: string, respawnDelaySeconds?: number): void;
   broadcastRespawn(playerId: string, position: NetworkVector3): void;
   broadcastReload(playerId: string, weaponId: string): void;
 
