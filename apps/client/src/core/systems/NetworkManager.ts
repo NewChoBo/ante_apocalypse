@@ -1,14 +1,8 @@
 import { Observable, Vector3 } from '@babylonjs/core';
 import { INetworkProvider } from '../network/INetworkProvider';
-import { PhotonProvider } from '../network/providers/PhotonProvider';
 import {
   INetworkAuthority,
   LogicalServer,
-  RequestEventCode,
-  AuthorityEventCode,
-  SystemEventCode,
-  getTransportEventKind,
-  isRequestEventCode as isRequestTransportEventCode,
 } from '@ante/game-core';
 import { LocalServerManager } from '../server/LocalServerManager';
 import {
@@ -39,6 +33,7 @@ import { INetworkManager } from '../interfaces/INetworkManager';
 import { NetworkEventRouter } from '../network/services/NetworkEventRouter';
 import { NetworkSessionService } from '../network/services/NetworkSessionService';
 import { NetworkLifecycleService } from '../network/services/NetworkLifecycleService';
+import { AuthorityDispatchService } from '../network/services/AuthorityDispatchService';
 import { NetworkProviderEvent } from '../network/INetworkProvider';
 
 const logger = new Logger('NetworkManager');
@@ -60,6 +55,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   private eventRouter: NetworkEventRouter;
   private sessionService: NetworkSessionService;
   private lifecycleService: NetworkLifecycleService;
+  private authorityDispatchService: AuthorityDispatchService;
   private providerUnsubscribe: () => void = () => undefined;
 
   public get onPlayerJoined(): Observable<PlayerState> {
@@ -154,8 +150,8 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     return this.eventRouter.onTargetSpawn;
   }
 
-  constructor(localServerManager: LocalServerManager, provider?: INetworkProvider) {
-    this.provider = provider ?? new PhotonProvider();
+  constructor(localServerManager: LocalServerManager, provider: INetworkProvider) {
+    this.provider = provider;
     this.localServerManager = localServerManager;
     this.connectionManager = new ConnectionManager(this.provider);
     this.playerStateManager = new PlayerStateManager();
@@ -199,6 +195,14 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
       disposeRoomManager: (): void => this.roomManager.dispose(),
       disposePlayerStateManager: (): void => this.playerStateManager.dispose(),
       disconnectProvider: (): void => this.provider.disconnect(),
+    });
+
+    this.authorityDispatchService = new AuthorityDispatchService({
+      provider: this.provider,
+      isMasterClient: (): boolean => this.isMasterClient(),
+      getSocketId: (): string | undefined => this.getSocketId(),
+      dispatchLocalEvent: (code, data, senderId): void => this.dispatchLocalEvent(code, data, senderId),
+      authorityLoopbackSenderId: NetworkManager.AUTHORITY_LOOPBACK_SENDER_ID,
     });
 
     this.providerUnsubscribe = this.provider.subscribe((event) => this.handleProviderEvent(event));
@@ -353,66 +357,15 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   }
 
   public sendRequest(code: number, data: unknown, reliable: boolean = true): void {
-    if (!isRequestTransportEventCode(code)) {
-      logger.warn(`sendRequest called with non-request code ${code}. Routing to sendEvent.`);
-      this.sendEvent(code, data, reliable);
-      return;
-    }
-
-    if (this.isMasterClient()) {
-      const myId = this.getSocketId();
-      if (myId) {
-        this.dispatchLocalEvent(code, data, myId);
-      }
-      return;
-    }
-
-    this.provider.publish({
-      kind: 'request',
-      code: code as RequestEventCode,
-      data: data as never,
-      reliable,
-    });
+    this.authorityDispatchService.sendRequest(code, data, reliable);
   }
 
   public broadcastAuthorityEvent(code: number, data: unknown, reliable: boolean = true): void {
-    this.provider.publish({
-      kind: 'authority',
-      code: code as AuthorityEventCode,
-      data: data as never,
-      reliable,
-    });
-
-    if (this.isMasterClient()) {
-      this.dispatchLocalEvent(code, data, NetworkManager.AUTHORITY_LOOPBACK_SENDER_ID);
-    }
+    this.authorityDispatchService.broadcastAuthorityEvent(code, data, reliable);
   }
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
-    const kind = getTransportEventKind(code);
-
-    if (kind === 'request') {
-      this.sendRequest(code, data, reliable);
-      return;
-    }
-
-    if (kind === 'authority') {
-      this.broadcastAuthorityEvent(code, data, reliable);
-      return;
-    }
-
-    if (kind === 'system') {
-      this.provider.publish({
-        kind: 'system',
-        code: code as SystemEventCode,
-        data: data as never,
-        reliable,
-      });
-      return;
-    }
-
-    logger.warn(`Unknown transport event code ${code}. Falling back to authority publish.`);
-    this.broadcastAuthorityEvent(code, data, reliable);
+    this.authorityDispatchService.sendEvent(code, data, reliable);
   }
 
   public getSocketId(): string | undefined {

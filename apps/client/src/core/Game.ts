@@ -12,6 +12,7 @@ import { SessionController } from './systems/SessionController';
 import { NetworkState, Logger } from '@ante/common';
 import { EnemyManager } from './systems/EnemyManager'; // Added import
 import { LocalServerManager } from './server/LocalServerManager';
+import { PhotonProvider } from './network/providers/PhotonProvider';
 
 const logger = new Logger('Game');
 import { NetworkManager } from './systems/NetworkManager';
@@ -58,7 +59,7 @@ export class Game {
 
     this.tickManager = new CoreTickManager();
     this.localServerManager = new LocalServerManager();
-    this.networkManager = new NetworkManager(this.localServerManager);
+    this.networkManager = new NetworkManager(this.localServerManager, new PhotonProvider());
 
     this.initCanvas();
     this.initEngine();
