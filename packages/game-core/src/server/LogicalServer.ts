@@ -183,7 +183,7 @@ export class LogicalServer {
     this.worldManager.register(pawn);
   }
 
-  public updatePlayerPawn(id: string, pos: commonVector3, rot: commonVector3): void {
+  public updatePlayerPawn(id: string, pos: commonVector3, rot?: commonVector3 | null): void {
     const pawn = this.playerPawns.get(id);
     if (pawn && pawn.mesh) {
       pawn.mesh.position.set(pos.x, pos.y, pos.z);
@@ -193,7 +193,9 @@ export class LogicalServer {
     const state = this.networkManager.getPlayerState(id);
     if (state) {
       state.position = { x: pos.x, y: pos.y, z: pos.z };
-      state.rotation = { x: rot.x, y: rot.y, z: rot.z };
+      if (rot) {
+        state.rotation = { x: rot.x, y: rot.y, z: rot.z };
+      }
     }
   }
 
@@ -313,7 +315,7 @@ export class LogicalServer {
             this.updatePlayerPawn(
               targetId,
               { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z },
-              null as any
+              undefined
             );
             logger.info(
               `Server-side Pawn ${targetId} revived at ${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z}`

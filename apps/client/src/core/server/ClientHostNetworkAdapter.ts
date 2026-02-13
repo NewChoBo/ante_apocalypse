@@ -1,3 +1,4 @@
+import { Observer } from '@babylonjs/core';
 import { IServerNetworkAuthority, WorldEntityManager } from '@ante/game-core';
 import {
   HitEventData,
@@ -8,10 +9,179 @@ import {
   EventCode,
   DeathEventData,
   Logger,
+  MovePayload,
+  FireEventData,
+  SyncWeaponPayload,
+  ReloadEventData,
+  RespawnEventData,
+  EnemyMovePayload,
+  EnemyHitPayload,
+  EnemyDestroyPayload,
+  TargetHitPayload,
+  TargetDestroyPayload,
+  SpawnTargetPayload,
+  PickupDestroyPayload,
 } from '@ante/common';
 import { NetworkManager } from '../systems/NetworkManager';
 
 const logger = new Logger('ClientHostNetworkAdapter');
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isVector3Like(value: unknown): value is NetworkVector3 {
+  return (
+    isRecord(value) &&
+    typeof value.x === 'number' &&
+    typeof value.y === 'number' &&
+    typeof value.z === 'number'
+  );
+}
+
+function isMovePayload(value: unknown): value is MovePayload {
+  return (
+    isRecord(value) && isVector3Like(value.position) && isVector3Like(value.rotation)
+  );
+}
+
+function isFireEventData(value: unknown): value is FireEventData {
+  if (!isRecord(value) || typeof value.weaponId !== 'string') return false;
+  if (value.muzzleTransform === undefined) return true;
+  return (
+    isRecord(value.muzzleTransform) &&
+    isVector3Like(value.muzzleTransform.position) &&
+    isVector3Like(value.muzzleTransform.direction)
+  );
+}
+
+function isSyncWeaponPayload(value: unknown): value is SyncWeaponPayload {
+  return isRecord(value) && typeof value.weaponId === 'string';
+}
+
+function isReloadEventData(value: unknown): value is ReloadEventData {
+  return (
+    isRecord(value) &&
+    typeof value.playerId === 'string' &&
+    typeof value.weaponId === 'string'
+  );
+}
+
+function isRequestHitData(value: unknown): value is RequestHitData {
+  return (
+    isRecord(value) &&
+    typeof value.targetId === 'string' &&
+    typeof value.damage === 'number' &&
+    typeof value.weaponId === 'string' &&
+    isVector3Like(value.origin) &&
+    isVector3Like(value.direction)
+  );
+}
+
+function isHitEventData(value: unknown): value is HitEventData {
+  return (
+    isRecord(value) &&
+    typeof value.targetId === 'string' &&
+    typeof value.attackerId === 'string' &&
+    typeof value.damage === 'number' &&
+    typeof value.newHealth === 'number'
+  );
+}
+
+function isDeathEventData(value: unknown): value is DeathEventData {
+  return (
+    isRecord(value) &&
+    typeof value.targetId === 'string' &&
+    typeof value.attackerId === 'string'
+  );
+}
+
+function isRespawnEventData(value: unknown): value is RespawnEventData {
+  return (
+    isRecord(value) &&
+    typeof value.playerId === 'string' &&
+    isVector3Like(value.position)
+  );
+}
+
+function isEnemyMovePayload(value: unknown): value is EnemyMovePayload {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    isVector3Like(value.position) &&
+    isVector3Like(value.rotation)
+  );
+}
+
+function isEnemyHitPayload(value: unknown): value is EnemyHitPayload {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.damage === 'number'
+  );
+}
+
+function isEnemyDestroyPayload(value: unknown): value is EnemyDestroyPayload {
+  return isRecord(value) && typeof value.id === 'string';
+}
+
+function isTargetHitPayload(value: unknown): value is TargetHitPayload {
+  return (
+    isRecord(value) &&
+    typeof value.targetId === 'string' &&
+    typeof value.part === 'string' &&
+    typeof value.damage === 'number'
+  );
+}
+
+function isTargetDestroyPayload(value: unknown): value is TargetDestroyPayload {
+  return isRecord(value) && typeof value.targetId === 'string';
+}
+
+function isSpawnTargetPayload(value: unknown): value is SpawnTargetPayload {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.type === 'string' &&
+    typeof value.isMoving === 'boolean' &&
+    isVector3Like(value.position)
+  );
+}
+
+function isPickupDestroyPayload(value: unknown): value is PickupDestroyPayload {
+  return isRecord(value) && typeof value.id === 'string';
+}
+
+function isInitialStatePayload(value: unknown): value is InitialStatePayload {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.players) &&
+    Array.isArray(value.enemies)
+  );
+}
+
+interface ServerPlayerEntityLike {
+  id: string;
+  name: string;
+  type: string;
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  weaponId?: string;
+  health: number;
+  isDead?: boolean;
+}
+
+function isServerPlayerEntityLike(entity: unknown): entity is ServerPlayerEntityLike {
+  return (
+    isRecord(entity) &&
+    (entity.type === 'remote_player' || entity.type === 'player') &&
+    typeof entity.id === 'string' &&
+    typeof entity.name === 'string' &&
+    isVector3Like(entity.position) &&
+    isVector3Like(entity.rotation) &&
+    typeof entity.health === 'number'
+  );
+}
 
 export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   private entityManager: WorldEntityManager;
@@ -31,6 +201,11 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   public onSyncWeaponRequest?: (playerId: string, weaponId: string) => void;
   public onPlayerDeath?: (targetId: string, attackerId: string) => void;
 
+  private playerJoinObserver: Observer<NetworkPlayerState> | null = null;
+  private playerLeaveObserver: Observer<string> | null = null;
+  private rawEventObserver: Observer<{ code: number; data: unknown; senderId: string }> | null =
+    null;
+
   constructor(
     private networkManager: NetworkManager,
     entityManager: WorldEntityManager
@@ -40,84 +215,68 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   private setupListeners(): void {
-    // 1. Connection / Room Events from NetworkManager
-    this.networkManager.onPlayerJoined.add((player) => {
-      // logger.info(\`HostAdapter: Player Joined \${player.id}\`);
+    this.playerJoinObserver = this.networkManager.onPlayerJoined.add((player) => {
       if (this.onPlayerJoin) this.onPlayerJoin(player.id, player.name);
-      // We also need to ensure they are registered in the Entity Manager for LogicalServer?
-      // LogicalServer does this on its own via onPlayerJoin callback.
     });
 
-    this.networkManager.onPlayerLeft.add((id) => {
-      // logger.info(\`HostAdapter: Player Left \${id}\`);
+    this.playerLeaveObserver = this.networkManager.onPlayerLeft.add((id) => {
       if (this.onPlayerLeave) this.onPlayerLeave(id);
     });
 
-    // 2. Game Events from NetworkManager Observables
-    // Note: NetworkManager already filters own events usually?
-    // But for LogicalServer, we need ALL relevant inputs.
-
-    // Move is tricky. NetworkManager handles standard interpolation.
-    // logicalServer needs raw updates for hitboxes.
-    this.networkManager.onEvent.add(({ code, data, senderId }) => {
-      // Dispatch via internal logic mapping
+    this.rawEventObserver = this.networkManager.onEvent.add(({ code, data, senderId }) => {
       this.handleRawEvent(code, data, senderId);
     });
   }
 
   private handleRawEvent(code: number, data: unknown, senderId: string): void {
-    // We can use the same dispatch logic as ServerNetworkAuthority or manual mapping.
     switch (code) {
       case EventCode.MOVE: {
-        const moveData = data as any; // Cast for now
+        if (!isMovePayload(data)) return;
         if (this.onPlayerMove) {
-          this.onPlayerMove(senderId, moveData.position, moveData.rotation);
+          this.onPlayerMove(senderId, data.position, data.rotation);
         }
         break;
       }
       case EventCode.FIRE: {
-        const fireData = data as any;
-        if (this.onFireRequest && fireData.muzzleTransform) {
+        if (!isFireEventData(data) || !data.muzzleTransform) return;
+        if (this.onFireRequest) {
           this.onFireRequest(
             senderId,
-            fireData.muzzleTransform.position,
-            fireData.muzzleTransform.direction,
-            fireData.weaponId
+            data.muzzleTransform.position,
+            data.muzzleTransform.direction,
+            data.weaponId
           );
         }
         break;
       }
       case EventCode.SYNC_WEAPON: {
-        const syncData = data as any;
+        if (!isSyncWeaponPayload(data)) return;
         if (this.onSyncWeaponRequest) {
-          this.onSyncWeaponRequest(senderId, syncData.weaponId);
+          this.onSyncWeaponRequest(senderId, data.weaponId);
         }
         break;
       }
       case EventCode.RELOAD: {
-        const reloadData = data as any;
-        if (reloadData.playerId === senderId && this.onReloadRequest) {
-          this.onReloadRequest(senderId, reloadData.weaponId);
+        if (!isReloadEventData(data)) return;
+        if (data.playerId === senderId && this.onReloadRequest) {
+          this.onReloadRequest(senderId, data.weaponId);
         }
         break;
       }
       case EventCode.REQUEST_HIT: {
-        const hitData = data as any;
+        if (!isRequestHitData(data)) return;
         if (this.onHitRequest) {
-          this.onHitRequest(senderId, hitData);
+          this.onHitRequest(senderId, data);
         }
         break;
       }
       case EventCode.REQ_INITIAL_STATE: {
         logger.info(`HostAdapter: Received Initial State Request from ${senderId}`);
-        // Send RELIABLE response to ensure joining player gets the state
         this.broadcastState([], true);
         break;
       }
     }
   }
-
-  // --- Interface Implementation ---
 
   public getSocketId(): string | undefined {
     return this.networkManager.getSocketId();
@@ -128,18 +287,13 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   public async createGameRoom(_name?: string, _mapId?: string): Promise<void> {
-    // The Host Client (NetworkManager) creates the room.
-    // This adapter is used when the room already exists or is being created by the host.
-    // So this might be a no-op or just verification.
     if (!this.networkManager.isMasterClient()) {
       throw new Error('ClientHostNetworkAdapter requires Client to be Master.');
     }
-    // We assume room is already created by NetworkManager.hostGame() sequence.
     logger.info('createGameRoom called on Adapter - interacting with existing room.');
   }
 
   public async joinGameRoom(_name: string): Promise<void> {
-    // Similarly, we assume we are already in.
     logger.info('joinGameRoom called on Adapter - interacting with existing room.');
   }
 
@@ -150,7 +304,6 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
       players.map((p) => p.id)
     );
     players.forEach((player) => {
-      // Manually trigger join for existing actors
       if (this.onPlayerJoin) {
         logger.info(`HostAdapter: Registering existing player ${player.id} (${player.name})`);
         this.onPlayerJoin(player.id, player.name);
@@ -159,67 +312,73 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
-    // 1. Send to others via Network
     this.networkManager.sendEvent(code, data, reliable);
 
-    // 2. Loopback to Self (Host needs to process these authoritative events too)
-
-    // Dispatch to specific observables expected by MultiplayerSystem/Game
     switch (code) {
       case EventCode.PLAYER_DEATH:
-        this.networkManager.onPlayerDied.notifyObservers(data as any);
+        if (isDeathEventData(data)) {
+          this.networkManager.onPlayerDied.notifyObservers(data);
+        }
         break;
       case EventCode.RESPAWN:
-        this.networkManager.onPlayerRespawn.notifyObservers(data as any);
+        if (isRespawnEventData(data)) {
+          this.networkManager.onPlayerRespawn.notifyObservers(data);
+        }
         break;
       case EventCode.HIT:
-        this.networkManager.onPlayerHit.notifyObservers(data as any);
+        if (isHitEventData(data)) {
+          this.networkManager.onPlayerHit.notifyObservers(data);
+        }
         break;
       case EventCode.FIRE:
-        this.networkManager.onPlayerFired.notifyObservers(data as any);
+        if (isFireEventData(data) && typeof data.playerId === 'string') {
+          this.networkManager.onPlayerFired.notifyObservers(data);
+        }
         break;
       case EventCode.RELOAD:
-        this.networkManager.onPlayerReloaded.notifyObservers(data as any);
+        if (isReloadEventData(data)) {
+          this.networkManager.onPlayerReloaded.notifyObservers(data);
+        }
         break;
-      case EventCode.SYNC_WEAPON:
-        // Sync weapon might need internal state update? NetworkManager handles it via dispatcher usually.
-        // But here we might just notify? NetworkManager doesn't have onWeaponSync observable...
-        // It uses dispatcher register func.
-        // So for dispatcher-only events, we might miss them unless we touch dispatcher or use specialized methods.
-        // However, SYNC_WEAPON is crucial for loadout.
-        break;
-
       case EventCode.ENEMY_MOVE:
-        this.networkManager.onEnemyUpdated.notifyObservers(data as any);
+        if (isEnemyMovePayload(data)) {
+          this.networkManager.onEnemyUpdated.notifyObservers(data);
+        }
         break;
       case EventCode.ENEMY_HIT:
-        this.networkManager.onEnemyHit.notifyObservers(data as any);
+        if (isEnemyHitPayload(data)) {
+          this.networkManager.onEnemyHit.notifyObservers(data);
+        }
         break;
       case EventCode.DESTROY_ENEMY:
-        this.networkManager.onEnemyDestroyed.notifyObservers(data as any);
+        if (isEnemyDestroyPayload(data)) {
+          this.networkManager.onEnemyDestroyed.notifyObservers(data);
+        }
         break;
-
       case EventCode.TARGET_HIT:
-        this.networkManager.onTargetHit.notifyObservers(data as any);
+        if (isTargetHitPayload(data)) {
+          this.networkManager.onTargetHit.notifyObservers(data);
+        }
         break;
       case EventCode.TARGET_DESTROY:
-        this.networkManager.onTargetDestroy.notifyObservers(data as any);
+        if (isTargetDestroyPayload(data)) {
+          this.networkManager.onTargetDestroy.notifyObservers(data);
+        }
         break;
       case EventCode.SPAWN_TARGET:
-        this.networkManager.onTargetSpawn.notifyObservers(data as any);
+        if (isSpawnTargetPayload(data)) {
+          this.networkManager.onTargetSpawn.notifyObservers(data);
+        }
         break;
-
       case EventCode.DESTROY_PICKUP:
-        this.networkManager.onPickupDestroyed.notifyObservers(data as any);
+        if (isPickupDestroyPayload(data)) {
+          this.networkManager.onPickupDestroyed.notifyObservers(data);
+        }
         break;
-
       case EventCode.INITIAL_STATE:
-        // Host typically doesn't need its own initial state loopbacked usually,
-        // as it HAS the state. But MultiplayerSystem might expect it to initialize?
-        // MultiplayerSystem.onInitialStateReceived calls applyPlayerStates.
-        // If Host calls this, it might re-apply states.
-        // Likely safe or harmless, but helpful for consistency.
-        this.networkManager.onInitialStateReceived.notifyObservers(data as any);
+        if (isInitialStatePayload(data)) {
+          this.networkManager.onInitialStateReceived.notifyObservers(data);
+        }
         break;
     }
   }
@@ -234,30 +393,20 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
     }[] = [],
     reliable: boolean = false
   ): void {
-    // We need to implement the same logic as ServerNetworkAuthority.broadcastState
-    // Gathering player states from entityManager?
-    // The entityManager passed to constructor IS the Server one.
-    // So we can read from it.
-
     const entities = this.entityManager.getAllEntities();
     const players: NetworkPlayerState[] = [];
 
-    // Helper to identify ServerPlayerEntity type (duck typing or shared helper)
-    // We duplicate simple logic here or expose helper from game-core.
     for (const entity of entities) {
-      if (entity.type === 'remote_player' || entity.type === 'player') {
-        const e = entity as any; // Cast to ServerPlayerEntity-like
-        if (e.position && e.rotation && e.name) {
-          players.push({
-            id: entity.id,
-            name: e.name,
-            position: { x: e.position.x, y: e.position.y, z: e.position.z },
-            rotation: { x: e.rotation.x, y: e.rotation.y, z: e.rotation.z },
-            weaponId: e.weaponId || 'Pistol',
-            health: e.health,
-            isDead: e.isDead,
-          });
-        }
+      if (isServerPlayerEntityLike(entity)) {
+        players.push({
+          id: entity.id,
+          name: entity.name,
+          position: { x: entity.position.x, y: entity.position.y, z: entity.position.z },
+          rotation: { x: entity.rotation.x, y: entity.rotation.y, z: entity.rotation.z },
+          weaponId: entity.weaponId || 'Pistol',
+          health: entity.health,
+          isDead: entity.isDead,
+        });
       }
     }
 
@@ -271,24 +420,21 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
     if (players.length === 0 && enemyStates.length === 0) return;
 
     const payload: InitialStatePayload = {
-      players: players,
+      players,
       enemies: enemyStates,
       targets: [],
     };
 
     if (reliable || Math.random() < 0.01) {
-      // Log critical updates or occasional stats
       logger.info(
         `HostAdapter Broadcasting State (Reliable=${reliable}): ${players.length} Players, ${enemyStates.length} Enemies. Names: ${players.map((p) => p.name).join(', ')}`
       );
     }
 
-    // Periodic updates should be UNRELIABLE to prevent congestion
     this.networkManager.sendEvent(EventCode.INITIAL_STATE, payload, reliable);
   }
 
   public broadcastHit(hitData: HitEventData, code: number = EventCode.HIT): void {
-    // Update local validation state if needed, then broadcast
     this.networkManager.sendEvent(code, hitData, true);
   }
 
@@ -321,33 +467,40 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   public getPlayerState(id: string): NetworkPlayerState | undefined {
-    // Read from Server EntityManager
     const entity = this.entityManager.getEntity(id);
-    if (entity && (entity.type === 'player' || entity.type === 'remote_player')) {
-      const e = entity as any;
+    if (isServerPlayerEntityLike(entity)) {
       return {
-        id: e.id,
-        name: e.name,
-        position: { x: e.position.x, y: e.position.y, z: e.position.z },
-        rotation: { x: e.rotation.x, y: e.rotation.y, z: e.rotation.z },
-        weaponId: e.weaponId,
-        health: e.health,
+        id: entity.id,
+        name: entity.name,
+        position: { x: entity.position.x, y: entity.position.y, z: entity.position.z },
+        rotation: { x: entity.rotation.x, y: entity.rotation.y, z: entity.rotation.z },
+        weaponId: entity.weaponId || 'Pistol',
+        health: entity.health,
       };
     }
     return undefined;
   }
 
   public getCurrentRoomProperty<T = unknown>(_key: string): T | undefined {
-    // NetworkManager -> RoomManager -> Provider
-    // We might need to expose this in NetworkManager
-    // For now, assume mapId is passed in or we can't easily get it without exposing method in NetworkManager.
-    // Return undefined and let fallback handle it.
     return undefined;
   }
 
   public disconnect(): void {
-    // No-op for adapter as it uses shared NetworkManager
-    // We do NOT want to disconnect the NetworkManager here.
     logger.info('ClientHostNetworkAdapter disconnected (virtual).');
+  }
+
+  public dispose(): void {
+    if (this.playerJoinObserver) {
+      this.networkManager.onPlayerJoined.remove(this.playerJoinObserver);
+      this.playerJoinObserver = null;
+    }
+    if (this.playerLeaveObserver) {
+      this.networkManager.onPlayerLeft.remove(this.playerLeaveObserver);
+      this.playerLeaveObserver = null;
+    }
+    if (this.rawEventObserver) {
+      this.networkManager.onEvent.remove(this.rawEventObserver);
+      this.rawEventObserver = null;
+    }
   }
 }

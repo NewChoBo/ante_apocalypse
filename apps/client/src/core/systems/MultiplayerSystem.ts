@@ -251,7 +251,7 @@ export class MultiplayerSystem {
   }
 
   public dispose(): void {
-    this.networkManager.clearObservers();
+    this.networkManager.clearObservers('session');
     this.remotePlayers.forEach((p) => p.dispose());
     this.remotePlayers.clear();
   }

@@ -82,6 +82,7 @@ export class Game {
   }
 
   private async initMenu(): Promise<void> {
+    this.uiManager?.dispose();
     const { scene, shadowGenerator } = await this.sceneManager.createMenuScene();
     this.uiManager = new UIManager(scene, this.networkManager);
 
@@ -103,7 +104,7 @@ export class Game {
   }
 
   private setupUIManagerEvents(): void {
-    // Clear old observers if any (UIManager.initialize already disposes old instance)
+    // Clear existing observers (UIManager.initialize already disposes old instance)
     this.uiManager.onLogin.add((name) => {
       this.playerName = name;
       this.uiManager.showScreen(UIScreen.MAIN_MENU);
@@ -184,6 +185,7 @@ export class Game {
     this.engine.displayLoadingUI();
 
     try {
+      this.uiManager?.dispose();
       const { scene, shadowGenerator } = await this.sceneManager.createGameScene();
       this.uiManager = new UIManager(scene, this.networkManager);
       this.setupUIManagerEvents();

@@ -7,6 +7,7 @@ import { CombatComponent } from './components/CombatComponent';
 import { GameAssets } from './GameAssets';
 import { HealthBarComponent } from './components/HealthBarComponent';
 import { playerHealthStore } from './store/GameStore';
+import { InventoryManager } from './inventory/InventoryManager';
 import type { GameContext } from '../types/GameContext';
 
 const logger = new Logger('PlayerPawn');
@@ -221,7 +222,6 @@ export class PlayerPawn extends BasePawn {
     this.respawn(position);
 
     // 2. 인벤토리 비우기
-    const { InventoryManager } = require('./inventory/InventoryManager'); // 순환 참조 방지 (지연 로딩)
     InventoryManager.clear();
 
     // 3. 전투 시스템 초기화 (무기 리셋 & 탄약 복구)

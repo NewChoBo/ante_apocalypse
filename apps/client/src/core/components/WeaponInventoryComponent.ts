@@ -98,7 +98,7 @@ export class WeaponInventoryComponent {
 
   public reset(): void {
     // 1. Reset all weapons (restore ammo)
-    this.weapons.forEach((w) => w.reset?.());
+    this.weapons.forEach((w) => w.reset());
 
     // 2. Force switch to default weapon (Pistol at index 0)
     // We do this silently or with animation, but for reset it's better to be instant.

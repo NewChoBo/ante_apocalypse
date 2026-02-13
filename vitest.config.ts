@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  assetsInclude: ['**/*.glb', '**/*.babylon', '**/*.env', '**/*.wav', '**/*.png'],
   test: {
     globals: true,
     environment: 'jsdom',

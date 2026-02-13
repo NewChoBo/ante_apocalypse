@@ -49,8 +49,7 @@ export class RoomManager {
    * 현재 룸 떠나기
    */
   public leaveRoom(): void {
-    // LocalServerManager logic moved to NetworkManager
-    this.provider.disconnect();
+    this.provider.leaveRoom();
   }
 
   /**

@@ -45,7 +45,6 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   private playerStateManager: PlayerStateManager;
   private roomManager: RoomManager;
   private dispatcher: NetworkDispatcher = new NetworkDispatcher();
-  private localServer: LogicalServer | null = null;
 
   // Player Observables (delegated from PlayerStateManager)
   public get onPlayerJoined(): Observable<PlayerState> {
@@ -111,7 +110,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     this.setupProviderListeners();
   }
 
-  public clearObservers(): void {
+  public clearObservers(scope: 'session' | 'all' = 'session'): void {
     this.onPlayersList.clear();
     this.onPlayerFired.clear();
     this.onPlayerReloaded.clear();
@@ -128,13 +127,17 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     this.onTargetHit.clear();
     this.onTargetDestroy.clear();
     this.onTargetSpawn.clear();
-    // this.onPlayersList.clear(); - Already cleared above
-
     this.playerStateManager.clearObservers();
+    this.onEvent.clear();
+
+    if (scope === 'all') {
+      this.connectionManager.onStateChanged.clear();
+      this.roomManager.onRoomListUpdated.clear();
+      this.dispatcher.clear();
+    }
   }
 
   public setLocalServer(server: LogicalServer | null): void {
-    this.localServer = server;
     logger.info(`LocalServer ${server ? 'registered' : 'unregistered'} in NetworkManager`);
   }
 
@@ -333,7 +336,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     this.roomManager.leaveRoom();
 
     // 3. 옵저버 정리
-    this.clearObservers();
+    this.clearObservers('session');
   }
 
   /**
@@ -368,6 +371,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
   public leaveRoom(): void {
     this.roomManager.leaveRoom();
+    this.clearObservers('session');
   }
 
   public isMasterClient(): boolean {
@@ -486,5 +490,19 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
   public getServerTime(): number {
     return this.provider.getServerTime();
+  }
+
+  public dispose(): void {
+    this.clearObservers('all');
+
+    if (this.localServerManager.isServerRunning()) {
+      this.localServerManager.stopSession();
+      this.setLocalServer(null);
+    }
+
+    this.connectionManager.dispose();
+    this.roomManager.dispose();
+    this.playerStateManager.dispose();
+    this.provider.disconnect();
   }
 }

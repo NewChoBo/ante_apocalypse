@@ -1,3 +1,9 @@
+export interface BaseWeaponStats {
+  magazineSize?: number;
+  fireRate?: number;
+  [key: string]: unknown;
+}
+
 /**
  * Core BaseWeapon: Handles pure logic (state, cooldowns).
  * No rendering, audio, or physics dependencies.
@@ -21,7 +27,7 @@ export abstract class BaseWeapon {
   /**
    * 하위 클래스나 Mixin에서 스태츠 객체를 제공해야 합니다.
    */
-  public abstract stats: any;
+  public abstract stats: BaseWeaponStats;
 
   /**
    * 무기 발향 가능 여부. 하위 클래스(FSM 등)에서 상태에 따라 재정의합니다.
