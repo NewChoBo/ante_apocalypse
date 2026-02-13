@@ -65,4 +65,38 @@ describe('ConnectionManager', () => {
 
     expect(provider.connect).not.toHaveBeenCalled();
   });
+
+  it('does not reconnect after explicit disconnect', async (): Promise<void> => {
+    const provider = createProviderMock();
+    const manager = new ConnectionManager(provider, {
+      delayMs: 100,
+      resolveUserId: (): string => 'ReconnectUser',
+    });
+
+    manager.disconnect();
+    manager.handleStateChange(NetworkState.Disconnected);
+    vi.advanceTimersByTime(100);
+    await Promise.resolve();
+
+    expect(provider.disconnect).toHaveBeenCalledTimes(1);
+    expect(provider.connect).not.toHaveBeenCalled();
+  });
+
+  it('re-enables reconnect policy after explicit connect call', async (): Promise<void> => {
+    const provider = createProviderMock();
+    const manager = new ConnectionManager(provider, {
+      delayMs: 100,
+      resolveUserId: (): string => 'ReconnectUser',
+    });
+
+    manager.disconnect();
+    await manager.connect('Commander');
+    manager.handleStateChange(NetworkState.Error);
+    vi.advanceTimersByTime(100);
+    await Promise.resolve();
+
+    expect(provider.connect).toHaveBeenCalledTimes(2);
+    expect(provider.connect).toHaveBeenNthCalledWith(1, 'Commander');
+    expect(provider.connect).toHaveBeenNthCalledWith(2, 'ReconnectUser');
+  });
 });

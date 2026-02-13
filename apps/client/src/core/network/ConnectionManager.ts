@@ -25,6 +25,7 @@ export class ConnectionManager {
 
   private reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private readonly reconnectPolicy: ReconnectPolicy;
+  private reconnectSuppressed = false;
 
   constructor(private provider: INetworkProvider, reconnectPolicy?: Partial<ReconnectPolicy>) {
     this.reconnectPolicy = { ...createDefaultReconnectPolicy(), ...reconnectPolicy };
@@ -34,6 +35,8 @@ export class ConnectionManager {
    * 네트워크 연결 시작
    */
   public async connect(userId: string): Promise<boolean> {
+    this.reconnectSuppressed = false;
+
     // Prevent redundant connection attempts
     if (
       this.currentState !== NetworkState.Disconnected &&
@@ -54,6 +57,7 @@ export class ConnectionManager {
    * 네트워크 연결 해제
    */
   public disconnect(): void {
+    this.reconnectSuppressed = true;
     this.clearReconnectTimer();
     this.provider.disconnect();
   }
@@ -67,6 +71,9 @@ export class ConnectionManager {
 
     // Auto-reconnect logic
     if (state === NetworkState.Disconnected || state === NetworkState.Error) {
+      if (this.reconnectSuppressed) {
+        return;
+      }
       this.scheduleReconnect();
     }
   }
