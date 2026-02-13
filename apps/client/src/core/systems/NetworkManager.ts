@@ -37,6 +37,8 @@ const logger = new Logger('NetworkManager');
  * 기존 API를 유지하면서 내부적으로 분리된 Manager들에 위임
  */
 export class NetworkManager implements INetworkAuthority, INetworkManager {
+  public static readonly AUTHORITY_LOOPBACK_SENDER_ID = '__authority__';
+
   private provider: INetworkProvider;
   private localServerManager: LocalServerManager;
 
@@ -97,8 +99,8 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   public onTargetDestroy = new Observable<TargetDestroyPayload>();
   public onTargetSpawn = new Observable<SpawnTargetPayload>();
 
-  constructor(localServerManager: LocalServerManager) {
-    this.provider = new PhotonProvider();
+  constructor(localServerManager: LocalServerManager, provider?: INetworkProvider) {
+    this.provider = provider ?? new PhotonProvider();
     this.localServerManager = localServerManager;
 
     // Initialize sub-managers
@@ -139,6 +141,49 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
   public setLocalServer(server: LogicalServer | null): void {
     logger.info(`LocalServer ${server ? 'registered' : 'unregistered'} in NetworkManager`);
+  }
+
+  private dispatchRawEvent(code: number, data: unknown, senderId: string): void {
+    this.dispatcher.dispatch(code as EventCode, data as never, senderId);
+  }
+
+  private isServerRequestEvent(code: number): boolean {
+    switch (code) {
+      case EventCode.MOVE:
+      case EventCode.FIRE:
+      case EventCode.SYNC_WEAPON:
+      case EventCode.RELOAD:
+      case EventCode.REQUEST_HIT:
+      case EventCode.REQ_INITIAL_STATE:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  private sendRequestToMaster(code: number, data: unknown, reliable: boolean = true): void {
+    if (this.isMasterClient()) {
+      const myId = this.getSocketId();
+      if (myId) {
+        this.onEvent.notifyObservers({ code, data, senderId: myId });
+      }
+      return;
+    }
+
+    this.provider.sendEventToMaster(code, data, reliable);
+  }
+
+  public broadcastAuthorityEvent(code: number, data: unknown, reliable: boolean = true): void {
+    this.provider.sendEvent(code, data, reliable);
+
+    // Host must also consume authoritative events locally.
+    if (this.isMasterClient()) {
+      this.onEvent.notifyObservers({
+        code,
+        data,
+        senderId: NetworkManager.AUTHORITY_LOOPBACK_SENDER_ID,
+      });
+    }
   }
 
   private setupDispatcher(): void {
@@ -189,6 +234,10 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
     this.dispatcher.register(EventCode.ENEMY_MOVE, (data): void => {
       this.onEnemyUpdated.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.ENEMY_HIT, (data): void => {
+      this.onEnemyHit.notifyObservers(data);
     });
 
     this.dispatcher.register(EventCode.TARGET_HIT, (data): void => {
@@ -259,12 +308,10 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
     this.provider.onEvent = (code: number, data: unknown, senderId: string): void => {
       this.onEvent.notifyObservers({ code, data, senderId });
-      // Use internal cast for dynamic dispatch
-      (this.dispatcher.dispatch as (code: EventCode, data: unknown, actorNr: string) => void)(
-        code as EventCode,
-        data,
-        senderId
-      );
+      if (this.isMasterClient() && this.isServerRequestEvent(code)) {
+        return;
+      }
+      this.dispatchRawEvent(code, data, senderId);
     };
 
     this.provider.onMasterClientSwitched = (newMasterId: string): void => {
@@ -312,7 +359,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
     // Request initial state from Master Client
     logger.info(`Requesting Initial State for room ${roomName}...`);
-    this.provider.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
+    this.sendRequestToMaster(EventCode.REQ_INITIAL_STATE, {}, true);
 
     // 혹시 들어가자마자 방장인 경우 (방이 비어있었을 때 등) 체크
     if (this.isMasterClient()) {
@@ -419,8 +466,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     const myId = this.getSocketId();
     if (myId) {
       const payload = this.playerStateManager.createMovePayload(myId, data.position, data.rotation);
-      // Unified: Host loopback handles local server update via ClientHostNetworkAdapter
-      this.sendEvent(EventCode.MOVE, payload, false);
+      this.sendRequestToMaster(EventCode.MOVE, payload, false);
     }
   }
 
@@ -436,8 +482,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
       direction: { x: number; y: number; z: number };
     };
   }): void {
-    // Unified: Host loopback handles local server update
-    this.sendEvent(EventCode.FIRE, fireData, true);
+    this.sendRequestToMaster(EventCode.FIRE, fireData, true);
   }
 
   public reload(weaponId: string): void {
@@ -445,42 +490,23 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     if (!myId) return;
 
     const payload = { playerId: myId, weaponId };
-    this.sendEvent(EventCode.RELOAD, payload, true);
+    this.sendRequestToMaster(EventCode.RELOAD, payload, true);
   }
 
   public syncWeapon(weaponId: string): void {
-    // Unified: Host loopback handles local server update
-    this.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
+    this.sendRequestToMaster(EventCode.SYNC_WEAPON, { weaponId }, true);
   }
 
   public requestHit(hitData: RequestHitData): void {
-    // Unified: Host loopback handles local server update
-    this.sendEvent(EventCode.REQUEST_HIT, hitData, true);
+    this.sendRequestToMaster(EventCode.REQUEST_HIT, hitData, true);
   }
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
-    this.provider.sendEvent(code, data, reliable);
-
-    // [Unified Host Logic]
-    // If we are the Host, the network event won't come back to us (ReceiverGroup.Others).
-    // So we manually loopback the event to our own listeners (Adapter -> LogicalServer).
-    if (this.isMasterClient()) {
-      const myId = this.getSocketId();
-      if (myId) {
-        // 1. Notify Observers (ClientHostNetworkAdapter listens here)
-        this.onEvent.notifyObservers({ code, data, senderId: myId });
-
-        // 2. Dispatch to internal handlers (e.g., specific event observables)
-        // Use loose casting to access protected dispatch method if needed,
-        // or ensure setupProviderListeners logic is duplicated here safely.
-        // Actually, the provider.onEvent handler does exactly this:
-        (this.dispatcher.dispatch as (code: EventCode, data: unknown, actorNr: string) => void)(
-          code as EventCode,
-          data,
-          myId
-        );
-      }
+    if (this.isServerRequestEvent(code)) {
+      this.sendRequestToMaster(code, data, reliable);
+      return;
     }
+    this.broadcastAuthorityEvent(code, data, reliable);
   }
 
   // === Utility Methods ===
@@ -490,6 +516,11 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
   public getServerTime(): number {
     return this.provider.getServerTime();
+  }
+
+  public getCurrentRoomProperty<T = unknown>(key: string): T | undefined {
+    const value = this.provider.getCurrentRoomProperty(key) as T | null;
+    return value ?? undefined;
   }
 
   public dispose(): void {

@@ -12,6 +12,7 @@ function createProviderMock(): INetworkProvider {
     joinRoom: vi.fn().mockResolvedValue(true),
     getRoomList: vi.fn().mockResolvedValue([]),
     sendEvent: vi.fn(),
+    sendEventToMaster: vi.fn(),
     getLocalPlayerId: vi.fn().mockReturnValue('local-player'),
     getServerTime: vi.fn().mockReturnValue(0),
     isMasterClient: vi.fn().mockReturnValue(false),

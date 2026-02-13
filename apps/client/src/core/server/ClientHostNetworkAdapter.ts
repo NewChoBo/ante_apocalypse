@@ -21,6 +21,7 @@ import {
   TargetDestroyPayload,
   SpawnTargetPayload,
   PickupDestroyPayload,
+  GameEndEventData,
 } from '@ante/common';
 import { NetworkManager } from '../systems/NetworkManager';
 
@@ -160,6 +161,10 @@ function isInitialStatePayload(value: unknown): value is InitialStatePayload {
   );
 }
 
+function isGameEndEventData(value: unknown): value is GameEndEventData {
+  return isRecord(value) && typeof value.reason === 'string';
+}
+
 interface ServerPlayerEntityLike {
   id: string;
   name: string;
@@ -229,6 +234,10 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   private handleRawEvent(code: number, data: unknown, senderId: string): void {
+    if (senderId === NetworkManager.AUTHORITY_LOOPBACK_SENDER_ID) {
+      return;
+    }
+
     switch (code) {
       case EventCode.MOVE: {
         if (!isMovePayload(data)) return;
@@ -312,7 +321,7 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
-    this.networkManager.sendEvent(code, data, reliable);
+    this.networkManager.broadcastAuthorityEvent(code, data, reliable);
 
     switch (code) {
       case EventCode.PLAYER_DEATH:
@@ -378,6 +387,11 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
       case EventCode.INITIAL_STATE:
         if (isInitialStatePayload(data)) {
           this.networkManager.onInitialStateReceived.notifyObservers(data);
+        }
+        break;
+      case EventCode.GAME_END:
+        if (isGameEndEventData(data)) {
+          this.networkManager.onGameEnd.notifyObservers(data);
         }
         break;
     }
@@ -482,7 +496,7 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   }
 
   public getCurrentRoomProperty<T = unknown>(_key: string): T | undefined {
-    return undefined;
+    return this.networkManager.getCurrentRoomProperty<T>(_key);
   }
 
   public disconnect(): void {
