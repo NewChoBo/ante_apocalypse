@@ -1,14 +1,13 @@
-import { scoreStore, ammoStore, playerHealthStore, AmmoState } from '../core/store/GameStore';
+import { ammoStore, playerHealthStore, AmmoState } from '../core/store/GameStore';
 import { GameObservables } from '../core/events/GameObservables';
 import { Observer } from '@babylonjs/core';
 import { AdvancedDynamicTexture, TextBlock, Rectangle, Control } from '@babylonjs/gui';
-import { UIManager } from './UIManager';
+import { IUIManager } from './IUIManager';
 
 export class HUD {
   private ui: AdvancedDynamicTexture;
 
   // UI Controls
-  private scoreText!: TextBlock;
   private currentAmmoText!: TextBlock;
   private totalAmmoText!: TextBlock;
   private healthBar!: Rectangle;
@@ -17,12 +16,10 @@ export class HUD {
   private crosshair!: Rectangle;
   private respawnText!: TextBlock;
 
-  private scoreContainer!: Rectangle;
   private ammoContainer!: Rectangle;
   private healthContainer!: Rectangle;
 
   private curAmmoUnsub: (() => void) | null = null;
-  private scoreUnsub: (() => void) | null = null;
   private healthUnsub: (() => void) | null = null;
   private weaponFireObserver: Observer<{
     weaponId: string;
@@ -34,8 +31,8 @@ export class HUD {
   private expandTimeout: ReturnType<typeof setTimeout> | undefined;
   private previousHealth: number = 100;
 
-  constructor() {
-    this.ui = UIManager.getInstance().getTexture();
+  constructor(uiManager: IUIManager) {
+    this.ui = uiManager.getTexture();
     this.createHUD();
     this.setupSubscriptions();
   }
@@ -51,32 +48,7 @@ export class HUD {
     this.damageOverlay.isHitTestVisible = false;
     this.ui.addControl(this.damageOverlay);
 
-    // 2. Score (Top Left)
-    this.scoreContainer = new Rectangle('scoreContainer');
-    this.scoreContainer.width = '200px';
-    this.scoreContainer.height = '50px';
-    this.scoreContainer.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this.scoreContainer.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
-    this.scoreContainer.top = '20px';
-    this.scoreContainer.left = '20px';
-    this.scoreContainer.thickness = 0;
-    this.ui.addControl(this.scoreContainer);
-
-    const scoreLabel = new TextBlock('scoreLabel', 'SCORE: ');
-    scoreLabel.color = 'white';
-    scoreLabel.fontSize = 24;
-    scoreLabel.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    scoreLabel.width = '80px';
-    this.scoreContainer.addControl(scoreLabel);
-
-    this.scoreText = new TextBlock('scoreValue', '0');
-    this.scoreText.color = '#4caf50'; // Green
-    this.scoreText.fontSize = 24;
-    this.scoreText.textHorizontalAlignment = Control.HORIZONTAL_ALIGNMENT_LEFT;
-    this.scoreText.left = '90px';
-    this.scoreContainer.addControl(this.scoreText);
-
-    // 3. Ammo (Bottom Right)
+    // 2. Ammo (Bottom Right)
     this.ammoContainer = new Rectangle('ammoContainer');
     this.ammoContainer.width = '200px';
     this.ammoContainer.height = '80px';
@@ -205,11 +177,6 @@ export class HUD {
       }
     });
 
-    // Score
-    this.scoreUnsub = scoreStore.subscribe((score) => {
-      this.scoreText.text = score.toString();
-    });
-
     // Health
     this.healthUnsub = playerHealthStore.subscribe((health) => {
       if (health < this.previousHealth) {
@@ -242,16 +209,23 @@ export class HUD {
         this.crosshair.height = '8px';
       }, 150);
     });
+
+    // Game State (Respawn UI)
+    import('../core/store/GameStore').then(({ gameStateStore }) => {
+      gameStateStore.subscribe((state) => {
+        if (state === 'DEAD') {
+          this.showRespawnCountdown(5); // Default to server's 5s
+        } else if (state === 'PLAYING') {
+          this.hideRespawnMessage();
+        }
+      });
+    });
   }
 
   public dispose(): void {
     if (this.curAmmoUnsub) {
       this.curAmmoUnsub();
       this.curAmmoUnsub = null;
-    }
-    if (this.scoreUnsub) {
-      this.scoreUnsub();
-      this.scoreUnsub = null;
     }
     if (this.healthUnsub) {
       this.healthUnsub();
@@ -267,7 +241,6 @@ export class HUD {
 
     // Dispose GUI controls
     this.damageOverlay.dispose();
-    this.scoreContainer.dispose();
     this.ammoContainer.dispose();
     this.healthContainer.dispose();
     this.crosshair.dispose();

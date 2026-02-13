@@ -1,78 +1,64 @@
-import * as Photon from 'photon-realtime';
-import { INetworkProvider, CreateRoomOptions } from '../INetworkProvider';
-import { RoomInfo, NetworkState, PlayerInfo, Logger } from '@ante/common';
-import { mapPhotonState, mapRoomList } from '@ante/game-core';
+import {
+  INetworkProvider,
+  CreateRoomOptions,
+  NetworkProviderEvent,
+  NetworkProviderSubscriber,
+} from '../INetworkProvider';
+import { RoomInfo, NetworkState, Logger } from '@ante/common';
+import {
+  mapPhotonState,
+  mapRoomList,
+  IPhotonClient,
+  PhotonActor,
+  OutboundTransportEvent,
+  Photon, // Use wrapper from game-core
+  LoadBalancing, // Use wrapper from game-core
+  ConnectionProtocol, // Use wrapper from game-core
+} from '@ante/game-core';
+import {
+  toInboundTransportEvent,
+  toPhotonRaiseEventOptions,
+} from './PhotonTransportMapper';
 
 const logger = new Logger('PhotonProvider');
 
-// Photon 라이브러리 타입 정의 (SDK에서 타입이 제공되지 않음)
-type PhotonClient = {
-  setUserId(userId: string): void;
-  myActor(): { actorNr: number; name: string; setName(name: string): void };
-  connectToRegionMaster(region: string): boolean;
-  disconnect(): void;
-  isInLobby(): boolean;
-  isJoinedToRoom(): boolean;
-  isConnectedToMaster(): boolean;
-  isConnectedToNameServer(): boolean;
-  joinRoom(roomId: string): boolean;
-  createRoom(name: string, options?: CreateRoomOptions): boolean;
-  leaveRoom(): void;
-  raiseEvent(code: number, data: unknown, options: object): void;
-  availableRooms(): unknown[];
-  myRoom(): {
-    name?: string;
-    masterClientId: number;
-    actors: Record<string, { name: string }>;
-    getCustomProperty(key: string): unknown;
-  };
-  loadBalancingPeer?: { getServerTime(): number };
-  onStateChange?: (state: number) => void;
-  onRoomListUpdate?: (rooms: unknown[]) => void;
-  onEvent?: (code: number, content: unknown, actorNr: number) => void;
-  onActorJoin?: (actor: { actorNr: number; name: string }) => void;
-  onActorLeave?: (actor: { actorNr: number }) => void;
-  onError?: (errorCode: number, errorMsg: string) => void;
-};
+export interface PhotonProviderOptions {
+  client?: IPhotonClient;
+  appId?: string;
+  appVersion?: string;
+  region?: string;
+  enableWebSocketImplSetup?: boolean;
+}
 
 /**
  * Photon Realtime Cloud를 이용한 네트워크 프로바이더 구현체.
  */
 export class PhotonProvider implements INetworkProvider {
-  private client: PhotonClient;
-  private appId: string = import.meta.env.VITE_PHOTON_APP_ID || '';
-  private appVersion: string = import.meta.env.VITE_PHOTON_APP_VERSION || '1.0';
+  private client: IPhotonClient;
+  private appId: string;
+  private appVersion: string;
+  private region: string;
+  private subscribers: Set<NetworkProviderSubscriber> = new Set();
 
-  public onStateChanged?: (state: NetworkState) => void;
-  public onRoomListUpdated?: (rooms: RoomInfo[]) => void;
-  public onEvent?: (code: number, data: unknown, senderId: string) => void;
-  public onPlayerJoined?: (user: PlayerInfo) => void;
-  public onPlayerLeft?: (userId: string) => void;
-  public onMasterClientSwitched?: (newMasterId: string) => void;
+  constructor(options: PhotonProviderOptions = {}) {
+    this.appId = options.appId ?? (import.meta.env.VITE_PHOTON_APP_ID || '');
+    this.appVersion = options.appVersion ?? (import.meta.env.VITE_PHOTON_APP_VERSION || '1.0');
+    this.region = options.region ?? 'kr';
 
-  constructor() {
+    const enableWebSocketImplSetup = options.enableWebSocketImplSetup ?? true;
+
     // browser 환경에서 require('ws') 에러 방지를 위해 WebSocket 구현체 재설정
-    const photonAny = Photon as unknown as Record<string, unknown>;
-    if (typeof window !== 'undefined' && photonAny['PhotonPeer']) {
-      (
-        photonAny['PhotonPeer'] as { setWebSocketImpl(impl: typeof WebSocket): void }
-      ).setWebSocketImpl(WebSocket);
+    if (enableWebSocketImplSetup && typeof window !== 'undefined' && 'PhotonPeer' in Photon) {
+      Photon.PhotonPeer.setWebSocketImpl(WebSocket);
     }
 
     if (!this.appId || this.appId === 'YOUR_APP_ID_HERE') {
       logger.error('AppID is missing! Please set VITE_PHOTON_APP_ID in your .env file.');
     }
 
-    const LoadBalancing = photonAny['LoadBalancing'] as {
-      LoadBalancingClient: new (protocol: number, appId: string, version: string) => PhotonClient;
-    };
-    const ConnectionProtocol = photonAny['ConnectionProtocol'] as { Wss: number };
-
-    this.client = new LoadBalancing.LoadBalancingClient(
-      ConnectionProtocol.Wss,
-      this.appId,
-      this.appVersion
-    );
+    this.client =
+      options.client ??
+      new LoadBalancing.LoadBalancingClient(ConnectionProtocol.Wss, this.appId, this.appVersion);
 
     this.setupListeners();
   }
@@ -82,11 +68,9 @@ export class PhotonProvider implements INetworkProvider {
       const mappedState = mapPhotonState(state);
       logger.info(`State changed: ${mappedState}`);
 
-      // Auto-join lobby when connected to master
-      this.onStateChanged?.(mappedState);
+      this.emit({ type: 'stateChanged', state: mappedState });
 
       if (mappedState === NetworkState.InLobby) {
-        // Initial fetch with slight delay to ensure list is populated
         setTimeout(() => {
           this.updateRoomListFromClient();
         }, 500);
@@ -95,51 +79,76 @@ export class PhotonProvider implements INetworkProvider {
 
     this.client.onRoomListUpdate = (rooms: unknown[]): void => {
       const roomInfos: RoomInfo[] = mapRoomList(rooms);
-      this.onRoomListUpdated?.(roomInfos);
+      this.emit({ type: 'roomListUpdated', rooms: roomInfos });
     };
 
     this.client.onEvent = (code: number, content: unknown, actorNr: number): void => {
-      this.onEvent?.(code, content, actorNr.toString());
+      const transportEvent = toInboundTransportEvent(code, content, actorNr);
+      if (!transportEvent) {
+        logger.warn(`Ignoring unknown transport event code: ${code}`);
+        return;
+      }
+      this.emit({
+        type: 'transport',
+        event: transportEvent,
+      });
     };
 
-    this.client.onActorJoin = (actor: { actorNr: number; name: string }): void => {
+    this.client.onActorJoin = (actor: PhotonActor): void => {
       logger.info(
         `Actor Joined: ${actor.actorNr} (${actor.name}) | My ID: ${this.client.myActor().actorNr}`
       );
       if (actor.actorNr !== this.client.myActor().actorNr) {
-        this.onPlayerJoined?.({
-          userId: actor.actorNr.toString(),
-          isMaster: actor.actorNr === this.client.myRoom().masterClientId,
-          name: actor.name,
+        this.emit({
+          type: 'playerJoined',
+          user: {
+            userId: actor.actorNr.toString(),
+            isMaster: actor.actorNr === this.client.myRoom().masterClientId,
+            name: actor.name || 'Anonymous',
+          },
         });
       }
     };
 
-    this.client.onActorLeave = (actor: { actorNr: number }): void => {
+    this.client.onActorLeave = (actor: PhotonActor): void => {
       logger.info(`Actor Left: ${actor.actorNr}`);
-      this.onPlayerLeft?.(actor.actorNr.toString());
+      this.emit({ type: 'playerLeft', userId: actor.actorNr.toString() });
 
-      // Check if we became the new Master Client
       if (this.isMasterClient()) {
         const myId = this.getLocalPlayerId();
         if (myId) {
-          this.onMasterClientSwitched?.(myId);
+          this.emit({ type: 'masterClientSwitched', newMasterId: myId });
         }
       }
     };
 
     this.client.onError = (errorCode: number, errorMsg: string): void => {
       logger.error(`Error ${errorCode}: ${errorMsg}`);
-      this.onStateChanged?.(NetworkState.Error);
+      this.emit({ type: 'stateChanged', state: NetworkState.Error });
     };
+  }
+
+  private emit(event: NetworkProviderEvent): void {
+    this.subscribers.forEach((subscriber) => {
+      try {
+        subscriber(event);
+      } catch (error) {
+        logger.error('Subscriber callback failed:', error);
+      }
+    });
   }
 
   public async connect(userId: string): Promise<boolean> {
     this.client.setUserId(userId);
+
+    // myActor() might return actor with minimal methods initially
+    // We assume setName exists or handled by setUserId internals usually,
+    // but in Photon JS we might need to set it on the actor object if joined?
+    // Actually LoadBalancingClient.myActor() returns the local actor.
     this.client.myActor().setName(userId);
 
-    // NameServer 접속 시도
-    return this.client.connectToRegionMaster('kr');
+    this.client.connectToRegionMaster(this.region);
+    return true;
   }
 
   public disconnect(): void {
@@ -147,18 +156,19 @@ export class PhotonProvider implements INetworkProvider {
   }
 
   public async joinRoom(roomId: string): Promise<boolean> {
-    if (!this.client.isInLobby() && !this.client.isJoinedToRoom()) {
-      logger.warn('Cannot join room: Not in lobby or already in a room.');
+    if (this.client.isJoinedToRoom()) {
+      logger.warn('Cannot join room: Already in a room.');
       return false;
     }
 
-    if (!this.client.isConnectedToMaster() && !this.client.isConnectedToNameServer()) {
+    if (!this.client.isConnectedToMaster() && !this.client.isInLobby()) {
       logger.error('Cannot join room: Not connected to master/name server.');
       return false;
     }
 
     try {
-      return this.client.joinRoom(roomId);
+      this.client.joinRoom(roomId);
+      return true;
     } catch (e) {
       logger.error('joinRoom exception:', e);
       return false;
@@ -166,12 +176,19 @@ export class PhotonProvider implements INetworkProvider {
   }
 
   public async createRoom(name: string, options?: CreateRoomOptions): Promise<boolean> {
-    if (!this.client.isConnectedToMaster()) {
+    if (this.client.isJoinedToRoom()) {
+      logger.warn('Cannot create room: Already in a room.');
+      return false;
+    }
+
+    if (!this.client.isConnectedToMaster() && !this.client.isInLobby()) {
       logger.error('Cannot create room: Not connected to Master Server.');
       return false;
     }
+
     try {
-      return this.client.createRoom(name, options);
+      this.client.createRoom(name, options);
+      return true;
     } catch (e) {
       logger.error('createRoom exception:', e);
       return false;
@@ -179,22 +196,26 @@ export class PhotonProvider implements INetworkProvider {
   }
 
   public getRoomList(): Promise<RoomInfo[]> {
-    const rooms = this.client.availableRooms() || [];
+    const rooms = this.client.availableRooms();
     return Promise.resolve(mapRoomList(rooms));
+  }
+
+  public subscribe(handler: NetworkProviderSubscriber): () => void {
+    this.subscribers.add(handler);
+    return (): void => {
+      this.subscribers.delete(handler);
+    };
   }
 
   public leaveRoom(): void {
     this.client.leaveRoom();
   }
 
-  public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
-    const photonAny = Photon as unknown as Record<string, unknown>;
-    const Constants = (
-      photonAny['LoadBalancing'] as { Constants: { ReceiverGroup: { Others: number } } }
-    ).Constants;
-    this.client.raiseEvent(code, data, {
-      receivers: Constants.ReceiverGroup.Others,
-      cache: reliable ? 1 : 0,
+  public publish(event: OutboundTransportEvent): void {
+    const options = toPhotonRaiseEventOptions(event);
+    this.client.raiseEvent(event.code, event.data, {
+      receivers: options.receivers,
+      cache: options.cache,
     });
   }
 
@@ -203,7 +224,6 @@ export class PhotonProvider implements INetworkProvider {
   }
 
   public getServerTime(): number {
-    // Photon Realtime JS (4.x) 에서 서버 시간은 loadBalancingPeer를 통해 가져옵니다.
     if (
       this.client &&
       this.client.loadBalancingPeer &&
@@ -212,13 +232,12 @@ export class PhotonProvider implements INetworkProvider {
       return this.client.loadBalancingPeer.getServerTime();
     }
 
-    // 기본값으로 현재 로컬 시간을 반환 (동기화 정밀도는 떨어질 수 있음)
     return Date.now();
   }
 
-  public getCurrentRoomProperty(key: string): unknown {
+  public getCurrentRoomProperty<T = unknown>(key: string): T | null {
     if (this.client.isJoinedToRoom()) {
-      return this.client.myRoom().getCustomProperty(key);
+      return (this.client.myRoom().getCustomProperty(key) as T) || null;
     }
     return null;
   }
@@ -232,9 +251,13 @@ export class PhotonProvider implements INetworkProvider {
     const actors = new Map<string, { id: string; name: string }>();
     if (this.client.isJoinedToRoom()) {
       const roomActors = this.client.myRoom().actors;
-      for (const nr in roomActors) {
-        const a = roomActors[nr];
-        actors.set(nr.toString(), { id: nr.toString(), name: a.name || 'Anonymous' });
+      // roomActors is { [key: number]: PhotonActor }
+      for (const nrStr in roomActors) {
+        if (Object.prototype.hasOwnProperty.call(roomActors, nrStr)) {
+          const nr = parseInt(nrStr);
+          const a = roomActors[nr];
+          actors.set(nr.toString(), { id: nr.toString(), name: a.name || 'Anonymous' });
+        }
       }
     }
     return actors;
@@ -252,10 +275,10 @@ export class PhotonProvider implements INetworkProvider {
   }
 
   private updateRoomListFromClient(): void {
-    if (!this.client || typeof this.client.availableRooms !== 'function') return;
+    if (!this.client) return;
 
-    const rooms = this.client.availableRooms() || [];
+    const rooms = this.client.availableRooms();
     logger.info('Manual room list refresh:', rooms);
-    this.onRoomListUpdated?.(mapRoomList(rooms));
+    this.emit({ type: 'roomListUpdated', rooms: mapRoomList(rooms) });
   }
 }

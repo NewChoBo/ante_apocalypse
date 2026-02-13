@@ -1,7 +1,8 @@
-import { Mesh, MeshBuilder, Scene, Vector3, AbstractMesh, Skeleton } from '@babylonjs/core';
+import { Mesh, MeshBuilder, Vector3, AbstractMesh, Skeleton } from '@babylonjs/core';
 import { Logger } from '@ante/common';
 import { BasePawn } from '../../simulation/BasePawn.js';
 import { IServerAssetLoader } from '../IServerAssetLoader.js';
+import { ServerGameContext } from '../../types/ServerGameContext.js';
 import { SkeletonAnimationComponent } from '../../simulation/components/SkeletonAnimationComponent.js';
 import { MeshUtils } from '../../simulation/utils/MeshUtils.js';
 import { BaseWeapon } from '../../combat/BaseWeapon.js';
@@ -10,12 +11,16 @@ import { WeaponRegistry } from '../../weapons/WeaponRegistry.js';
 
 const logger = new Logger('ServerPlayerPawn');
 
+/**
+ * 서버측 플레이어 Pawn 객체.
+ */
 export class ServerPlayerPawn extends BasePawn {
   public override mesh: Mesh;
   public visualMesh: AbstractMesh | null = null;
   public skeleton: Skeleton | null = null;
   public headBox: Mesh | null = null;
   public override type = 'player';
+  public name: string = 'Unknown';
 
   public weapons: Map<string, BaseWeapon> = new Map();
   public currentWeapon: BaseWeapon | null = null;
@@ -24,33 +29,37 @@ export class ServerPlayerPawn extends BasePawn {
 
   constructor(
     id: string,
-    scene: Scene,
+    private ctx: ServerGameContext,
     position: Vector3,
     private assetLoader: IServerAssetLoader
   ) {
-    super(scene);
+    super(ctx.scene, ctx.tickManager);
     this.id = id;
 
     // 1. Root Collider (Pivot at feet: 0.0m)
     this.mesh = MeshBuilder.CreateBox(
       'serverPlayerRoot_' + id,
       { width: 0.5, height: 2, depth: 0.5 },
-      scene
+      this.ctx.scene
     );
     this.mesh.setPivotPoint(new Vector3(0, -1, 0));
-    this.mesh.position.copyFrom(position); // Should be ground level
+    this.mesh.position.copyFrom(position);
     this.mesh.checkCollisions = true;
-    this.mesh.isPickable = true;
+    this.mesh.isPickable = false;
     this.mesh.metadata = { type: 'player', id: this.id, pawn: this };
+    this.damageProfile = {
+      multipliers: { head: 2.0, body: 1.0 },
+      defaultMultiplier: 1.0,
+    };
 
     logger.info(`Created ServerPlayerPawn for ${id}`);
 
     // Animation Component
-    this.animationComponent = new SkeletonAnimationComponent(this, scene);
+    this.animationComponent = new SkeletonAnimationComponent(this, this.ctx.scene);
     this.addComponent(this.animationComponent);
 
     // 2. Load Model
-    this.loadModel(scene);
+    this.loadModel();
 
     // 3. Init Default Weapon
     this.equipWeapon('Pistol');
@@ -64,7 +73,6 @@ export class ServerPlayerPawn extends BasePawn {
         return;
       }
 
-      // Server side: give substantial reserve ammo to allow multiple reloads
       const weapon = new Firearm(weaponId, this.id, stats);
       weapon.reserveAmmo = 999;
       this.weapons.set(weaponId, weapon);
@@ -86,50 +94,39 @@ export class ServerPlayerPawn extends BasePawn {
     }
   }
 
-  private async loadModel(scene: Scene): Promise<void> {
+  private async loadModel(): Promise<void> {
     try {
       logger.info(`Loading model via AssetLoader for ${this.id}`);
 
-      const result = await this.assetLoader.loadModel(scene, 'dummy3.babylon');
+      const result = await this.assetLoader.loadModel(this.ctx.scene, 'dummy3.babylon');
 
       logger.info(
         `AssetLoader finished. Meshes: ${result.meshes.length}, Skeletons: ${result.skeletons.length}`
       );
 
-      this.visualMesh = result.meshes[0]; // Assuming root is 0, or we check common parent
-      // In RemotePlayerPawn: entries.rootNodes[0]
-      // ImportMeshAsync returns all meshes. dummy3 usually has a __root__ node.
+      this.visualMesh = result.meshes[0];
       if (!this.visualMesh) {
         logger.error(`No visual mesh found in loaded model!`);
         return;
       }
-      logger.info(`Visual Root Name: ${this.visualMesh.name}`);
 
       this.visualMesh.parent = this.mesh;
-
-      // Pivot is now at ground level (0,0,0)
       this.visualMesh.position = Vector3.Zero();
       this.visualMesh.rotation = Vector3.Zero();
       this.visualMesh.scaling.set(1, 1, 1);
-
-      // Force update world matrix to prevent ghosting or floating issues
       this.visualMesh.computeWorldMatrix(true);
 
       this.skeleton = result.skeletons.length > 0 ? result.skeletons[0] : null;
 
-      // Setup Metrics/Metadata for Raycast
       result.meshes.forEach((m) => {
         m.isPickable = true;
         m.metadata = { type: 'player', id: this.id, bodyPart: 'body', pawn: this };
         if (this.skeleton) m.skeleton = this.skeleton;
       });
 
-      // 3. Head Hitbox (Critical for Headshots)
       if (this.skeleton) {
-        // Initialize shared animation component
         this.animationComponent.initializeSkeleton(this.skeleton);
-
-        this.headBox = MeshUtils.createHeadHitbox(scene, this.skeleton, this.visualMesh, {
+        this.headBox = MeshUtils.createHeadHitbox(this.ctx.scene, this.skeleton, this.visualMesh, {
           id: this.id,
           type: 'player',
           pawn: this,
@@ -143,12 +140,9 @@ export class ServerPlayerPawn extends BasePawn {
   }
 
   public tick(deltaTime: number): void {
-    // 1. Weapon Logic (Reload timers, etc)
     if (this.currentWeapon) {
       this.currentWeapon.tick(deltaTime);
     }
-
-    // 2. Component Logic (Animation, etc)
     this.updateComponents(deltaTime);
   }
 
@@ -156,7 +150,7 @@ export class ServerPlayerPawn extends BasePawn {
     logger.info(`ServerPlayerPawn ${this.id} died.`);
   }
 
-  public override dispose() {
+  public override dispose(): void {
     super.dispose();
   }
 }

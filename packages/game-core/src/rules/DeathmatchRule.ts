@@ -1,6 +1,8 @@
 import { IGameRule, RespawnDecision, GameEndResult } from './IGameRule.js';
 import { WorldSimulation } from '../simulation/WorldSimulation.js';
 
+type RandomSource = () => number;
+
 /**
  * 데스매치 모드: PvP, 리스폰 허용, 킬 수 기반 승리
  */
@@ -11,6 +13,8 @@ export class DeathmatchRule implements IGameRule {
 
   private killCount: Map<string, number> = new Map();
   private readonly killTarget = 10; // 10킬 시 승리
+
+  constructor(private readonly randomSource: RandomSource = Math.random) {}
 
   public onInitialize(_simulation: WorldSimulation): void {
     // 데스매치는 초기 스폰 없음 (플레이어만)
@@ -46,7 +50,9 @@ export class DeathmatchRule implements IGameRule {
       { x: 5, y: 1, z: -5 },
       { x: -5, y: 1, z: -5 },
     ];
-    const randomSpawn = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
+    const randomIndex = Math.floor(this.randomSource() * spawnPoints.length);
+    const clampedIndex = Math.max(0, Math.min(randomIndex, spawnPoints.length - 1));
+    const randomSpawn = spawnPoints[clampedIndex];
 
     return {
       action: 'respawn',

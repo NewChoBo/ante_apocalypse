@@ -9,32 +9,31 @@ import {
   Checkbox,
   InputText,
 } from '@babylonjs/gui';
-import { Observer } from '@babylonjs/core';
-import { NetworkManager } from '../core/systems/NetworkManager';
+// import removed
+import { INetworkManager } from '../core/interfaces/INetworkManager';
 import { UIManager, UIScreen } from './UIManager';
-import { RoomInfo } from '@ante/common';
-import { LocalServerManager } from '../core/server/LocalServerManager';
-import { Logger } from '@ante/common';
+import { RoomInfo, Logger } from '@ante/common';
+import { UI_THEME } from './theme';
+import { createTacticalButton } from './buttonFactory';
 
 const logger = new Logger('LobbyUI');
 
 export class LobbyUI {
   private container: Container;
   private roomListPanel: StackPanel;
-  private networkManager: NetworkManager;
+  private networkManager: INetworkManager;
   private uiManager: UIManager;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private observers: Observer<any>[] = [];
+  private cleanups: (() => void)[] = [];
 
-  // Visual Constants from UIManager (for consistency)
-  private readonly PRIMARY_COLOR = '#ffc400';
-  private readonly BG_COLOR = 'rgba(5, 5, 10, 0.95)';
-  private readonly FONT_TACTICAL = 'Rajdhani, sans-serif';
-  private readonly FONT_MONO = 'Roboto Mono, monospace';
+  // Visual Constants from shared theme
+  private readonly PRIMARY_COLOR = UI_THEME.primaryColor;
+  private readonly BG_COLOR = UI_THEME.backgroundColor;
+  private readonly FONT_TACTICAL = UI_THEME.fontTactical;
+  private readonly FONT_MONO = UI_THEME.fontMono;
 
-  constructor(uiManager: UIManager) {
+  constructor(uiManager: UIManager, networkManager: INetworkManager) {
     this.uiManager = uiManager;
-    this.networkManager = NetworkManager.getInstance();
+    this.networkManager = networkManager;
     this.container = this.createContainer();
     this.roomListPanel = this.container
       .getDescendants()
@@ -44,11 +43,8 @@ export class LobbyUI {
   }
 
   public dispose(): void {
-    this.observers.forEach((obs) => {
-      this.networkManager.onRoomListUpdated.remove(obs);
-      this.networkManager.onStateChanged.remove(obs);
-    });
-    this.observers = [];
+    this.cleanups.forEach((cleanup) => cleanup());
+    this.cleanups = [];
     this.container.dispose();
   }
 
@@ -142,7 +138,7 @@ export class LobbyUI {
     backBtn.verticalAlignment = Control.VERTICAL_ALIGNMENT_BOTTOM;
     backBtn.top = '-40px';
     backBtn.onPointerUpObservable.add(() => {
-      LocalServerManager.getInstance().stopSession(); // Ensure local server stops if we leave lobby
+      // Local Server should be stopped by now if we are in Lobby
       this.uiManager.showScreen(UIScreen.MAIN_MENU);
     });
     content.addControl(backBtn);
@@ -156,12 +152,16 @@ export class LobbyUI {
         this.updateRoomList(rooms);
       }
     );
-    if (roomListObserver) this.observers.push(roomListObserver);
+    if (roomListObserver) {
+      this.cleanups.push(() => this.networkManager.onRoomListUpdated.remove(roomListObserver));
+    }
 
     const stateObserver = this.networkManager.onStateChanged.add((state: string): void => {
       this.handleStateChange(state);
     });
-    if (stateObserver) this.observers.push(stateObserver);
+    if (stateObserver) {
+      this.cleanups.push(() => this.networkManager.onStateChanged.remove(stateObserver));
+    }
 
     // Initial fetch from cache
     this.updateRoomList(this.networkManager.getRoomList());
@@ -276,15 +276,18 @@ export class LobbyUI {
     stack.addControl(count);
 
     // Join Button
-    const joinBtn = Button.CreateSimpleButton('join-' + room.name, 'JOIN');
-    joinBtn.width = '100px';
-    joinBtn.height = '35px';
-    joinBtn.color = this.PRIMARY_COLOR;
-    joinBtn.background = 'transparent';
-    joinBtn.thickness = 1;
-    joinBtn.fontFamily = this.FONT_TACTICAL;
+    const joinBtn = createTacticalButton({
+      id: 'join-' + room.name,
+      text: 'JOIN',
+      width: '100px',
+      height: '35px',
+      primaryColor: this.PRIMARY_COLOR,
+      fontFamily: this.FONT_TACTICAL,
+      fontSize: 14,
+      thickness: 1,
+    });
     joinBtn.onPointerUpObservable.add(() => {
-      this.networkManager.joinRoom(room.name);
+      this.networkManager.joinGame(room.name);
     });
     stack.addControl(joinBtn);
 
@@ -494,9 +497,8 @@ export class LobbyUI {
       try {
         let success = false;
         if (checkbox.isChecked) {
-          logger.info('Creating Local Server Session...');
-          await LocalServerManager.getInstance().startSession(roomName, mapId, gameMode);
-          success = await this.networkManager.joinRoom(roomName);
+          logger.info('Creating Local Server Session (HostGame)...');
+          success = await this.networkManager.hostGame(roomName, mapId, gameMode);
         } else {
           success = await this.networkManager.createRoom(roomName, mapId);
         }
@@ -507,10 +509,10 @@ export class LobbyUI {
           throw new Error('FAILED_TO_ESTABLISH_UPLINK');
         }
       } catch (e: unknown) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        logger.error('Failed to create/join room:', e as any);
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        logger.error('Failed to create/join room:', errorMessage);
         if (checkbox.isChecked) {
-          LocalServerManager.getInstance().stopSession();
+          this.networkManager.leaveGame();
         }
         initBtn.isEnabled = true;
         initBtn.textBlock!.text = 'INITIATE';
@@ -534,25 +536,16 @@ export class LobbyUI {
   }
 
   private createButton(text: string, width: string): Button {
-    const btn = Button.CreateSimpleButton('btn-' + text, text);
-    btn.width = width;
-    btn.height = '40px';
-    btn.color = this.PRIMARY_COLOR;
-    btn.background = 'transparent';
-    btn.thickness = 2;
-    btn.fontFamily = this.FONT_TACTICAL;
-    btn.fontSize = 16;
-    btn.fontWeight = '700';
-
-    btn.onPointerEnterObservable.add((): void => {
-      btn.background = this.PRIMARY_COLOR;
-      btn.color = 'black';
+    return createTacticalButton({
+      id: 'btn-' + text,
+      text,
+      width,
+      height: '40px',
+      primaryColor: this.PRIMARY_COLOR,
+      fontFamily: this.FONT_TACTICAL,
+      fontSize: 16,
+      fontWeight: '700',
+      thickness: 2,
     });
-    btn.onPointerOutObservable.add((): void => {
-      btn.background = 'transparent';
-      btn.color = this.PRIMARY_COLOR;
-    });
-
-    return btn;
   }
 }

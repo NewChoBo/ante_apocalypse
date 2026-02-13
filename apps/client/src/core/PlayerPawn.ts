@@ -1,37 +1,16 @@
-import {
-  Mesh,
-  Scene,
-  UniversalCamera,
-  Vector3,
-  Animation as BabylonAnimation,
-} from '@babylonjs/core';
+import { Mesh, UniversalCamera, Vector3, Animation as BabylonAnimation } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { Logger } from '@ante/common';
+import { CharacterMovementComponent, MovementInput } from './components/movement/CharacterMovementComponent';
+import { CameraComponent } from './components/movement/CameraComponent';
+import { CombatComponent } from './components/combat/CombatComponent';
+import { GameAssets } from './GameAssets';
+import { HealthBarComponent } from './components/character/HealthBarComponent';
+import { playerHealthStore } from './store/GameStore';
+import { InventoryManager } from './inventory/InventoryManager';
+import type { GameContext } from '../types/GameContext';
 
 const logger = new Logger('PlayerPawn');
-import { CharacterMovementComponent } from './components/CharacterMovementComponent';
-import { CameraComponent } from './components/CameraComponent';
-import { CombatComponent } from './components/CombatComponent';
-import { GameAssets } from './GameAssets';
-import { HealthBarComponent } from './components/HealthBarComponent';
-
-export interface InputState {
-  forward: boolean;
-  backward: boolean;
-  left: boolean;
-  right: boolean;
-  sprint: boolean;
-  jump: boolean;
-  crouch: boolean;
-  aim: boolean;
-}
-
-export interface MouseDelta {
-  x: number;
-  y: number;
-}
-
-import { playerHealthStore } from './store/GameStore';
 
 /**
  * 1인칭 플레이어 캐릭터 실체 (Pawn).
@@ -42,8 +21,8 @@ export class PlayerPawn extends BasePawn {
   private movementComponent: CharacterMovementComponent;
   private cameraComponent: CameraComponent;
 
-  constructor(scene: Scene) {
-    super(scene);
+  constructor(context: GameContext) {
+    super(context.scene, context);
     this.id = 'player_local'; // Local player ID
     this.damageProfile = {
       multipliers: { head: 2.0, body: 1.0 },
@@ -54,8 +33,9 @@ export class PlayerPawn extends BasePawn {
     playerHealthStore.set(this.health);
 
     // Root mesh is at ground level (feet)
-    this.mesh = Mesh.CreateBox('playerPawn', 0.5, scene);
+    this.mesh = Mesh.CreateBox('playerPawn', 0.5, this.scene);
     this.mesh.isVisible = false;
+    this.mesh.isPickable = false;
     this.mesh.position.set(0, 0, -5); // Grounded initial position
 
     // 물리 충돌 설정 (루트가 지면이므로 ellipsoidOffset 조정)
@@ -64,11 +44,11 @@ export class PlayerPawn extends BasePawn {
     this.mesh.ellipsoidOffset = new Vector3(0, 0.875, 0); // 콜라이더 중심이 지면 위 0.875m
 
     // 카메라 컴포넌트 추가 (눈높이: 지면 + 1.75m)
-    this.cameraComponent = new CameraComponent(this, scene, 1.75);
+    this.cameraComponent = new CameraComponent(this, this.scene, 1.75);
     this.addComponent(this.cameraComponent);
 
     // 이동 컴포넌트 추가
-    this.movementComponent = new CharacterMovementComponent(this, scene);
+    this.movementComponent = new CharacterMovementComponent(this, this.scene);
     this.addComponent(this.movementComponent);
   }
 
@@ -81,7 +61,11 @@ export class PlayerPawn extends BasePawn {
   }
 
   /** Controller로부터 입력을 받아 처리 */
-  public handleInput(keys: InputState, mouseDelta: MouseDelta, deltaTime: number): void {
+  public handleInput(
+    keys: MovementInput,
+    mouseDelta: { x: number; y: number },
+    deltaTime: number
+  ): void {
     // 1. 회전 처리를 컴포넌트에 위임
     this.cameraComponent.handleRotation(mouseDelta);
 
@@ -147,9 +131,6 @@ export class PlayerPawn extends BasePawn {
     this.cameraComponent.detach();
     // Hide actual model child meshes
     this.mesh.getChildMeshes().forEach((m) => {
-      // Don't hide the camera if it was somehow a mesh child,
-      // but usually it's not.
-      // We only want to hide the character models.
       if (m.name.includes('Character') || m.name.includes('Model') || m.id.includes('Character')) {
         m.setEnabled(false);
       }
@@ -183,7 +164,6 @@ export class PlayerPawn extends BasePawn {
       });
       this.corpseHealthBar.updateHealth(0);
 
-      // Simple death animation for the corpse
       const deathAnim = new BabylonAnimation(
         'deathAnim',
         'rotation.x',
@@ -209,7 +189,6 @@ export class PlayerPawn extends BasePawn {
     this.mesh.rotation.x = 0; // Ensure upright
     this.mesh.checkCollisions = true; // Restore collisions
 
-    // 1. Cleanup Corpse
     if (this.corpseMesh) {
       this.corpseMesh.dispose();
       this.corpseMesh = null;
@@ -219,13 +198,11 @@ export class PlayerPawn extends BasePawn {
       this.corpseHealthBar = null;
     }
 
-    // 2. Restore local visuals and attach camera
     this.cameraComponent.attach();
     this.mesh.getChildMeshes().forEach((m) => {
       m.setEnabled(true);
     });
 
-    // 3. Show weapons on respawn
     const combat = this.getComponent(CombatComponent) as CombatComponent;
     if (combat) {
       combat.getCurrentWeapon()?.show();
@@ -234,4 +211,39 @@ export class PlayerPawn extends BasePawn {
     playerHealthStore.set(100);
     logger.info('Respawned');
   }
+
+  /**
+   * 완전한 상태 초기화 (사망 후 부활 시 사용)
+   * - 위치/체력/충돌 복구 (respawn)
+   * - 인벤토리 초기화
+   * - 무기/탄약 초기화
+   */
+  public fullReset(position: Vector3): void {
+    // 1. 기본 부활 (위치, 시체 제거, 물리)
+    this.respawn(position);
+
+    // 2. 인벤토리 비우기
+    InventoryManager.clear();
+
+    // 3. 전투 시스템 초기화 (무기 리셋 & 탄약 복구)
+    const combat = this.getComponent(CombatComponent) as CombatComponent;
+    if (combat) {
+      combat.reset();
+    }
+
+    logger.info('Full Reset Complete');
+  }
+
+  public override dispose(): void {
+    if (this.corpseMesh) {
+      this.corpseMesh.dispose();
+      this.corpseMesh = null;
+    }
+    if (this.corpseHealthBar) {
+      this.corpseHealthBar.dispose();
+      this.corpseHealthBar = null;
+    }
+    super.dispose();
+  }
 }
+

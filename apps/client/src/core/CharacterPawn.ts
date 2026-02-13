@@ -9,9 +9,10 @@ import {
 } from '@babylonjs/core';
 import { BasePawn } from './BasePawn';
 import { Logger } from '@ante/common';
-import { HealthBarComponent } from './components/HealthBarComponent';
+import { HealthBarComponent } from './components/character/HealthBarComponent';
 import { SkeletonAnimationComponent } from '@ante/game-core';
-import { CharacterModelLoader } from './components/CharacterModelLoader';
+import { CharacterModelLoader } from './components/character/CharacterModelLoader';
+import type { GameContext } from '../types/GameContext';
 
 const logger = new Logger('CharacterPawn');
 
@@ -47,8 +48,8 @@ export abstract class CharacterPawn extends BasePawn {
 
   protected config: CharacterPawnConfig;
 
-  constructor(scene: Scene, config: CharacterPawnConfig) {
-    super(scene);
+  constructor(scene: Scene, config: CharacterPawnConfig, context: GameContext) {
+    super(scene, context);
     this.config = config;
 
     this.damageProfile = {
@@ -67,6 +68,7 @@ export abstract class CharacterPawn extends BasePawn {
     this.mesh.position.copyFrom(config.position); // Ground pivot
 
     this.mesh.checkCollisions = true;
+    this.mesh.isPickable = false;
     this.mesh.isVisible = false;
     this.mesh.metadata = { type: config.type, pawn: this };
 
@@ -178,3 +180,4 @@ export abstract class CharacterPawn extends BasePawn {
     this.healthBarComponent?.updateHealth(health);
   }
 }
+
