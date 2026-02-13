@@ -21,6 +21,7 @@ import { IUIManager } from '../../ui/IUIManager';
 import { LocalServerManager } from '../server/LocalServerManager';
 import { GlobalInputManager } from './GlobalInputManager';
 import { CameraComponent } from '../components/CameraComponent';
+import { SpectatorManager } from './session/SpectatorManager';
 import type { GameContext } from '../../types/GameContext';
 
 /**
@@ -65,6 +66,7 @@ export class SessionController {
   private worldManager: WorldEntityManager;
   private pickupManager: PickupManager;
   private inputManager: GlobalInputManager;
+  private spectatorManager: SpectatorManager;
   private tickManager: TickManager;
   private localServerManager: LocalServerManager;
   private ctx!: GameContext;
@@ -86,6 +88,12 @@ export class SessionController {
     this.tickManager = options.tickManager;
     this.localServerManager = options.localServerManager;
     this.inputManager = new GlobalInputManager(this.uiManager);
+    this.spectatorManager = new SpectatorManager({
+      getMultiplayerSystem: (): MultiplayerSystem | null => this.multiplayerSystem,
+      getPlayerPawn: (): PlayerPawn | null => this.playerPawn,
+      getPlayerController: (): PlayerController | null => this.playerController,
+      getHud: (): HUD | null => this.hud,
+    });
   }
 
   public async initialize(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
@@ -124,7 +132,7 @@ export class SessionController {
     this.setupInput();
 
     this.setupMultiplayer(playerName);
-    this.setupSpectatorInput();
+    this.spectatorManager.initializeInput();
   }
 
   private setupSystems(levelData: LevelData): void {
@@ -143,22 +151,7 @@ export class SessionController {
     this.playerPawn!.addComponent(combatComp);
 
     this.healthUnsub = playerHealthStore.subscribe((health: number): void => {
-      if (health <= 0) {
-        if (!this.isSpectating) {
-          GameObservables.playerDied.notifyObservers(null);
-          this.isSpectating = true;
-          this.spectateMode = 'FREE';
-          this.hud?.showRespawnCountdown(3);
-        }
-      } else {
-        // [Fix] If health restored via State Sync (without Respawn Event), ensure we exit spectator mode
-        if (this.isSpectating) {
-          this.isSpectating = false;
-          this.spectateTargetIndex = -1;
-          this.hud?.hideRespawnMessage();
-          this.playerController?.setInputBlocked(false);
-        }
-      }
+      this.spectatorManager.onHealthChanged(health);
     });
 
     combatComp.onWeaponChanged((newWeapon: { name: string }): void => {
@@ -266,20 +259,7 @@ export class SessionController {
 
     this.networkManager.onPlayerRespawn.add((data) => {
       if (data.playerId === this.networkManager.getSocketId()) {
-        this.isSpectating = false;
-        this.spectateMode = 'FREE';
-        this.spectateTargetIndex = -1;
-        this.hud?.hideRespawnMessage();
-
-        const spawnPos = data.position
-          ? new Vector3(data.position.x, data.position.y, data.position.z)
-          : new Vector3(0, 2, 0);
-
-        // Perform Full Reset (restore health, physics, clear inventory, reset combat)
-        this.playerPawn?.fullReset(spawnPos);
-
-        // Ensure input block is released
-        this.playerController?.setInputBlocked(false);
+        this.spectatorManager.onLocalRespawn(data.position);
       }
     });
   }
@@ -320,10 +300,6 @@ export class SessionController {
     this.playerController?.setInputBlocked(blocked);
   }
 
-  private isSpectating: boolean = false;
-  private spectateMode: 'FREE' | 'FOLLOW' = 'FREE';
-  private spectateTargetIndex: number = -1;
-
   public update(deltaTime: number): void {
     if (this.multiplayerSystem) {
       this.multiplayerSystem.update();
@@ -331,82 +307,12 @@ export class SessionController {
     if (this.enemyManager) {
       this.enemyManager.update(deltaTime);
     }
-
-    if (this.isSpectating && this.spectateMode === 'FOLLOW') {
-      this.updateSpectatorFollow();
-    }
-  }
-
-  private updateSpectatorFollow(): void {
-    if (!this.multiplayerSystem || !this.playerPawn) return;
-    const players = this.multiplayerSystem.getRemotePlayers();
-    if (players.length === 0) {
-      this.spectateMode = 'FREE';
-      return;
-    }
-
-    if (this.spectateTargetIndex < 0 || this.spectateTargetIndex >= players.length) {
-      this.spectateTargetIndex = 0;
-    }
-
-    const target = players[this.spectateTargetIndex];
-    if (target && target.mesh) {
-      const targetPos = target.mesh.position;
-      const followOffset = new Vector3(0, 2.0, -3.0);
-      const desiredPos = targetPos.add(followOffset);
-      this.playerPawn.mesh.position.copyFrom(desiredPos);
-      this.playerPawn.camera.setTarget(targetPos);
-    }
-  }
-
-  private setupSpectatorInput(): void {
-    const onMouseDown = (e: MouseEvent): void => {
-      if (!this.isSpectating) return;
-      if (!document.pointerLockElement) return;
-
-      if (e.button === 0) {
-        this.cycleSpectateTarget(1);
-      } else if (e.button === 2) {
-        this.cycleSpectateTarget(-1);
-      }
-    };
-
-    const onKeyDown = (e: KeyboardEvent): void => {
-      if (!this.isSpectating) return;
-      if (e.code === 'Space' && !e.repeat) {
-        this.spectateMode = this.spectateMode === 'FREE' ? 'FOLLOW' : 'FREE';
-        if (this.spectateMode === 'FOLLOW') {
-          this.cycleSpectateTarget(0);
-        }
-      }
-    };
-
-    window.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('keydown', onKeyDown);
-
-    this._spectatorCleanup = (): void => {
-      window.removeEventListener('mousedown', onMouseDown);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }
-
-  private _spectatorCleanup: (() => void) | null = null;
-
-  private cycleSpectateTarget(dir: number): void {
-    if (!this.multiplayerSystem) return;
-    const players = this.multiplayerSystem.getRemotePlayers();
-    if (players.length === 0) {
-      this.spectateMode = 'FREE';
-      return;
-    }
-
-    this.spectateMode = 'FOLLOW';
-    this.spectateTargetIndex = (this.spectateTargetIndex + dir + players.length) % players.length;
+    this.spectatorManager.update();
   }
 
   public dispose(): void {
     this.healthUnsub?.();
-    this._spectatorCleanup?.();
+    this.spectatorManager.dispose();
     this.inputManager.dispose();
     this.playerController?.dispose();
     this.playerPawn?.dispose();
