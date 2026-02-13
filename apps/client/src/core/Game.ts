@@ -13,6 +13,7 @@ import { NetworkState, Logger } from '@ante/common';
 import { EnemyManager } from './systems/EnemyManager'; // Added import
 import { LocalServerManager } from './server/LocalServerManager';
 import { PhotonProvider } from './network/providers/PhotonProvider';
+import { GameNetworkCoordinator } from './systems/GameNetworkCoordinator';
 
 const logger = new Logger('Game');
 import { NetworkManager } from './systems/NetworkManager';
@@ -33,15 +34,14 @@ export class Game {
   private uiManager!: UIManager;
   private tickManager: CoreTickManager;
   private networkManager: NetworkManager;
+  private networkCoordinator: GameNetworkCoordinator;
   private localServerManager: LocalServerManager;
 
   private isRunning = false;
   private isLoading = false;
   private playerName: string = 'Anonymous';
   private renderFunction: () => void;
-  private _networkStateObserver: Observer<NetworkState> | null = null;
   private _playerDiedObserver: Observer<null> | null = null;
-  private _gameEndObserver: Observer<{ reason: string }> | null = null;
 
   constructor() {
     this.renderFunction = (): void => {
@@ -60,6 +60,14 @@ export class Game {
     this.tickManager = new CoreTickManager();
     this.localServerManager = new LocalServerManager();
     this.networkManager = new NetworkManager(this.localServerManager, new PhotonProvider());
+    this.networkCoordinator = new GameNetworkCoordinator({
+      networkManager: this.networkManager,
+      onNetworkStateChanged: (state: NetworkState): void => this.handleNetworkStateChange(state),
+      onGameEnd: (data): void => {
+        logger.info(`Game End received: ${data.reason}`);
+        this.gameOver(data.reason);
+      },
+    });
 
     this.initCanvas();
     this.initEngine();
@@ -117,17 +125,8 @@ export class Game {
       this.uiManager.showScreen(UIScreen.LOBBY);
     });
 
-    // Listen for room join
-    const nm = this.networkManager;
-    if (this._networkStateObserver) {
-      nm.onStateChanged.remove(this._networkStateObserver);
-      this._networkStateObserver = null;
-    }
-
-    logger.info('Registering NetworkState observer in Game...');
-    this._networkStateObserver = nm.onStateChanged.add((state) => {
-      this.handleNetworkStateChange(state);
-    });
+    logger.info('Binding Game network observers...');
+    this.networkCoordinator.bind();
 
     this.uiManager.onAbort.add(() => this.quitToMenu());
 
@@ -143,15 +142,6 @@ export class Game {
       this.uiManager.showScreen(UIScreen.LOGIN);
     });
 
-    // Handle Game End from Server
-    if (this._gameEndObserver) {
-      nm.onGameEnd.remove(this._gameEndObserver);
-      this._gameEndObserver = null;
-    }
-    this._gameEndObserver = nm.onGameEnd.add((data) => {
-      logger.info(`Game End received: ${data.reason}`);
-      this.gameOver(data.reason);
-    });
   }
 
   private handleNetworkStateChange(state: NetworkState): void {
@@ -293,13 +283,8 @@ export class Game {
       this._playerDiedObserver = null;
     }
 
-    // Clean up network listener
-    // Clean up network listener
-    if (this._networkStateObserver) {
-      this.networkManager.onStateChanged.remove(this._networkStateObserver);
-      this._networkStateObserver = null;
-      logger.info('Removed NetworkState observer in Game');
-    }
+    this.networkCoordinator.dispose();
+    logger.info('Removed Game network observers');
 
     this.initMenu();
   }
