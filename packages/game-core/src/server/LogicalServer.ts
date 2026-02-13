@@ -18,6 +18,7 @@ import { ServerLevelLoader } from '../levels/ServerLevelLoader.js';
 import { ServerGameContext } from '../types/ServerGameContext.js';
 import { WorldEntityManager } from '../simulation/WorldEntityManager.js';
 import { DamageSystem } from '../systems/DamageSystem.js';
+import { syncBabylonLoggerWithAnte } from '../utils/BabylonLogger.js';
 
 const logger = new Logger('LogicalServer');
 
@@ -54,6 +55,8 @@ export class LogicalServer {
     assetLoader: IServerAssetLoader,
     options?: LogicalServerOptions
   ) {
+    syncBabylonLoggerWithAnte();
+
     this.networkManager = networkManager;
     this.assetLoader = assetLoader;
     this.isTakeover = options?.isTakeover ?? false;

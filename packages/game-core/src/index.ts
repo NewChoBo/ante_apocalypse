@@ -47,3 +47,4 @@ export * from './levels/ServerLevelLoader.js';
 
 // Utils
 export * from './utils/Mixins.js';
+export * from './utils/BabylonLogger.js';
