@@ -18,12 +18,6 @@ interface SpectatorManagerDeps {
 
 type WindowLike = Pick<Window, 'addEventListener' | 'removeEventListener'>;
 
-interface RemotePlayerLike {
-  mesh?: {
-    position: Vector3;
-  };
-}
-
 export class SpectatorManager {
   private isSpectating = false;
   private spectateMode: SpectateMode = 'FREE';
@@ -122,7 +116,7 @@ export class SpectatorManager {
     const playerPawn = this.deps.getPlayerPawn();
     if (!multiplayerSystem || !playerPawn) return;
 
-    const players = multiplayerSystem.getRemotePlayers() as unknown as RemotePlayerLike[];
+    const players = multiplayerSystem.getRemotePlayers();
     if (players.length === 0) {
       this.spectateMode = 'FREE';
       return;
@@ -133,8 +127,6 @@ export class SpectatorManager {
     }
 
     const target = players[this.spectateTargetIndex];
-    if (!target?.mesh) return;
-
     const targetPos = target.mesh.position;
     const followOffset = new Vector3(0, 2.0, -3.0);
     const desiredPos = targetPos.add(followOffset);
