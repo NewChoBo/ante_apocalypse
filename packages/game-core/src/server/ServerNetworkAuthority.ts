@@ -98,7 +98,6 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
   public onReloadRequest?: (playerId: string, weaponId: string) => void;
   public onHitRequest?: (shooterId: string, data: RequestHitData) => void;
   public onSyncWeaponRequest?: (playerId: string, weaponId: string) => void;
-  public onPlayerDeath?: (targetId: string, attackerId: string) => void;
 
   public getPlayerState(id: string): NetworkPlayerState | undefined {
     const entity = this.entityManager.getEntity(id);
@@ -444,18 +443,22 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
     }
   }
 
-  public broadcastDeath(targetId: string, attackerId: string, respawnDelaySeconds?: number): void {
+  public broadcastDeath(
+    targetId: string,
+    attackerId: string,
+    respawnDelaySeconds?: number,
+    canRespawn?: boolean,
+    gameMode?: string
+  ): void {
     logger.info(`💀 Player ${targetId} was killed by ${attackerId}`);
     const payload: DeathEventData = {
       targetId,
       attackerId,
       respawnDelaySeconds,
+      canRespawn,
+      gameMode,
     };
     this.sendEventToAll(EventCode.PLAYER_DEATH, payload);
-
-    if (this.onPlayerDeath) {
-      this.onPlayerDeath(targetId, attackerId);
-    }
   }
 
   public broadcastRespawn(playerId: string, position: NetworkVector3): void {

@@ -126,9 +126,6 @@ export class LogicalServer {
 
     this.networkManager.onSyncWeaponRequest = (playerId: string, weaponId: string): void =>
       this.processSyncWeapon(playerId, weaponId);
-
-    this.networkManager.onPlayerDeath = (targetId: string, attackerId: string): void =>
-      this.handlePlayerDeath(targetId, attackerId);
   }
 
   private createGameRule(mode: string): IGameRule {
@@ -273,11 +270,20 @@ export class LogicalServer {
             // Trigger valid death
             if (newHealth <= 0 && wasAlive) {
               pawn.isDead = true;
-              const respawnDelaySeconds =
-                this.simulation.gameRule?.allowRespawn === true
-                  ? this.simulation.gameRule.respawnDelay
-                  : 0;
-              this.networkManager.broadcastDeath(data.targetId, shooterId, respawnDelaySeconds);
+              const canRespawn = this.simulation.gameRule?.allowRespawn === true;
+              const respawnDelaySeconds = canRespawn
+                ? (this.simulation.gameRule?.respawnDelay ?? 0)
+                : 0;
+              const gameMode = this.simulation.gameRule?.modeId;
+
+              this.networkManager.broadcastDeath(
+                data.targetId,
+                shooterId,
+                respawnDelaySeconds,
+                canRespawn,
+                gameMode
+              );
+              this.handlePlayerDeath(data.targetId, shooterId);
             }
           }
           // Generic State (Enemy/Target fallback)

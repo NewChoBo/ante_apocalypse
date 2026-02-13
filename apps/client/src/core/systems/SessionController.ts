@@ -103,6 +103,16 @@ export class SessionController {
       getEnemyManager: (): EnemyManager | null => this.enemyManager,
       getTargetSpawner: (): TargetSpawnerComponent | null => this.targetSpawner,
       onLocalRespawn: (position): void => this.spectatorManager.onLocalRespawn(position),
+      createMultiplayerSystem: (pawn: PlayerPawn, playerName: string): MultiplayerSystem =>
+        new MultiplayerSystem(
+          this.scene,
+          pawn,
+          this.shadowGenerator,
+          this.networkManager,
+          this.worldManager,
+          this.tickManager,
+          playerName
+        ),
     });
     this.spectatorManager = new SpectatorManager({
       getMultiplayerSystem: (): MultiplayerSystem | null =>

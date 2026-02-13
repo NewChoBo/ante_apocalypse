@@ -85,6 +85,8 @@ export interface DeathEventData {
   targetId: string;
   attackerId: string;
   respawnDelaySeconds?: number;
+  canRespawn?: boolean;
+  gameMode?: string;
 }
 
 export interface RequestHitData {

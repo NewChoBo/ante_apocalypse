@@ -114,7 +114,6 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   public onReloadRequest?: (playerId: string, weaponId: string) => void;
   public onHitRequest?: (shooterId: string, data: RequestHitData) => void;
   public onSyncWeaponRequest?: (playerId: string, weaponId: string) => void;
-  public onPlayerDeath?: (targetId: string, attackerId: string) => void;
 
   private playerJoinObserver: Observer<NetworkPlayerState> | null = null;
   private playerLeaveObserver: Observer<string> | null = null;
@@ -294,14 +293,21 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
     this.sendEvent(code, hitData, true);
   }
 
-  public broadcastDeath(targetId: string, attackerId: string, respawnDelaySeconds?: number): void {
+  public broadcastDeath(
+    targetId: string,
+    attackerId: string,
+    respawnDelaySeconds?: number,
+    canRespawn?: boolean,
+    gameMode?: string
+  ): void {
     const payload: DeathEventData = {
       targetId,
       attackerId,
       respawnDelaySeconds,
+      canRespawn,
+      gameMode,
     };
     this.sendEvent(EventCode.PLAYER_DEATH, payload, true);
-    if (this.onPlayerDeath) this.onPlayerDeath(targetId, attackerId);
   }
 
   public broadcastRespawn(playerId: string, position: NetworkVector3): void {

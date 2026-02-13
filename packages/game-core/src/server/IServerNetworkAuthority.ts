@@ -26,7 +26,13 @@ export interface IServerNetworkAuthority extends INetworkAuthority {
     }[]
   ): void;
   broadcastHit(hitData: HitEventData, code?: number): void;
-  broadcastDeath(targetId: string, attackerId: string, respawnDelaySeconds?: number): void;
+  broadcastDeath(
+    targetId: string,
+    attackerId: string,
+    respawnDelaySeconds?: number,
+    canRespawn?: boolean,
+    gameMode?: string
+  ): void;
   broadcastRespawn(playerId: string, position: NetworkVector3): void;
   broadcastReload(playerId: string, weaponId: string): void;
 
@@ -47,5 +53,4 @@ export interface IServerNetworkAuthority extends INetworkAuthority {
   onReloadRequest?: (playerId: string, weaponId: string) => void;
   onHitRequest?: (shooterId: string, data: RequestHitData) => void;
   onSyncWeaponRequest?: (playerId: string, weaponId: string) => void;
-  onPlayerDeath?: (targetId: string, attackerId: string) => void;
 }

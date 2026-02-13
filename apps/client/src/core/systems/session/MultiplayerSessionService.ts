@@ -1,9 +1,9 @@
 import { Observer, Scene, ShadowGenerator, Vector3 } from '@babylonjs/core';
 import { InitialStatePayload, RespawnEventData, SpawnTargetPayload } from '@ante/common';
 import { TickManager, WaveSurvivalRule, WorldSimulation } from '@ante/game-core';
-import { PlayerPawn } from '../../PlayerPawn';
+import type { PlayerPawn } from '../../PlayerPawn';
 import { INetworkManager } from '../../interfaces/INetworkManager';
-import { MultiplayerSystem } from '../MultiplayerSystem';
+import type { MultiplayerSystem } from '../MultiplayerSystem';
 import { WorldEntityManager } from '../WorldEntityManager';
 import { EnemyManager } from '../EnemyManager';
 import { PickupManager } from '../PickupManager';
@@ -22,7 +22,7 @@ interface MultiplayerSessionServiceDeps {
   getEnemyManager: () => EnemyManager | null;
   getTargetSpawner: () => TargetSpawnerComponent | null;
   onLocalRespawn: (position?: { x: number; y: number; z: number }) => void;
-  createMultiplayerSystem?: (playerPawn: PlayerPawn, playerName: string) => MultiplayerSystem;
+  createMultiplayerSystem: (playerPawn: PlayerPawn, playerName: string) => MultiplayerSystem;
   createSimulation?: (
     enemyManager: EnemyManager,
     targetSpawner: TargetSpawnerComponent
@@ -38,19 +38,7 @@ export class MultiplayerSessionService {
   constructor(private readonly deps: MultiplayerSessionServiceDeps) {}
 
   public initialize(playerPawn: PlayerPawn, playerName: string): MultiplayerSystem {
-    const createMultiplayerSystem =
-      this.deps.createMultiplayerSystem ??
-      ((pawn: PlayerPawn, name: string): MultiplayerSystem =>
-        new MultiplayerSystem(
-          this.deps.scene,
-          pawn,
-          this.deps.shadowGenerator,
-          this.deps.networkManager,
-          this.deps.worldManager,
-          this.deps.tickManager,
-          name
-        ));
-    this.multiplayerSystem = createMultiplayerSystem(playerPawn, playerName);
+    this.multiplayerSystem = this.deps.createMultiplayerSystem(playerPawn, playerName);
     this.multiplayerSystem.setLocalRespawnHandler((position: Vector3): void => {
       this.deps.onLocalRespawn({ x: position.x, y: position.y, z: position.z });
     });
