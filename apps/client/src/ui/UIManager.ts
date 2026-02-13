@@ -14,6 +14,7 @@ import { LobbyUI } from './LobbyUI';
 import { settingsStore } from '../core/store/SettingsStore';
 import { NetworkState, Logger } from '@ante/common';
 import { INetworkManager } from '../core/interfaces/INetworkManager';
+import { UI_THEME } from './theme';
 
 import { IUIManager } from './IUIManager';
 
@@ -40,10 +41,10 @@ export class UIManager implements IUIManager {
   private cleanups: (() => void)[] = [];
 
   // Visual Constants
-  private readonly PRIMARY_COLOR = '#ffc400';
-  private readonly BG_COLOR = 'rgba(5, 5, 10, 0.95)';
-  private readonly FONT_TACTICAL = 'Rajdhani, sans-serif';
-  private readonly FONT_MONO = 'Roboto Mono, monospace';
+  private readonly PRIMARY_COLOR = UI_THEME.primaryColor;
+  private readonly BG_COLOR = UI_THEME.backgroundColor;
+  private readonly FONT_TACTICAL = UI_THEME.fontTactical;
+  private readonly FONT_MONO = UI_THEME.fontMono;
 
   // Observables for Menu Actions
   public onLogin = new Observable<string>();

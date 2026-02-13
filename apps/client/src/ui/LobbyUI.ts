@@ -13,6 +13,7 @@ import {
 import { INetworkManager } from '../core/interfaces/INetworkManager';
 import { UIManager, UIScreen } from './UIManager';
 import { RoomInfo, Logger } from '@ante/common';
+import { UI_THEME } from './theme';
 
 const logger = new Logger('LobbyUI');
 
@@ -23,11 +24,11 @@ export class LobbyUI {
   private uiManager: UIManager;
   private cleanups: (() => void)[] = [];
 
-  // Visual Constants from UIManager (for consistency)
-  private readonly PRIMARY_COLOR = '#ffc400';
-  private readonly BG_COLOR = 'rgba(5, 5, 10, 0.95)';
-  private readonly FONT_TACTICAL = 'Rajdhani, sans-serif';
-  private readonly FONT_MONO = 'Roboto Mono, monospace';
+  // Visual Constants from shared theme
+  private readonly PRIMARY_COLOR = UI_THEME.primaryColor;
+  private readonly BG_COLOR = UI_THEME.backgroundColor;
+  private readonly FONT_TACTICAL = UI_THEME.fontTactical;
+  private readonly FONT_MONO = UI_THEME.fontMono;
 
   constructor(uiManager: UIManager, networkManager: INetworkManager) {
     this.uiManager = uiManager;
