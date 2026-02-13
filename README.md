@@ -40,7 +40,13 @@ pnpm -r build
 ```env
 VITE_PHOTON_APP_ID=...
 VITE_PHOTON_APP_VERSION=...
+ANTE_LOG_LEVEL=info
+VITE_LOG_LEVEL=info
 ```
+
+로그 레벨 값: `debug`, `info`, `warn`, `error`, `none`
+- `ANTE_LOG_LEVEL`: 서버/테스트 기본 로그 레벨
+- `VITE_LOG_LEVEL`: 클라이언트 로그 레벨
 
 ## 조작
 - 이동: `W A S D`
