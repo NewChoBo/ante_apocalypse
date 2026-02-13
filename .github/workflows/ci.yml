@@ -27,8 +27,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Lint
-        run: pnpm --filter @ante/client lint
+      - name: Workspace Check
+        run: pnpm -r check
 
-      - name: Type Check
-        run: pnpm --filter @ante/client check
+      - name: Test
+        run: pnpm test

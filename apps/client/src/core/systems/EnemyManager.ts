@@ -1,11 +1,12 @@
-import { Scene, Vector3, ShadowGenerator, Observer } from '@babylonjs/core';
+import { Scene, Vector3, ShadowGenerator, Observer, UniversalCamera } from '@babylonjs/core';
 import { EnemyPawn } from '../EnemyPawn';
 import { PlayerPawn } from '../PlayerPawn';
-import { NetworkManager } from './NetworkManager';
-import { BaseEnemyManager } from '@ante/game-core';
+import { INetworkManager } from '../interfaces/INetworkManager';
+import { BaseEnemyManager, TickManager } from '@ante/game-core';
 import { EventCode } from '@ante/common';
 import { WorldEntityManager } from './WorldEntityManager';
-import { EnemyState } from '@ante/common';
+import { EnemyState, EnemyMovePayload } from '@ante/common';
+import type { GameContext } from '../../types/GameContext';
 
 /**
  * 적(Enemy) 실체의 생성 및 AI 업데이트를 담당합니다.
@@ -14,20 +15,23 @@ import { EnemyState } from '@ante/common';
 export class EnemyManager extends BaseEnemyManager {
   private scene: Scene;
   private shadowGenerator: ShadowGenerator;
-  private networkManager: NetworkManager;
+  private networkManager: INetworkManager;
   private worldManager: WorldEntityManager;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _enemyUpdateObserver: Observer<any> | null = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private _eventObserver: Observer<any> | null = null;
+  private _enemyUpdateObserver: Observer<EnemyMovePayload> | null = null;
+  private _eventObserver: Observer<{ code: number; data: unknown; senderId: string }> | null = null;
 
-  constructor(scene: Scene, shadowGenerator: ShadowGenerator) {
-    const netManager = NetworkManager.getInstance();
-    super(netManager);
+  constructor(
+    scene: Scene,
+    shadowGenerator: ShadowGenerator,
+    networkManager: INetworkManager,
+    worldManager: WorldEntityManager,
+    tickManager: TickManager
+  ) {
+    super(networkManager, tickManager);
     this.scene = scene;
     this.shadowGenerator = shadowGenerator;
-    this.networkManager = netManager;
-    this.worldManager = WorldEntityManager.getInstance();
+    this.networkManager = networkManager;
+    this.worldManager = worldManager;
     this.setupNetworkListeners();
   }
 
@@ -38,7 +42,7 @@ export class EnemyManager extends BaseEnemyManager {
 
     // onEnemyHit is now handled by WorldEntityManager
 
-    this.networkManager.sendEvent(EventCode.REQ_INITIAL_STATE, {}, true);
+    this.networkManager.sendRequest(EventCode.REQ_INITIAL_STATE, {}, true);
 
     this._eventObserver = this.networkManager.onEvent.add(
       (event: { code: number; data: unknown }): void => {
@@ -65,7 +69,15 @@ export class EnemyManager extends BaseEnemyManager {
   }
 
   public createEnemy(id: string, position: Vector3, target?: PlayerPawn): EnemyPawn {
-    const enemy = new EnemyPawn(this.scene, position, this.shadowGenerator);
+    const context: GameContext = {
+      scene: this.scene,
+      networkManager: this.networkManager,
+      worldManager: this.worldManager,
+      tickManager: this.tickManager,
+      camera: target?.camera as UniversalCamera, // Fallback to provided target's camera
+    };
+
+    const enemy = new EnemyPawn(this.scene, position, this.shadowGenerator, context);
     enemy.id = id;
     this.pawns.set(id, enemy);
 

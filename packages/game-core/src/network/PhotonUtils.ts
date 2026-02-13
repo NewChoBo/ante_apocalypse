@@ -1,14 +1,11 @@
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
-import Photon from 'photon-realtime';
+import { Photon } from './PhotonWrapper.js';
 import { NetworkState } from '@ante/common';
 
 /**
  * Maps Photon internal state numbers to NetworkState enum.
  */
 export function mapPhotonState(photonState: number): NetworkState {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const States = (Photon as any).LoadBalancing.LoadBalancingClient.State;
+  const States = Photon.LoadBalancing.LoadBalancingClient.State;
   switch (photonState) {
     case States.Uninitialized:
     case States.Disconnected:
@@ -34,22 +31,28 @@ export function mapPhotonState(photonState: number): NetworkState {
 /**
  * Converts a Photon room list to RoomInfo array.
  */
+interface PhotonRoomInternal {
+  name: string;
+  playerCount: number;
+  maxPlayers: number;
+  isOpen: boolean;
+  getCustomProperties?(): Record<string, unknown>;
+}
+
 export function mapRoomList(rooms: unknown[]): {
   id: string;
   name: string;
   playerCount: number;
   maxPlayers: number;
   isOpen: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  customProperties: any;
+  customProperties: Record<string, unknown>;
 }[] {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return rooms.map((r: any) => ({
-    id: (r as any).name,
-    name: (r as any).name,
-    playerCount: (r as any).playerCount,
-    maxPlayers: (r as any).maxPlayers,
-    isOpen: (r as any).isOpen,
-    customProperties: (r as any).getCustomProperties ? (r as any).getCustomProperties() : {},
+  return (rooms as PhotonRoomInternal[]).map((r) => ({
+    id: r.name,
+    name: r.name,
+    playerCount: r.playerCount,
+    maxPlayers: r.maxPlayers,
+    isOpen: r.isOpen,
+    customProperties: typeof r.getCustomProperties === 'function' ? r.getCustomProperties() : {},
   }));
 }

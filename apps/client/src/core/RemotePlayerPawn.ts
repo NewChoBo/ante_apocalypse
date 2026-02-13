@@ -11,11 +11,12 @@ import {
   DynamicTexture,
 } from '@babylonjs/core';
 import { CharacterPawn, CharacterPawnConfig } from './CharacterPawn';
+import type { GameContext } from '../types/GameContext';
 import { GameAssets } from './GameAssets';
 import { Logger } from '@ante/common';
 
-import { NetworkInterpolationComponent } from './components/NetworkInterpolationComponent';
-import { MuzzleFlashComponent } from './components/MuzzleFlashComponent';
+import { NetworkInterpolationComponent } from './components/movement/NetworkInterpolationComponent';
+import { MuzzleFlashComponent } from './components/combat/MuzzleFlashComponent';
 
 const logger = new Logger('RemotePlayerPawn');
 
@@ -26,7 +27,7 @@ const logger = new Logger('RemotePlayerPawn');
 export class RemotePlayerPawn extends CharacterPawn {
   public type = 'remote_player';
   public id: string;
-  public playerName: string;
+  // name property is inherited from BasePawn
 
   // Player-specific components
   private interpolation: NetworkInterpolationComponent;
@@ -42,6 +43,7 @@ export class RemotePlayerPawn extends CharacterPawn {
     scene: Scene,
     id: string,
     shadowGenerator: ShadowGenerator,
+    context: GameContext,
     name: string = 'Unknown'
   ) {
     const config: CharacterPawnConfig = {
@@ -52,10 +54,10 @@ export class RemotePlayerPawn extends CharacterPawn {
       healthBarStyle: 'player',
       showHealthBar: true,
     };
-    super(scene, config);
+    super(scene, config, context);
 
     this.id = id;
-    this.playerName = name;
+    this.name = name;
     this.shadowGenerator = shadowGenerator;
 
     // Override mesh setup for remote player
@@ -174,7 +176,7 @@ export class RemotePlayerPawn extends CharacterPawn {
     this.mesh.rotation.x = 0; // Reset death tilt
 
     this.mesh.checkCollisions = true;
-    this.mesh.isPickable = true;
+    this.mesh.isPickable = false;
 
     this.updateHealth(100);
     this.animationComponent.playAnimation('idle'); // Ensure it's not in death pose
@@ -253,9 +255,15 @@ export class RemotePlayerPawn extends CharacterPawn {
     this.muzzleFlash.createFlash(flashPos);
   }
 
+  public reload(weaponId: string): void {
+    logger.info(`Player ${this.id} is reloading ${weaponId}`);
+    // Future: Play reload animation or sound
+  }
+
   public override dispose(): void {
     super.dispose();
     if (this.weaponMesh) this.weaponMesh.dispose();
     if (this._nameLabel) this._nameLabel.dispose();
   }
 }
+

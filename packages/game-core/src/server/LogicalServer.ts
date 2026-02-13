@@ -1,5 +1,5 @@
 import { NullEngine, Scene, ArcRotateCamera, Vector3 } from '@babylonjs/core';
-import { ServerNetworkAuthority } from './ServerNetworkAuthority.js';
+import { IServerNetworkAuthority } from './IServerNetworkAuthority.js';
 import { RequestHitData, Vector3 as commonVector3, Logger, EventCode } from '@ante/common';
 import { WorldSimulation } from '../simulation/WorldSimulation.js';
 import { IGameRule } from '../rules/IGameRule.js';
@@ -7,30 +7,33 @@ import { WaveSurvivalRule } from '../rules/WaveSurvivalRule.js';
 import { ShootingRangeRule } from '../rules/ShootingRangeRule.js';
 import { DeathmatchRule } from '../rules/DeathmatchRule.js';
 import { HitRegistrationSystem } from '../systems/HitRegistrationSystem.js';
-
 import { ServerEnemyManager } from './managers/ServerEnemyManager.js';
 import { ServerPickupManager } from './managers/ServerPickupManager.js';
 import { ServerTargetSpawner } from './managers/ServerTargetSpawner.js';
 import { ServerPlayerPawn } from './pawns/ServerPlayerPawn.js';
+import { TickManager } from '../systems/TickManager.js';
 import { IServerAssetLoader } from './IServerAssetLoader.js';
 import { LevelData } from '../levels/LevelData.js';
 import { ServerLevelLoader } from '../levels/ServerLevelLoader.js';
+import { ServerGameContext } from '../types/ServerGameContext.js';
+import { WorldEntityManager } from '../simulation/WorldEntityManager.js';
+import { DamageSystem } from '../systems/DamageSystem.js';
+import { syncBabylonLoggerWithAnte } from '../utils/BabylonLogger.js';
 
 const logger = new Logger('LogicalServer');
 
 /**
  * 게임 로직을 수행하는 핵심 서버 클래스.
- * Node.js(Dedicated Server)와 Browser(Client Host) 모두에서 동작할 수 있도록 설계됨.
  */
 export interface LogicalServerOptions {
-  /** If true, skip world initialization (used for host migration) */
   isTakeover?: boolean;
-  /** Game mode ID: 'survival' | 'shooting_range' | 'deathmatch' */
   gameMode?: string;
+  tickManager?: TickManager;
+  worldManager?: WorldEntityManager;
 }
 
 export class LogicalServer {
-  private networkManager: ServerNetworkAuthority;
+  private networkManager: IServerNetworkAuthority;
   private assetLoader: IServerAssetLoader;
   private isRunning = false;
   private isTakeover: boolean;
@@ -40,16 +43,20 @@ export class LogicalServer {
   private simulation: WorldSimulation;
   private enemyManager: ServerEnemyManager;
   private targetSpawner: ServerTargetSpawner;
+  private tickManager: TickManager;
+  private worldManager: WorldEntityManager;
+  private ctx: ServerGameContext;
 
-  // 플레이어 ID와 물리 메쉬(Hitbox) 매핑
   private playerPawns: Map<string, ServerPlayerPawn> = new Map();
   private levelLoader: ServerLevelLoader;
 
   constructor(
-    networkManager: ServerNetworkAuthority,
+    networkManager: IServerNetworkAuthority,
     assetLoader: IServerAssetLoader,
     options?: LogicalServerOptions
   ) {
+    syncBabylonLoggerWithAnte();
+
     this.networkManager = networkManager;
     this.assetLoader = assetLoader;
     this.isTakeover = options?.isTakeover ?? false;
@@ -57,13 +64,18 @@ export class LogicalServer {
     this.engine = new NullEngine();
     this.scene = new Scene(this.engine);
 
-    // 시뮬레이션 엔진 초기화
-    this.enemyManager = new ServerEnemyManager(
-      this.networkManager,
-      this.scene,
-      () => this.playerPawns
-    );
-    this.targetSpawner = new ServerTargetSpawner(this.networkManager, this.scene);
+    this.tickManager = options?.tickManager ?? new TickManager();
+    this.worldManager = options?.worldManager ?? new WorldEntityManager(this.tickManager);
+
+    this.ctx = {
+      scene: this.scene,
+      tickManager: this.tickManager,
+      networkManager: this.networkManager,
+      worldManager: this.worldManager,
+    };
+
+    this.enemyManager = new ServerEnemyManager(this.ctx, () => this.playerPawns);
+    this.targetSpawner = new ServerTargetSpawner(this.ctx);
 
     this.simulation = new WorldSimulation(
       this.enemyManager,
@@ -72,7 +84,6 @@ export class LogicalServer {
       this.networkManager
     );
 
-    // 게임 룰(모드) 설정 - gameMode에 따라 선택
     const gameMode = options?.gameMode ?? 'survival';
     const gameRule = this.createGameRule(gameMode);
     this.simulation.setGameRule(gameRule);
@@ -80,27 +91,18 @@ export class LogicalServer {
 
     this.levelLoader = new ServerLevelLoader(this.scene);
 
-    // 서버용 더미 카메라 생성
-    // 서버는 화면을 그리지 않지만, 씬 구동을 위해 카메라가 필수입니다.
     const camera = new ArcRotateCamera('ServerCamera', 0, 0, 10, Vector3.Zero(), this.scene);
-    logger.info('Camera was created...', camera);
+    logger.info(`Camera created: ${camera.name}`);
 
-    // 기본 바닥 생성 (LevelLoader에서 생성하므로 여기서는 제거하거나 중복 확인 필요)
-    // this.levelLoader.loadLevelData(...) 호출 전까지는 충돌체가 없을 수 있음.
-
-    // 네트워크 이벤트 연결
     this.setupNetworkEvents();
-
-    // [Fix] Register all existing actors immediately (in case they joined before LogicalServer setup)
     this.networkManager.registerAllActors();
 
     logger.info('Physics World Initialized');
   }
 
   private setupNetworkEvents(): void {
-    this.networkManager.onPlayerJoin = (id: string): void => {
-      this.createPlayerPawn(id);
-      // 첫 플레이어가 입장하면 게임 레이아웃 생성 (Takeover가 아닐 때만)
+    this.networkManager.onPlayerJoin = (id: string, name: string): void => {
+      this.createPlayerPawn(id, name);
       if (!this.isTakeover && this.playerPawns.size === 1) {
         this.simulation.initializeRequest();
       }
@@ -114,7 +116,6 @@ export class LogicalServer {
       dir: commonVector3
     ): void => this.processFireEvent(id, origin, dir);
 
-    // Register RELOAD callback
     this.networkManager.onReloadRequest = (playerId: string, weaponId: string): void => {
       const pawn = this.playerPawns.get(playerId);
       if (pawn) {
@@ -126,20 +127,8 @@ export class LogicalServer {
     this.networkManager.onHitRequest = (shooterId: string, data: RequestHitData): void =>
       this.processHitRequest(shooterId, data);
 
-    this.networkManager.onPlayerDeath = (targetId: string, _attackerId: string): void => {
-      if (this.simulation['gameRule']) {
-        const decision = this.simulation['gameRule'].onPlayerDeath(this.simulation, targetId);
-        if (decision.action === 'respawn') {
-          const delayMs = decision.delay * 1000;
-          logger.info(`Player ${targetId} will respawn in ${decision.delay}s`);
-
-          setTimeout(() => {
-            const spawnPos = decision.position || { x: 0, y: 1.75, z: 0 };
-            this.networkManager.broadcastRespawn(targetId, spawnPos);
-          }, delayMs);
-        }
-      }
-    };
+    this.networkManager.onSyncWeaponRequest = (playerId: string, weaponId: string): void =>
+      this.processSyncWeapon(playerId, weaponId);
   }
 
   private createGameRule(mode: string): IGameRule {
@@ -160,7 +149,7 @@ export class LogicalServer {
     this.isRunning = true;
 
     let lastTickTime = performance.now();
-    const tickInterval = 7.8; // 128Hz
+    const tickInterval = 50; // 20Hz network update rate (improved from 128Hz)
     let lastClock = performance.now();
 
     this.engine.runRenderLoop(() => {
@@ -170,7 +159,7 @@ export class LogicalServer {
       const deltaTime = (currentTime - lastClock) / 1000;
       lastClock = currentTime;
 
-      this.playerPawns.forEach((pawn) => pawn.tick(deltaTime));
+      this.tickManager.tick(deltaTime);
       this.scene.render();
 
       if (currentTime - lastTickTime >= tickInterval) {
@@ -186,36 +175,35 @@ export class LogicalServer {
     this.levelLoader.loadLevelData(data);
   }
 
-  private createPlayerPawn(id: string): void {
+  private createPlayerPawn(id: string, name: string): void {
     if (this.playerPawns.has(id)) return;
 
-    // Use ServerPlayerPawn which loads the mesh via AssetLoader
-    const pawn = new ServerPlayerPawn(id, this.scene, new Vector3(0, 1.75, 0), this.assetLoader);
+    const pawn = new ServerPlayerPawn(id, this.ctx, new Vector3(0, 1.75, 0), this.assetLoader);
+    pawn.name = name; // Assign proper name for isServerPlayerEntity check
     this.playerPawns.set(id, pawn);
+    this.worldManager.register(pawn);
   }
 
-  public updatePlayerPawn(id: string, pos: commonVector3, rot: commonVector3): void {
+  public updatePlayerPawn(id: string, pos: commonVector3, rot?: commonVector3 | null): void {
     const pawn = this.playerPawns.get(id);
     if (pawn && pawn.mesh) {
-      // 서버의 캡슐을 클라이언트 위치로 순간이동
       pawn.mesh.position.set(pos.x, pos.y, pos.z);
-
-      // 회전은 보통 Y축(Heading)만 중요
       if (rot) pawn.mesh.rotation.set(rot.x, rot.y, rot.z);
     }
 
-    // Also update entityManager so broadcastState sends correct positions
     const state = this.networkManager.getPlayerState(id);
     if (state) {
       state.position = { x: pos.x, y: pos.y, z: pos.z };
-      state.rotation = { x: rot.x, y: rot.y, z: rot.z };
+      if (rot) {
+        state.rotation = { x: rot.x, y: rot.y, z: rot.z };
+      }
     }
   }
 
   private removePlayerPawn(id: string): void {
     const pawn = this.playerPawns.get(id);
     if (pawn) {
-      pawn.dispose();
+      this.worldManager.unregister(id);
       this.playerPawns.delete(id);
       logger.info(`Removed Pawn for Player: ${id}`);
     }
@@ -227,124 +215,142 @@ export class LogicalServer {
     direction: commonVector3,
     weaponIdOverride?: string
   ): void {
-    // 1. Get Player Pawn
     const pawn = this.playerPawns.get(playerId);
-    if (!pawn) {
-      logger.warn(`Fire event from unknown player: ${playerId}`);
-      return;
-    }
+    if (!pawn) return;
 
-    // 2. Validate Fire
     const canFire = pawn.fireRequest();
 
     if (canFire) {
-      // Broadcast Event
-      // Re-construct event data to broadcast
       this.networkManager.sendEvent(EventCode.FIRE, {
         playerId,
         weaponId: weaponIdOverride || pawn.currentWeapon?.id || 'Unknown',
         muzzleTransform: { position: origin, direction: direction },
       });
-
-      logger.debug(`[VALID] Fire from: ${playerId} (Ammo: ${pawn.currentWeapon?.currentAmmo})`);
-    } else {
-      logger.warn(`[REJECTED] Fire from: ${playerId} - Weapon not ready or out of ammo.`);
-      // Optional: Send correction event to client? (e.g. force reload)
-    }
-  }
-
-  public processSyncWeapon(playerId: string, weaponId: string): void {
-    const state = this.networkManager.getPlayerState(playerId);
-    if (state) {
-      // Short-circuit: only update if state exists
-      state.weaponId = weaponId;
     }
   }
 
   public processHitRequest(shooterId: string, data: RequestHitData): void {
-    // 1. Validate Hit using Server Raycast
-    let isValidHit = false;
-    const finalDamage = data.damage;
-    let hitPart = data.part || 'body';
-
-    logger.info(`Validating Hit from ${shooterId} on ${data.targetId}`);
-
-    // Ignore ground hits or undefined targets for now
-    if (!data.targetId || data.targetId === 'ground') {
-      return;
-    }
+    if (!data.targetId || data.targetId === 'ground') return;
 
     if (data.origin && data.direction) {
       const rayOrigin = new Vector3(data.origin.x, data.origin.y, data.origin.z);
       const rayDirection = new Vector3(data.direction.x, data.direction.y, data.direction.z);
 
-      // 1. Find the target mesh
       const targetMesh =
         this.enemyManager.getEnemyMesh(data.targetId) ||
         this.targetSpawner.getTargetMesh(data.targetId) ||
         this.playerPawns.get(data.targetId)?.mesh;
 
       if (targetMesh) {
-        // 2. Use common HitRegistrationSystem for validation
         const validation = HitRegistrationSystem.validateHit(
           this.scene,
           data.targetId,
           rayOrigin,
           rayDirection,
           targetMesh,
-          0.8 // margin
+          0.8
         );
 
-        isValidHit = validation.isValid;
-        hitPart = validation.part;
+        if (validation.isValid) {
+          const pawn = this.playerPawns.get(data.targetId);
+          const shooterPawn = this.playerPawns.get(shooterId);
+          const weaponDamage = (shooterPawn?.currentWeapon?.stats as { damage?: number } | undefined)
+            ?.damage;
+          const baseDamage =
+            typeof weaponDamage === 'number' && weaponDamage > 0 ? weaponDamage : data.damage;
+          const finalDamage = pawn
+            ? DamageSystem.calculateDamage(baseDamage, validation.part, pawn.damageProfile)
+            : baseDamage;
+          let newHealth = 0;
+          let wasAlive = false;
 
-        if (isValidHit) {
-          logger.info(`Verified Hit: ${data.targetId} (${hitPart})`);
-        } else {
-          logger.warn(`[Rejected] Hit too far: Distance=${validation.distance?.toFixed(3)}m`);
-        }
-      } else {
-        // [New] Check if it's an environment hit (Wall, Prop)
-        const environmentMesh = this.scene.getMeshByName(data.targetId);
-        if (environmentMesh) {
-          logger.debug(`[VALID] Environment Hit: ${data.targetId}`);
-          isValidHit = true;
-          hitPart = 'object';
-        } else {
-          logger.warn(`[Rejected] Target mesh not found: ${data.targetId}`);
+          // Player Logic
+          if (pawn) {
+            newHealth = Math.max(0, pawn.health - finalDamage);
+            wasAlive = !pawn.isDead;
+            pawn.health = newHealth;
+
+            // Trigger valid death
+            if (newHealth <= 0 && wasAlive) {
+              pawn.isDead = true;
+              const canRespawn = this.simulation.gameRule?.allowRespawn === true;
+              const respawnDelaySeconds = canRespawn
+                ? (this.simulation.gameRule?.respawnDelay ?? 0)
+                : 0;
+              const gameMode = this.simulation.gameRule?.modeId;
+
+              this.networkManager.broadcastDeath(
+                data.targetId,
+                shooterId,
+                respawnDelaySeconds,
+                canRespawn,
+                gameMode
+              );
+              this.handlePlayerDeath(data.targetId, shooterId);
+            }
+          }
+          // Generic State (Enemy/Target fallback)
+          else {
+            const targetState = this.networkManager.getPlayerState(data.targetId);
+            if (targetState) {
+              newHealth = Math.max(0, targetState.health - finalDamage);
+            }
+          }
+
+          const isPlayer = !!pawn;
+          const eventCode = isPlayer ? EventCode.HIT : EventCode.TARGET_HIT;
+
+          this.networkManager.broadcastHit(
+            {
+              targetId: data.targetId,
+              damage: finalDamage,
+              attackerId: shooterId,
+              part: validation.part,
+              newHealth: newHealth,
+            },
+            eventCode
+          );
         }
       }
-    } else {
-      // Fallback for missing ray data
-      isValidHit = true;
     }
+  }
 
-    if (isValidHit) {
-      // Determine Event Code based on target type
-      const isPlayer = this.playerPawns.has(data.targetId);
-      const eventCode = isPlayer ? EventCode.HIT : EventCode.TARGET_HIT;
+  private handlePlayerDeath(targetId: string, _attackerId: string): void {
+    if (this.simulation.gameRule) {
+      const decision = this.simulation.gameRule.onPlayerDeath(this.simulation, targetId);
+      if (decision.action === 'respawn') {
+        const delayMs = decision.delay * 1000;
+        logger.info(`Player ${targetId} died. Respawning in ${decision.delay}s`);
 
-      // Calculate new health based on server state
-      const targetState = this.networkManager.getPlayerState(data.targetId);
-      let newHealth = 0;
-      if (targetState) {
-        newHealth = Math.max(0, targetState.health - finalDamage);
+        setTimeout(() => {
+          const spawnPos = decision.position || { x: 0, y: 1.75, z: 0 };
+
+          // Server-side state reset
+          const pawn = this.playerPawns.get(targetId);
+          if (pawn) {
+            pawn.health = 100; // or maxHealth
+            pawn.isDead = false;
+            this.updatePlayerPawn(
+              targetId,
+              { x: spawnPos.x, y: spawnPos.y, z: spawnPos.z },
+              undefined
+            );
+            logger.info(
+              `Server-side Pawn ${targetId} revived at ${spawnPos.x}, ${spawnPos.y}, ${spawnPos.z}`
+            );
+          }
+
+          this.networkManager.broadcastRespawn(targetId, spawnPos);
+        }, delayMs);
       }
+    }
+  }
 
-      logger.info(
-        `Processing Hit: ${shooterId} hit ${data.targetId} (${data.part}) for ${finalDamage} dmg. NewHealth: ${newHealth} (Type: ${isPlayer ? 'Player' : 'Target'})`
-      );
-
-      this.networkManager.broadcastHit(
-        {
-          targetId: data.targetId,
-          damage: finalDamage,
-          attackerId: shooterId,
-          part: data.part,
-          newHealth: newHealth,
-        },
-        eventCode
-      );
+  public processSyncWeapon(playerId: string, weaponId: string): void {
+    const pawn = this.playerPawns.get(playerId);
+    if (pawn) {
+      pawn.equipWeapon(weaponId);
+      logger.info(`ServerPlayerPawn ${playerId} synced weapon to ${weaponId}`);
     }
   }
 

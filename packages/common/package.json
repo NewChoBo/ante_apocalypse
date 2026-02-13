@@ -9,5 +9,8 @@
     "format": "prettier --write src",
     "check": "tsc --noEmit",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
   }
 }

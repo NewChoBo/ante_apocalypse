@@ -9,11 +9,15 @@ import {
   Container,
   Slider,
 } from '@babylonjs/gui';
-import { Scene, Observable, Observer } from '@babylonjs/core';
+import { Scene, Observable } from '@babylonjs/core';
 import { LobbyUI } from './LobbyUI';
-import { NetworkManager } from '../core/systems/NetworkManager';
+import { createTacticalButton as createTacticalButtonControl } from './buttonFactory';
 import { settingsStore } from '../core/store/SettingsStore';
 import { NetworkState, Logger } from '@ante/common';
+import { INetworkManager } from '../core/interfaces/INetworkManager';
+import { UI_THEME } from './theme';
+
+import { IUIManager } from './IUIManager';
 
 const logger = new Logger('UIManager');
 
@@ -26,8 +30,7 @@ export enum UIScreen {
   NONE = 'NONE',
 }
 
-export class UIManager {
-  private static instance: UIManager;
+export class UIManager implements IUIManager {
   public ui: AdvancedDynamicTexture;
 
   // UI Containers
@@ -36,14 +39,13 @@ export class UIManager {
   public currentScreen: UIScreen = UIScreen.NONE;
   private previousScreen: UIScreen = UIScreen.MAIN_MENU;
   private lobbyUI: LobbyUI | null = null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private observers: Observer<any>[] = [];
+  private cleanups: (() => void)[] = [];
 
   // Visual Constants
-  private readonly PRIMARY_COLOR = '#ffc400';
-  private readonly BG_COLOR = 'rgba(5, 5, 10, 0.95)';
-  private readonly FONT_TACTICAL = 'Rajdhani, sans-serif';
-  private readonly FONT_MONO = 'Roboto Mono, monospace';
+  private readonly PRIMARY_COLOR = UI_THEME.primaryColor;
+  private readonly BG_COLOR = UI_THEME.backgroundColor;
+  private readonly FONT_TACTICAL = UI_THEME.fontTactical;
+  private readonly FONT_MONO = UI_THEME.fontMono;
 
   // Observables for Menu Actions
   public onLogin = new Observable<string>();
@@ -54,7 +56,19 @@ export class UIManager {
 
   private selectedMap = 'training_ground';
 
-  private constructor(scene: Scene) {
+  private networkManager: INetworkManager;
+  private onWindowKeyDown = (e: KeyboardEvent): void => {
+    if (e.code === 'Escape') {
+      if (this.currentScreen === UIScreen.SETTINGS) {
+        const target =
+          this.previousScreen !== UIScreen.NONE ? this.previousScreen : UIScreen.MAIN_MENU;
+        this.showScreen(target);
+      }
+    }
+  };
+
+  constructor(scene: Scene, networkManager: INetworkManager) {
+    this.networkManager = networkManager;
     this.ui = AdvancedDynamicTexture.CreateFullscreenUI('UI', true, scene);
     this.createScreens();
     this.setupNetworkListeners();
@@ -62,21 +76,11 @@ export class UIManager {
   }
 
   private setupInput(): void {
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Escape') {
-        if (this.currentScreen === UIScreen.SETTINGS) {
-          // Return to previous screen if valid, otherwise Main Menu
-          const target =
-            this.previousScreen !== UIScreen.NONE ? this.previousScreen : UIScreen.MAIN_MENU;
-          this.showScreen(target);
-        }
-      }
-    });
+    window.addEventListener('keydown', this.onWindowKeyDown);
   }
 
   private setupNetworkListeners(): void {
-    const network = NetworkManager.getInstance();
-    const stateObserver = network.onStateChanged.add((state: string): void => {
+    const stateObserver = this.networkManager.onStateChanged.add((state: string): void => {
       // Safety check: if UI texture is disposed, don't try to add notifications
       if (this.ui && this.ui.getScene()) {
         if (state === NetworkState.Disconnected || state === NetworkState.Error) {
@@ -86,22 +90,9 @@ export class UIManager {
         }
       }
     });
-    if (stateObserver) this.observers.push(stateObserver);
-  }
-
-  public static initialize(scene: Scene): UIManager {
-    if (UIManager.instance) {
-      UIManager.instance.dispose();
+    if (stateObserver) {
+      this.cleanups.push(() => this.networkManager.onStateChanged.remove(stateObserver));
     }
-    UIManager.instance = new UIManager(scene);
-    return UIManager.instance;
-  }
-
-  public static getInstance(): UIManager {
-    if (!UIManager.instance) {
-      throw new Error('UIManager not initialized. Call initialize() first.');
-    }
-    return UIManager.instance;
   }
 
   /**
@@ -270,7 +261,7 @@ export class UIManager {
   }
 
   private createLobbyScreen(): Container {
-    this.lobbyUI = new LobbyUI(this);
+    this.lobbyUI = new LobbyUI(this, this.networkManager);
     const container = this.lobbyUI.getContainer();
     this.ui.addControl(container);
     return container;
@@ -408,26 +399,17 @@ export class UIManager {
 
   // UI Helpers
   private createTacticalButton(text: string, width: string, height: string): Button {
-    const btn = Button.CreateSimpleButton('btn-' + text, text);
-    btn.width = width;
-    btn.height = height;
-    btn.color = this.PRIMARY_COLOR;
-    btn.background = 'transparent';
-    btn.thickness = 2;
-    btn.fontFamily = this.FONT_TACTICAL;
-    btn.fontSize = 18;
-    btn.fontWeight = '700';
-
-    btn.onPointerEnterObservable.add((): void => {
-      btn.background = this.PRIMARY_COLOR;
-      btn.color = 'black';
+    return createTacticalButtonControl({
+      id: 'btn-' + text,
+      text,
+      width,
+      height,
+      primaryColor: this.PRIMARY_COLOR,
+      fontFamily: this.FONT_TACTICAL,
+      fontSize: 18,
+      fontWeight: '700',
+      thickness: 2,
     });
-    btn.onPointerOutObservable.add((): void => {
-      btn.background = 'transparent';
-      btn.color = this.PRIMARY_COLOR;
-    });
-
-    return btn;
   }
 
   private createMenuButton(title: string, sub: string): Button {
@@ -484,9 +466,9 @@ export class UIManager {
     if (canvas) {
       // In modern browsers, requestPointerLock returns a promise
       try {
-        const promise = canvas.requestPointerLock() as unknown as Promise<void>;
-        if (promise && promise.catch) {
-          promise.catch((e: Error) => {
+        const result = canvas.requestPointerLock() as unknown;
+        if (result instanceof Promise) {
+          result.catch((e: Error) => {
             if (e.name !== 'SecurityError') {
               logger.warn(`PointerLock request failed: ${e.message}`);
             }
@@ -554,10 +536,9 @@ export class UIManager {
     }
 
     // Clean up observers
-    this.observers.forEach((obs) => {
-      NetworkManager.getInstance().onStateChanged.remove(obs);
-    });
-    this.observers = [];
+    this.cleanups.forEach((cleanup) => cleanup());
+    this.cleanups = [];
+    window.removeEventListener('keydown', this.onWindowKeyDown);
 
     this.ui.dispose();
   }

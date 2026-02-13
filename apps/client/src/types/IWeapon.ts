@@ -37,8 +37,7 @@ export interface IWeapon {
   update(deltaTime: number): void;
 
   /** 무기 스태츠 가져오기 */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getStats(): Record<string, any>;
+  getStats(): Record<string, unknown>;
 
   /** 무기 모델 표시 */
   show(): void;
@@ -65,8 +64,10 @@ export interface IWeapon {
   addAmmo(amount: number): void;
 
   /** 서버 데이터로 스태츠 업데이트 */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  updateStats(stats: Partial<Record<string, any>>): void;
+  updateStats(stats: Partial<Record<string, unknown>>): void;
+
+  /** 상태 초기화 */
+  reset(): void;
 
   /** 리소스 해제 */
   dispose(): void;

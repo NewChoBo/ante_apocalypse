@@ -5,25 +5,56 @@ import {
   MeshBuilder,
   StandardMaterial,
   Color3,
+  AbstractMesh,
 } from '@babylonjs/core';
 import { Firearm as CoreFirearm } from '@ante/game-core';
 import { GameObservables } from '../core/events/GameObservables';
 import { ammoStore } from '../core/store/GameStore';
 import { MuzzleTransform, IFirearm } from '../types/IWeapon';
-import { NetworkManager } from '../core/systems/NetworkManager';
-import { HitScanSystem, DamageSystem } from '@ante/game-core';
-import { ClientWeaponMixin } from './ClientWeaponMixin';
-
-// Apply Mixin to CoreFirearm
-class VisualFirearm extends ClientWeaponMixin(CoreFirearm) {}
+import { HitScanSystem, DamageSystem, WeaponStats } from '@ante/game-core';
+import { WeaponVisualController } from './WeaponVisualController';
+import type { GameContext } from '../types/GameContext';
 
 /**
  * 총기류(Firearms)를 위한 중간 추상 클래스.
  * 탄약 관리, 재장전, 레이캐스트 사격 로직을 포함합니다.
  */
-export abstract class Firearm extends VisualFirearm implements IFirearm {
+export abstract class Firearm extends CoreFirearm implements IFirearm {
   public abstract firingMode: 'semi' | 'auto';
   public abstract recoilForce: number;
+
+  // Visual controller (composition pattern)
+  protected visualController: WeaponVisualController;
+
+  // IWeapon properties
+  public name: string = '';
+  public damage: number = 0;
+  public range: number = 0;
+
+  // Expose visual controller properties for backward compatibility
+  public get scene(): Scene {
+    return this.visualController.scene;
+  }
+
+  public get camera(): UniversalCamera {
+    return this.visualController.camera;
+  }
+
+  public get weaponMesh(): AbstractMesh | null {
+    return this.visualController.weaponMesh;
+  }
+
+  public set weaponMesh(mesh: AbstractMesh | null) {
+    this.visualController.weaponMesh = mesh;
+  }
+
+  public get isActive(): boolean {
+    return this.visualController.isActive;
+  }
+
+  public get isAiming(): boolean {
+    return this.visualController.isAiming;
+  }
 
   public getMovementSpeedMultiplier(): number {
     return this.isAiming ? 0.4 : 1.0;
@@ -33,17 +64,16 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
     return this.isAiming ? 0.8 : defaultFOV;
   }
 
+  protected ctx: GameContext;
   protected applyRecoilCallback?: (force: number) => void;
 
   protected isFiring = false;
   protected muzzleOffset = new Vector3(0, 0.1, 0.5);
 
   constructor(
-    scene: Scene,
-    camera: UniversalCamera,
+    context: GameContext,
     initialAmmo: number,
     reserveAmmo: number,
-    onScore?: (points: number) => void,
     applyRecoil?: (force: number) => void
   ) {
     // Pass dummy stats to core, subclasses should initialize proper stats or we update them here
@@ -56,17 +86,14 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
       reloadTime: 1.0,
     });
 
-    // Mixin Init
-    this.initVisuals(scene, camera, onScore);
+    this.ctx = context;
+
+    // Initialize visual controller with stopFire callback
+    this.visualController = new WeaponVisualController(context, () => this.stopFire());
 
     // Manual setup for client-side legacy compatibility (until subclasses fully move to stats)
     this.currentAmmo = initialAmmo;
     this.reserveAmmo = reserveAmmo;
-
-    // BaseWeapon props
-    this.scene = scene;
-    this.camera = camera;
-    this.onScoreCallback = onScore || null;
 
     this.applyRecoilCallback = applyRecoil;
   }
@@ -91,7 +118,7 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
       };
     }
 
-    // 모델이 없을 경우 카메라 위치 기준 (월드 좌표)
+    // 모델이 없을 경우 치메라 위치 기준 (월드 좌표)
     const pos = this.camera.globalPosition.add(forward.scale(0.8));
     return { position: pos, direction: forward };
   }
@@ -99,8 +126,8 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
   public fire(): boolean {
     // Core logic check (ammo, fire rate, reload state)
     // Note: Mixin 'fire' is not defined, we must implement it here or rely on Core's fireLogic
-    // Core has 'fireLogic', 'canFire'
-    if (!super.canFire) return false;
+    // Core has 'canFire'
+    if (!this.canFire) return false;
 
     // Execute logic (ammo decrement)
     if (!super.fireLogic()) return false;
@@ -118,7 +145,7 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
 
     // 네트워크 발사 이벤트 전송
     const muzzle = this.getMuzzleTransform();
-    NetworkManager.getInstance().fire({
+    this.ctx.networkManager.fire({
       weaponId: this.name,
       muzzleTransform: {
         position: { x: muzzle.position.x, y: muzzle.position.y, z: muzzle.position.z },
@@ -155,23 +182,17 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
   }
 
   public reload(): void {
-    if (this.isReloading || this.currentAmmo === this.magazineSize || this.reserveAmmo === 0) {
-      return;
-    }
-
-    // Start Core Reload (sets isReloading = true)
+    // Start Core Reload (transitions FSM to 'Reloading')
     super.reload();
 
-    this.isFiring = false;
-    this.onReloadStart();
-    this.ejectMagazine();
+    if (this.currentState === 'Reloading') {
+      this.isFiring = false;
+      this.onReloadStart();
+      this.ejectMagazine();
 
-    // Notify Server
-    NetworkManager.getInstance().reload(this.name);
-
-    // Core handles the timer in tick(), but we can also hook into that or just keep visual logic here.
-    // However, Core 'reloadLogic' is called when timer finishes.
-    // We should override 'reloadLogic' to add our visual callbacks.
+      // Notify Server
+      this.ctx.networkManager.reload(this.name);
+    }
   }
 
   public override reloadLogic(): void {
@@ -186,11 +207,12 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
 
   public update(deltaTime: number): void {
     super.tick(deltaTime); // Update Core logic (reload timer)
-    this.updateAnimations(deltaTime);
+    this.visualController.updateAnimations(deltaTime);
 
     // 장전 중 연출 (기울기)
     if (this.weaponMesh) {
-      const targetZ = this.isReloading ? this.idleRotation.z + 0.6 : this.idleRotation.z;
+      const idleRotationZ = this.visualController.getIdleRotationZ();
+      const targetZ = this.currentState === 'Reloading' ? idleRotationZ + 0.6 : idleRotationZ;
       this.weaponMesh.rotation.z += (targetZ - this.weaponMesh.rotation.z) * deltaTime * 10;
     }
 
@@ -262,7 +284,7 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
         }
       }
 
-      NetworkManager.getInstance().requestHit({
+      this.ctx.networkManager.requestHit({
         targetId,
         damage: finalDamage,
         weaponId: this.name,
@@ -272,7 +294,7 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
       });
 
       // 3. 통합 히트 프로세싱 (로컬 연출 등)
-      this.processHit(targetMesh, result.pickedPoint!, finalDamage);
+      this.visualController.processHit(targetMesh, result.pickedPoint!, finalDamage);
     }
   }
 
@@ -333,20 +355,27 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
     }
   }
 
+  public reset(): void {
+    this.isFiring = false;
+    this.transitionTo('Ready');
+
+    // Restore Ammo completely
+    if ((this.stats.magazineSize || 0) > 0) {
+      this.currentAmmo = this.stats.magazineSize!;
+      this.reserveAmmo = this.stats.magazineSize! * 5;
+      this.updateAmmoStore();
+    }
+  }
+
   public override updateStats(stats: Partial<Record<string, unknown>>): void {
     const isInitialSync = this.magazineSize === 0;
 
-    super.updateStats(stats);
-    // Overriding getters from Core? No, we should update internal state or the Core stats obj
-    // But Core props are getters reading from this.stats.
-    // So update this.stats if possible.
-    // Core BaseWeapon has public stats: WeaponStats.
+    // Update local properties
+    if (stats.damage !== undefined) this.damage = stats.damage as number;
+    if (stats.range !== undefined) this.range = stats.range as number;
 
-    if (stats.damage !== undefined) this.stats.damage = stats.damage as number;
-    if (stats.range !== undefined) this.stats.range = stats.range as number;
-    if (stats.magazineSize !== undefined) this.stats.magazineSize = stats.magazineSize as number;
-    if (stats.fireRate !== undefined) this.stats.fireRate = stats.fireRate as number;
-    if (stats.reloadTime !== undefined) this.stats.reloadTime = stats.reloadTime as number;
+    // Update Core stats
+    super.updateStats(stats as Partial<WeaponStats>);
 
     // [신규] 최초 동기화 시 탄약 자동 지급
     if (isInitialSync && (this.stats.magazineSize || 0) > 0) {
@@ -360,8 +389,33 @@ export abstract class Firearm extends VisualFirearm implements IFirearm {
     }
   }
 
-  // override dispose from Mixin and Core
+  // IWeapon methods - delegate to visual controller
+  public show(): void {
+    this.visualController.show();
+  }
+
+  public hide(): void {
+    this.visualController.hide();
+  }
+
+  public setAiming(isAiming: boolean): void {
+    this.visualController.setAiming(isAiming);
+  }
+
+  public lower(): Promise<void> {
+    return this.visualController.lower();
+  }
+
+  public raise(): void {
+    this.visualController.raise();
+  }
+
   public dispose(): void {
-    super.dispose();
+    this.visualController.dispose();
+  }
+
+  // Protected helper methods for subclasses
+  public setIdleState(): void {
+    this.visualController.setIdleState();
   }
 }
