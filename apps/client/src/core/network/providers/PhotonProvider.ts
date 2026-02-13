@@ -149,9 +149,8 @@ export class PhotonProvider implements INetworkProvider {
       return false;
     }
 
-    const normalizedOptions = this.normalizeCreateRoomOptions(options);
     try {
-      this.client.createRoom(name, normalizedOptions);
+      this.client.createRoom(name, options);
       return true;
     } catch (e) {
       logger.error('createRoom exception:', e);
@@ -243,17 +242,5 @@ export class PhotonProvider implements INetworkProvider {
     const rooms = this.client.availableRooms();
     logger.info('Manual room list refresh:', rooms);
     this.onRoomListUpdated?.(mapRoomList(rooms));
-  }
-
-  private normalizeCreateRoomOptions(options?: CreateRoomOptions): CreateRoomOptions | undefined {
-    if (!options) return undefined;
-
-    const normalized: CreateRoomOptions = { ...options };
-    if (normalized.customRoomProperties && !normalized.customGameProperties) {
-      normalized.customGameProperties = normalized.customRoomProperties;
-    }
-    delete normalized.customRoomProperties;
-
-    return normalized;
   }
 }

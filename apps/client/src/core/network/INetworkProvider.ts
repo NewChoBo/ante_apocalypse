@@ -6,8 +6,6 @@ export interface CreateRoomOptions {
   isVisible?: boolean;
   isOpen?: boolean;
   customGameProperties?: Record<string, unknown>;
-  /** @deprecated Use `customGameProperties` instead. */
-  customRoomProperties?: Record<string, unknown>;
   propsListedInLobby?: string[];
   [key: string]: unknown;
 }
