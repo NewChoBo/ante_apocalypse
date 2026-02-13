@@ -56,8 +56,11 @@ export class MultiplayerSystem {
 
   public applyPlayerStates(states: PlayerState[]): void {
     states.forEach((p) => {
-      if (p.id !== this.networkManager.getSocketId()) {
-        const remote = this.remotePlayers.get(p.id);
+      const playerId = String(p.id);
+      const localId = String(this.networkManager.getSocketId());
+
+      if (playerId !== localId) {
+        const remote = this.remotePlayers.get(playerId);
         if (remote) {
           remote.updateNetworkState(p.position, p.rotation);
           if (p.weaponId) remote.updateWeapon(p.weaponId);
@@ -105,7 +108,7 @@ export class MultiplayerSystem {
   private setupListeners(): void {
     this.networkManager.onPlayersList.add((players: PlayerState[]): void => {
       players.forEach((p: PlayerState): void => {
-        if (p.id !== this.networkManager.getSocketId()) {
+        if (String(p.id) !== String(this.networkManager.getSocketId())) {
           this.spawnRemotePlayer(p);
         }
       });
@@ -119,13 +122,13 @@ export class MultiplayerSystem {
     });
 
     this.networkManager.onPlayerJoined.add((player: PlayerState): void => {
-      if (player.id !== this.networkManager.getSocketId()) {
+      if (String(player.id) !== String(this.networkManager.getSocketId())) {
         this.spawnRemotePlayer(player);
       }
     });
 
     this.networkManager.onPlayerUpdated.add((player: PlayerState): void => {
-      const remote = this.remotePlayers.get(player.id);
+      const remote = this.remotePlayers.get(String(player.id));
       if (remote) {
         remote.updateNetworkState(player.position, player.rotation);
         if (player.weaponId) {
@@ -135,15 +138,17 @@ export class MultiplayerSystem {
     });
 
     this.networkManager.onPlayerLeft.add((id: string): void => {
-      const remote = this.remotePlayers.get(id);
+      const remote = this.remotePlayers.get(String(id));
       if (remote) {
-        this.worldManager.unregister(id);
-        this.remotePlayers.delete(id);
+        this.worldManager.unregister(String(id));
+        this.remotePlayers.delete(String(id));
       }
     });
 
     this.networkManager.onPlayerFired.add((data: import('@ante/common').FireEventData): void => {
-      const remote = this.remotePlayers.get(data.playerId);
+      if (String(data.playerId) === String(this.networkManager.getSocketId())) return;
+
+      const remote = this.remotePlayers.get(String(data.playerId));
       if (remote) {
         remote.fire(data.weaponId, data.muzzleTransform);
       }
@@ -151,7 +156,9 @@ export class MultiplayerSystem {
 
     this.networkManager.onPlayerReloaded.add(
       (data: { playerId: string; weaponId: string }): void => {
-        const remote = this.remotePlayers.get(data.playerId);
+        if (String(data.playerId) === String(this.networkManager.getSocketId())) return;
+
+        const remote = this.remotePlayers.get(String(data.playerId));
         if (remote) {
           // If the remote player has a reload method (e.g. for animation), call it
           if (
@@ -214,7 +221,9 @@ export class MultiplayerSystem {
   }
 
   private spawnRemotePlayer(player: PlayerState): void {
-    if (this.remotePlayers.has(player.id)) return;
+    const playerId = String(player.id);
+    if (this.remotePlayers.has(playerId)) return;
+    if (playerId === String(this.networkManager.getSocketId())) return;
 
     const name = player.name || 'Anonymous';
     const context: GameContext = {
@@ -225,9 +234,9 @@ export class MultiplayerSystem {
       tickManager: this.tickManager,
     };
 
-    const remote = new RemotePlayerPawn(this.scene, player.id, this.shadowGenerator, context, name);
+    const remote = new RemotePlayerPawn(this.scene, playerId, this.shadowGenerator, context, name);
     remote.position = new Vector3(player.position.x, player.position.y, player.position.z);
-    this.remotePlayers.set(player.id, remote);
+    this.remotePlayers.set(playerId, remote);
     this.worldManager.register(remote);
   }
 
