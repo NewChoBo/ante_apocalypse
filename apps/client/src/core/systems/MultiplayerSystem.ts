@@ -23,6 +23,7 @@ export class MultiplayerSystem {
   private shadowGenerator: ShadowGenerator;
   private lastUpdateTime = 0;
   private updateInterval = 8; // ~128Hz update rate (extremely responsive)
+  private localRespawnHandler: ((position: Vector3) => void) | null = null;
 
   constructor(
     scene: Scene,
@@ -98,7 +99,11 @@ export class MultiplayerSystem {
           if (p.isDead === false && p.health > 0 && this.localPlayer.isDead) {
             logger.info('State Sync forced Respawn for Local Player');
             const pos = new Vector3(p.position.x, p.position.y, p.position.z);
-            this.localPlayer.respawn(pos);
+            if (this.localRespawnHandler) {
+              this.localRespawnHandler(pos);
+            } else {
+              this.localPlayer.respawn(pos);
+            }
             gameStateStore.set('PLAYING');
           }
         }
@@ -201,21 +206,27 @@ export class MultiplayerSystem {
 
     this.networkManager.onPlayerRespawn.add(
       (data: import('@ante/common').RespawnEventData): void => {
-        const pos = new Vector3(data.position.x, data.position.y, data.position.z);
+        const playerId = normalizePlayerId(data.playerId);
+        if (isSamePlayerId(playerId, this.networkManager.getSocketId())) {
+          // Local respawn is handled by SessionController/SpectatorManager to rebuild pawn objects.
+          return;
+        }
 
-        if (data.playerId === this.networkManager.getSocketId()) {
-          // Local player respawn
-          this.localPlayer.respawn(pos);
-          gameStateStore.set('PLAYING');
-        } else {
-          // Remote player respawn
-          const remote = this.remotePlayers.get(data.playerId);
-          if (remote) {
-            remote.respawn(pos);
-          }
+        const pos = new Vector3(data.position.x, data.position.y, data.position.z);
+        const remote = this.remotePlayers.get(playerId);
+        if (remote) {
+          remote.respawn(pos);
         }
       }
     );
+  }
+
+  public setLocalRespawnHandler(handler: ((position: Vector3) => void) | null): void {
+    this.localRespawnHandler = handler;
+  }
+
+  public replaceLocalPlayer(player: PlayerPawn): void {
+    this.localPlayer = player;
   }
 
   public getRemotePlayers(): RemotePlayerPawn[] {
@@ -263,6 +274,7 @@ export class MultiplayerSystem {
 
   public dispose(): void {
     this.networkManager.clearObservers('session');
+    this.localRespawnHandler = null;
     this.remotePlayers.forEach((p) => p.dispose());
     this.remotePlayers.clear();
   }

@@ -91,12 +91,22 @@ export class CharacterModelLoader extends BaseComponent {
       entries.rootNodes.forEach((node) => {
         if (node instanceof AbstractMesh) {
           node.checkCollisions = false;
-          node.metadata = { type: this.config.entityType, pawn: this.charOwner };
+          node.metadata = {
+            type: this.config.entityType,
+            id: this.charOwner.id,
+            bodyPart: 'body',
+            pawn: this.charOwner,
+          };
           node.isPickable = true;
         }
 
         node.getChildMeshes().forEach((m) => {
-          m.metadata = { type: this.config.entityType, pawn: this.charOwner };
+          m.metadata = {
+            type: this.config.entityType,
+            id: this.charOwner.id,
+            bodyPart: 'body',
+            pawn: this.charOwner,
+          };
           m.isPickable = true;
           if (this.skeleton && m.skeleton !== this.skeleton) {
             m.skeleton = this.skeleton;

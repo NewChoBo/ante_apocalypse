@@ -68,6 +68,7 @@ export abstract class CharacterPawn extends BasePawn {
     this.mesh.position.copyFrom(config.position); // Ground pivot
 
     this.mesh.checkCollisions = true;
+    this.mesh.isPickable = false;
     this.mesh.isVisible = false;
     this.mesh.metadata = { type: config.type, pawn: this };
 

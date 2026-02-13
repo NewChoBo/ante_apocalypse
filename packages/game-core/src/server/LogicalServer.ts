@@ -17,6 +17,7 @@ import { LevelData } from '../levels/LevelData.js';
 import { ServerLevelLoader } from '../levels/ServerLevelLoader.js';
 import { ServerGameContext } from '../types/ServerGameContext.js';
 import { WorldEntityManager } from '../simulation/WorldEntityManager.js';
+import { DamageSystem } from '../systems/DamageSystem.js';
 
 const logger = new Logger('LogicalServer');
 
@@ -252,22 +253,26 @@ export class LogicalServer {
 
         if (validation.isValid) {
           const pawn = this.playerPawns.get(data.targetId);
+          const shooterPawn = this.playerPawns.get(shooterId);
+          const weaponDamage = (shooterPawn?.currentWeapon?.stats as { damage?: number } | undefined)
+            ?.damage;
+          const baseDamage =
+            typeof weaponDamage === 'number' && weaponDamage > 0 ? weaponDamage : data.damage;
+          const finalDamage = pawn
+            ? DamageSystem.calculateDamage(baseDamage, validation.part, pawn.damageProfile)
+            : baseDamage;
           let newHealth = 0;
           let wasAlive = false;
 
           // Player Logic
           if (pawn) {
-            newHealth = Math.max(0, pawn.health - data.damage);
+            newHealth = Math.max(0, pawn.health - finalDamage);
             wasAlive = !pawn.isDead;
             pawn.health = newHealth;
 
             // Trigger valid death
             if (newHealth <= 0 && wasAlive) {
               pawn.isDead = true;
-              this.handlePlayerDeath(data.targetId, shooterId);
-              // Broadcast Death Event separately or let handlePlayerDeath do it?
-              // Usually we broadcast death AND hit, or just death.
-              // For now, let's keep hit broadcast, and handlePlayerDeath broadcasts death.
               this.networkManager.broadcastDeath(data.targetId, shooterId);
             }
           }
@@ -275,7 +280,7 @@ export class LogicalServer {
           else {
             const targetState = this.networkManager.getPlayerState(data.targetId);
             if (targetState) {
-              newHealth = Math.max(0, targetState.health - data.damage);
+              newHealth = Math.max(0, targetState.health - finalDamage);
             }
           }
 
@@ -285,7 +290,7 @@ export class LogicalServer {
           this.networkManager.broadcastHit(
             {
               targetId: data.targetId,
-              damage: data.damage,
+              damage: finalDamage,
               attackerId: shooterId,
               part: validation.part,
               newHealth: newHealth,

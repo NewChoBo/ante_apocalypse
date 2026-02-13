@@ -12,6 +12,7 @@ interface SpectatorManagerDeps {
   getPlayerPawn: () => PlayerPawn | null;
   getPlayerController: () => PlayerController | null;
   getHud: () => HUD | null;
+  resetLocalPlayer?: (position: Vector3) => void;
   isPointerLocked?: () => boolean;
   emitPlayerDied?: () => void;
 }
@@ -94,7 +95,11 @@ export class SpectatorManager {
 
     this.deps.getHud()?.hideRespawnMessage();
     const spawnPos = position ? new Vector3(position.x, position.y, position.z) : new Vector3(0, 2, 0);
-    this.deps.getPlayerPawn()?.fullReset(spawnPos);
+    if (this.deps.resetLocalPlayer) {
+      this.deps.resetLocalPlayer(spawnPos);
+    } else {
+      this.deps.getPlayerPawn()?.fullReset(spawnPos);
+    }
     this.deps.getPlayerController()?.setInputBlocked(false);
   }
 

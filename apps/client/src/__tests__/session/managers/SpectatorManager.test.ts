@@ -70,28 +70,26 @@ describe('SpectatorManager', (): void => {
     expect(setInputBlocked).toHaveBeenCalledWith(false);
   });
 
-  it('resets player on local respawn', (): void => {
-    const fullReset = vi.fn<(position: Vector3) => void>();
+  it('rebuilds player on local respawn when reset callback is provided', (): void => {
+    const resetLocalPlayer = vi.fn<(position: Vector3) => void>();
     const hideRespawnMessage = vi.fn<() => void>();
     const setInputBlocked = vi.fn<(blocked: boolean) => void>();
 
     const manager = new SpectatorManager({
       getMultiplayerSystem: (): MultiplayerSystem | null => null,
-      getPlayerPawn: (): PlayerPawn =>
-        ({
-          fullReset,
-        } as unknown as PlayerPawn),
+      getPlayerPawn: (): PlayerPawn | null => null,
       getPlayerController: (): PlayerController => ({ setInputBlocked } as unknown as PlayerController),
       getHud: (): HUD =>
         ({
           hideRespawnMessage,
         } as unknown as HUD),
+      resetLocalPlayer,
     });
 
     manager.onLocalRespawn({ x: 1, y: 2, z: 3 });
 
-    expect(fullReset).toHaveBeenCalledTimes(1);
-    expect(fullReset.mock.calls[0][0]).toMatchObject({ x: 1, y: 2, z: 3 });
+    expect(resetLocalPlayer).toHaveBeenCalledTimes(1);
+    expect(resetLocalPlayer.mock.calls[0][0]).toMatchObject({ x: 1, y: 2, z: 3 });
     expect(hideRespawnMessage).toHaveBeenCalledTimes(1);
     expect(setInputBlocked).toHaveBeenCalledWith(false);
   });

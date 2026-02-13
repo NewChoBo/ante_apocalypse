@@ -50,6 +50,9 @@ export class MultiplayerSessionService {
           name
         ));
     this.multiplayerSystem = createMultiplayerSystem(playerPawn, playerName);
+    this.multiplayerSystem.setLocalRespawnHandler((position: Vector3): void => {
+      this.deps.onLocalRespawn({ x: position.x, y: position.y, z: position.z });
+    });
 
     this.setupSimulation();
     this.bindObservers();

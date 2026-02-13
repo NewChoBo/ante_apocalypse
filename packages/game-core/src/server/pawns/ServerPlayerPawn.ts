@@ -45,8 +45,12 @@ export class ServerPlayerPawn extends BasePawn {
     this.mesh.setPivotPoint(new Vector3(0, -1, 0));
     this.mesh.position.copyFrom(position);
     this.mesh.checkCollisions = true;
-    this.mesh.isPickable = true;
+    this.mesh.isPickable = false;
     this.mesh.metadata = { type: 'player', id: this.id, pawn: this };
+    this.damageProfile = {
+      multipliers: { head: 2.0, body: 1.0 },
+      defaultMultiplier: 1.0,
+    };
 
     logger.info(`Created ServerPlayerPawn for ${id}`);
 

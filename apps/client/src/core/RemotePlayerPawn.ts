@@ -176,7 +176,7 @@ export class RemotePlayerPawn extends CharacterPawn {
     this.mesh.rotation.x = 0; // Reset death tilt
 
     this.mesh.checkCollisions = true;
-    this.mesh.isPickable = true;
+    this.mesh.isPickable = false;
 
     this.updateHealth(100);
     this.animationComponent.playAnimation('idle'); // Ensure it's not in death pose

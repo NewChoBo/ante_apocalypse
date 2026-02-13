@@ -39,6 +39,7 @@ describe('MultiplayerSessionService', (): void => {
       applyPlayerStates: vi.fn(),
       update: vi.fn(),
       dispose: vi.fn(),
+      setLocalRespawnHandler: vi.fn(),
     } as unknown as MultiplayerSystem;
     const createMultiplayerSystem = vi.fn((): MultiplayerSystem => multiplayerSystem);
     const createSimulation = vi.fn((): WorldSimulation => ({}) as WorldSimulation);
@@ -134,6 +135,7 @@ describe('MultiplayerSessionService', (): void => {
             applyPlayerStates: vi.fn(),
             update: vi.fn(),
             dispose: vi.fn(),
+            setLocalRespawnHandler: vi.fn(),
           } as unknown as MultiplayerSystem)
       ),
       createSimulation,
@@ -151,6 +153,7 @@ describe('MultiplayerSessionService', (): void => {
       applyPlayerStates: vi.fn(),
       update: vi.fn(),
       dispose: vi.fn(),
+      setLocalRespawnHandler: vi.fn(),
     } as unknown as MultiplayerSystem;
     const onLocalRespawn = vi.fn();
 

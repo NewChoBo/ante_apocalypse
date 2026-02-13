@@ -35,6 +35,7 @@ export class PlayerPawn extends BasePawn {
     // Root mesh is at ground level (feet)
     this.mesh = Mesh.CreateBox('playerPawn', 0.5, this.scene);
     this.mesh.isVisible = false;
+    this.mesh.isPickable = false;
     this.mesh.position.set(0, 0, -5); // Grounded initial position
 
     // 물리 충돌 설정 (루트가 지면이므로 ellipsoidOffset 조정)
@@ -231,6 +232,18 @@ export class PlayerPawn extends BasePawn {
     }
 
     logger.info('Full Reset Complete');
+  }
+
+  public override dispose(): void {
+    if (this.corpseMesh) {
+      this.corpseMesh.dispose();
+      this.corpseMesh = null;
+    }
+    if (this.corpseHealthBar) {
+      this.corpseHealthBar.dispose();
+      this.corpseHealthBar = null;
+    }
+    super.dispose();
   }
 }
 

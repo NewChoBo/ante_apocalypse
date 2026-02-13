@@ -23,6 +23,7 @@ import { SpectatorManager } from './session/SpectatorManager';
 import { InventorySyncService } from './session/InventorySyncService';
 import { MultiplayerSessionService } from './session/MultiplayerSessionService';
 import type { GameContext } from '../../types/GameContext';
+import { InventoryManager } from '../inventory/InventoryManager';
 
 /**
  * 네트워크 에러 헨들러 타입
@@ -106,6 +107,7 @@ export class SessionController {
       getPlayerPawn: (): PlayerPawn | null => this.playerPawn,
       getPlayerController: (): PlayerController | null => this.playerController,
       getHud: (): HUD | null => this.hud,
+      resetLocalPlayer: (position: Vector3): void => this.recreateLocalPlayer(position),
     });
     this.inventorySyncService = new InventorySyncService({
       getPlayerPawn: (): PlayerPawn | null => this.playerPawn,
@@ -163,19 +165,13 @@ export class SessionController {
   }
 
   private setupCombat(): void {
-    const combatComp = new CombatComponent(this.playerPawn!, this.scene, this.ctx);
-    this.playerPawn!.addComponent(combatComp);
+    this.bindCombatForPlayer(this.playerPawn!);
 
-    this.healthUnsub = playerHealthStore.subscribe((health: number): void => {
-      this.spectatorManager.onHealthChanged(health);
-    });
-
-    combatComp.onWeaponChanged((newWeapon: { name: string }): void => {
-      this.inventorySyncService.syncStoreFromCombat();
-      if (this.multiplayerSessionService.getMultiplayerSystem()) {
-        this.networkManager.syncWeapon(newWeapon.name);
-      }
-    });
+    if (!this.healthUnsub) {
+      this.healthUnsub = playerHealthStore.subscribe((health: number): void => {
+        this.spectatorManager.onHealthChanged(health);
+      });
+    }
   }
 
   private setupInventory(): void {
@@ -201,6 +197,53 @@ export class SessionController {
 
   private setupMultiplayer(playerName: string): void {
     this.multiplayerSessionService.initialize(this.playerPawn!, playerName);
+  }
+
+  private bindCombatForPlayer(playerPawn: PlayerPawn): CombatComponent {
+    const combatComp = new CombatComponent(playerPawn, this.scene, this.ctx);
+    playerPawn.addComponent(combatComp);
+
+    combatComp.onWeaponChanged((newWeapon: { name: string }): void => {
+      this.inventorySyncService.syncStoreFromCombat();
+      if (this.multiplayerSessionService.getMultiplayerSystem()) {
+        this.networkManager.syncWeapon(newWeapon.name);
+      }
+    });
+
+    return combatComp;
+  }
+
+  private recreateLocalPlayer(position: Vector3): void {
+    if (!this.playerController || !this.inventoryUI) return;
+
+    if (this.playerPawn) {
+      this.worldManager.unregister(this.playerPawn.id);
+    }
+
+    const nextPawn = new PlayerPawn(this.ctx);
+    const camComp = nextPawn.getComponent(CameraComponent) as CameraComponent;
+    if (camComp) {
+      this.ctx.camera = camComp.camera;
+    }
+
+    nextPawn.position = position;
+    this.worldManager.register(nextPawn);
+    this.playerController.possess(nextPawn);
+
+    InventoryManager.clear();
+    this.bindCombatForPlayer(nextPawn);
+    this.playerPawn = nextPawn;
+
+    this.inputManager.initialize(
+      this.scene,
+      this.canvas,
+      nextPawn,
+      this.playerController,
+      this.inventoryUI
+    );
+
+    this.multiplayerSessionService.getMultiplayerSystem()?.replaceLocalPlayer(nextPawn);
+    this.inventorySyncService.syncStoreFromCombat();
   }
 
   public getPlayerCamera(): UniversalCamera | null {
