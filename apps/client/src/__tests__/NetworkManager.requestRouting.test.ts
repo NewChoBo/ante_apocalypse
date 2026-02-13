@@ -60,6 +60,53 @@ describe('NetworkManager request routing', () => {
     });
   });
 
+  it('does not dispatch request events when master receives them from provider', () => {
+    const provider = createProviderMock(true);
+    const manager = new NetworkManager(new LocalServerManager(), provider);
+    const rawObserver = vi.fn();
+    const reloadObserver = vi.fn();
+    manager.onEvent.add(rawObserver);
+    manager.onPlayerReloaded.add(reloadObserver);
+
+    provider.onEvent?.(
+      EventCode.RELOAD,
+      {
+        playerId: '2',
+        weaponId: 'Rifle',
+      },
+      '2'
+    );
+
+    expect(rawObserver).toHaveBeenCalledTimes(1);
+    expect(reloadObserver).not.toHaveBeenCalled();
+  });
+
+  it('dispatches non-request events when master receives them from provider', () => {
+    const provider = createProviderMock(true);
+    const manager = new NetworkManager(new LocalServerManager(), provider);
+    const hitObserver = vi.fn();
+    manager.onPlayerHit.add(hitObserver);
+
+    provider.onEvent?.(
+      EventCode.HIT,
+      {
+        targetId: '2',
+        attackerId: '1',
+        damage: 25,
+        newHealth: 75,
+      },
+      '1'
+    );
+
+    expect(hitObserver).toHaveBeenCalledTimes(1);
+    expect(hitObserver.mock.calls[0][0]).toMatchObject({
+      targetId: '2',
+      attackerId: '1',
+      damage: 25,
+      newHealth: 75,
+    });
+  });
+
   it('uses payload playerId for authoritative fire broadcasts', () => {
     const provider = createProviderMock(false);
     const manager = new NetworkManager(new LocalServerManager(), provider);

@@ -5,6 +5,7 @@ import { Pistol } from '../weapons/Pistol';
 import { Rifle } from '../weapons/Rifle';
 import { Knife } from '../weapons/Knife';
 import { Bat } from '../weapons/Bat';
+import { GameAssets } from '../core/GameAssets';
 import type { GameContext } from '../types/GameContext';
 import type { INetworkManager } from '../core/interfaces/INetworkManager';
 import type { WorldEntityManager } from '../core/systems/WorldEntityManager';
@@ -44,6 +45,7 @@ function createContext(): { context: GameContext; teardown: () => void } {
 
 describe('IWeapon reset contract', () => {
   it('all concrete weapons expose reset() and can invoke it safely', () => {
+    const modelSpy = vi.spyOn(GameAssets, 'instantiateModel').mockReturnValue(null);
     const { context, teardown } = createContext();
 
     const weapons = [new Pistol(context), new Rifle(context), new Knife(context), new Bat(context)];
@@ -57,5 +59,6 @@ describe('IWeapon reset contract', () => {
       weapon.dispose();
     }
     teardown();
+    modelSpy.mockRestore();
   });
 });
