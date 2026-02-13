@@ -5,23 +5,23 @@ import { LevelData } from '@ante/game-core';
 import { CombatComponent } from '../components/CombatComponent';
 import { HUD } from '../../ui/HUD';
 import { InventoryUI } from '../../ui/inventory/InventoryUI';
-import { InventoryManager } from '../inventory/InventoryManager';
 import { MultiplayerSystem } from './MultiplayerSystem';
 import { PickupManager } from './PickupManager';
 import { TargetSpawnerComponent } from '../components/TargetSpawnerComponent';
 import { EnemyManager } from './EnemyManager';
-import { InitialStatePayload, SpawnTargetPayload } from '@ante/common';
+import { InitialStatePayload, SpawnTargetPayload, RespawnEventData } from '@ante/common';
 import { WorldSimulation, WaveSurvivalRule, TickManager } from '@ante/game-core';
 import { WorldEntityManager } from './WorldEntityManager';
 import { GameObservables } from '../events/GameObservables';
 import { GameAssets } from '../GameAssets';
-import { playerHealthStore, inventoryStore } from '../store/GameStore';
+import { playerHealthStore } from '../store/GameStore';
 import { INetworkManager } from '../interfaces/INetworkManager';
 import { IUIManager } from '../../ui/IUIManager';
 import { LocalServerManager } from '../server/LocalServerManager';
 import { GlobalInputManager } from './GlobalInputManager';
 import { CameraComponent } from '../components/CameraComponent';
 import { SpectatorManager } from './session/SpectatorManager';
+import { InventorySyncService } from './session/InventorySyncService';
 import type { GameContext } from '../../types/GameContext';
 
 /**
@@ -60,6 +60,8 @@ export class SessionController {
   private simulation: WorldSimulation | null = null;
   private healthUnsub: (() => void) | null = null;
   private _initialStateObserver: Observer<InitialStatePayload> | null = null;
+  private _itemCollectionObserver: Observer<{ itemId: string; position: Vector3 }> | null = null;
+  private _playerRespawnObserver: Observer<RespawnEventData> | null = null;
 
   private networkManager: INetworkManager;
   private uiManager: IUIManager;
@@ -67,6 +69,7 @@ export class SessionController {
   private pickupManager: PickupManager;
   private inputManager: GlobalInputManager;
   private spectatorManager: SpectatorManager;
+  private inventorySyncService: InventorySyncService;
   private tickManager: TickManager;
   private localServerManager: LocalServerManager;
   private ctx!: GameContext;
@@ -93,6 +96,9 @@ export class SessionController {
       getPlayerPawn: (): PlayerPawn | null => this.playerPawn,
       getPlayerController: (): PlayerController | null => this.playerController,
       getHud: (): HUD | null => this.hud,
+    });
+    this.inventorySyncService = new InventorySyncService({
+      getPlayerPawn: (): PlayerPawn | null => this.playerPawn,
     });
   }
 
@@ -141,7 +147,7 @@ export class SessionController {
       // Logic for enemy spawns
     }
     this.pickupManager.initialize(this.scene, this.playerPawn!);
-    GameObservables.itemCollection.add((): void => {
+    this._itemCollectionObserver = GameObservables.itemCollection.add((): void => {
       GameAssets.sounds.swipe?.play();
     });
   }
@@ -155,7 +161,7 @@ export class SessionController {
     });
 
     combatComp.onWeaponChanged((newWeapon: { name: string }): void => {
-      this.syncInventoryStore();
+      this.inventorySyncService.syncStoreFromCombat();
       if (this.multiplayerSystem) {
         this.networkManager.syncWeapon(newWeapon.name);
       }
@@ -163,45 +169,14 @@ export class SessionController {
   }
 
   private setupInventory(): void {
-    this.inventoryUI = new InventoryUI(
-      {
-        onEquipWeapon: async (_slot, id): Promise<void> => {
-          const combat = this.playerPawn?.getComponent(CombatComponent);
-          if (combat && id) await combat.equipWeapon(id);
-        },
-        onUseItem: (id): void => {
-          if (this.playerPawn) {
-            InventoryManager.useItem(id, this.playerPawn);
-            this.syncInventoryStore();
-          }
-        },
-        onDropItem: (id): void => {
-          if (!this.playerPawn) return;
-          const state = inventoryStore.get();
-          const bag = [...state.bagItems];
-          const itemIndex = bag.findIndex((i) => i.id === id);
-
-          if (itemIndex !== -1) {
-            const item = bag[itemIndex];
-            if (item.count > 1) {
-              bag[itemIndex] = { ...item, count: item.count - 1 };
-            } else {
-              bag.splice(itemIndex, 1);
-            }
-            inventoryStore.setKey('bagItems', bag);
-          }
-          this.syncInventoryStore();
-        },
-      },
-      this.uiManager
-    );
-    this.syncInventoryStore();
+    this.inventoryUI = new InventoryUI(this.inventorySyncService.createCallbacks(), this.uiManager);
+    this.inventorySyncService.syncStoreFromCombat();
   }
 
   public start(): void {
     if (!this.playerPawn) return;
     this.playerPawn.initialize();
-    this.syncInventoryStore();
+    this.inventorySyncService.syncStoreFromCombat();
   }
 
   private setupInput(): void {
@@ -257,38 +232,10 @@ export class SessionController {
       }
     );
 
-    this.networkManager.onPlayerRespawn.add((data) => {
+    this._playerRespawnObserver = this.networkManager.onPlayerRespawn.add((data) => {
       if (data.playerId === this.networkManager.getSocketId()) {
         this.spectatorManager.onLocalRespawn(data.position);
       }
-    });
-  }
-
-  private syncInventoryStore(): void {
-    if (!this.playerPawn) return;
-    const combat = this.playerPawn.getComponent(CombatComponent);
-    if (!combat) return;
-
-    const weapons = (combat as CombatComponent).getWeapons();
-    const slots: (string | null)[] = [null, null, null, null];
-    weapons.forEach((w, i) => {
-      if (i < 4) slots[i] = w.name;
-    });
-
-    const weaponBagItems = weapons.map((w) => ({
-      id: w.name,
-      name: w.name,
-      type: 'weapon' as const,
-      count: 1,
-    }));
-
-    const currentState = inventoryStore.get();
-    const consumables = currentState.bagItems.filter((i) => i.type === 'consumable');
-
-    inventoryStore.set({
-      ...currentState,
-      weaponSlots: slots,
-      bagItems: [...weaponBagItems, ...consumables],
     });
   }
 
@@ -323,6 +270,14 @@ export class SessionController {
     if (this._initialStateObserver) {
       this.networkManager.onInitialStateReceived.remove(this._initialStateObserver);
       this._initialStateObserver = null;
+    }
+    if (this._itemCollectionObserver) {
+      GameObservables.itemCollection.remove(this._itemCollectionObserver);
+      this._itemCollectionObserver = null;
+    }
+    if (this._playerRespawnObserver) {
+      this.networkManager.onPlayerRespawn.remove(this._playerRespawnObserver);
+      this._playerRespawnObserver = null;
     }
   }
 }
