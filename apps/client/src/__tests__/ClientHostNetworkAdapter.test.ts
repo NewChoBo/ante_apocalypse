@@ -13,6 +13,7 @@ interface NetworkManagerStubBundle {
     getSocketId: ReturnType<typeof vi.fn>;
     isMasterClient: ReturnType<typeof vi.fn>;
     sendEvent: ReturnType<typeof vi.fn>;
+    broadcastAuthorityEvent: ReturnType<typeof vi.fn>;
     getAllPlayerStates: ReturnType<typeof vi.fn>;
   };
   onPlayerJoined: Observable<PlayerState>;
@@ -32,6 +33,7 @@ function createNetworkManagerStub(): NetworkManagerStubBundle {
     getSocketId: vi.fn().mockReturnValue('1'),
     isMasterClient: vi.fn().mockReturnValue(true),
     sendEvent: vi.fn(),
+    broadcastAuthorityEvent: vi.fn(),
     getAllPlayerStates: vi.fn().mockReturnValue([]),
   };
 
@@ -114,5 +116,34 @@ describe('ClientHostNetworkAdapter.dispose', () => {
     });
 
     expect(onMove).not.toHaveBeenCalled();
+  });
+
+  it('delegates outgoing authority events through network manager broadcast path', () => {
+    const { stub } = createNetworkManagerStub();
+    const worldManager = new WorldEntityManager(new TickManager());
+    const adapter = new ClientHostNetworkAdapter(stub as unknown as NetworkManager, worldManager);
+
+    adapter.sendEvent(
+      EventCode.HIT,
+      {
+        targetId: '2',
+        attackerId: '1',
+        damage: 10,
+        newHealth: 90,
+      },
+      true
+    );
+
+    expect(stub.broadcastAuthorityEvent).toHaveBeenCalledTimes(1);
+    expect(stub.broadcastAuthorityEvent).toHaveBeenCalledWith(
+      EventCode.HIT,
+      {
+        targetId: '2',
+        attackerId: '1',
+        damage: 10,
+        newHealth: 90,
+      },
+      true
+    );
   });
 });

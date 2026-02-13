@@ -28,8 +28,10 @@ const logger = new Logger('GameAssets');
  * 에셋 유형별 보관소
  */
 export const GameAssets = {
-  scene: null as unknown as Scene,
-  audioEngine: null as unknown as AudioEngineV2,
+  scene: null as Scene | null,
+  audioEngine: null as AudioEngineV2 | null,
+  settingsUnsubscribe: null as (() => void) | null,
+  isInitialized: false,
 
   // 에셋 접근용 네임스페이스
   sounds: {} as Record<string, Sound>,
@@ -41,6 +43,12 @@ export const GameAssets = {
    * 초기화: 모든 에셋을 유형별로 자동 분류하여 로드
    */
   async initialize(scene: Scene): Promise<void> {
+    if (this.isInitialized && this.scene === scene) {
+      return;
+    }
+
+    // Reinitialize safely when scene changes (or stale assets remain).
+    this.clear();
     this.scene = scene;
 
     try {
@@ -58,7 +66,7 @@ export const GameAssets = {
           }
         };
         applyVol(settingsStore.get().masterVolume);
-        settingsStore.subscribe((s) => applyVol(s.masterVolume));
+        this.settingsUnsubscribe = settingsStore.subscribe((s) => applyVol(s.masterVolume));
       }
 
       // 2. Asset Manifest
@@ -81,18 +89,20 @@ export const GameAssets = {
             });
             this.sounds[item.key] = s as unknown as Sound;
           } else if (item.type === 'texture') {
-            this.textures[item.key] = new Texture(item.asset, this.scene);
+            this.textures[item.key] = new Texture(item.asset, scene);
           } else {
-            const container = await SceneLoader.LoadAssetContainerAsync('', item.asset, this.scene);
+            const container = await SceneLoader.LoadAssetContainerAsync('', item.asset, scene);
             const targetMap = item.type === 'glb' ? this.glb : this.babylon;
             targetMap[item.key] = container;
           }
         })
       );
 
+      this.isInitialized = true;
       logger.info('GameAssets initialized.');
     } catch (e) {
       logger.error('Failed to initialize GameAssets:', e);
+      this.clear();
     }
   },
 
@@ -117,7 +127,6 @@ export const GameAssets = {
     if (entries.rootNodes.length !== 1) {
       const wrapper = new Mesh(rootName || `${key}_wrapper`, this.scene);
       entries.rootNodes.forEach((node) => (node.parent = wrapper));
-      entries.rootNodes.forEach((node) => (node.parent = wrapper));
       // Re-assign rootNodes safely. casting to unknown first then to writable type if needed,
       // but InstantiatedEntries.rootNodes is readonly in definition?
       // Check babylon definition. If readonly, we might need a workaround or avoid modifying it.
@@ -138,14 +147,24 @@ export const GameAssets = {
   },
 
   clear(): void {
+    this.settingsUnsubscribe?.();
+    this.settingsUnsubscribe = null;
+
     [this.glb, this.babylon].forEach((map) => {
       Object.values(map).forEach((c) => c.dispose());
     });
     Object.values(this.sounds).forEach((s) => s.dispose());
     Object.values(this.textures).forEach((t) => t.dispose());
+
+    const audioEngineWithDispose = this.audioEngine as AudioEngineV2 & { dispose?: () => void };
+    audioEngineWithDispose.dispose?.();
+
     this.sounds = {};
     this.textures = {};
     this.glb = {};
     this.babylon = {};
+    this.audioEngine = null;
+    this.scene = null;
+    this.isInitialized = false;
   },
 };

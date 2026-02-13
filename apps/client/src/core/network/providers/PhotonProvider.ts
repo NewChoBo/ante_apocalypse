@@ -119,12 +119,12 @@ export class PhotonProvider implements INetworkProvider {
   }
 
   public async joinRoom(roomId: string): Promise<boolean> {
-    if (!this.client.isInLobby() && !this.client.isJoinedToRoom()) {
-      logger.warn('Cannot join room: Not in lobby or already in a room.');
+    if (this.client.isJoinedToRoom()) {
+      logger.warn('Cannot join room: Already in a room.');
       return false;
     }
 
-    if (!this.client.isConnectedToMaster()) {
+    if (!this.client.isConnectedToMaster() && !this.client.isInLobby()) {
       logger.error('Cannot join room: Not connected to master/name server.');
       return false;
     }
@@ -139,12 +139,19 @@ export class PhotonProvider implements INetworkProvider {
   }
 
   public async createRoom(name: string, options?: CreateRoomOptions): Promise<boolean> {
-    if (!this.client.isConnectedToMaster()) {
+    if (this.client.isJoinedToRoom()) {
+      logger.warn('Cannot create room: Already in a room.');
+      return false;
+    }
+
+    if (!this.client.isConnectedToMaster() && !this.client.isInLobby()) {
       logger.error('Cannot create room: Not connected to Master Server.');
       return false;
     }
+
+    const normalizedOptions = this.normalizeCreateRoomOptions(options);
     try {
-      this.client.createRoom(name, options);
+      this.client.createRoom(name, normalizedOptions);
       return true;
     } catch (e) {
       logger.error('createRoom exception:', e);
@@ -236,5 +243,17 @@ export class PhotonProvider implements INetworkProvider {
     const rooms = this.client.availableRooms();
     logger.info('Manual room list refresh:', rooms);
     this.onRoomListUpdated?.(mapRoomList(rooms));
+  }
+
+  private normalizeCreateRoomOptions(options?: CreateRoomOptions): CreateRoomOptions | undefined {
+    if (!options) return undefined;
+
+    const normalized: CreateRoomOptions = { ...options };
+    if (normalized.customRoomProperties && !normalized.customGameProperties) {
+      normalized.customGameProperties = normalized.customRoomProperties;
+    }
+    delete normalized.customRoomProperties;
+
+    return normalized;
   }
 }

@@ -11,6 +11,7 @@ import {
 } from '@babylonjs/gui';
 import { Scene, Observable } from '@babylonjs/core';
 import { LobbyUI } from './LobbyUI';
+import { createTacticalButton as createTacticalButtonControl } from './buttonFactory';
 import { settingsStore } from '../core/store/SettingsStore';
 import { NetworkState, Logger } from '@ante/common';
 import { INetworkManager } from '../core/interfaces/INetworkManager';
@@ -398,26 +399,17 @@ export class UIManager implements IUIManager {
 
   // UI Helpers
   private createTacticalButton(text: string, width: string, height: string): Button {
-    const btn = Button.CreateSimpleButton('btn-' + text, text);
-    btn.width = width;
-    btn.height = height;
-    btn.color = this.PRIMARY_COLOR;
-    btn.background = 'transparent';
-    btn.thickness = 2;
-    btn.fontFamily = this.FONT_TACTICAL;
-    btn.fontSize = 18;
-    btn.fontWeight = '700';
-
-    btn.onPointerEnterObservable.add((): void => {
-      btn.background = this.PRIMARY_COLOR;
-      btn.color = 'black';
+    return createTacticalButtonControl({
+      id: 'btn-' + text,
+      text,
+      width,
+      height,
+      primaryColor: this.PRIMARY_COLOR,
+      fontFamily: this.FONT_TACTICAL,
+      fontSize: 18,
+      fontWeight: '700',
+      thickness: 2,
     });
-    btn.onPointerOutObservable.add((): void => {
-      btn.background = 'transparent';
-      btn.color = this.PRIMARY_COLOR;
-    });
-
-    return btn;
   }
 
   private createMenuButton(title: string, sub: string): Button {

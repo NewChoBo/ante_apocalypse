@@ -14,6 +14,7 @@ import { INetworkManager } from '../core/interfaces/INetworkManager';
 import { UIManager, UIScreen } from './UIManager';
 import { RoomInfo, Logger } from '@ante/common';
 import { UI_THEME } from './theme';
+import { createTacticalButton } from './buttonFactory';
 
 const logger = new Logger('LobbyUI');
 
@@ -275,13 +276,16 @@ export class LobbyUI {
     stack.addControl(count);
 
     // Join Button
-    const joinBtn = Button.CreateSimpleButton('join-' + room.name, 'JOIN');
-    joinBtn.width = '100px';
-    joinBtn.height = '35px';
-    joinBtn.color = this.PRIMARY_COLOR;
-    joinBtn.background = 'transparent';
-    joinBtn.thickness = 1;
-    joinBtn.fontFamily = this.FONT_TACTICAL;
+    const joinBtn = createTacticalButton({
+      id: 'join-' + room.name,
+      text: 'JOIN',
+      width: '100px',
+      height: '35px',
+      primaryColor: this.PRIMARY_COLOR,
+      fontFamily: this.FONT_TACTICAL,
+      fontSize: 14,
+      thickness: 1,
+    });
     joinBtn.onPointerUpObservable.add(() => {
       this.networkManager.joinGame(room.name);
     });
@@ -532,25 +536,16 @@ export class LobbyUI {
   }
 
   private createButton(text: string, width: string): Button {
-    const btn = Button.CreateSimpleButton('btn-' + text, text);
-    btn.width = width;
-    btn.height = '40px';
-    btn.color = this.PRIMARY_COLOR;
-    btn.background = 'transparent';
-    btn.thickness = 2;
-    btn.fontFamily = this.FONT_TACTICAL;
-    btn.fontSize = 16;
-    btn.fontWeight = '700';
-
-    btn.onPointerEnterObservable.add((): void => {
-      btn.background = this.PRIMARY_COLOR;
-      btn.color = 'black';
+    return createTacticalButton({
+      id: 'btn-' + text,
+      text,
+      width,
+      height: '40px',
+      primaryColor: this.PRIMARY_COLOR,
+      fontFamily: this.FONT_TACTICAL,
+      fontSize: 16,
+      fontWeight: '700',
+      thickness: 2,
     });
-    btn.onPointerOutObservable.add((): void => {
-      btn.background = 'transparent';
-      btn.color = this.PRIMARY_COLOR;
-    });
-
-    return btn;
   }
 }

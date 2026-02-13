@@ -211,10 +211,8 @@ export abstract class Firearm extends CoreFirearm implements IFirearm {
 
     // 장전 중 연출 (기울기)
     if (this.weaponMesh) {
-      const targetZ =
-        this.currentState === 'Reloading'
-          ? this.visualController['idleRotation'].z + 0.6
-          : this.visualController['idleRotation'].z;
+      const idleRotationZ = this.visualController.getIdleRotationZ();
+      const targetZ = this.currentState === 'Reloading' ? idleRotationZ + 0.6 : idleRotationZ;
       this.weaponMesh.rotation.z += (targetZ - this.weaponMesh.rotation.z) * deltaTime * 10;
     }
 

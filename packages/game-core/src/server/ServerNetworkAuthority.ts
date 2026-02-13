@@ -9,7 +9,9 @@ import {
   MovePayload,
   InitialStatePayload,
   SyncWeaponPayload,
+  ReloadEventData,
   Logger,
+  isRequestEventCode,
 } from '@ante/common';
 import { Vector3, AbstractMesh, Scene, VertexBuffer, Geometry } from '@babylonjs/core';
 import { WorldEntityManager } from '../simulation/WorldEntityManager.js';
@@ -195,14 +197,11 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
   }
 
   private setupDispatcher(): void {
-    this.dispatcher.register(
-      EventCode.REQ_INITIAL_STATE,
-      (_data: unknown, senderId: string): void => {
-        this.sendInitialState(senderId);
-      }
-    );
+    this.registerRequestHandler(EventCode.REQ_INITIAL_STATE, (_data, senderId) => {
+      this.sendInitialState(senderId);
+    });
 
-    this.dispatcher.register(EventCode.MOVE, (data: unknown, senderId: string): void => {
+    this.registerRequestHandler(EventCode.MOVE, (data: MovePayload, senderId): void => {
       const moveData = data as MovePayload;
       if (senderId === this.client.myActor().actorNr.toString()) return;
 
@@ -258,7 +257,7 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
       }
     });
 
-    this.dispatcher.register(EventCode.SYNC_WEAPON, (data: unknown, senderId: string): void => {
+    this.registerRequestHandler(EventCode.SYNC_WEAPON, (data: SyncWeaponPayload, senderId) => {
       const syncData = data as SyncWeaponPayload;
       const entity = this.entityManager.getEntity(senderId);
       if (isServerPlayerEntity(entity)) {
@@ -269,7 +268,7 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
       }
     });
 
-    this.dispatcher.register(EventCode.FIRE, (data: unknown, senderId: string): void => {
+    this.registerRequestHandler(EventCode.FIRE, (data: FireEventData, senderId) => {
       const fireData = data as FireEventData;
       if (this.onFireRequest && fireData.muzzleTransform) {
         this.onFireRequest(
@@ -281,7 +280,7 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
       }
     });
 
-    this.dispatcher.register(EventCode.RELOAD, (data: unknown, senderId: string): void => {
+    this.registerRequestHandler(EventCode.RELOAD, (data: ReloadEventData, senderId) => {
       const reloadData = data as { playerId: string; weaponId: string };
       // Security check
       if (reloadData.playerId !== senderId) return;
@@ -290,11 +289,25 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
       }
     });
 
-    this.dispatcher.register(EventCode.REQUEST_HIT, (data: unknown, senderId: string): void => {
+    this.registerRequestHandler(EventCode.REQUEST_HIT, (data: RequestHitData, senderId) => {
       const hitData = data as RequestHitData;
       if (this.onHitRequest) {
         this.onHitRequest(senderId, hitData);
       }
+    });
+  }
+
+  private registerRequestHandler<T>(
+    code: EventCode,
+    handler: (data: T, senderId: string) => void
+  ): void {
+    if (!isRequestEventCode(code)) {
+      logger.warn(`Attempted to register non-request event as request handler: ${code}`);
+      return;
+    }
+
+    this.dispatcher.register(code, (data: unknown, senderId: string): void => {
+      handler(data as T, senderId);
     });
   }
 

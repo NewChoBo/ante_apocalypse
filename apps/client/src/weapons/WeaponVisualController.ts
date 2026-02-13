@@ -75,6 +75,10 @@ export class WeaponVisualController {
     return defaultFOV;
   }
 
+  public getIdleRotationZ(): number {
+    return this.idleRotation.z;
+  }
+
   /**
    * 무기 표시
    */

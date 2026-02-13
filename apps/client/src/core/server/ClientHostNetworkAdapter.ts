@@ -13,15 +13,7 @@ import {
   FireEventData,
   SyncWeaponPayload,
   ReloadEventData,
-  RespawnEventData,
-  EnemyMovePayload,
-  EnemyHitPayload,
-  EnemyDestroyPayload,
-  TargetHitPayload,
-  TargetDestroyPayload,
-  SpawnTargetPayload,
-  PickupDestroyPayload,
-  GameEndEventData,
+  isRequestEventCode,
 } from '@ante/common';
 import { NetworkManager } from '../systems/NetworkManager';
 
@@ -77,92 +69,6 @@ function isRequestHitData(value: unknown): value is RequestHitData {
     isVector3Like(value.origin) &&
     isVector3Like(value.direction)
   );
-}
-
-function isHitEventData(value: unknown): value is HitEventData {
-  return (
-    isRecord(value) &&
-    typeof value.targetId === 'string' &&
-    typeof value.attackerId === 'string' &&
-    typeof value.damage === 'number' &&
-    typeof value.newHealth === 'number'
-  );
-}
-
-function isDeathEventData(value: unknown): value is DeathEventData {
-  return (
-    isRecord(value) &&
-    typeof value.targetId === 'string' &&
-    typeof value.attackerId === 'string'
-  );
-}
-
-function isRespawnEventData(value: unknown): value is RespawnEventData {
-  return (
-    isRecord(value) &&
-    typeof value.playerId === 'string' &&
-    isVector3Like(value.position)
-  );
-}
-
-function isEnemyMovePayload(value: unknown): value is EnemyMovePayload {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    isVector3Like(value.position) &&
-    isVector3Like(value.rotation)
-  );
-}
-
-function isEnemyHitPayload(value: unknown): value is EnemyHitPayload {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.damage === 'number'
-  );
-}
-
-function isEnemyDestroyPayload(value: unknown): value is EnemyDestroyPayload {
-  return isRecord(value) && typeof value.id === 'string';
-}
-
-function isTargetHitPayload(value: unknown): value is TargetHitPayload {
-  return (
-    isRecord(value) &&
-    typeof value.targetId === 'string' &&
-    typeof value.part === 'string' &&
-    typeof value.damage === 'number'
-  );
-}
-
-function isTargetDestroyPayload(value: unknown): value is TargetDestroyPayload {
-  return isRecord(value) && typeof value.targetId === 'string';
-}
-
-function isSpawnTargetPayload(value: unknown): value is SpawnTargetPayload {
-  return (
-    isRecord(value) &&
-    typeof value.id === 'string' &&
-    typeof value.type === 'string' &&
-    typeof value.isMoving === 'boolean' &&
-    isVector3Like(value.position)
-  );
-}
-
-function isPickupDestroyPayload(value: unknown): value is PickupDestroyPayload {
-  return isRecord(value) && typeof value.id === 'string';
-}
-
-function isInitialStatePayload(value: unknown): value is InitialStatePayload {
-  return (
-    isRecord(value) &&
-    Array.isArray(value.players) &&
-    Array.isArray(value.enemies)
-  );
-}
-
-function isGameEndEventData(value: unknown): value is GameEndEventData {
-  return isRecord(value) && typeof value.reason === 'string';
 }
 
 interface ServerPlayerEntityLike {
@@ -237,6 +143,7 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
     if (senderId === NetworkManager.AUTHORITY_LOOPBACK_SENDER_ID) {
       return;
     }
+    if (!isRequestEventCode(code)) return;
 
     switch (code) {
       case EventCode.MOVE: {
@@ -322,79 +229,6 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
     this.networkManager.broadcastAuthorityEvent(code, data, reliable);
-
-    switch (code) {
-      case EventCode.PLAYER_DEATH:
-        if (isDeathEventData(data)) {
-          this.networkManager.onPlayerDied.notifyObservers(data);
-        }
-        break;
-      case EventCode.RESPAWN:
-        if (isRespawnEventData(data)) {
-          this.networkManager.onPlayerRespawn.notifyObservers(data);
-        }
-        break;
-      case EventCode.HIT:
-        if (isHitEventData(data)) {
-          this.networkManager.onPlayerHit.notifyObservers(data);
-        }
-        break;
-      case EventCode.FIRE:
-        if (isFireEventData(data) && typeof data.playerId === 'string') {
-          this.networkManager.onPlayerFired.notifyObservers(data);
-        }
-        break;
-      case EventCode.RELOAD:
-        if (isReloadEventData(data)) {
-          this.networkManager.onPlayerReloaded.notifyObservers(data);
-        }
-        break;
-      case EventCode.ENEMY_MOVE:
-        if (isEnemyMovePayload(data)) {
-          this.networkManager.onEnemyUpdated.notifyObservers(data);
-        }
-        break;
-      case EventCode.ENEMY_HIT:
-        if (isEnemyHitPayload(data)) {
-          this.networkManager.onEnemyHit.notifyObservers(data);
-        }
-        break;
-      case EventCode.DESTROY_ENEMY:
-        if (isEnemyDestroyPayload(data)) {
-          this.networkManager.onEnemyDestroyed.notifyObservers(data);
-        }
-        break;
-      case EventCode.TARGET_HIT:
-        if (isTargetHitPayload(data)) {
-          this.networkManager.onTargetHit.notifyObservers(data);
-        }
-        break;
-      case EventCode.TARGET_DESTROY:
-        if (isTargetDestroyPayload(data)) {
-          this.networkManager.onTargetDestroy.notifyObservers(data);
-        }
-        break;
-      case EventCode.SPAWN_TARGET:
-        if (isSpawnTargetPayload(data)) {
-          this.networkManager.onTargetSpawn.notifyObservers(data);
-        }
-        break;
-      case EventCode.DESTROY_PICKUP:
-        if (isPickupDestroyPayload(data)) {
-          this.networkManager.onPickupDestroyed.notifyObservers(data);
-        }
-        break;
-      case EventCode.INITIAL_STATE:
-        if (isInitialStatePayload(data)) {
-          this.networkManager.onInitialStateReceived.notifyObservers(data);
-        }
-        break;
-      case EventCode.GAME_END:
-        if (isGameEndEventData(data)) {
-          this.networkManager.onGameEnd.notifyObservers(data);
-        }
-        break;
-    }
   }
 
   public broadcastState(

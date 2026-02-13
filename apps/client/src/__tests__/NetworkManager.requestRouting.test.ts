@@ -149,4 +149,31 @@ describe('NetworkManager request routing', () => {
       weaponId: 'Pistol',
     });
   });
+
+  it('dispatches authoritative non-request events locally for master broadcasts', () => {
+    const provider = createProviderMock(true);
+    const manager = new NetworkManager(new LocalServerManager(), provider);
+    const hitObserver = vi.fn();
+    manager.onPlayerHit.add(hitObserver);
+
+    manager.sendEvent(
+      EventCode.HIT,
+      {
+        targetId: '2',
+        attackerId: '1',
+        damage: 15,
+        newHealth: 85,
+      },
+      true
+    );
+
+    expect(provider.sendEvent).toHaveBeenCalledTimes(1);
+    expect(hitObserver).toHaveBeenCalledTimes(1);
+    expect(hitObserver.mock.calls[0][0]).toMatchObject({
+      targetId: '2',
+      attackerId: '1',
+      damage: 15,
+      newHealth: 85,
+    });
+  });
 });

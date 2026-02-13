@@ -23,6 +23,7 @@ import {
   RespawnEventData,
   GameEndEventData,
   Logger,
+  isRequestEventCode,
 } from '@ante/common';
 import { ConnectionManager } from '../network/ConnectionManager';
 import { PlayerStateManager } from '../network/PlayerStateManager';
@@ -41,6 +42,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
   private provider: INetworkProvider;
   private localServerManager: LocalServerManager;
+  private localServer: LogicalServer | null = null;
 
   // Sub-managers
   private connectionManager: ConnectionManager;
@@ -140,6 +142,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   }
 
   public setLocalServer(server: LogicalServer | null): void {
+    this.localServer = server;
     logger.info(`LocalServer ${server ? 'registered' : 'unregistered'} in NetworkManager`);
   }
 
@@ -148,17 +151,11 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   }
 
   private isServerRequestEvent(code: number): boolean {
-    switch (code) {
-      case EventCode.MOVE:
-      case EventCode.FIRE:
-      case EventCode.SYNC_WEAPON:
-      case EventCode.RELOAD:
-      case EventCode.REQUEST_HIT:
-      case EventCode.REQ_INITIAL_STATE:
-        return true;
-      default:
-        return false;
-    }
+    return isRequestEventCode(code);
+  }
+
+  private notifyPlayersSnapshot(): void {
+    this.onPlayersList.notifyObservers(this.playerStateManager.getAllPlayers());
   }
 
   private sendRequestToMaster(code: number, data: unknown, reliable: boolean = true): void {
@@ -178,15 +175,26 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
     // Host must also consume authoritative events locally.
     if (this.isMasterClient()) {
-      this.onEvent.notifyObservers({
-        code,
-        data,
-        senderId: NetworkManager.AUTHORITY_LOOPBACK_SENDER_ID,
-      });
+      this.dispatchLocalEvent(code, data, NetworkManager.AUTHORITY_LOOPBACK_SENDER_ID);
     }
   }
 
+  public dispatchLocalEvent(
+    code: number,
+    data: unknown,
+    senderId: string = NetworkManager.AUTHORITY_LOOPBACK_SENDER_ID
+  ): void {
+    this.onEvent.notifyObservers({ code, data, senderId });
+    this.dispatchRawEvent(code, data, senderId);
+  }
+
   private setupDispatcher(): void {
+    this.registerPlayerCombatEvents();
+    this.registerWorldEvents();
+    this.registerStateEvents();
+  }
+
+  private registerPlayerCombatEvents(): void {
     this.dispatcher.register(EventCode.FIRE, (fireData, senderId): void => {
       const payload = fireData as Partial<FireEventData>;
       const playerId = typeof payload.playerId === 'string' ? payload.playerId : senderId;
@@ -201,14 +209,6 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
     this.dispatcher.register(EventCode.HIT, (data): void => {
       this.onPlayerHit.notifyObservers(data);
-    });
-
-    this.dispatcher.register(EventCode.DESTROY_ENEMY, (data): void => {
-      this.onEnemyDestroyed.notifyObservers(data);
-    });
-
-    this.dispatcher.register(EventCode.DESTROY_PICKUP, (data): void => {
-      this.onPickupDestroyed.notifyObservers(data);
     });
 
     this.dispatcher.register(EventCode.SYNC_WEAPON, (syncData, senderId): void => {
@@ -236,6 +236,28 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
       }
     });
 
+    this.dispatcher.register(EventCode.PLAYER_DEATH, (data): void => {
+      this.onPlayerDied.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.RESPAWN, (data): void => {
+      this.onPlayerRespawn.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.RELOAD, (data): void => {
+      this.onPlayerReloaded.notifyObservers(data);
+    });
+  }
+
+  private registerWorldEvents(): void {
+    this.dispatcher.register(EventCode.DESTROY_ENEMY, (data): void => {
+      this.onEnemyDestroyed.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.DESTROY_PICKUP, (data): void => {
+      this.onPickupDestroyed.notifyObservers(data);
+    });
+
     this.dispatcher.register(EventCode.ENEMY_MOVE, (data): void => {
       this.onEnemyUpdated.notifyObservers(data);
     });
@@ -248,14 +270,6 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
       this.onTargetHit.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.PLAYER_DEATH, (data): void => {
-      this.onPlayerDied.notifyObservers(data);
-    });
-
-    this.dispatcher.register(EventCode.RESPAWN, (data): void => {
-      this.onPlayerRespawn.notifyObservers(data);
-    });
-
     this.dispatcher.register(EventCode.GAME_END, (data): void => {
       this.onGameEnd.notifyObservers(data);
     });
@@ -264,14 +278,12 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
       this.onTargetDestroy.notifyObservers(data);
     });
 
-    this.dispatcher.register(EventCode.RELOAD, (data): void => {
-      this.onPlayerReloaded.notifyObservers(data);
-    });
-
     this.dispatcher.register(EventCode.SPAWN_TARGET, (data): void => {
       this.onTargetSpawn.notifyObservers(data);
     });
+  }
 
+  private registerStateEvents(): void {
     this.dispatcher.register(EventCode.REQ_INITIAL_STATE, (_data, senderId): void => {
       this.onInitialStateRequested.notifyObservers({ senderId });
     });
@@ -304,10 +316,12 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
         weaponId: 'Pistol',
         health: 100,
       });
+      this.notifyPlayersSnapshot();
     };
 
     this.provider.onPlayerLeft = (id): void => {
       this.playerStateManager.removePlayer(id);
+      this.notifyPlayersSnapshot();
     };
 
     this.provider.onEvent = (code: number, data: unknown, senderId: string): void => {
@@ -377,7 +391,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
    */
   public leaveGame(): void {
     // 1. 내가 서버를 돌리고 있었다면 종료
-    if (this.localServerManager.isServerRunning()) {
+    if (this.localServer || this.localServerManager.isServerRunning()) {
       logger.info('LeaveGame: Stopping Local Server...');
       this.localServerManager.stopSession();
       this.setLocalServer(null);
@@ -462,6 +476,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
         weaponId: data.weaponId,
         health: 100,
       });
+      this.notifyPlayersSnapshot();
     }
     this.updateState(data);
   }
@@ -530,7 +545,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
   public dispose(): void {
     this.clearObservers('all');
 
-    if (this.localServerManager.isServerRunning()) {
+    if (this.localServer || this.localServerManager.isServerRunning()) {
       this.localServerManager.stopSession();
       this.setLocalServer(null);
     }

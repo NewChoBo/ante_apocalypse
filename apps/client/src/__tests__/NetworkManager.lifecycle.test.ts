@@ -60,6 +60,21 @@ function sampleRoomList(): RoomInfo[] {
 }
 
 describe('NetworkManager lifecycle', () => {
+  it('publishes player snapshots when players join and leave', () => {
+    const provider = createProviderMock(false);
+    const { manager: localServerManager } = createLocalServerManagerMock(false);
+    const manager = new NetworkManager(localServerManager, provider);
+    const listObserver = vi.fn();
+    manager.onPlayersList.add(listObserver);
+
+    provider.onPlayerJoined?.({ userId: '2', name: 'remote', isMaster: false });
+    provider.onPlayerLeft?.('2');
+
+    expect(listObserver).toHaveBeenCalledTimes(2);
+    expect(listObserver.mock.calls[0][0]).toHaveLength(1);
+    expect(listObserver.mock.calls[1][0]).toHaveLength(0);
+  });
+
   it('clearObservers(session) keeps global observers and clears session observers', () => {
     const provider = createProviderMock(false);
     const { manager: localServerManager } = createLocalServerManagerMock(false);
@@ -135,4 +150,3 @@ describe('NetworkManager lifecycle', () => {
     expect(provider.disconnect).toHaveBeenCalledTimes(1);
   });
 });
-
