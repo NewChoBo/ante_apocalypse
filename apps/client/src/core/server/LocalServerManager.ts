@@ -101,9 +101,6 @@ export class LocalServerManager {
       // Since Host joined room BEFORE starting LocalServer, we must manually inject them now.
       this.networkAuthority.registerAllActors();
 
-      // 6. Inject LogicalServer into NetworkManager for Direct Access (Split-Brain Revert)
-      networkManager.setLocalServer(this.logicalServer);
-
       this.isRunning = true;
       logger.info('Local Server Session Started (Takeover Complete).');
     } catch (e) {
@@ -117,10 +114,6 @@ export class LocalServerManager {
     if (this.logicalServer) {
       this.logicalServer.stop();
       this.logicalServer = null;
-      // Clear reference in NetworkManager? We need access to NetworkManager instance here.
-      // Ideally we passed it in startSession but don't store it.
-      // But LocalServerManager usually is a singleton or long-lived.
-      // We can't clear it easily without reference. But it might not be harmful if checked against isRunning.
     }
     if (this.networkAuthority) {
       if (this.networkAuthority instanceof ClientHostNetworkAdapter) {
