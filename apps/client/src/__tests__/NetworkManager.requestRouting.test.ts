@@ -59,4 +59,47 @@ describe('NetworkManager request routing', () => {
       senderId: '1',
     });
   });
+
+  it('uses payload playerId for authoritative fire broadcasts', () => {
+    const provider = createProviderMock(false);
+    const manager = new NetworkManager(new LocalServerManager(), provider);
+    const firedObserver = vi.fn();
+    manager.onPlayerFired.add(firedObserver);
+
+    provider.onEvent?.(
+      EventCode.FIRE,
+      {
+        playerId: '7',
+        weaponId: 'Rifle',
+      },
+      '1'
+    );
+
+    expect(firedObserver).toHaveBeenCalledTimes(1);
+    expect(firedObserver.mock.calls[0][0]).toMatchObject({
+      playerId: '7',
+      weaponId: 'Rifle',
+    });
+  });
+
+  it('falls back to senderId when fire payload has no playerId', () => {
+    const provider = createProviderMock(false);
+    const manager = new NetworkManager(new LocalServerManager(), provider);
+    const firedObserver = vi.fn();
+    manager.onPlayerFired.add(firedObserver);
+
+    provider.onEvent?.(
+      EventCode.FIRE,
+      {
+        weaponId: 'Pistol',
+      },
+      '1'
+    );
+
+    expect(firedObserver).toHaveBeenCalledTimes(1);
+    expect(firedObserver.mock.calls[0][0]).toMatchObject({
+      playerId: '1',
+      weaponId: 'Pistol',
+    });
+  });
 });

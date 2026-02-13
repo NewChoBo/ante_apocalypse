@@ -188,10 +188,14 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
   private setupDispatcher(): void {
     this.dispatcher.register(EventCode.FIRE, (fireData, senderId): void => {
+      const payload = fireData as Partial<FireEventData>;
+      const playerId = typeof payload.playerId === 'string' ? payload.playerId : senderId;
+      const weaponId = typeof payload.weaponId === 'string' ? payload.weaponId : 'Unknown';
+
       this.onPlayerFired.notifyObservers({
-        playerId: senderId,
-        weaponId: fireData.weaponId,
-        muzzleTransform: fireData.muzzleTransform,
+        playerId,
+        weaponId,
+        muzzleTransform: payload.muzzleTransform,
       });
     });
 
