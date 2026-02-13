@@ -11,14 +11,14 @@ import {
   IPhotonClient,
   PhotonActor,
   OutboundTransportEvent,
-  InboundTransportEvent,
-  TransportEventCode,
-  getTransportEventKind,
   Photon, // Use wrapper from game-core
   LoadBalancing, // Use wrapper from game-core
   ConnectionProtocol, // Use wrapper from game-core
-  ReceiverGroup,
 } from '@ante/game-core';
+import {
+  toInboundTransportEvent,
+  toPhotonRaiseEventOptions,
+} from './PhotonTransportMapper';
 
 const logger = new Logger('PhotonProvider');
 
@@ -83,17 +83,11 @@ export class PhotonProvider implements INetworkProvider {
     };
 
     this.client.onEvent = (code: number, content: unknown, actorNr: number): void => {
-      const kind = getTransportEventKind(code);
-      if (!kind) {
+      const transportEvent = toInboundTransportEvent(code, content, actorNr);
+      if (!transportEvent) {
         logger.warn(`Ignoring unknown transport event code: ${code}`);
         return;
       }
-      const transportEvent = {
-        kind,
-        code: code as TransportEventCode,
-        data: content as never,
-        senderId: actorNr.toString(),
-      } as InboundTransportEvent;
       this.emit({
         type: 'transport',
         event: transportEvent,
@@ -218,13 +212,10 @@ export class PhotonProvider implements INetworkProvider {
   }
 
   public publish(event: OutboundTransportEvent): void {
-    const reliable = event.reliable ?? true;
-    const receivers =
-      event.kind === 'request' ? ReceiverGroup.MasterClient : ReceiverGroup.Others;
-
+    const options = toPhotonRaiseEventOptions(event);
     this.client.raiseEvent(event.code, event.data, {
-      receivers,
-      cache: reliable ? 1 : 0,
+      receivers: options.receivers,
+      cache: options.cache,
     });
   }
 
