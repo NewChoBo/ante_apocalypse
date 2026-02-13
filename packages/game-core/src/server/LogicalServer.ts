@@ -89,7 +89,7 @@ export class LogicalServer {
     this.levelLoader = new ServerLevelLoader(this.scene);
 
     const camera = new ArcRotateCamera('ServerCamera', 0, 0, 10, Vector3.Zero(), this.scene);
-    logger.info('Camera was created...', camera);
+    logger.info(`Camera created: ${camera.name}`);
 
     this.setupNetworkEvents();
     this.networkManager.registerAllActors();

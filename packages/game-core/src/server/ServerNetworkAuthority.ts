@@ -185,7 +185,6 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
           /* no-op */
         },
         // Mock mesh for server-side logic that doesn't use rendering
-        // Mock mesh for server-side logic that doesn't use rendering
         mesh: new ServerMockMesh('server_player_mesh'),
       };
 
@@ -427,16 +426,11 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
     const entity = this.entityManager.getEntity(hitData.targetId);
 
     if (isServerPlayerEntity(entity)) {
-      const wasAlive = entity.health > 0;
       entity.health = hitData.newHealth; // Map directly to entity
 
       logger.info(`Player ${hitData.targetId} Health: ${entity.health} (Part: ${hitData.part})`);
 
       this.sendEventToAll(code, hitData);
-
-      if (wasAlive && entity.health <= 0) {
-        this.broadcastDeath(hitData.targetId, hitData.attackerId);
-      }
     } else {
       logger.info(`Non-player Hit Broadcasted: ${hitData.targetId} with Code ${code}`);
       this.sendEventToAll(code, hitData);
