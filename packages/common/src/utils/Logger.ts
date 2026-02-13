@@ -1,4 +1,7 @@
-declare const process: { versions?: { node?: unknown } };
+declare const process: {
+  versions?: { node?: unknown };
+  env?: Record<string, string | undefined>;
+};
 
 export enum LogLevel {
   DEBUG = 0,
@@ -9,7 +12,7 @@ export enum LogLevel {
 }
 
 export class Logger {
-  private static globalLevel: LogLevel = LogLevel.INFO;
+  private static globalLevel: LogLevel = Logger.resolveInitialLevel();
   private static isNode =
     typeof process !== 'undefined' && process.versions != null && process.versions.node != null;
 
@@ -17,6 +20,61 @@ export class Logger {
 
   constructor(context: string) {
     this.context = context;
+  }
+
+  private static parseLogLevel(value: string | undefined): LogLevel | undefined {
+    if (!value) return undefined;
+    switch (value.trim().toLowerCase()) {
+      case 'debug':
+      case '0':
+        return LogLevel.DEBUG;
+      case 'info':
+      case '1':
+        return LogLevel.INFO;
+      case 'warn':
+      case 'warning':
+      case '2':
+        return LogLevel.WARN;
+      case 'error':
+      case '3':
+        return LogLevel.ERROR;
+      case 'none':
+      case 'off':
+      case 'silent':
+      case '4':
+        return LogLevel.NONE;
+      default:
+        return undefined;
+    }
+  }
+
+  private static resolveLevelFromEnvironment(env: Record<string, string | undefined>): LogLevel {
+    const explicit = Logger.parseLogLevel(env.ANTE_LOG_LEVEL ?? env.LOG_LEVEL);
+    if (explicit !== undefined) return explicit;
+
+    const nodeEnv = env.NODE_ENV?.toLowerCase();
+    const isTest = nodeEnv === 'test' || env.VITEST === 'true' || env.VITEST_WORKER_ID !== undefined;
+    if (isTest) return LogLevel.WARN;
+
+    if (nodeEnv === 'production') return LogLevel.WARN;
+    return LogLevel.INFO;
+  }
+
+  private static readProcessEnv(): Record<string, string | undefined> {
+    if (typeof process === 'undefined' || process.env == null) return {};
+    return process.env;
+  }
+
+  private static resolveInitialLevel(): LogLevel {
+    return Logger.resolveLevelFromEnvironment(Logger.readProcessEnv());
+  }
+
+  public static configureFromEnvironment(env?: Record<string, string | undefined>): void {
+    Logger.globalLevel = Logger.resolveLevelFromEnvironment(env ?? Logger.readProcessEnv());
+  }
+
+  public static getGlobalLevel(): LogLevel {
+    return Logger.globalLevel;
   }
 
   public static setGlobalLevel(level: LogLevel): void {
