@@ -110,7 +110,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     this.setupProviderListeners();
   }
 
-  public clearObservers(): void {
+  public clearObservers(scope: 'session' | 'all' = 'session'): void {
     this.onPlayersList.clear();
     this.onPlayerFired.clear();
     this.onPlayerReloaded.clear();
@@ -127,19 +127,24 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     this.onTargetHit.clear();
     this.onTargetDestroy.clear();
     this.onTargetSpawn.clear();
-    // this.onPlayersList.clear(); - Already cleared above
-
     this.playerStateManager.clearObservers();
+    this.onEvent.clear();
+
+    if (scope === 'all') {
+      this.connectionManager.onStateChanged.clear();
+      this.roomManager.onRoomListUpdated.clear();
+      this.dispatcher.clear();
+    }
   }
 
-  public setLocalServer(_server: LogicalServer | null): void {
-    logger.info(`LocalServer ${_server ? 'registered' : 'unregistered'} in NetworkManager`);
+  public setLocalServer(server: LogicalServer | null): void {
+    logger.info(`LocalServer ${server ? 'registered' : 'unregistered'} in NetworkManager`);
   }
 
   private setupDispatcher(): void {
     this.dispatcher.register(EventCode.FIRE, (fireData, senderId): void => {
       this.onPlayerFired.notifyObservers({
-        playerId: fireData.playerId || senderId,
+        playerId: senderId,
         weaponId: fireData.weaponId,
         muzzleTransform: fireData.muzzleTransform,
       });
@@ -331,7 +336,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     this.roomManager.leaveRoom();
 
     // 3. 옵저버 정리
-    this.clearObservers();
+    this.clearObservers('session');
   }
 
   /**
@@ -366,6 +371,7 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
   public leaveRoom(): void {
     this.roomManager.leaveRoom();
+    this.clearObservers('session');
   }
 
   public isMasterClient(): boolean {
@@ -430,8 +436,8 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
       direction: { x: number; y: number; z: number };
     };
   }): void {
-    // Redirection: Send to Master for authoritative broadcast
-    this.sendToMaster(EventCode.FIRE, fireData, true);
+    // Unified: Host loopback handles local server update
+    this.sendEvent(EventCode.FIRE, fireData, true);
   }
 
   public reload(weaponId: string): void {
@@ -439,59 +445,41 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
     if (!myId) return;
 
     const payload = { playerId: myId, weaponId };
-    this.sendToMaster(EventCode.RELOAD, payload, true);
+    this.sendEvent(EventCode.RELOAD, payload, true);
   }
 
   public syncWeapon(weaponId: string): void {
-    // Redirection: Send to Master for authoritative broadcast
-    this.sendToMaster(EventCode.SYNC_WEAPON, { weaponId }, true);
+    // Unified: Host loopback handles local server update
+    this.sendEvent(EventCode.SYNC_WEAPON, { weaponId }, true);
   }
 
   public requestHit(hitData: RequestHitData): void {
-    // Redirection: Send to Master for authoritative broadcast
-    this.sendToMaster(EventCode.REQUEST_HIT, hitData, true);
+    // Unified: Host loopback handles local server update
+    this.sendEvent(EventCode.REQUEST_HIT, hitData, true);
   }
 
   public sendEvent(code: number, data: unknown, reliable: boolean = true): void {
     this.provider.sendEvent(code, data, reliable);
 
-    // Host broadcast loopback
+    // [Unified Host Logic]
+    // If we are the Host, the network event won't come back to us (ReceiverGroup.Others).
+    // So we manually loopback the event to our own listeners (Adapter -> LogicalServer).
     if (this.isMasterClient()) {
-      this.loopback(code, data, true);
-    }
-  }
-
-  /**
-   * Send an event ONLY to the Master Client (Host).
-   * If the caller is the Master Client, it loops back locally as a REQUEST.
-   */
-  public sendToMaster(code: number, data: unknown, reliable: boolean = true): void {
-    if (this.isMasterClient()) {
-      this.loopback(code, data, false);
-    } else {
-      this.provider.sendEventToMaster(code, data, reliable);
-    }
-  }
-
-  /**
-   * Locally dispatch an event to observers and dispatcher handlers.
-   * @param isBroadcast If true, this is a downstream broadcast (no re-processing by server adapter).
-   *                    If false, this is an upstream request (triggers server adapter).
-   */
-  private loopback(code: number, data: unknown, isBroadcast: boolean = false): void {
-    const myId = this.getSocketId();
-    if (myId) {
-      // 1. Notify Observers (Server adapter listens here for REQUESTS)
-      if (!isBroadcast) {
+      const myId = this.getSocketId();
+      if (myId) {
+        // 1. Notify Observers (ClientHostNetworkAdapter listens here)
         this.onEvent.notifyObservers({ code, data, senderId: myId });
-      }
 
-      // 2. Dispatch to internal handlers (Client systems)
-      (this.dispatcher.dispatch as (code: EventCode, data: unknown, actorNr: string) => void)(
-        code as EventCode,
-        data,
-        myId
-      );
+        // 2. Dispatch to internal handlers (e.g., specific event observables)
+        // Use loose casting to access protected dispatch method if needed,
+        // or ensure setupProviderListeners logic is duplicated here safely.
+        // Actually, the provider.onEvent handler does exactly this:
+        (this.dispatcher.dispatch as (code: EventCode, data: unknown, actorNr: string) => void)(
+          code as EventCode,
+          data,
+          myId
+        );
+      }
     }
   }
 
@@ -502,5 +490,19 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
   public getServerTime(): number {
     return this.provider.getServerTime();
+  }
+
+  public dispose(): void {
+    this.clearObservers('all');
+
+    if (this.localServerManager.isServerRunning()) {
+      this.localServerManager.stopSession();
+      this.setLocalServer(null);
+    }
+
+    this.connectionManager.dispose();
+    this.roomManager.dispose();
+    this.playerStateManager.dispose();
+    this.provider.disconnect();
   }
 }

@@ -1,3 +1,5 @@
+import { EventCode, NetworkEventMap } from '@ante/common';
+
 /**
  * Interface for network authority implementations.
  * Both Client (NetworkManager) and Server (ServerNetworkAuthority) implement this.
@@ -8,16 +10,16 @@ export interface INetworkAuthority {
   getSocketId(): string | undefined;
 
   // Event communication
+  sendEvent<K extends EventCode>(code: K, data: NetworkEventMap[K], reliable?: boolean): void;
   sendEvent(code: number, data: unknown, reliable?: boolean): void;
 
   // Lifecycle (optional for implementations that manage connection externally)
-  // Lifecycle (optional for implementations that manage connection externally)
-  connect?(...args: unknown[]): void | Promise<void | boolean>;
-  disconnect?(): void | Promise<void>;
+  connect?(idOrRegion: string): Promise<boolean | void>;
+  disconnect?(): void;
 
   // Room management (optional)
-  createRoom?(...args: unknown[]): void | Promise<void | boolean>;
-  joinRoom?(...args: unknown[]): void | Promise<void | boolean>;
+  createRoom?(name: string, mapIdOrOptions: string | Record<string, unknown>): Promise<boolean | void>;
+  joinRoom?(name: string): Promise<boolean | void>;
 
   // State queries (optional)
   getServerTime?(): number;

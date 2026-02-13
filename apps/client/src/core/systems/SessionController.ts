@@ -407,6 +407,7 @@ export class SessionController {
   public dispose(): void {
     this.healthUnsub?.();
     this._spectatorCleanup?.();
+    this.inputManager.dispose();
     this.playerController?.dispose();
     this.playerPawn?.dispose();
     this.hud?.dispose();

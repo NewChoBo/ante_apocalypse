@@ -55,6 +55,15 @@ export class UIManager implements IUIManager {
   private selectedMap = 'training_ground';
 
   private networkManager: INetworkManager;
+  private onWindowKeyDown = (e: KeyboardEvent): void => {
+    if (e.code === 'Escape') {
+      if (this.currentScreen === UIScreen.SETTINGS) {
+        const target =
+          this.previousScreen !== UIScreen.NONE ? this.previousScreen : UIScreen.MAIN_MENU;
+        this.showScreen(target);
+      }
+    }
+  };
 
   constructor(scene: Scene, networkManager: INetworkManager) {
     this.networkManager = networkManager;
@@ -65,16 +74,7 @@ export class UIManager implements IUIManager {
   }
 
   private setupInput(): void {
-    window.addEventListener('keydown', (e) => {
-      if (e.code === 'Escape') {
-        if (this.currentScreen === UIScreen.SETTINGS) {
-          // Return to previous screen if valid, otherwise Main Menu
-          const target =
-            this.previousScreen !== UIScreen.NONE ? this.previousScreen : UIScreen.MAIN_MENU;
-          this.showScreen(target);
-        }
-      }
-    });
+    window.addEventListener('keydown', this.onWindowKeyDown);
   }
 
   private setupNetworkListeners(): void {
@@ -545,6 +545,7 @@ export class UIManager implements IUIManager {
     // Clean up observers
     this.cleanups.forEach((cleanup) => cleanup());
     this.cleanups = [];
+    window.removeEventListener('keydown', this.onWindowKeyDown);
 
     this.ui.dispose();
   }

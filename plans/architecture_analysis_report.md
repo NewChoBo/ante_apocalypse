@@ -86,24 +86,17 @@ this.weaponMesh.scaling = Vector3.One();
 
 ### 2.2 높은 우선순위: 아키텍처 패턴 위반
 
-#### 2.2.1 Mixin 안티패턴 사용
+#### 2.2.1 무기 시각/로직 결합도
 
-**위치**: `apps/client/src/weapons/ClientWeaponMixin.ts`
+**위치**: `apps/client/src/weapons/BaseWeapon.ts`, `apps/client/src/weapons/Firearm.ts`, `apps/client/src/weapons/WeaponVisualController.ts`
 
-**문제**: 복잡한 mixin 패턴이 다음을 생성:
+**문제**: `WeaponVisualController`로 컴포지션 전환은 되었지만, 여전히 시각 로직과 전투 로직의 경계가 파일 단위로 완전히 분리되지 않음
 
-- 타입 안전성 문제 (`@ts-expect-error` 필요)
-- 코어와 시각적 로직 간 숨겨진 의존성
-- 추적하기 어려운 메서드 해석 순서
+- `Firearm.ts`가 렌더링/애니메이션/히트요청을 동시에 처리
+- 시각 상태 접근(`idleRotation` 등)이 문자열 인덱싱으로 우회됨
+- 테스트 분리 단위가 불명확해 회귀 범위가 큼
 
-**코드 증거**:
-
-```typescript
-// @ts-expect-error: Mixin return types can be complex
-const VisualBaseWeapon = ClientWeaponMixin(CoreBaseWeapon);
-```
-
-**권장사항**: 컴포지션 패턴 또는 의존성 주입으로 대체
+**권장사항**: `WeaponVisualController`를 유지하되 `Firearm`에서 렌더링 관련 분기 로직을 단계적으로 이관
 
 #### 2.2.2 Store 싱글톤 안티패턴
 
@@ -268,7 +261,7 @@ private _enemyUpdateObserver: Observer<any> | null = null;
 onScore?: (points: number) => void
 ```
 
-**프로미스**: `apps/client/src/weapons/ClientWeaponMixin.ts:76`
+**프로미스**: `apps/client/src/weapons/WeaponVisualController.ts:95`
 
 ```typescript
 public async lower(): Promise<void>
@@ -323,9 +316,9 @@ export class ErrorBoundary {
 
 ### Phase 2: 높은 우선순위 (3-4주)
 
-#### 5.2.1 Mixin 패턴을 컴포지션으로 대체
+#### 5.2.1 컴포지션 구조 고도화
 
-**대상**: `apps/client/src/weapons/ClientWeaponMixin.ts`
+**대상**: `apps/client/src/weapons/WeaponVisualController.ts`, `apps/client/src/weapons/Firearm.ts`
 
 ```typescript
 // 제안: WeaponVisualController.ts
@@ -432,7 +425,7 @@ export const PhysicsConfig = {
 
 ### 7.1 Mixin vs 컴포지션
 
-**현재**: 무기 시각적 효과를 위한 Mixin 패턴
+**현재**: 무기 시각 로직은 `WeaponVisualController` 컴포지션으로 1차 전환 완료
 **재검토**: 컴포지션이 더 나은 타입 안전성과 테스트 용이성 제공
 
 ### 7.2 전역 Store vs DI

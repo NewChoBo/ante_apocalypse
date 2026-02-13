@@ -88,5 +88,6 @@ export interface INetworkManager {
   sendEvent(code: number, data: unknown, reliable?: boolean): void;
   getSocketId(): string | undefined;
   getServerTime(): number;
-  clearObservers(): void;
+  clearObservers(scope?: 'session' | 'all'): void;
+  dispose(): void;
 }

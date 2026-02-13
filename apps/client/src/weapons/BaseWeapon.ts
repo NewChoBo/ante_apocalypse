@@ -1,15 +1,17 @@
 import { Scene, UniversalCamera, Vector3, AbstractMesh } from '@babylonjs/core';
-import { BaseWeapon as CoreBaseWeapon, WeaponStats } from '@ante/game-core';
+import { BaseWeapon as CoreBaseWeapon, WithStatSync, WeaponStats } from '@ante/game-core';
 import { IWeapon } from '../types/IWeapon';
 import { WeaponVisualController } from './WeaponVisualController';
 import type { GameContext } from '../types/GameContext';
 
 /**
  * 모든 무기의 최상위 추상 클래스.
- * WeaponVisualController를 통해 시각적 로직을 포함합니다.
+ * WithStatSync Mixin을 통해 동기화 기능을, WeaponVisualController를 통해 시각적 로직을 포함합니다.
  */
-export abstract class BaseWeapon extends CoreBaseWeapon implements IWeapon {
-  public abstract override stats: WeaponStats;
+export abstract class BaseWeapon
+  extends WithStatSync<typeof CoreBaseWeapon, WeaponStats>(CoreBaseWeapon)
+  implements IWeapon
+{
   // IWeapon properties
   public name: string = '';
   public damage: number = 0;

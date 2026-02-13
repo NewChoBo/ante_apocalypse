@@ -14,6 +14,7 @@ export interface INetworkProvider {
   // Methods
   connect(userId: string): Promise<boolean>;
   disconnect(): void;
+  leaveRoom(): void;
 
   createRoom(name: string, options?: CreateRoomOptions): Promise<boolean>;
   joinRoom(roomId: string): Promise<boolean>;

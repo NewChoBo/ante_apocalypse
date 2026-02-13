@@ -45,5 +45,4 @@ export * from './levels/LevelData.js';
 export * from './levels/ServerLevelLoader.js';
 
 // Utils
-export * from './utils/StateMachine.js';
-export * from './utils/StatsManager.js';
+export * from './utils/Mixins.js';

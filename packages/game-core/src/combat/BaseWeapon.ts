@@ -1,4 +1,8 @@
-import { WeaponStats } from '@ante/common';
+export interface BaseWeaponStats {
+  magazineSize?: number;
+  fireRate?: number;
+  [key: string]: unknown;
+}
 
 /**
  * Core BaseWeapon: Handles pure logic (state, cooldowns).
@@ -23,7 +27,7 @@ export abstract class BaseWeapon {
   /**
    * 하위 클래스나 Mixin에서 스태츠 객체를 제공해야 합니다.
    */
-  public abstract stats: WeaponStats;
+  public abstract stats: BaseWeaponStats;
 
   /**
    * 무기 발향 가능 여부. 하위 클래스(FSM 등)에서 상태에 따라 재정의합니다.
@@ -52,20 +56,5 @@ export abstract class BaseWeapon {
 
   public tick(_deltaTime: number): void {
     // Override in subclasses for timer logic
-  }
-
-  /**
-   * 스태츠를 업데이트합니다. 컴포지션 아키텍처에서 Mixin의 updateStats 역할을 대체합니다.
-   */
-  public updateStats(stats: Partial<WeaponStats>): void {
-    Object.assign(this.stats, stats);
-    this.onStatsUpdated(stats);
-  }
-
-  /**
-   * 스태츠 업데이트 직후의 사용자 로직을 위한 후처리 메서드.
-   */
-  protected onStatsUpdated(_stats: Partial<WeaponStats>): void {
-    // Override in subclasses
   }
 }

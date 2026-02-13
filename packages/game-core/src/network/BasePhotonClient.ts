@@ -202,10 +202,17 @@ export abstract class BasePhotonClient implements INetworkAuthority {
     return undefined;
   }
 
-  public async createRoom(name: string, options?: RoomOptions): Promise<void> {
+  public async createRoom(name: string, mapIdOrOptions: string | RoomOptions): Promise<void> {
     if (!this.client.isConnectedToMaster() && !this.client.isInLobby()) {
       throw new Error('Cannot create room: Not connected.');
     }
+    const options: RoomOptions =
+      typeof mapIdOrOptions === 'string'
+        ? {
+            customGameProperties: { mapId: mapIdOrOptions },
+            propsListedInLobby: ['mapId'],
+          }
+        : mapIdOrOptions;
     logger.info(`Creating Room: ${name}`);
     this.client.createRoom(name, options);
   }

@@ -66,6 +66,9 @@ export interface IWeapon {
   /** 서버 데이터로 스태츠 업데이트 */
   updateStats(stats: Partial<Record<string, unknown>>): void;
 
+  /** 상태 초기화 */
+  reset(): void;
+
   /** 리소스 해제 */
   dispose(): void;
 

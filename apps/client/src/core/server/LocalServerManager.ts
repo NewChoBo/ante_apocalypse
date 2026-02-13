@@ -85,10 +85,8 @@ export class LocalServerManager {
       });
 
       // 3.5 Load Level Data
-      const currentMapId =
-        mapId ||
-        (this.networkAuthority.getCurrentRoomProperty('mapId') as string) ||
-        'training_ground';
+      const roomMapId = this.networkAuthority.getCurrentRoomProperty<string>('mapId');
+      const currentMapId = mapId ?? roomMapId ?? 'training_ground';
       const levelData = LEVELS[currentMapId];
       if (levelData) {
         this.logicalServer.loadLevel(levelData);
@@ -125,16 +123,14 @@ export class LocalServerManager {
       // We can't clear it easily without reference. But it might not be harmful if checked against isRunning.
     }
     if (this.networkAuthority) {
+      if (this.networkAuthority instanceof ClientHostNetworkAdapter) {
+        this.networkAuthority.dispose();
+      }
       if (
         'disconnect' in this.networkAuthority &&
         typeof this.networkAuthority.disconnect === 'function'
       ) {
-        const result: unknown = this.networkAuthority.disconnect();
-        if (result && typeof result === 'object' && 'then' in result) {
-          (result as Promise<void>).catch((e: unknown) =>
-            logger.error('Error during disconnect:', e)
-          );
-        }
+        this.networkAuthority.disconnect();
       }
       this.networkAuthority = null;
     }

@@ -1,12 +1,11 @@
-import { BaseWeapon } from './BaseWeapon.js';
-import { WeaponStats } from '../weapons/WeaponRegistry.js';
-import { StateMachine, TransitionMap } from '../utils/StateMachine.js';
-import { StatsManager } from '../utils/StatsManager.js';
+import { BaseWeapon } from './BaseWeapon';
+import { WeaponStats } from '../weapons/WeaponRegistry';
+import { WithStatSync, WithFSM } from '../utils/Mixins';
 
 export type WeaponState = 'Ready' | 'Firing' | 'Reloading' | 'Empty';
 
 /** 무기 상태 전이 규칙 정의 */
-const FirearmTransitions: TransitionMap<WeaponState> = {
+const FirearmTransitions: Record<WeaponState, WeaponState[]> = {
   Ready: ['Firing', 'Reloading', 'Empty'],
   Firing: ['Ready', 'Reloading', 'Empty'],
   Reloading: ['Ready'],
@@ -14,21 +13,14 @@ const FirearmTransitions: TransitionMap<WeaponState> = {
 };
 
 /**
- * 컴포지션을 활용한 Firearm 클래스.
- * FSM과 StatsManager를 통해 무기의 상태와 스태츠를 관리합니다.
+ * Mixin을 적용한 Firearm 클래스.
+ * FSM을 통해 무기의 상태(발사, 장전 등)를 엄격히 관리합니다.
  */
-export class Firearm extends BaseWeapon {
-  private fsm: StateMachine<WeaponState>;
-  private statsManager: StatsManager<WeaponStats>;
-
-  public get currentState(): WeaponState {
-    return this.fsm.currentState;
-  }
-
-  public get stats(): WeaponStats {
-    return this.statsManager.stats;
-  }
-
+export class Firearm extends WithFSM(
+  WithStatSync<typeof BaseWeapon, WeaponStats>(BaseWeapon),
+  FirearmTransitions,
+  'Ready'
+) {
   public get magazineSize(): number {
     return this.stats.magazineSize || 0;
   }
@@ -43,19 +35,16 @@ export class Firearm extends BaseWeapon {
 
   protected reloadTimer: number = 0;
 
+  public stats: WeaponStats;
+
   constructor(id: string, ownerId: string, stats: WeaponStats) {
     super(id, ownerId);
-
-    this.statsManager = new StatsManager(stats, (partial) => this.onStatsUpdated(partial));
-    this.fsm = new StateMachine(FirearmTransitions, 'Ready', (ns, os) =>
-      this.onStateChanged(ns, os)
-    );
-
+    this.stats = stats;
     this.currentAmmo = stats.magazineSize || 0;
 
     // 초기 탄약 상태에 따른 상태 설정
     if (this.currentAmmo === 0 && this.magazineSize > 0) {
-      this.fsm.transitionTo('Empty');
+      this.transitionTo('Empty');
     }
   }
 
@@ -65,7 +54,7 @@ export class Firearm extends BaseWeapon {
   public reload(): void {
     if (this.currentAmmo === this.magazineSize || this.reserveAmmo === 0) return;
 
-    if (this.fsm.transitionTo('Reloading')) {
+    if (this.transitionTo('Reloading')) {
       this.reloadTimer = 0;
     }
   }
@@ -81,7 +70,7 @@ export class Firearm extends BaseWeapon {
     this.reserveAmmo -= amount;
 
     // 장전 완료 후 Ready 상태로 복귀
-    this.fsm.transitionTo('Ready');
+    this.transitionTo('Ready');
   }
 
   public override fireLogic(): boolean {
@@ -92,9 +81,9 @@ export class Firearm extends BaseWeapon {
 
     if (super.fireLogic()) {
       if (this.currentAmmo <= 0) {
-        this.fsm.transitionTo('Empty');
+        this.transitionTo('Empty');
       } else {
-        this.fsm.transitionTo('Firing');
+        this.transitionTo('Firing');
       }
       return true;
     }
@@ -113,24 +102,8 @@ export class Firearm extends BaseWeapon {
     if (this.currentState === 'Firing') {
       const now = Date.now() / 1000;
       if (now - this.lastFireTime >= this.fireRate) {
-        this.fsm.transitionTo('Ready');
+        this.transitionTo('Ready');
       }
     }
-  }
-
-  public transitionTo(state: WeaponState): boolean {
-    return this.fsm.transitionTo(state);
-  }
-
-  public updateStats(partial: Partial<WeaponStats>): void {
-    this.statsManager.updateStats(partial);
-  }
-
-  protected onStateChanged(_newState: WeaponState, _oldState: WeaponState): void {
-    // 상속받은 클래스에서 오버라이드 가능하도록
-  }
-
-  protected onStatsUpdated(_partial: Partial<WeaponStats>): void {
-    // 상속받은 클래스에서 오버라이드 가능하도록
   }
 }
