@@ -122,7 +122,7 @@ export abstract class BaseEnemyManager {
 
   /**
    * 네트워크로부터 Enemy 이동 패킷을 수신했을 때 호출.
-   * Master/Server가 아닌 경우에만 로컬 상태를 업데이트함.
+   * 로컬 렌더링 상태를 authoritative 위치로 보정한다.
    */
   public processEnemyMove(data: {
     id: string;
@@ -130,9 +130,6 @@ export abstract class BaseEnemyManager {
     rotation: { x: number; y: number; z: number };
     isMoving?: boolean;
   }): void {
-    // 권한이 있는 경우(Master)는 자신의 시뮬레이션이 우선이므로 무시
-    if (this.authority.isMasterClient()) return;
-
     const enemy = this.getEnemyPawn(data.id);
     if (enemy) {
       if (enemy.position && enemy.position.set) {
