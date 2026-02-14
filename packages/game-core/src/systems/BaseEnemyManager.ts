@@ -156,6 +156,24 @@ export abstract class BaseEnemyManager {
     return this.pawns.get(id);
   }
 
+  public getEnemyPawnById(id: string): IEnemyPawn | undefined {
+    return this.getEnemyPawn(id);
+  }
+
+  public getAliveEnemyCount(): number {
+    let aliveCount = 0;
+    this.pawns.forEach((pawn) => {
+      if (!pawn.isDead) {
+        aliveCount++;
+      }
+    });
+    return aliveCount;
+  }
+
+  public getTotalEnemyCount(): number {
+    return this.pawns.size;
+  }
+
   public getEnemyStates(): {
     id: string;
     position: { x: number; y: number; z: number };

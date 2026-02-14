@@ -29,6 +29,7 @@ export class ServerTargetSpawner extends BaseTargetSpawner {
       new Vector3(position.x, position.y, position.z)
     );
     this.targetPawns.set(id, pawn);
+    this.ctx.worldManager.register(pawn);
   }
 
   public override broadcastTargetDestroy(targetId: string): void {
@@ -36,6 +37,7 @@ export class ServerTargetSpawner extends BaseTargetSpawner {
 
     const pawn = this.targetPawns.get(targetId);
     if (pawn) {
+      this.ctx.worldManager.unregister(targetId);
       pawn.dispose();
       this.targetPawns.delete(targetId);
     }
@@ -43,5 +45,9 @@ export class ServerTargetSpawner extends BaseTargetSpawner {
 
   public getTargetMesh(id: string): AbstractMesh | undefined {
     return this.targetPawns.get(id)?.mesh;
+  }
+
+  public getTargetPawn(id: string): ServerTargetPawn | undefined {
+    return this.targetPawns.get(id);
   }
 }

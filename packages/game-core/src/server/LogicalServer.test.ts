@@ -5,6 +5,9 @@ import { LogicalServer } from './LogicalServer.js';
 import { IServerAssetLoader } from './IServerAssetLoader.js';
 import { IServerNetworkAuthority } from './IServerNetworkAuthority.js';
 import { HitRegistrationSystem } from '../systems/HitRegistrationSystem.js';
+import { WaveSurvivalRule } from '../rules/WaveSurvivalRule.js';
+import { LegacyWaveSurvivalRule } from '../rules/LegacyWaveSurvivalRule.js';
+import { WorldSimulation } from '../simulation/WorldSimulation.js';
 
 interface MockNetworkBundle {
   network: IServerNetworkAuthority;
@@ -12,6 +15,7 @@ interface MockNetworkBundle {
   broadcastHit: ReturnType<typeof vi.fn>;
   broadcastDeath: ReturnType<typeof vi.fn>;
   broadcastRespawn: ReturnType<typeof vi.fn>;
+  sendEvent: ReturnType<typeof vi.fn>;
 }
 
 const activeServers: LogicalServer[] = [];
@@ -36,7 +40,7 @@ function createHitRequest(targetId: string): RequestHitData {
   };
 }
 
-function createNetwork(): MockNetworkBundle {
+function createNetwork(roomProps: Record<string, unknown> = {}): MockNetworkBundle {
   const states = new Map<string, PlayerState>();
   const broadcastHit = vi.fn<(hitData: HitEventData, code?: number) => void>();
   const broadcastDeath = vi.fn<
@@ -49,6 +53,7 @@ function createNetwork(): MockNetworkBundle {
     ) => void
   >();
   const broadcastRespawn = vi.fn<(playerId: string, position: { x: number; y: number; z: number }) => void>();
+  const sendEvent = vi.fn<(code: number, data: unknown, reliable?: boolean) => void>();
 
   const network = {
     getSocketId: (): string => 'server',
@@ -57,7 +62,9 @@ function createNetwork(): MockNetworkBundle {
     joinGameRoom: async (): Promise<void> => undefined,
     registerAllActors: (): void => undefined,
     sendRequest: (_code: number, _data: unknown, _reliable?: boolean): void => undefined,
-    sendEvent: (_code: number, _data: unknown, _reliable?: boolean): void => undefined,
+    sendEvent: (code: number, eventData: unknown, reliable?: boolean): void => {
+      sendEvent(code, eventData, reliable);
+    },
     broadcastState: (): void => undefined,
     broadcastHit: (hitData: HitEventData, code: number = EventCode.HIT): void => {
       broadcastHit(hitData, code);
@@ -85,7 +92,7 @@ function createNetwork(): MockNetworkBundle {
     },
     broadcastReload: (_playerId: string, _weaponId: string): void => undefined,
     getPlayerState: (id: string): PlayerState | undefined => states.get(id),
-    getCurrentRoomProperty: <T = unknown>(_key: string): T | undefined => undefined,
+    getCurrentRoomProperty: <T = unknown>(key: string): T | undefined => roomProps[key] as T | undefined,
     onPlayerJoin: undefined,
     onPlayerLeave: undefined,
     onPlayerMove: undefined,
@@ -93,6 +100,7 @@ function createNetwork(): MockNetworkBundle {
     onReloadRequest: undefined,
     onHitRequest: undefined,
     onSyncWeaponRequest: undefined,
+    onUpgradePickRequest: undefined,
   } as IServerNetworkAuthority;
 
   const joinPlayer = (id: string, name: string): void => {
@@ -113,6 +121,7 @@ function createNetwork(): MockNetworkBundle {
     broadcastHit,
     broadcastDeath,
     broadcastRespawn,
+    sendEvent,
   };
 }
 
@@ -126,6 +135,63 @@ afterEach((): void => {
 });
 
 describe('LogicalServer.processHitRequest', () => {
+  it.each(['survival', 'deathmatch', 'shooting_range'] as const)(
+    'broadcasts GAME_END when %s mode reports completion',
+    (mode) => {
+      const roomProps = mode === 'survival' ? { survivalRuleset: 'v2' } : {};
+      const { network, sendEvent } = createNetwork(roomProps);
+      const server = new LogicalServer(network, createAssetLoader(), { gameMode: mode });
+      activeServers.push(server);
+
+      const simulation = (server as unknown as { simulation: WorldSimulation }).simulation;
+      const rule = simulation.gameRule;
+      expect(rule).toBeTruthy();
+
+      vi.spyOn(rule!, 'checkGameEnd').mockReturnValue({
+        reason: `${mode} completed`,
+      });
+
+      (server as unknown as { checkAndBroadcastGameEnd: () => void }).checkAndBroadcastGameEnd();
+      (server as unknown as { checkAndBroadcastGameEnd: () => void }).checkAndBroadcastGameEnd();
+
+      expect(sendEvent).toHaveBeenCalledTimes(1);
+      expect(sendEvent).toHaveBeenCalledWith(
+        EventCode.GAME_END,
+        expect.objectContaining({
+          reason: `${mode} completed`,
+          stats: expect.objectContaining({
+            durationSeconds: expect.any(Number),
+            kills: expect.any(Object),
+            deaths: expect.any(Object),
+            damageDealt: expect.any(Object),
+          }),
+        }),
+        true
+      );
+    }
+  );
+
+  it('uses v2 survival ruleset only when room property is explicitly set', () => {
+    const v2Server = new LogicalServer(
+      createNetwork({ survivalRuleset: 'v2' }).network,
+      createAssetLoader(),
+      { gameMode: 'survival' }
+    );
+    activeServers.push(v2Server);
+
+    const legacyServer = new LogicalServer(createNetwork().network, createAssetLoader(), {
+      gameMode: 'survival',
+    });
+    activeServers.push(legacyServer);
+
+    const v2Rule = (v2Server as unknown as { simulation: { gameRule: unknown } }).simulation.gameRule;
+    const legacyRule = (legacyServer as unknown as { simulation: { gameRule: unknown } }).simulation
+      .gameRule;
+
+    expect(v2Rule).toBeInstanceOf(WaveSurvivalRule);
+    expect(legacyRule).toBeInstanceOf(LegacyWaveSurvivalRule);
+  });
+
   it('applies headshot multiplier and includes respawn metadata in death event', () => {
     const { network, joinPlayer, broadcastHit, broadcastDeath } = createNetwork();
     const server = new LogicalServer(network, createAssetLoader(), { gameMode: 'deathmatch' });
@@ -212,5 +278,107 @@ describe('LogicalServer.processHitRequest', () => {
 
     vi.runAllTimers();
     expect(broadcastRespawn).not.toHaveBeenCalled();
+  });
+
+  it('handles UPGRADE_PICK request and broadcasts UPGRADE_APPLY for v2 survival', () => {
+    const { network, joinPlayer, sendEvent } = createNetwork({ survivalRuleset: 'v2' });
+    const server = new LogicalServer(network, createAssetLoader(), { gameMode: 'survival' });
+    activeServers.push(server);
+
+    joinPlayer('1', 'Shooter');
+
+    const simulation = (server as unknown as { simulation: WorldSimulation }).simulation;
+    const rule = simulation.gameRule as WaveSurvivalRule;
+
+    // Build an offer directly for deterministic request handling test.
+    (rule as unknown as { createUpgradeOffers: () => void }).createUpgradeOffers();
+    const offers = rule.consumeUpgradeOfferEvents();
+    const offer = offers[0];
+    expect(offer).toBeDefined();
+
+    network.onUpgradePickRequest?.('1', {
+      offerId: offer.offerId,
+      upgradeId: offer.options[0].id,
+    });
+
+    (server as unknown as { processRuleSideEffects: () => void }).processRuleSideEffects();
+
+    expect(sendEvent).toHaveBeenCalledWith(
+      EventCode.UPGRADE_APPLY,
+      expect.objectContaining({
+        playerId: '1',
+        offerId: offer.offerId,
+        upgradeId: offer.options[0].id,
+        stacks: 1,
+      }),
+      true
+    );
+  });
+
+  it('broadcasts ENEMY_HIT and DESTROY_ENEMY when enemy dies', () => {
+    const { network, joinPlayer, sendEvent } = createNetwork();
+    const server = new LogicalServer(network, createAssetLoader(), { gameMode: 'survival' });
+    activeServers.push(server);
+
+    joinPlayer('1', 'Shooter');
+    server.processSyncWeapon('1', 'Bat');
+
+    const enemyManager = (
+      server as unknown as {
+        enemyManager: {
+          requestSpawnEnemy: (id: string, position: { x: number; y: number; z: number }) => boolean;
+        };
+      }
+    ).enemyManager;
+    enemyManager.requestSpawnEnemy('enemy_test', { x: 0, y: 0, z: 5 });
+
+    vi.spyOn(HitRegistrationSystem, 'validateHit').mockReturnValue({
+      isValid: true,
+      part: 'body',
+      method: 'strict',
+    });
+
+    server.processHitRequest('1', createHitRequest('enemy_test'));
+
+    expect(sendEvent).toHaveBeenCalledWith(EventCode.ENEMY_HIT, { id: 'enemy_test', damage: 100 }, undefined);
+    expect(sendEvent).toHaveBeenCalledWith(EventCode.DESTROY_ENEMY, { id: 'enemy_test' }, undefined);
+  });
+
+  it('broadcasts TARGET_HIT and TARGET_DESTROY when target is destroyed', () => {
+    const { network, joinPlayer, sendEvent } = createNetwork();
+    const server = new LogicalServer(network, createAssetLoader(), { gameMode: 'survival' });
+    activeServers.push(server);
+
+    joinPlayer('1', 'Shooter');
+    server.processSyncWeapon('1', 'Bat');
+
+    const targetSpawner = (
+      server as unknown as {
+        targetSpawner: {
+          broadcastTargetSpawn: (
+            id: string,
+            type: string,
+            position: { x: number; y: number; z: number },
+            isMoving: boolean
+          ) => void;
+        };
+      }
+    ).targetSpawner;
+    targetSpawner.broadcastTargetSpawn('target_test', 'static_target', { x: 0, y: 1, z: 7 }, false);
+
+    vi.spyOn(HitRegistrationSystem, 'validateHit').mockReturnValue({
+      isValid: true,
+      part: 'body',
+      method: 'strict',
+    });
+
+    server.processHitRequest('1', createHitRequest('target_test'));
+
+    expect(sendEvent).toHaveBeenCalledWith(
+      EventCode.TARGET_HIT,
+      { targetId: 'target_test', part: 'body', damage: 100 },
+      undefined
+    );
+    expect(sendEvent).toHaveBeenCalledWith(EventCode.TARGET_DESTROY, { targetId: 'target_test' }, undefined);
   });
 });

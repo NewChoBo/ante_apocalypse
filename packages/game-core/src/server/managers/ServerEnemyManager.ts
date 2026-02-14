@@ -22,6 +22,7 @@ export class ServerEnemyManager extends BaseEnemyManager {
     // Create server-side representation
     const pawn = new ServerEnemyPawn(id, this.ctx, new Vector3(position.x, position.y, position.z));
     this.pawns.set(id, pawn);
+    this.ctx.worldManager.register(pawn);
 
     // Register AI
     const players = this.getPlayers();
@@ -32,5 +33,20 @@ export class ServerEnemyManager extends BaseEnemyManager {
 
   public getEnemyMesh(id: string): AbstractMesh | undefined {
     return (this.pawns.get(id) as ServerEnemyPawn)?.mesh;
+  }
+
+  public getEnemyPawn(id: string): ServerEnemyPawn | undefined {
+    return this.pawns.get(id) as ServerEnemyPawn | undefined;
+  }
+
+  public destroyEnemy(id: string): void {
+    const pawn = this.getEnemyPawn(id);
+    if (!pawn) return;
+
+    this.requestDestroyEnemy(id);
+    this.ctx.worldManager.unregister(id);
+    pawn.dispose();
+    this.pawns.delete(id);
+    this.unregisterAI(id);
   }
 }
