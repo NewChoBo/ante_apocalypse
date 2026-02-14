@@ -22,6 +22,7 @@ import { CameraComponent } from '../components/movement/CameraComponent';
 import { SpectatorManager } from './session/SpectatorManager';
 import { InventorySyncService } from './session/InventorySyncService';
 import { MultiplayerSessionService } from './session/MultiplayerSessionService';
+import { ProgressionEventService } from './session/ProgressionEventService';
 import type { GameContext } from '../../types/GameContext';
 import { InventoryManager } from '../inventory/InventoryManager';
 import type { DeathEventData } from '@ante/common';
@@ -71,6 +72,7 @@ export class SessionController {
   private spectatorManager: SpectatorManager;
   private inventorySyncService: InventorySyncService;
   private multiplayerSessionService: MultiplayerSessionService;
+  private progressionEventService: ProgressionEventService;
   private tickManager: TickManager;
   private localServerManager: LocalServerManager;
   private ctx!: GameContext;
@@ -125,6 +127,7 @@ export class SessionController {
     this.inventorySyncService = new InventorySyncService({
       getPlayerPawn: (): PlayerPawn | null => this.playerPawn,
     });
+    this.progressionEventService = new ProgressionEventService(this.networkManager, this.uiManager);
   }
 
   public async initialize(levelData: LevelData, playerName: string = 'Anonymous'): Promise<void> {
@@ -164,6 +167,7 @@ export class SessionController {
 
     this.setupMultiplayer(playerName);
     this.spectatorManager.initializeInput();
+    this.progressionEventService.initialize();
   }
 
   private setupSystems(levelData: LevelData): void {
@@ -289,6 +293,7 @@ export class SessionController {
       this.playerDeathObserver = null;
     }
     this.spectatorManager.dispose();
+    this.progressionEventService.dispose();
     this.inputManager.dispose();
     this.playerController?.dispose();
     this.playerPawn?.dispose();
