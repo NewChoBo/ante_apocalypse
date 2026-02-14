@@ -37,7 +37,7 @@ export class EnemyManager extends BaseEnemyManager {
 
   private setupNetworkListeners(): void {
     this._enemyUpdateObserver = this.networkManager.onEnemyUpdated.add((data) => {
-      this.processEnemyMove(data);
+      this.applyEnemyNetworkMove(data);
     });
 
     // onEnemyHit is now handled by WorldEntityManager
@@ -65,6 +65,20 @@ export class EnemyManager extends BaseEnemyManager {
     const enemy = this.pawns.get(data.id);
     if (enemy) {
       this.worldManager.removeEntity(data.id);
+    }
+  }
+
+  private applyEnemyNetworkMove(data: EnemyMovePayload): void {
+    const enemy = this.pawns.get(data.id) as EnemyPawn | undefined;
+    if (!enemy) {
+      const spawnPos = new Vector3(data.position.x, data.position.y, data.position.z);
+      this.createEnemy(data.id, spawnPos);
+      return;
+    }
+
+    enemy.updateNetworkState(data.position, data.rotation);
+    if (data.isMoving !== undefined) {
+      enemy.isMoving = data.isMoving;
     }
   }
 
@@ -108,8 +122,7 @@ export class EnemyManager extends BaseEnemyManager {
     states.forEach((state: EnemyState): void => {
       const enemy = this.pawns.get(state.id) as EnemyPawn;
       if (enemy) {
-        enemy.position.set(state.position.x, state.position.y, state.position.z);
-        enemy.mesh.rotation.set(state.rotation.x, state.rotation.y, state.rotation.z);
+        enemy.updateNetworkState(state.position, state.rotation);
         enemy.updateHealthBar(state.health);
         if (state.isDead && !enemy.isDead) {
           this.worldManager.processHit(state.id, 10000, 'body');

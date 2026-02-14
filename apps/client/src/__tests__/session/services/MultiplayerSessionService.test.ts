@@ -5,7 +5,6 @@ import { WorldSimulation } from '@ante/game-core';
 import { MultiplayerSessionService } from '../../../core/systems/session/MultiplayerSessionService';
 import type { INetworkManager } from '../../../core/interfaces/INetworkManager';
 import type { EnemyManager } from '../../../core/systems/EnemyManager';
-import type { TargetSpawnerComponent } from '../../../core/components/target/TargetSpawnerComponent';
 import type { LocalServerManager } from '../../../core/server/LocalServerManager';
 import type { MultiplayerSystem } from '../../../core/systems/MultiplayerSystem';
 import type { PlayerPawn } from '../../../core/PlayerPawn';
@@ -33,8 +32,6 @@ describe('MultiplayerSessionService', (): void => {
   it('routes initial state and local respawn through injected dependencies', (): void => {
     const { networkManager, onInitialStateReceived, onPlayerRespawn } = createNetworkManagerMock();
     const enemyManager = { applyEnemyStates: vi.fn() } as unknown as EnemyManager;
-    const spawnTarget = vi.fn();
-    const targetSpawner = { spawnTarget } as unknown as TargetSpawnerComponent;
     const multiplayerSystem = {
       applyPlayerStates: vi.fn(),
       update: vi.fn(),
@@ -54,7 +51,6 @@ describe('MultiplayerSessionService', (): void => {
       pickupManager: {} as never,
       localServerManager: { isServerRunning: vi.fn((): boolean => false) } as unknown as LocalServerManager,
       getEnemyManager: (): EnemyManager => enemyManager,
-      getTargetSpawner: (): TargetSpawnerComponent => targetSpawner,
       onLocalRespawn,
       createMultiplayerSystem,
       createSimulation,
@@ -83,14 +79,6 @@ describe('MultiplayerSessionService', (): void => {
           isDead: false,
         },
       ],
-      targets: [
-        {
-          id: 'target1',
-          type: 'static',
-          isMoving: false,
-          position: { x: 3, y: 1, z: 2 },
-        },
-      ],
     };
 
     onInitialStateReceived.notifyObservers(payload);
@@ -107,8 +95,6 @@ describe('MultiplayerSessionService', (): void => {
     expect(createSimulation).toHaveBeenCalledTimes(1);
     expect(enemyManager.applyEnemyStates).toHaveBeenCalledWith(payload.enemies);
     expect(multiplayerSystem.applyPlayerStates).toHaveBeenCalledWith(payload.players);
-    expect(spawnTarget).toHaveBeenCalledTimes(1);
-    expect(spawnTarget.mock.calls[0][0]).toMatchObject({ x: 3, y: 1, z: 2 });
     expect(onLocalRespawn).toHaveBeenCalledTimes(1);
     expect(onLocalRespawn).toHaveBeenCalledWith({ x: 0, y: 2, z: 0 });
   });
@@ -126,8 +112,6 @@ describe('MultiplayerSessionService', (): void => {
       pickupManager: {} as never,
       localServerManager: { isServerRunning: vi.fn((): boolean => true) } as unknown as LocalServerManager,
       getEnemyManager: (): EnemyManager => ({ applyEnemyStates: vi.fn() } as unknown as EnemyManager),
-      getTargetSpawner: (): TargetSpawnerComponent =>
-        ({ spawnTarget: vi.fn() } as unknown as TargetSpawnerComponent),
       onLocalRespawn: vi.fn(),
       createMultiplayerSystem: vi.fn(
         (): MultiplayerSystem =>
@@ -166,8 +150,6 @@ describe('MultiplayerSessionService', (): void => {
       pickupManager: {} as never,
       localServerManager: { isServerRunning: vi.fn((): boolean => false) } as unknown as LocalServerManager,
       getEnemyManager: (): EnemyManager => ({ applyEnemyStates: vi.fn() } as unknown as EnemyManager),
-      getTargetSpawner: (): TargetSpawnerComponent =>
-        ({ spawnTarget: vi.fn() } as unknown as TargetSpawnerComponent),
       onLocalRespawn,
       createMultiplayerSystem: vi.fn((): MultiplayerSystem => multiplayerSystem),
       createSimulation: vi.fn((): WorldSimulation => ({}) as WorldSimulation),

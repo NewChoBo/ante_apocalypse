@@ -1,15 +1,41 @@
 import { Observer, Scene, ShadowGenerator, Vector3 } from '@babylonjs/core';
-import { InitialStatePayload, RespawnEventData, SpawnTargetPayload } from '@ante/common';
-import { TickManager, WaveSurvivalRule, WorldSimulation } from '@ante/game-core';
+import { InitialStatePayload, RespawnEventData } from '@ante/common';
+import { BaseTargetSpawner, TickManager, WaveSurvivalRule, WorldSimulation } from '@ante/game-core';
 import type { PlayerPawn } from '../../PlayerPawn';
 import { INetworkManager } from '../../interfaces/INetworkManager';
 import type { MultiplayerSystem } from '../MultiplayerSystem';
 import { WorldEntityManager } from '../WorldEntityManager';
 import { EnemyManager } from '../EnemyManager';
 import { PickupManager } from '../PickupManager';
-import { TargetSpawnerComponent } from '../../components/target/TargetSpawnerComponent';
 import { LocalServerManager } from '../../server/LocalServerManager';
 import { isSamePlayerId } from '../../network/identity';
+
+class DisabledTargetSpawner extends BaseTargetSpawner {
+  public override spawnInitialTargets(): void {}
+
+  public override broadcastTargetSpawn(
+    _id: string,
+    _type: string,
+    _position: Vector3,
+    _isMoving: boolean
+  ): void {}
+
+  public override broadcastTargetDestroy(_targetId: string): void {}
+
+  public override getRandomTargetPosition(): { position: Vector3; isMoving: boolean } {
+    return {
+      position: Vector3.Zero(),
+      isMoving: false,
+    };
+  }
+
+  public override spawnTargetAt(
+    _id: string,
+    _type: string,
+    _position: Vector3,
+    _isMoving: boolean
+  ): void {}
+}
 
 interface MultiplayerSessionServiceDeps {
   scene: Scene;
@@ -20,13 +46,9 @@ interface MultiplayerSessionServiceDeps {
   pickupManager: PickupManager;
   localServerManager: LocalServerManager;
   getEnemyManager: () => EnemyManager | null;
-  getTargetSpawner: () => TargetSpawnerComponent | null;
   onLocalRespawn: (position?: { x: number; y: number; z: number }) => void;
   createMultiplayerSystem: (playerPawn: PlayerPawn, playerName: string) => MultiplayerSystem;
-  createSimulation?: (
-    enemyManager: EnemyManager,
-    targetSpawner: TargetSpawnerComponent
-  ) => WorldSimulation;
+  createSimulation?: (enemyManager: EnemyManager) => WorldSimulation;
 }
 
 export class MultiplayerSessionService {
@@ -77,25 +99,24 @@ export class MultiplayerSessionService {
 
   private setupSimulation(): void {
     const enemyManager = this.deps.getEnemyManager();
-    const targetSpawner = this.deps.getTargetSpawner();
-    if (!enemyManager || !targetSpawner || this.deps.localServerManager.isServerRunning()) {
+    if (!enemyManager || this.deps.localServerManager.isServerRunning()) {
       this.simulation = null;
       return;
     }
 
     const createSimulation =
       this.deps.createSimulation ??
-      ((enemy: EnemyManager, target: TargetSpawnerComponent): WorldSimulation => {
+      ((enemy: EnemyManager): WorldSimulation => {
         const simulation = new WorldSimulation(
           enemy,
           this.deps.pickupManager,
-          target,
+          new DisabledTargetSpawner(this.deps.networkManager),
           this.deps.networkManager
         );
         simulation.setGameRule(new WaveSurvivalRule());
         return simulation;
       });
-    this.simulation = createSimulation(enemyManager, targetSpawner);
+    this.simulation = createSimulation(enemyManager);
   }
 
   private bindObservers(): void {
@@ -103,18 +124,6 @@ export class MultiplayerSessionService {
       (data: InitialStatePayload): void => {
         this.deps.getEnemyManager()?.applyEnemyStates(data.enemies);
         this.multiplayerSystem?.applyPlayerStates(data.players);
-
-        const targetSpawner = this.deps.getTargetSpawner();
-        if (targetSpawner && data.targets) {
-          data.targets.forEach((target: SpawnTargetPayload): void => {
-            targetSpawner.spawnTarget(
-              new Vector3(target.position.x, target.position.y, target.position.z),
-              target.isMoving,
-              target.id,
-              target.type
-            );
-          });
-        }
       }
     );
 

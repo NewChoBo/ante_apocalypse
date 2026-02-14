@@ -7,7 +7,6 @@ import { HUD } from '../../ui/HUD';
 import { InventoryUI } from '../../ui/inventory/InventoryUI';
 import { MultiplayerSystem } from './MultiplayerSystem';
 import { PickupManager } from './PickupManager';
-import { TargetSpawnerComponent } from '../components/target/TargetSpawnerComponent';
 import { EnemyManager } from './EnemyManager';
 import { TickManager } from '@ante/game-core';
 import { WorldEntityManager } from './WorldEntityManager';
@@ -59,7 +58,6 @@ export class SessionController {
   private hud: HUD | null = null;
   private inventoryUI: InventoryUI | null = null;
   private enemyManager: EnemyManager | null = null;
-  private targetSpawner: TargetSpawnerComponent | null = null;
   private healthUnsub: (() => void) | null = null;
   private _itemCollectionObserver: Observer<{ itemId: string; position: Vector3 }> | null = null;
   private playerDeathObserver: Observer<DeathEventData> | null = null;
@@ -103,7 +101,6 @@ export class SessionController {
       pickupManager: this.pickupManager,
       localServerManager: this.localServerManager,
       getEnemyManager: (): EnemyManager | null => this.enemyManager,
-      getTargetSpawner: (): TargetSpawnerComponent | null => this.targetSpawner,
       onLocalRespawn: (position): void => this.spectatorManager.onLocalRespawn(position),
       createMultiplayerSystem: (pawn: PlayerPawn, playerName: string): MultiplayerSystem =>
         new MultiplayerSystem(
@@ -171,7 +168,6 @@ export class SessionController {
   }
 
   private setupSystems(levelData: LevelData): void {
-    this.targetSpawner = new TargetSpawnerComponent(this.ctx, this.shadowGenerator);
     if (levelData.enemySpawns && levelData.enemySpawns.length > 0) {
       // Logic for enemy spawns
     }

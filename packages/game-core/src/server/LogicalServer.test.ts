@@ -344,7 +344,7 @@ describe('LogicalServer.processHitRequest', () => {
     expect(sendEvent).toHaveBeenCalledWith(EventCode.DESTROY_ENEMY, { id: 'enemy_test' }, undefined);
   });
 
-  it('broadcasts TARGET_HIT and TARGET_DESTROY when target is destroyed', () => {
+  it('ignores target hits after target gameplay removal', () => {
     const { network, joinPlayer, sendEvent } = createNetwork();
     const server = new LogicalServer(network, createAssetLoader(), { gameMode: 'survival' });
     activeServers.push(server);
@@ -374,11 +374,15 @@ describe('LogicalServer.processHitRequest', () => {
 
     server.processHitRequest('1', createHitRequest('target_test'));
 
-    expect(sendEvent).toHaveBeenCalledWith(
+    expect(sendEvent).not.toHaveBeenCalledWith(
       EventCode.TARGET_HIT,
-      { targetId: 'target_test', part: 'body', damage: 100 },
-      undefined
+      expect.anything(),
+      expect.anything()
     );
-    expect(sendEvent).toHaveBeenCalledWith(EventCode.TARGET_DESTROY, { targetId: 'target_test' }, undefined);
+    expect(sendEvent).not.toHaveBeenCalledWith(
+      EventCode.TARGET_DESTROY,
+      expect.anything(),
+      expect.anything()
+    );
   });
 });

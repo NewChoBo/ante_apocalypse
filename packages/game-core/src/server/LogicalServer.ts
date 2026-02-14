@@ -304,9 +304,7 @@ export class LogicalServer {
     const rayDirection = new Vector3(data.direction.x, data.direction.y, data.direction.z);
 
     const targetMesh =
-      this.enemyManager.getEnemyMesh(data.targetId) ||
-      this.targetSpawner.getTargetMesh(data.targetId) ||
-      this.playerPawns.get(data.targetId)?.mesh;
+      this.enemyManager.getEnemyMesh(data.targetId) || this.playerPawns.get(data.targetId)?.mesh;
     if (!targetMesh) return;
 
     const validation = HitRegistrationSystem.validateHit(
@@ -330,12 +328,6 @@ export class LogicalServer {
     const enemyPawn = this.enemyManager.getEnemyPawn(data.targetId);
     if (enemyPawn) {
       this.applyEnemyHit(data.targetId, shooterId, baseDamage, part);
-      return;
-    }
-
-    const targetPawn = this.targetSpawner.getTargetPawn(data.targetId);
-    if (targetPawn) {
-      this.applyTargetHit(data.targetId, shooterId, baseDamage, part);
     }
   }
 
@@ -397,24 +389,6 @@ export class LogicalServer {
 
     if (!enemy.isDead) return;
     this.enemyManager.destroyEnemy(targetId);
-  }
-
-  private applyTargetHit(targetId: string, shooterId: string, baseDamage: number, part: string): void {
-    const target = this.targetSpawner.getTargetPawn(targetId);
-    if (!target || target.isDead) return;
-
-    const finalDamage = DamageSystem.calculateDamage(baseDamage, part, target.damageProfile);
-    this.trackDamage(shooterId, finalDamage);
-    target.takeDamage(finalDamage);
-
-    this.networkManager.sendEvent(EventCode.TARGET_HIT, {
-      targetId,
-      part,
-      damage: finalDamage,
-    });
-
-    if (!target.isDead) return;
-    this.targetSpawner.broadcastTargetDestroy(targetId);
   }
 
   private resolveBaseDamage(shooterId: string, fallbackDamage: number): number {

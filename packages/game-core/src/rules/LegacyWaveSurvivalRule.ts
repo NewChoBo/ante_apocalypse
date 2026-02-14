@@ -1,6 +1,5 @@
 import { IGameRule, RespawnDecision, GameEndResult } from './IGameRule.js';
 import { WorldSimulation } from '../simulation/WorldSimulation.js';
-import { Vector3 } from '@babylonjs/core';
 
 /**
  * Backward-compatible legacy survival rule used when survivalRuleset !== 'v2'.
@@ -13,24 +12,6 @@ export class LegacyWaveSurvivalRule implements IGameRule {
   private alivePlayers: Set<string> = new Set();
 
   public onInitialize(simulation: WorldSimulation): void {
-    const distances = [10, 15, 20];
-
-    for (let lane = 0; lane < 5; lane++) {
-      const x = (lane - 2) * 7;
-      distances.forEach((z) => {
-        const isMoving = Math.random() > 0.5;
-        const position = new Vector3(x, 1.0, z);
-        const id = `target_${lane}_${z}_${Math.random().toString(36).substr(2, 4)}`;
-
-        simulation.targets.spawnTargetAt(
-          id,
-          isMoving ? 'moving_target' : 'static_target',
-          position,
-          isMoving
-        );
-      });
-    }
-
     simulation.enemies.spawnEnemiesAt([
       [5, 0, 5],
       [-5, 0, 5],
