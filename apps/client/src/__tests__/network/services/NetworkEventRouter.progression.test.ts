@@ -77,4 +77,59 @@ describe('NetworkEventRouter progression events', () => {
       newHealth: 85,
     });
   });
+
+  it('upserts players from INITIAL_STATE so snapshots drive ally movement', () => {
+    const playerStateManager = new PlayerStateManager();
+    const router = new NetworkEventRouter(playerStateManager, () => '1');
+    const playersListObserver = vi.fn();
+    const playerUpdatedObserver = vi.fn();
+
+    router.onPlayersList.add(playersListObserver);
+    playerStateManager.onPlayerUpdated.add(playerUpdatedObserver);
+
+    router.dispatchLocalEvent(
+      EventCode.INITIAL_STATE,
+      {
+        players: [
+          {
+            id: '2',
+            name: 'Ally',
+            position: { x: 0, y: 1.75, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            weaponId: 'Rifle',
+            health: 100,
+          },
+        ],
+        enemies: [],
+      },
+      'server'
+    );
+
+    router.dispatchLocalEvent(
+      EventCode.INITIAL_STATE,
+      {
+        players: [
+          {
+            id: '2',
+            name: 'Ally',
+            position: { x: 4, y: 1.75, z: 2 },
+            rotation: { x: 0, y: 1.2, z: 0 },
+            weaponId: 'Rifle',
+            health: 88,
+          },
+        ],
+        enemies: [],
+      },
+      'server'
+    );
+
+    expect(playersListObserver).toHaveBeenCalledTimes(2);
+    expect(playerUpdatedObserver).toHaveBeenCalledTimes(1);
+    expect(playerStateManager.getPlayer('2')).toMatchObject({
+      id: '2',
+      position: { x: 4, y: 1.75, z: 2 },
+      rotation: { x: 0, y: 1.2, z: 0 },
+      health: 88,
+    });
+  });
 });

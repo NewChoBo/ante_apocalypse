@@ -31,8 +31,8 @@ export class WorldSimulation {
   public update(_deltaTime: number): void {
     if (!this.authority.isMasterClient()) return;
 
-    // TODO: AI 업데이트, 물리 시뮬레이션 등 서버 전용 로직 통합
-    // 현재는 각 매니저의 helper들을 호출하는 용도로 사용 가능
+    // Keep enemy AI/controller updates coupled to the authoritative simulation step.
+    this.enemies.update(_deltaTime);
 
     if (this._gameRule) {
       this._gameRule.onUpdate(this, _deltaTime);

@@ -73,11 +73,14 @@ export class AIController {
     enemy.lookAt(lookAtPos);
 
     // 2. Chase
+    let isMoving = false;
     if (distance < this.detectionRange && distance > 2) {
       // 2m distance to stop
       const direction = diff.normalize();
       enemy.move(direction, this.moveSpeed, deltaTime);
+      isMoving = true;
     }
+    enemy.isMoving = isMoving;
 
     // 3. Attack (Melee)
     const now = performance.now() / 1000;

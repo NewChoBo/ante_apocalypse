@@ -86,6 +86,13 @@ export abstract class BaseEnemyManager {
     this.aiControllers.forEach((controller) => {
       controller.tick(deltaTime);
     });
+
+    if (!this.shouldSyncEnemies()) return;
+
+    this.pawns.forEach((pawn, id) => {
+      if (pawn.isDead) return;
+      this.syncEnemyMove(id, pawn.position, pawn.rotation, pawn.isMoving ?? false);
+    });
   }
 
   protected registerAI(id: string, pawn: IEnemyPawn, target: { position: Vector3 }): void {

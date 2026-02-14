@@ -244,6 +244,22 @@ export class NetworkEventRouter {
     });
 
     this.dispatcher.register(EventCode.INITIAL_STATE, (stateData): void => {
+      stateData.players.forEach((player: PlayerState): void => {
+        const existing = this.playerStateManager.getPlayer(player.id);
+        if (!existing) {
+          this.playerStateManager.registerPlayer(player);
+          return;
+        }
+
+        this.playerStateManager.updatePlayer(player.id, {
+          position: player.position,
+          rotation: player.rotation,
+          weaponId: player.weaponId,
+          health: player.health,
+        });
+      });
+      this.notifyPlayersSnapshot();
+
       this.onInitialStateReceived.notifyObservers({
         players: stateData.players,
         enemies: stateData.enemies,
