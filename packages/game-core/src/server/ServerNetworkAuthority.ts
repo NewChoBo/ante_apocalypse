@@ -5,6 +5,7 @@ import {
   HitEventData,
   DeathEventData,
   RequestHitData,
+  UpgradePickPayload,
   Vector3 as NetworkVector3,
   MovePayload,
   InitialStatePayload,
@@ -98,6 +99,7 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
   public onReloadRequest?: (playerId: string, weaponId: string) => void;
   public onHitRequest?: (shooterId: string, data: RequestHitData) => void;
   public onSyncWeaponRequest?: (playerId: string, weaponId: string) => void;
+  public onUpgradePickRequest?: (playerId: string, data: UpgradePickPayload) => void;
 
   public getPlayerState(id: string): NetworkPlayerState | undefined {
     const entity = this.entityManager.getEntity(id);
@@ -291,6 +293,12 @@ export class ServerNetworkAuthority extends BasePhotonClient implements IServerN
       const hitData = data as RequestHitData;
       if (this.onHitRequest) {
         this.onHitRequest(senderId, hitData);
+      }
+    });
+
+    this.registerRequestHandler(EventCode.UPGRADE_PICK, (data: UpgradePickPayload, senderId) => {
+      if (this.onUpgradePickRequest) {
+        this.onUpgradePickRequest(senderId, data);
       }
     });
   }

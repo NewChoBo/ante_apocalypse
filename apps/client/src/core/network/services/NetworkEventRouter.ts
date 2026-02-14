@@ -17,6 +17,9 @@ import {
   RespawnEventData,
   GameEndEventData,
   PlayerInfo,
+  WaveStatePayload,
+  UpgradeOfferPayload,
+  UpgradeApplyPayload,
 } from '@ante/common';
 import { PlayerStateManager } from '../PlayerStateManager';
 import { isSamePlayerId } from '../identity';
@@ -31,6 +34,9 @@ export class NetworkEventRouter {
   public readonly onPlayerDied = new Observable<DeathEventData>();
   public readonly onPlayerRespawn = new Observable<RespawnEventData>();
   public readonly onGameEnd = new Observable<GameEndEventData>();
+  public readonly onWaveState = new Observable<WaveStatePayload>();
+  public readonly onUpgradeOffer = new Observable<UpgradeOfferPayload>();
+  public readonly onUpgradeApplied = new Observable<UpgradeApplyPayload>();
 
   public readonly onEnemyUpdated = new Observable<EnemyMovePayload>();
   public readonly onEnemyHit = new Observable<EnemyHitPayload>();
@@ -101,6 +107,9 @@ export class NetworkEventRouter {
     this.onPickupDestroyed.clear();
     this.onPlayerRespawn.clear();
     this.onGameEnd.clear();
+    this.onWaveState.clear();
+    this.onUpgradeOffer.clear();
+    this.onUpgradeApplied.clear();
     this.onInitialStateReceived.clear();
     this.onInitialStateRequested.clear();
     this.onTargetHit.clear();
@@ -206,6 +215,18 @@ export class NetworkEventRouter {
 
     this.dispatcher.register(EventCode.GAME_END, (data): void => {
       this.onGameEnd.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.WAVE_STATE, (data): void => {
+      this.onWaveState.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.UPGRADE_OFFER, (data): void => {
+      this.onUpgradeOffer.notifyObservers(data);
+    });
+
+    this.dispatcher.register(EventCode.UPGRADE_APPLY, (data): void => {
+      this.onUpgradeApplied.notifyObservers(data);
     });
 
     this.dispatcher.register(EventCode.TARGET_DESTROY, (data): void => {

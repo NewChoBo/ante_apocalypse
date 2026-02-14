@@ -1,6 +1,7 @@
 import {
   HitEventData,
   RequestHitData,
+  UpgradePickPayload,
   PlayerState as NetworkPlayerState,
   Vector3 as NetworkVector3,
 } from '@ante/common';
@@ -53,4 +54,5 @@ export interface IServerNetworkAuthority extends INetworkAuthority {
   onReloadRequest?: (playerId: string, weaponId: string) => void;
   onHitRequest?: (shooterId: string, data: RequestHitData) => void;
   onSyncWeaponRequest?: (playerId: string, weaponId: string) => void;
+  onUpgradePickRequest?: (playerId: string, data: UpgradePickPayload) => void;
 }

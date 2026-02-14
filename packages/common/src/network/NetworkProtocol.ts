@@ -25,6 +25,10 @@ export enum EventCode {
   RELOAD = 24,
   RESPAWN = 25,
   GAME_END = 26,
+  WAVE_STATE = 27,
+  UPGRADE_OFFER = 28,
+  UPGRADE_PICK = 29,
+  UPGRADE_APPLY = 30,
 }
 
 export interface Vector3 {
@@ -168,6 +172,51 @@ export interface GameEndEventData {
   winnerId?: string;
   winnerTeam?: string;
   reason: string;
+  stats?: {
+    durationSeconds?: number;
+    waveReached?: number;
+    kills?: Record<string, number>;
+    deaths?: Record<string, number>;
+    damageDealt?: Record<string, number>;
+  };
+}
+
+export type WavePhase = 'warmup' | 'combat' | 'intermission' | 'upgrade' | 'ended';
+
+export interface WaveStatePayload {
+  wave: number;
+  phase: WavePhase;
+  remainingEnemies: number;
+  timeRemaining: number;
+  alivePlayers: number;
+  totalPlayers: number;
+}
+
+export interface UpgradeOptionPayload {
+  id: string;
+  label: string;
+  description: string;
+  rarity?: 'common' | 'rare' | 'epic';
+}
+
+export interface UpgradeOfferPayload {
+  offerId: string;
+  playerId: string;
+  wave: number;
+  expiresInSeconds: number;
+  options: UpgradeOptionPayload[];
+}
+
+export interface UpgradePickPayload {
+  offerId: string;
+  upgradeId: string;
+}
+
+export interface UpgradeApplyPayload {
+  playerId: string;
+  offerId: string;
+  upgradeId: string;
+  stacks: number;
 }
 
 export enum NetworkState {
@@ -209,4 +258,8 @@ export interface NetworkEventMap {
   [EventCode.RELOAD]: ReloadEventData;
   [EventCode.RESPAWN]: RespawnEventData;
   [EventCode.GAME_END]: GameEndEventData;
+  [EventCode.WAVE_STATE]: WaveStatePayload;
+  [EventCode.UPGRADE_OFFER]: UpgradeOfferPayload;
+  [EventCode.UPGRADE_PICK]: UpgradePickPayload;
+  [EventCode.UPGRADE_APPLY]: UpgradeApplyPayload;
 }

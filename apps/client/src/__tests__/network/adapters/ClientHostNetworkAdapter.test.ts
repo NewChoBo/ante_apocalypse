@@ -146,6 +146,26 @@ describe('ClientHostNetworkAdapter.dispose', () => {
       true
     );
   });
+
+  it('routes UPGRADE_PICK request payload to server callback', () => {
+    const { stub, onEvent } = createNetworkManagerStub();
+    const worldManager = new WorldEntityManager(new TickManager());
+    const adapter = new ClientHostNetworkAdapter(stub as unknown as NetworkManager, worldManager);
+    const onUpgradePick = vi.fn();
+    adapter.onUpgradePickRequest = onUpgradePick;
+
+    onEvent.notifyObservers({
+      code: EventCode.UPGRADE_PICK,
+      data: { offerId: 'offer_1', upgradeId: 'damage_amp' },
+      senderId: '2',
+    });
+
+    expect(onUpgradePick).toHaveBeenCalledTimes(1);
+    expect(onUpgradePick).toHaveBeenCalledWith('2', {
+      offerId: 'offer_1',
+      upgradeId: 'damage_amp',
+    });
+  });
 });
 
 

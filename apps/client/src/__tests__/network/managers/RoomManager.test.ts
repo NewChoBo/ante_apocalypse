@@ -51,8 +51,8 @@ describe('RoomManager', () => {
     expect(provider.createRoom).toHaveBeenCalledTimes(1);
     expect(provider.createRoom).toHaveBeenCalledWith('alpha-room', {
       maxPlayers: 20,
-      customGameProperties: { mapId: 'training_ground' },
-      propsListedInLobby: ['mapId'],
+      customGameProperties: { mapId: 'training_ground', survivalRuleset: 'v2' },
+      propsListedInLobby: ['mapId', 'survivalRuleset'],
     });
   });
 

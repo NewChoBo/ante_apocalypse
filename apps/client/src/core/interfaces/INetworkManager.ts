@@ -17,6 +17,9 @@ import {
   TargetHitPayload,
   TargetDestroyPayload,
   SpawnTargetPayload,
+  WaveStatePayload,
+  UpgradeOfferPayload,
+  UpgradeApplyPayload,
 } from '@ante/common';
 
 export interface INetworkManager {
@@ -40,6 +43,9 @@ export interface INetworkManager {
   readonly onPlayerDied: Observable<DeathEventData>;
   readonly onPlayerRespawn: Observable<RespawnEventData>;
   readonly onGameEnd: Observable<GameEndEventData>;
+  readonly onWaveState: Observable<WaveStatePayload>;
+  readonly onUpgradeOffer: Observable<UpgradeOfferPayload>;
+  readonly onUpgradeApplied: Observable<UpgradeApplyPayload>;
 
   // Enemy Synchronization
   readonly onEnemyUpdated: Observable<EnemyMovePayload>;
@@ -84,6 +90,7 @@ export interface INetworkManager {
   }): void;
   reload(weaponId: string): void;
   syncWeapon(weaponId: string): void;
+  submitUpgradePick(offerId: string, upgradeId: string): void;
   requestHit(hitData: RequestHitData): void;
   sendRequest(code: number, data: unknown, reliable?: boolean): void;
   sendEvent(code: number, data: unknown, reliable?: boolean): void;

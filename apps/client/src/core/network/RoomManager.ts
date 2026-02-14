@@ -26,8 +26,8 @@ export class RoomManager {
 
     const options = {
       maxPlayers: 20,
-      customGameProperties: { mapId },
-      propsListedInLobby: ['mapId'],
+      customGameProperties: { mapId, survivalRuleset: 'v2' },
+      propsListedInLobby: ['mapId', 'survivalRuleset'],
     };
 
     return this.provider.createRoom(name, options);

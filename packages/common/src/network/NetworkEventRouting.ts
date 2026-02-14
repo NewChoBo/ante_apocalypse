@@ -9,6 +9,7 @@ export const REQUEST_EVENT_CODES = [
   EventCode.RELOAD,
   EventCode.REQUEST_HIT,
   EventCode.REQ_INITIAL_STATE,
+  EventCode.UPGRADE_PICK,
 ] as const;
 
 export const AUTHORITY_EVENT_CODES = [
@@ -25,6 +26,9 @@ export const AUTHORITY_EVENT_CODES = [
   EventCode.WEAPON_CONFIGS,
   EventCode.RESPAWN,
   EventCode.GAME_END,
+  EventCode.WAVE_STATE,
+  EventCode.UPGRADE_OFFER,
+  EventCode.UPGRADE_APPLY,
 ] as const;
 
 export const SYSTEM_EVENT_CODES = [

@@ -24,6 +24,9 @@ import {
   PickupDestroyPayload,
   RespawnEventData,
   GameEndEventData,
+  WaveStatePayload,
+  UpgradeOfferPayload,
+  UpgradeApplyPayload,
   Logger,
 } from '@ante/common';
 import { ConnectionManager } from '../network/ConnectionManager';
@@ -109,6 +112,18 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
   public get onGameEnd(): Observable<GameEndEventData> {
     return this.eventRouter.onGameEnd;
+  }
+
+  public get onWaveState(): Observable<WaveStatePayload> {
+    return this.eventRouter.onWaveState;
+  }
+
+  public get onUpgradeOffer(): Observable<UpgradeOfferPayload> {
+    return this.eventRouter.onUpgradeOffer;
+  }
+
+  public get onUpgradeApplied(): Observable<UpgradeApplyPayload> {
+    return this.eventRouter.onUpgradeApplied;
   }
 
   public get onEnemyUpdated(): Observable<EnemyMovePayload> {
@@ -351,6 +366,10 @@ export class NetworkManager implements INetworkAuthority, INetworkManager {
 
   public syncWeapon(weaponId: string): void {
     this.sendRequest(EventCode.SYNC_WEAPON, { weaponId }, true);
+  }
+
+  public submitUpgradePick(offerId: string, upgradeId: string): void {
+    this.sendRequest(EventCode.UPGRADE_PICK, { offerId, upgradeId }, true);
   }
 
   public requestHit(hitData: RequestHitData): void {

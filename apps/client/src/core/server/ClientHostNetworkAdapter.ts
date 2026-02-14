@@ -17,6 +17,7 @@ import {
   FireEventData,
   SyncWeaponPayload,
   ReloadEventData,
+  UpgradePickPayload,
 } from '@ante/common';
 import { NetworkManager } from '../systems/NetworkManager';
 import { isSamePlayerId } from '../network/identity';
@@ -75,6 +76,14 @@ function isRequestHitData(value: unknown): value is RequestHitData {
   );
 }
 
+function isUpgradePickPayload(value: unknown): value is UpgradePickPayload {
+  return (
+    isRecord(value) &&
+    typeof value.offerId === 'string' &&
+    typeof value.upgradeId === 'string'
+  );
+}
+
 interface ServerPlayerEntityLike {
   id: string;
   name: string;
@@ -114,6 +123,7 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
   public onReloadRequest?: (playerId: string, weaponId: string) => void;
   public onHitRequest?: (shooterId: string, data: RequestHitData) => void;
   public onSyncWeaponRequest?: (playerId: string, weaponId: string) => void;
+  public onUpgradePickRequest?: (playerId: string, data: UpgradePickPayload) => void;
 
   private playerJoinObserver: Observer<NetworkPlayerState> | null = null;
   private playerLeaveObserver: Observer<string> | null = null;
@@ -192,6 +202,13 @@ export class ClientHostNetworkAdapter implements IServerNetworkAuthority {
       case EventCode.REQ_INITIAL_STATE: {
         logger.info(`HostAdapter: Received Initial State Request from ${senderId}`);
         this.broadcastState([], true);
+        break;
+      }
+      case EventCode.UPGRADE_PICK: {
+        if (!isUpgradePickPayload(data)) return;
+        if (this.onUpgradePickRequest) {
+          this.onUpgradePickRequest(senderId, data);
+        }
         break;
       }
     }
