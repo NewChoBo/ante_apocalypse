@@ -2,8 +2,10 @@ import { Observer } from '@babylonjs/core';
 import type { UpgradeApplyPayload, UpgradeOfferPayload, WaveStatePayload } from '@ante/common';
 import type { INetworkManager } from '../../interfaces/INetworkManager';
 import type { IUIManager } from '../../../ui/IUIManager';
+import { BabylonUpgradeSelectionOverlay, IUpgradeSelectionOverlay } from '../../../ui/UpgradeSelectionOverlay';
 
 type WindowLike = Pick<Window, 'addEventListener' | 'removeEventListener'>;
+type UpgradeOverlayFactory = (uiManager: IUIManager) => IUpgradeSelectionOverlay;
 
 const noopWindowRef: WindowLike = {
   addEventListener: (): void => undefined,
@@ -30,6 +32,8 @@ export class ProgressionEventService {
   private pendingOffer: UpgradeOfferPayload | null = null;
   private offerExpiresAtMs = 0;
   private lastWavePhaseKey = '';
+  private offerCountdownInterval: ReturnType<typeof setInterval> | null = null;
+  private overlay: IUpgradeSelectionOverlay | null = null;
 
   private readonly onKeyDown = (event: KeyboardEvent): void => {
     if (this.handleUpgradeHotkey(event.code)) {
@@ -40,11 +44,15 @@ export class ProgressionEventService {
   constructor(
     private readonly networkManager: INetworkManager,
     private readonly uiManager: IUIManager,
-    private readonly windowRef: WindowLike = resolveDefaultWindowRef()
+    private readonly windowRef: WindowLike = resolveDefaultWindowRef(),
+    private readonly overlayFactory: UpgradeOverlayFactory = (
+      manager: IUIManager
+    ): IUpgradeSelectionOverlay => new BabylonUpgradeSelectionOverlay(manager.getTexture())
   ) {}
 
   public initialize(): void {
     if (this.waveStateObserver || this.upgradeOfferObserver || this.upgradeApplyObserver) return;
+    this.overlay = this.overlayFactory(this.uiManager);
 
     this.waveStateObserver = this.networkManager.onWaveState.add((payload: WaveStatePayload): void => {
       this.handleWaveState(payload);
@@ -77,10 +85,7 @@ export class ProgressionEventService {
     const option = offer.options[slotIndex];
     if (!option) return false;
 
-    this.networkManager.submitUpgradePick(offer.offerId, option.id);
-    this.uiManager.showNotification(`UPGRADE_LOCKED_${this.sanitizeForBanner(option.label)}`);
-    this.clearPendingOffer();
-    return true;
+    return this.submitOfferChoice(offer.offerId, option.id, option.label);
   }
 
   public dispose(): void {
@@ -100,6 +105,8 @@ export class ProgressionEventService {
     this.windowRef.removeEventListener('keydown', this.onKeyDown);
     this.clearPendingOffer();
     this.lastWavePhaseKey = '';
+    this.overlay?.dispose();
+    this.overlay = null;
   }
 
   private handleWaveState(payload: WaveStatePayload): void {
@@ -119,6 +126,11 @@ export class ProgressionEventService {
 
     this.pendingOffer = payload;
     this.offerExpiresAtMs = Date.now() + payload.expiresInSeconds * 1000;
+    this.overlay?.showOffer(payload, (upgradeId: string): void => {
+      this.submitOfferChoice(payload.offerId, upgradeId);
+    });
+    this.startOfferCountdown();
+    this.syncOfferCountdown();
     this.uiManager.showNotification(this.formatUpgradePrompt(payload));
   }
 
@@ -175,7 +187,50 @@ export class ProgressionEventService {
     return Boolean(localPlayerId) && localPlayerId === playerId;
   }
 
+  private submitOfferChoice(offerId: string, upgradeId: string, labelHint?: string): boolean {
+    const offer = this.pendingOffer;
+    if (!offer || offer.offerId !== offerId) return false;
+
+    const option = offer.options.find((entry) => entry.id === upgradeId);
+    if (!option) return false;
+
+    this.networkManager.submitUpgradePick(offer.offerId, option.id);
+    const label = labelHint || option.label || option.id;
+    this.uiManager.showNotification(`UPGRADE_LOCKED_${this.sanitizeForBanner(label)}`);
+    this.clearPendingOffer();
+    return true;
+  }
+
+  private startOfferCountdown(): void {
+    if (this.offerCountdownInterval) {
+      clearInterval(this.offerCountdownInterval);
+      this.offerCountdownInterval = null;
+    }
+
+    this.offerCountdownInterval = setInterval((): void => {
+      this.syncOfferCountdown();
+    }, 250);
+  }
+
+  private syncOfferCountdown(): void {
+    if (!this.pendingOffer) return;
+
+    const remainingMs = this.offerExpiresAtMs - Date.now();
+    if (remainingMs <= 0) {
+      this.clearPendingOffer();
+      return;
+    }
+
+    this.overlay?.setTimeRemaining(Math.ceil(remainingMs / 1000));
+  }
+
   private clearPendingOffer(): void {
+    if (this.offerCountdownInterval) {
+      clearInterval(this.offerCountdownInterval);
+      this.offerCountdownInterval = null;
+    }
+
+    this.overlay?.hide();
     this.pendingOffer = null;
     this.offerExpiresAtMs = 0;
   }

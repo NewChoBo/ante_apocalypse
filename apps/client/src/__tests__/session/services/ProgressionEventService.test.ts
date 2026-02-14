@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Observable } from '@babylonjs/core';
 import type { UpgradeApplyPayload, UpgradeOfferPayload, WaveStatePayload } from '@ante/common';
 import { ProgressionEventService } from '../../../core/systems/session/ProgressionEventService';
 import type { INetworkManager } from '../../../core/interfaces/INetworkManager';
 import type { IUIManager } from '../../../ui/IUIManager';
+import type { IUpgradeSelectionOverlay } from '../../../ui/UpgradeSelectionOverlay';
 
 interface NetworkMockBundle {
   networkManager: INetworkManager;
@@ -49,11 +50,56 @@ function createWindowRefMock(): Pick<Window, 'addEventListener' | 'removeEventLi
   };
 }
 
+interface OverlayMockBundle {
+  overlay: IUpgradeSelectionOverlay;
+  showOffer: ReturnType<typeof vi.fn>;
+  setTimeRemaining: ReturnType<typeof vi.fn>;
+  hide: ReturnType<typeof vi.fn>;
+  dispose: ReturnType<typeof vi.fn>;
+  invokePick: (upgradeId: string) => void;
+}
+
+function createOverlayMock(): OverlayMockBundle {
+  let onPick: ((upgradeId: string) => void) | null = null;
+  const showOffer = vi.fn((_: UpgradeOfferPayload, pick: (upgradeId: string) => void): void => {
+    onPick = pick;
+  });
+  const setTimeRemaining = vi.fn();
+  const hide = vi.fn();
+  const dispose = vi.fn();
+
+  return {
+    overlay: {
+      showOffer,
+      setTimeRemaining,
+      hide,
+      dispose,
+    },
+    showOffer,
+    setTimeRemaining,
+    hide,
+    dispose,
+    invokePick: (upgradeId: string): void => {
+      onPick?.(upgradeId);
+    },
+  };
+}
+
+afterEach((): void => {
+  vi.useRealTimers();
+});
+
 describe('ProgressionEventService', (): void => {
   it('announces only phase transitions for wave state updates', (): void => {
     const { networkManager, onWaveState } = createNetworkManagerMock();
     const uiManager = createUiManagerMock();
-    const service = new ProgressionEventService(networkManager, uiManager, createWindowRefMock());
+    const overlay = createOverlayMock();
+    const service = new ProgressionEventService(
+      networkManager,
+      uiManager,
+      createWindowRefMock(),
+      (): IUpgradeSelectionOverlay => overlay.overlay
+    );
     service.initialize();
 
     onWaveState.notifyObservers({
@@ -84,12 +130,19 @@ describe('ProgressionEventService', (): void => {
     expect(uiManager.showNotification).toHaveBeenCalledTimes(2);
     expect(uiManager.showNotification).toHaveBeenNthCalledWith(1, 'WAVE_1_WARMUP');
     expect(uiManager.showNotification).toHaveBeenNthCalledWith(2, 'WAVE_1_COMBAT_ENEMY_10');
+    service.dispose();
   });
 
-  it('submits upgrade pick when valid hotkey is pressed for local offer', (): void => {
+  it('submits upgrade pick when clicking an offered option', (): void => {
     const { networkManager, onUpgradeOffer, submitUpgradePick } = createNetworkManagerMock();
     const uiManager = createUiManagerMock();
-    const service = new ProgressionEventService(networkManager, uiManager, createWindowRefMock());
+    const overlay = createOverlayMock();
+    const service = new ProgressionEventService(
+      networkManager,
+      uiManager,
+      createWindowRefMock(),
+      (): IUpgradeSelectionOverlay => overlay.overlay
+    );
     service.initialize();
 
     onUpgradeOffer.notifyObservers({
@@ -104,19 +157,26 @@ describe('ProgressionEventService', (): void => {
       ],
     });
 
-    const handled = service.handleUpgradeHotkey('Digit2');
+    overlay.invokePick('defense_amp');
 
-    expect(handled).toBe(true);
+    expect(overlay.showOffer).toHaveBeenCalledTimes(1);
     expect(submitUpgradePick).toHaveBeenCalledTimes(1);
     expect(submitUpgradePick).toHaveBeenCalledWith('offer_1', 'defense_amp');
     expect(uiManager.showNotification).toHaveBeenCalledWith('UPGRADE_LOCKED_DEFENSE_MATRIX');
+    service.dispose();
   });
 
   it('ignores remote offers and clears pending offer after local apply', (): void => {
     const { networkManager, onUpgradeOffer, onUpgradeApplied, submitUpgradePick } =
       createNetworkManagerMock();
     const uiManager = createUiManagerMock();
-    const service = new ProgressionEventService(networkManager, uiManager, createWindowRefMock());
+    const overlay = createOverlayMock();
+    const service = new ProgressionEventService(
+      networkManager,
+      uiManager,
+      createWindowRefMock(),
+      (): IUpgradeSelectionOverlay => overlay.overlay
+    );
     service.initialize();
 
     onUpgradeOffer.notifyObservers({
@@ -153,5 +213,38 @@ describe('ProgressionEventService', (): void => {
     expect(service.handleUpgradeHotkey('Digit1')).toBe(false);
     expect(submitUpgradePick).not.toHaveBeenCalled();
     expect(uiManager.showNotification).toHaveBeenCalledWith('UPGRADE_APPLIED_DAMAGE_AMP_X1');
+    expect(overlay.hide).toHaveBeenCalled();
+    service.dispose();
+  });
+
+  it('updates remaining time and auto-hides when offer expires', (): void => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-02-14T10:00:00.000Z'));
+
+    const { networkManager, onUpgradeOffer } = createNetworkManagerMock();
+    const uiManager = createUiManagerMock();
+    const overlay = createOverlayMock();
+    const service = new ProgressionEventService(
+      networkManager,
+      uiManager,
+      createWindowRefMock(),
+      (): IUpgradeSelectionOverlay => overlay.overlay
+    );
+    service.initialize();
+
+    onUpgradeOffer.notifyObservers({
+      offerId: 'offer_timer',
+      playerId: 'local',
+      wave: 3,
+      expiresInSeconds: 2,
+      options: [{ id: 'damage_amp', label: 'Damage Amplifier', description: 'd' }],
+    });
+
+    expect(overlay.setTimeRemaining).toHaveBeenCalled();
+
+    vi.advanceTimersByTime(2200);
+
+    expect(overlay.hide).toHaveBeenCalled();
+    service.dispose();
   });
 });
