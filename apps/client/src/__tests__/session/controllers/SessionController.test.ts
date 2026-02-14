@@ -65,6 +65,116 @@ describe('SessionController', () => {
 
     expect(controller).toBeDefined();
   });
+
+  it('skips enemy manager update when local server is running', () => {
+    const mockScene = {} as Scene;
+    const mockCanvas = {} as HTMLCanvasElement;
+    const mockShadowGenerator = {} as ShadowGenerator;
+
+    const enemyUpdate = vi.fn();
+    const localServerRunning = vi.fn(() => true);
+
+    const controller = new SessionController(mockScene, mockCanvas, mockShadowGenerator, {
+      networkManager: {
+        onStateChanged: { add: vi.fn(), remove: vi.fn() },
+        onInitialStateReceived: { add: vi.fn(), remove: vi.fn() },
+        onPlayerRespawn: { add: vi.fn(), remove: vi.fn() },
+        onPlayerDied: { add: vi.fn(), remove: vi.fn() },
+        clearObservers: vi.fn(),
+      } as unknown as INetworkManager,
+      uiManager: {
+        onLogin: { add: vi.fn() },
+        onStartMultiplayer: { add: vi.fn() },
+        onLogout: { add: vi.fn() },
+        onResume: { add: vi.fn() },
+        onAbort: { add: vi.fn() },
+        showScreen: vi.fn(),
+        getTexture: vi.fn(),
+      } as unknown as IUIManager,
+      worldManager: {
+        initialize: vi.fn(),
+        register: vi.fn(),
+        unregister: vi.fn(),
+        clear: vi.fn(),
+      } as unknown as WorldEntityManager,
+      enemyManager: {
+        update: enemyUpdate,
+        applyEnemyStates: vi.fn(),
+        dispose: vi.fn(),
+      } as unknown as EnemyManager,
+      pickupManager: {
+        initialize: vi.fn(),
+      } as unknown as PickupManager,
+      tickManager: {
+        register: vi.fn(),
+        unregister: vi.fn(),
+        tick: vi.fn(),
+        clear: vi.fn(),
+      } as unknown as TickManager,
+      localServerManager: {
+        isServerRunning: localServerRunning,
+      } as unknown as LocalServerManager,
+    });
+
+    controller.update(0.016);
+
+    expect(localServerRunning).toHaveBeenCalled();
+    expect(enemyUpdate).not.toHaveBeenCalled();
+  });
+
+  it('updates enemy manager when local server is not running', () => {
+    const mockScene = {} as Scene;
+    const mockCanvas = {} as HTMLCanvasElement;
+    const mockShadowGenerator = {} as ShadowGenerator;
+
+    const enemyUpdate = vi.fn();
+
+    const controller = new SessionController(mockScene, mockCanvas, mockShadowGenerator, {
+      networkManager: {
+        onStateChanged: { add: vi.fn(), remove: vi.fn() },
+        onInitialStateReceived: { add: vi.fn(), remove: vi.fn() },
+        onPlayerRespawn: { add: vi.fn(), remove: vi.fn() },
+        onPlayerDied: { add: vi.fn(), remove: vi.fn() },
+        clearObservers: vi.fn(),
+      } as unknown as INetworkManager,
+      uiManager: {
+        onLogin: { add: vi.fn() },
+        onStartMultiplayer: { add: vi.fn() },
+        onLogout: { add: vi.fn() },
+        onResume: { add: vi.fn() },
+        onAbort: { add: vi.fn() },
+        showScreen: vi.fn(),
+        getTexture: vi.fn(),
+      } as unknown as IUIManager,
+      worldManager: {
+        initialize: vi.fn(),
+        register: vi.fn(),
+        unregister: vi.fn(),
+        clear: vi.fn(),
+      } as unknown as WorldEntityManager,
+      enemyManager: {
+        update: enemyUpdate,
+        applyEnemyStates: vi.fn(),
+        dispose: vi.fn(),
+      } as unknown as EnemyManager,
+      pickupManager: {
+        initialize: vi.fn(),
+      } as unknown as PickupManager,
+      tickManager: {
+        register: vi.fn(),
+        unregister: vi.fn(),
+        tick: vi.fn(),
+        clear: vi.fn(),
+      } as unknown as TickManager,
+      localServerManager: {
+        isServerRunning: vi.fn(() => false),
+      } as unknown as LocalServerManager,
+    });
+
+    controller.update(0.016);
+
+    expect(enemyUpdate).toHaveBeenCalledWith(0.016);
+  });
 });
 
 

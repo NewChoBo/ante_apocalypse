@@ -276,7 +276,10 @@ export class SessionController {
 
   public update(deltaTime: number): void {
     this.multiplayerSessionService.update();
-    if (this.enemyManager) {
+    // When a local logical server is running (host), enemy authority updates must come
+    // from the server loop only. Skipping client-side enemy manager updates prevents
+    // duplicate ENEMY_MOVE broadcasts and host/guest desync.
+    if (this.enemyManager && !this.localServerManager.isServerRunning()) {
       this.enemyManager.update(deltaTime);
     }
     this.spectatorManager.update();
