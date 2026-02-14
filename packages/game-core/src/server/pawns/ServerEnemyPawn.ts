@@ -33,6 +33,10 @@ export class ServerEnemyPawn extends BasePawn implements IEnemyPawn {
     this.mesh.checkCollisions = true;
     this.mesh.isPickable = true;
     this.mesh.metadata = { type: 'enemy', id: this.id, bodyPart: 'body', pawn: this };
+    this.damageProfile = {
+      multipliers: { head: 2.0, body: 1.0 },
+      defaultMultiplier: 1.0,
+    };
 
     // 2. Head Hitbox
     this.headBox = MeshBuilder.CreateBox('headBox_' + id, { size: 0.25 }, this.ctx.scene);

@@ -28,6 +28,23 @@ export class HitRegistrationSystem {
     targetMesh.getChildMeshes(false).forEach((child) => child.computeWorldMatrix(true));
 
     // 2. 엄격한 레이캐스트 (Strict Raycast)
+    // Prefer explicit head hitboxes first. Some targets use overlapping body/root colliders,
+    // and default closest-hit raycast would otherwise classify all head shots as body hits.
+    const headResult = HitScanSystem.doRaycast(
+      scene,
+      origin,
+      direction,
+      100, // Range
+      (mesh) => mesh.metadata?.id === targetId && mesh.metadata?.bodyPart === 'head'
+    );
+    if (headResult.hit && headResult.pickedMesh) {
+      return {
+        isValid: true,
+        part: 'head',
+        method: 'strict',
+      };
+    }
+
     const result = HitScanSystem.doRaycast(
       scene,
       origin,

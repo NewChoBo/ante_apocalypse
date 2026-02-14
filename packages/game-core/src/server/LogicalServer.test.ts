@@ -344,6 +344,42 @@ describe('LogicalServer.processHitRequest', () => {
     expect(sendEvent).toHaveBeenCalledWith(EventCode.DESTROY_ENEMY, { id: 'enemy_test' }, undefined);
   });
 
+  it('applies headshot multiplier to enemy hits', () => {
+    const { network, joinPlayer, sendEvent } = createNetwork();
+    const server = new LogicalServer(network, createAssetLoader(), { gameMode: 'survival' });
+    activeServers.push(server);
+
+    joinPlayer('1', 'Shooter');
+
+    const enemyManager = (
+      server as unknown as {
+        enemyManager: {
+          requestSpawnEnemy: (id: string, position: { x: number; y: number; z: number }) => boolean;
+        };
+      }
+    ).enemyManager;
+    enemyManager.requestSpawnEnemy('enemy_headshot', { x: 0, y: 0, z: 5 });
+
+    vi.spyOn(HitRegistrationSystem, 'validateHit').mockReturnValue({
+      isValid: true,
+      part: 'head',
+      method: 'strict',
+    });
+
+    server.processHitRequest('1', createHitRequest('enemy_headshot'));
+
+    expect(sendEvent).toHaveBeenCalledWith(
+      EventCode.ENEMY_HIT,
+      { id: 'enemy_headshot', damage: 100 },
+      undefined
+    );
+    expect(sendEvent).toHaveBeenCalledWith(
+      EventCode.DESTROY_ENEMY,
+      { id: 'enemy_headshot' },
+      undefined
+    );
+  });
+
   it('ignores target hits after target gameplay removal', () => {
     const { network, joinPlayer, sendEvent } = createNetwork();
     const server = new LogicalServer(network, createAssetLoader(), { gameMode: 'survival' });
